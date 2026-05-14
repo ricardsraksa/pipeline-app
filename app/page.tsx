@@ -365,7 +365,7 @@ export default function Home() {
               Product URL
             </label>
             <input
-              type="url"
+              type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runScrapeAndStage1()}
