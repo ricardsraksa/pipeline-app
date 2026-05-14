@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pipeline-app
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: node server.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: HIGGSFIELD_API_KEY
+        sync: false
