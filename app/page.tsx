@@ -106,21 +106,43 @@ export default function Home() {
     let scraped = "";
     let imgs: string[] = [];
 
+    const competitorList = competitorUrls
+      .split("\n")
+      .map((u) => u.trim())
+      .filter(Boolean);
+
     try {
-      const scrapeRes = await fetch("/api/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-      const scrapeData = await scrapeRes.json();
-      if (scrapeData.success) {
-        scraped = scrapeData.scraped_text ?? "";
-        imgs = scrapeData.images ?? [];
-        setScrapedImages(imgs);
-        if (imgs.length < 2) setShowImageUploader(true);
-      } else {
-        setShowImageUploader(true);
+      const allUrls = [url.trim(), ...competitorList];
+      const scrapeResults = await Promise.allSettled(
+        allUrls.map((u) =>
+          fetch("/api/scrape", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: u }),
+          }).then((r) => r.json())
+        )
+      );
+
+      // First result is the main product URL
+      const mainResult = scrapeResults[0];
+      if (mainResult.status === "fulfilled" && mainResult.value.success) {
+        scraped = mainResult.value.scraped_text ?? "";
+        imgs = mainResult.value.images ?? [];
       }
+
+      // Remaining results are competitors — collect their images
+      for (let i = 1; i < scrapeResults.length; i++) {
+        const r = scrapeResults[i];
+        if (r.status === "fulfilled" && r.value.success) {
+          const compImgs: string[] = r.value.images ?? [];
+          for (const img of compImgs) {
+            if (!imgs.includes(img)) imgs.push(img);
+          }
+        }
+      }
+
+      setScrapedImages(imgs);
+      if (imgs.length < 2) setShowImageUploader(true);
     } catch {
       setShowImageUploader(true);
     }
@@ -128,10 +150,6 @@ export default function Home() {
     setPipeline("stage1_running");
 
     try {
-      const competitorList = competitorUrls
-        .split("\n")
-        .map((u) => u.trim())
-        .filter(Boolean);
 
       const res = await fetch("/api/stage1", {
         method: "POST",
