@@ -1,0 +1,26 @@
+import { NextRequest } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { OFFER_BRIEF_PROMPT } from "@/lib/prompts/offer_brief";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export async function POST(req: NextRequest) {
+  const { research, avatar } = await req.json();
+
+  const userMessage = `RESEARCH.txt:\n\n${research}\n\n---\n\nAVATAR.txt:\n\n${avatar}`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 3500,
+      system: OFFER_BRIEF_PROMPT,
+      messages: [{ role: "user", content: userMessage }],
+    });
+
+    const output = message.content.find((b) => b.type === "text")?.text ?? "";
+    return Response.json({ success: true, output });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return Response.json({ success: false, error: msg }, { status: 500 });
+  }
+}
