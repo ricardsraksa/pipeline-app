@@ -71,6 +71,7 @@ interface StepCardProps {
   errorMessage: string;
   output: string | null;
   skipped?: boolean;
+  slug: string;
   onRetry: () => void;
   children?: React.ReactNode;
 }
@@ -118,6 +119,7 @@ function ResearchStepCard({
   errorMessage,
   output,
   skipped,
+  slug,
   onRetry,
   children,
 }: StepCardProps) {
@@ -222,7 +224,7 @@ function ResearchStepCard({
               Copy
             </button>
             <button
-              onClick={() => downloadTxt(filenameMap[stepNum] ?? `step${stepNum}.txt`, output)}
+              onClick={() => downloadTxt(`${slug}_${filenameMap[stepNum] ?? `step${stepNum}.txt`}`, output)}
               className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
             >
               Download .txt
@@ -264,6 +266,8 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const [outputs, setOutputs] = useState<Outputs>(EMPTY_OUTPUTS);
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
+  const [productSlug, setProductSlug] = useState<string | null>(null);
 
   // Image generation state (kept from original)
   const [scrapedImages, setScrapedImages] = useState<string[]>([]);
@@ -281,6 +285,45 @@ export default function Home() {
     setErrorStage(stage);
     setErrorMessage(msg);
     setPipeline("error");
+  }
+
+  function toSlug(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s_]/g, "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .slice(0, 40);
+  }
+
+  function extractBrandSlug(offerBriefText: string): string | null {
+    // Look for recommended name (marked with *, (recommended), or listed first under "Product Name"/"Brand Name" section
+    const sectionMatch = offerBriefText.match(/(?:product name|brand name)[^\n]*\n([\s\S]{0,600}?)(?:\n\n|\n\d\.|\n##)/i);
+    if (!sectionMatch) return null;
+    const block = sectionMatch[1];
+    // Try to find a recommended marker first
+    const recommended = block.match(/\*\*?([^*\n]+?)\*\*?[^\n]*(?:recommend|preferred)/i)
+      ?? block.match(/([^\n]+?)(?:\s*[-–]\s*|\s*\()(?:recommend|preferred)/i);
+    if (recommended) return toSlug(recommended[1].trim()) || null;
+    // Otherwise take the first non-empty line that looks like a name
+    const firstLine = block.split("\n").map(l => l.replace(/^[-*\d.\s]+/, "").trim()).find(l => l.length > 0 && l.length < 60);
+    return firstLine ? toSlug(firstLine) || null : null;
+  }
+
+  function extractProductSlug(researchText: string): string | null {
+    // Look for Section 1 / Product Identification
+    const match = researchText.match(/(?:1\.|product identification)[^\n]*\n([\s\S]{0,400}?)(?:\n\n\d\.|\n\n##)/i);
+    if (!match) return null;
+    // Try to pull a product name from the first meaningful line
+    const firstLine = match[1].split("\n").map(l => l.replace(/^[-*\s]+/, "").trim()).find(l => l.length > 3 && l.length < 80);
+    return firstLine ? toSlug(firstLine) || null : null;
+  }
+
+  function getFileSlug(brand: string | null, product: string | null): string {
+    if (brand) return brand;
+    if (product) return product;
+    const d = new Date();
+    return `${d.getFullYear()}_${String(d.getMonth() + 1).padStart(2, "0")}_${String(d.getDate()).padStart(2, "0")}`;
   }
 
   // Scrape helper
@@ -350,6 +393,8 @@ export default function Home() {
     setShowImageUploader(false);
     setRunId(null);
     setProductName("");
+    setBrandSlug(null);
+    setProductSlug(null);
 
     const competitorList = competitorUrls
       .split("\n")
@@ -379,6 +424,8 @@ export default function Home() {
       if (!data.success) throw new Error(data.error ?? "Step 1 failed");
       research = data.output;
       setOutputs((prev) => ({ ...prev, research }));
+      const pSlug = extractProductSlug(research);
+      setProductSlug(pSlug);
       setPipeline("step1_done");
     } catch (err) {
       setError(1, err instanceof Error ? err.message : String(err));
@@ -450,7 +497,9 @@ export default function Home() {
       }).then((r) => r.json());
       if (!data.success) throw new Error(data.error ?? "Step 4b failed");
       offerBrief = data.output;
-      setOutputs((prev) => ({ ...prev, offer_brief: data.output }));
+      setOutputs((prev) => ({ ...prev, offer_brief: offerBrief }));
+      const bSlug = extractBrandSlug(offerBrief);
+      setBrandSlug(bSlug);
       setPipeline("step4b_done");
     } catch (err) {
       setError(5, err instanceof Error ? err.message : String(err));
@@ -526,18 +575,19 @@ export default function Home() {
   }
 
   async function downloadAll() {
+    const slug = getFileSlug(brandSlug, productSlug);
     const zip = new JSZip();
-    zip.file("RESEARCH.txt", outputs.research_revised ?? "");
-    zip.file("AVATAR.txt", outputs.avatar_revised ?? "");
-    zip.file("OFFER_BRIEF.txt", outputs.offer_brief_revised ?? "");
-    zip.file("NECESSARY_BELIEFS.txt", outputs.necessary_beliefs_revised ?? "");
-    zip.file("CHIEF_MID.txt", outputs.chief_mid ?? "");
-    zip.file("CHIEF_FINAL.txt", outputs.chief_final ?? "");
+    zip.file(`${slug}_RESEARCH.txt`, outputs.research_revised ?? "");
+    zip.file(`${slug}_AVATAR.txt`, outputs.avatar_revised ?? "");
+    zip.file(`${slug}_OFFER_BRIEF.txt`, outputs.offer_brief_revised ?? "");
+    zip.file(`${slug}_NECESSARY_BELIEFS.txt`, outputs.necessary_beliefs_revised ?? "");
+    zip.file(`${slug}_CHIEF_MID.txt`, outputs.chief_mid ?? "");
+    zip.file(`${slug}_CHIEF_FINAL.txt`, outputs.chief_final ?? "");
     const blob = await zip.generateAsync({ type: "blob" });
     const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = blobUrl;
-    a.download = "pipeline-docs.zip";
+    a.download = `${slug}_research_docs.zip`;
     a.click();
     URL.revokeObjectURL(blobUrl);
   }
@@ -656,7 +706,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product_url: url.trim(),
-          product_name: productName,
+          product_name: brandSlug ?? productSlug ?? productName,
           stage1_output: outputs.research_revised ?? outputs.research ?? "",
           stage2_output: stage2Output,
           stage3_prompts: prompts,
@@ -844,6 +894,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.research}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={runPipeline}
             />
 
@@ -855,6 +906,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.chief_mid}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={() => {
                 // Retry from step 2 — need research
                 if (!outputs.research) return;
@@ -884,6 +936,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.research_revised}
+              slug={getFileSlug(brandSlug, productSlug)}
               skipped={outputs.chief_mid?.includes("NO REVISIONS REQUIRED") ?? false}
               onRetry={() => {
                 if (!outputs.research || !outputs.chief_mid) return;
@@ -913,6 +966,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.avatar}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={() => {
                 if (!outputs.research_revised) return;
                 setErrorStage(null);
@@ -941,6 +995,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.offer_brief}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={() => {
                 if (!outputs.research_revised || !outputs.avatar) return;
                 setErrorStage(null);
@@ -969,6 +1024,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.necessary_beliefs}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={() => {
                 if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief) return;
                 setErrorStage(null);
@@ -1001,6 +1057,7 @@ export default function Home() {
               errorStage={errorStage}
               errorMessage={errorMessage}
               output={outputs.chief_final}
+              slug={getFileSlug(brandSlug, productSlug)}
               onRetry={() => {
                 if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
                 setErrorStage(null);
@@ -1033,6 +1090,7 @@ export default function Home() {
               pipeline={pipeline}
               errorStage={errorStage}
               errorMessage={errorMessage}
+              slug={getFileSlug(brandSlug, productSlug)}
               output={
                 outputs.avatar_revised
                   ? [
