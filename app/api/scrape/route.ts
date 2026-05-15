@@ -6,15 +6,22 @@ export async function POST(req: NextRequest) {
   if (!url) return Response.json({ success: false, error: "URL required" }, { status: 400 });
 
   try {
-    const res = await axios.get(url, {
-      timeout: 12000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
+    const scraperApiKey = process.env.SCRAPERAPI_KEY;
+    const fetchUrl = scraperApiKey
+      ? `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=true`
+      : url;
+
+    const res = await axios.get(fetchUrl, {
+      timeout: 60000,
+      headers: scraperApiKey
+        ? {}
+        : {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept:
+              "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
       maxRedirects: 5,
     });
 
