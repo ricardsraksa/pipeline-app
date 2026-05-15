@@ -105,6 +105,7 @@ export default function Home() {
 
     let scraped = "";
     let imgs: string[] = [];
+    let competitorScraped: { url: string; text: string }[] = [];
 
     const competitorList = competitorUrls
       .split("\n")
@@ -130,13 +131,16 @@ export default function Home() {
         imgs = mainResult.value.images ?? [];
       }
 
-      // Remaining results are competitors — collect their images
+      // Remaining results are competitors — collect their images and text
       for (let i = 1; i < scrapeResults.length; i++) {
         const r = scrapeResults[i];
         if (r.status === "fulfilled" && r.value.success) {
           const compImgs: string[] = r.value.images ?? [];
           for (const img of compImgs) {
             if (!imgs.includes(img)) imgs.push(img);
+          }
+          if (r.value.scraped_text) {
+            competitorScraped.push({ url: competitorList[i - 1], text: r.value.scraped_text });
           }
         }
       }
@@ -158,6 +162,7 @@ export default function Home() {
           url: url.trim(),
           scraped_text: scraped,
           competitor_urls: competitorList,
+          competitor_scraped: competitorScraped,
         }),
       });
       const data = await res.json();

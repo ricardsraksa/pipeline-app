@@ -25,16 +25,29 @@ function buildFeedbackBlock(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { url, scraped_text, competitor_urls } = await req.json();
+  const { url, scraped_text, competitor_urls, competitor_scraped } = await req.json();
 
   const systemPrompt = getPrompt("stage1") + buildFeedbackBlock();
+
+  const competitorBlock = (() => {
+    if (!competitor_urls?.length) return "";
+    const lines: string[] = ["\nCOMPETITOR ANALYSIS:"];
+    for (let i = 0; i < competitor_urls.length; i++) {
+      lines.push(`\nCompetitor ${i + 1}: ${competitor_urls[i]}`);
+      const scraped = competitor_scraped?.find((c: { url: string; text: string }) => c.url === competitor_urls[i]);
+      if (scraped?.text) {
+        lines.push(`Scraped content:\n${scraped.text.slice(0, 1500)}`);
+      } else {
+        lines.push("(content not available)");
+      }
+    }
+    return lines.join("\n");
+  })();
 
   const userMessage = [
     `PRODUCT URL: ${url}`,
     scraped_text ? `\nSCRAPED PRODUCT TEXT:\n${scraped_text}` : "\nSCRAPED PRODUCT TEXT: (not available)",
-    competitor_urls?.length
-      ? `\nCOMPETITOR URLS PROVIDED:\n${competitor_urls.join("\n")}`
-      : "",
+    competitorBlock,
     "\n\nProduce the full research brief now.",
   ]
     .filter(Boolean)
