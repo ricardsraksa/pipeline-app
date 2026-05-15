@@ -168,6 +168,9 @@ export default function Home() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Stage 1 failed");
       setStage1Output(data.output);
+      // Auto-extract suggested product name from stage1 output
+      const nameMatch = (data.output as string).match(/^PRODUCT_NAME:\s*(.+)$/m);
+      if (nameMatch?.[1]) setProductName(nameMatch[1].trim());
       setPipeline("stage1_done");
     } catch (err) {
       setError(1, err instanceof Error ? err.message : String(err));

@@ -26,6 +26,8 @@ You will receive a product URL and any available scraped product text. Analyze t
 
 OUTPUT STRUCTURE:
 
+PRODUCT_NAME: [your single recommended German DTC brand name for this product — one word or compound word, e.g. WELLENFROH]
+
 PRODUCT IDENTIFICATION
 - Describe the product: what it is, key visible features, available variants/colors, target age or user group
 - Identify the core category it competes in (German consumer market)
