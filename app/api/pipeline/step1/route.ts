@@ -5,7 +5,7 @@ import { RESEARCH_PROMPT } from "@/lib/prompts/research";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { product_url, scraped_text, competitor_urls, competitor_scraped } = await req.json();
+  const { product_url, product_description, scraped_text, competitor_urls, competitor_scraped } = await req.json();
 
   const competitorUrlsBlock = competitor_urls?.length
     ? competitor_urls.join("\n")
@@ -13,13 +13,18 @@ export async function POST(req: NextRequest) {
 
   const competitorDataBlock = competitor_scraped?.length
     ? competitor_scraped
-        .map((c: { url: string; text: string }) => `Competitor: ${c.url}\n${c.text.slice(0, 1500)}`)
-        .join("\n\n")
+        .map((c: { url: string; text: string }) => `Competitor: ${c.url}\nContent: ${c.text.slice(0, 1500)}\n`)
+        .join("\n")
     : "(not available)";
+
+  const productDescriptionBlock = product_description?.trim()
+    ? product_description.trim()
+    : "Not provided — use scraped data as the source";
 
   const userMessage = [
     `PRODUCT URL: ${product_url}`,
-    `\nSCRAPED PRODUCT DATA:\n${scraped_text || "(not available)"}`,
+    `\nPRODUCT DESCRIPTION (user-provided ground truth):\n${productDescriptionBlock}`,
+    `\nSCRAPED DATA:\n${scraped_text || "(not available)"}`,
     `\nCOMPETITOR URLS:\n${competitorUrlsBlock}`,
     `\nCOMPETITOR DATA:\n${competitorDataBlock}`,
   ].join("");

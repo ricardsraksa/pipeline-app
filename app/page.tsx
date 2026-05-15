@@ -257,6 +257,7 @@ function imageStageCardState(
 
 export default function Home() {
   const [url, setUrl] = useState("");
+  const [productDescription, setProductDescription] = useState("");
   const [competitorUrls, setCompetitorUrls] = useState("");
   const [pipeline, setPipeline] = useState<PipelineState>("idle");
   const [errorStage, setErrorStage] = useState<number | null>(null);
@@ -367,6 +368,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product_url: url.trim(),
+          product_description: productDescription,
           scraped_text: scraped,
           competitor_urls: competitorList,
           competitor_scraped: competitorScraped,
@@ -762,6 +764,22 @@ export default function Home() {
               placeholder="https://www.aliexpress.com/item/..."
               disabled={isActive}
               className="w-full bg-[#111] border border-[#2a2a2a] rounded-md px-3 py-2.5 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb] disabled:opacity-40 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-[#737373] uppercase tracking-wider mb-1.5">
+              Product Description <span className="normal-case text-[#333]">(optional)</span>
+            </label>
+            <p className="text-xs text-[#333] mb-1.5">
+              Describe what the product actually is. Use this when the listing is unclear or in a language Claude may misread. This overrides the scraper's product identification.
+            </p>
+            <textarea
+              value={productDescription}
+              onChange={(e) => setProductDescription(e.target.value)}
+              rows={4}
+              placeholder="e.g. Children's swimming goggle set including goggles, swim cap, and nose clip. Made from soft silicone. Target ages 4-10."
+              className="w-full bg-[#111] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb] resize-none transition-colors"
             />
           </div>
 
