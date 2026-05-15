@@ -362,6 +362,7 @@ export default function Home() {
 
     // Step 1 — Research
     setPipeline("step1_running");
+    let research = "";
     try {
       const res = await fetch("/api/pipeline/step1", {
         method: "POST",
@@ -376,7 +377,8 @@ export default function Home() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Step 1 failed");
-      setOutputs((prev) => ({ ...prev, research: data.output }));
+      research = data.output;
+      setOutputs((prev) => ({ ...prev, research }));
       setPipeline("step1_done");
     } catch (err) {
       setError(1, err instanceof Error ? err.message : String(err));
@@ -390,23 +392,16 @@ export default function Home() {
       const data = await fetch("/api/pipeline/step2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ research: outputs.research ?? "" }),
+        body: JSON.stringify({ research }),
       }).then((r) => r.json());
       if (!data.success) throw new Error(data.error ?? "Step 2 failed");
       chiefMid = data.output;
-      setOutputs((prev) => ({ ...prev, chief_mid: data.output }));
+      setOutputs((prev) => ({ ...prev, chief_mid: chiefMid }));
       setPipeline("step2_done");
     } catch (err) {
       setError(2, err instanceof Error ? err.message : String(err));
       return;
     }
-
-    // We need to read outputs.research synchronously — capture it
-    let currentResearch = "";
-    setOutputs((prev) => {
-      currentResearch = prev.research ?? "";
-      return prev;
-    });
 
     // Step 3 — Revise Research
     setPipeline("step3_running");
@@ -415,7 +410,7 @@ export default function Home() {
       const data = await fetch("/api/pipeline/step3", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ research: currentResearch, chief_mid: chiefMid }),
+        body: JSON.stringify({ research, chief_mid: chiefMid }),
       }).then((r) => r.json());
       if (!data.success) throw new Error(data.error ?? "Step 3 failed");
       researchRevised = data.output;
