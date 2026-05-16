@@ -1098,7 +1098,7 @@ export default function Home() {
     <main className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-blue-500/30">
 
       {/* ============ Sticky top bar ============ */}
-      <header className="sticky top-0 z-30 border-b border-zinc-900 bg-zinc-950/85 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-5 h-12 flex items-center justify-between gap-4">
           {/* Logo + breadcrumb */}
           <div className="flex items-center gap-2.5 min-w-0">
@@ -1117,7 +1117,7 @@ export default function Home() {
           </div>
 
           {/* Stage tabs */}
-          <nav className="flex items-center gap-0.5 bg-zinc-900/80 border border-zinc-800 rounded-lg p-0.5">
+          <nav className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-700/60 rounded-lg p-0.5">
             {([
               { num: 1, label: "Research", state: tab1State, disabled: false },
               { num: 2, label: "Copy",     state: tab2State, disabled: tab2Disabled },
@@ -1189,10 +1189,10 @@ export default function Home() {
                   <h2 className="text-[14px] font-semibold text-zinc-100 tracking-tight">New research run</h2>
                   <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">8 steps · ~3-4 min</span>
                 </div>
-                <div className="border border-zinc-800 rounded-xl bg-zinc-900/30 divide-y divide-zinc-800/70">
+                <div className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-5 space-y-4">
                   {/* URL */}
-                  <div className="p-4 space-y-1.5">
-                    <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Product URL</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Product URL</label>
                     <input
                       type="url"
                       value={url}
@@ -1200,15 +1200,15 @@ export default function Home() {
                       onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
                       placeholder="https://www.aliexpress.com/item/..."
                       disabled={isActive}
-                      className="w-full bg-transparent text-[14px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40"
+                      className="w-full bg-zinc-950 border border-zinc-700/60 rounded-lg px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/10 transition-colors disabled:opacity-40"
                     />
                   </div>
 
                   {/* Description */}
-                  <div className="p-4 space-y-1.5">
-                    <label className={`block text-[10px] font-mono uppercase tracking-widest transition-colors ${ambiguousListing ? 'text-red-400' : 'text-zinc-500'}`}>
+                  <div className="space-y-1.5">
+                    <label className={`block text-[10px] font-mono uppercase tracking-widest transition-colors ${ambiguousListing ? 'text-red-400' : 'text-zinc-400'}`}>
                       Description
-                      <span className={`ml-2 normal-case tracking-normal font-sans ${ambiguousListing ? 'text-red-400' : 'text-zinc-700'}`}>
+                      <span className={`ml-2 normal-case tracking-normal font-sans text-[11px] ${ambiguousListing ? 'text-red-400' : 'text-zinc-600'}`}>
                         {ambiguousListing ? 'required — listing is ambiguous' : 'optional — overrides scraper'}
                       </span>
                     </label>
@@ -1219,31 +1219,35 @@ export default function Home() {
                       rows={2}
                       placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10."
                       disabled={isActive}
-                      className={`w-full bg-transparent text-[13px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40 resize-none ${ambiguousListing ? 'animate-pulse' : ''}`}
+                      className={`w-full bg-zinc-950 border rounded-lg px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-1 transition-all resize-none disabled:opacity-40 ${
+                        ambiguousListing
+                          ? 'border-red-500/70 focus:border-red-400 focus:ring-red-500/10 ring-1 ring-red-500/20'
+                          : 'border-zinc-700/60 focus:border-blue-500/60 focus:ring-blue-500/10'
+                      }`}
                     />
                   </div>
 
                   {/* Competitors */}
                   <details className="group">
-                    <summary className="px-4 py-3 cursor-pointer select-none list-none flex items-center gap-2 hover:bg-zinc-900/40 transition-colors">
-                      <span className="text-[9px] text-zinc-600 group-open:rotate-90 transition-transform inline-block">▶</span>
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Competitor URLs</span>
-                      <span className="text-[10px] font-mono text-zinc-700">optional</span>
+                    <summary className="cursor-pointer select-none list-none flex items-center gap-2">
+                      <span className="text-[9px] text-zinc-500 group-open:rotate-90 transition-transform inline-block">▶</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Competitor URLs</span>
+                      <span className="text-[10px] text-zinc-600">optional</span>
                     </summary>
-                    <div className="px-4 pb-4">
+                    <div className="mt-2">
                       <textarea
                         value={competitorUrls}
                         onChange={(e) => setCompetitorUrls(e.target.value)}
                         placeholder="One URL per line"
                         rows={2}
                         disabled={isActive}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-2 text-[12px] font-mono text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-zinc-700 transition-colors resize-none"
+                        className="w-full bg-zinc-950 border border-zinc-700/60 rounded-lg px-3.5 py-2.5 text-[12px] font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/10 transition-colors resize-none disabled:opacity-40"
                       />
                     </div>
                   </details>
 
                   {/* Run row */}
-                  <div className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 pt-1">
                     <button
                       onClick={runPipeline}
                       disabled={!canStartPipeline || isActive}
@@ -1252,7 +1256,7 @@ export default function Home() {
                       Run Pipeline
                       <kbd className="text-[10px] font-mono bg-blue-700/60 px-1 py-0.5 rounded">↵</kbd>
                     </button>
-                    <span className="text-[11px] text-zinc-600 hidden sm:inline">Generates research + 6 strategy docs</span>
+                    <span className="text-[11px] text-zinc-500 hidden sm:inline">Generates research + 6 strategy docs</span>
                   </div>
                 </div>
 
@@ -1271,7 +1275,7 @@ export default function Home() {
             {showPipeline && (
               <>
                 {/* Run summary */}
-                <section className="border border-zinc-800 rounded-xl bg-zinc-900/30 p-4 flex items-center gap-4">
+                <section className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">URL</span>
@@ -1309,8 +1313,8 @@ export default function Home() {
                           onClick={() => setSelectedStep(m.num)}
                           className={`relative rounded-md p-2 text-left transition-all duration-150 cursor-pointer ${
                             isSel
-                              ? "bg-zinc-800 ring-1 ring-blue-500/50"
-                              : "bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-900"
+                              ? "bg-zinc-700/70 ring-1 ring-blue-500/50"
+                              : "bg-zinc-900 hover:bg-zinc-800/70 border border-zinc-800"
                           }`}
                         >
                           <div className="flex items-center gap-1.5 mb-1">
@@ -1332,15 +1336,15 @@ export default function Home() {
                 </section>
 
                 {/* Master-detail panel */}
-                <section className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
-                  <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
+                <section className="border border-zinc-700/60 rounded-xl overflow-hidden bg-zinc-900">
+                  <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-700/50">
 
                     {/* Master: phase-grouped list */}
                     <div className="overflow-y-auto max-h-[640px]">
                       {(["Research", "Strategy", "Review"] as const).map(phase => (
                         <div key={phase}>
-                          <div className="px-3 py-2 bg-zinc-900/60 border-b border-zinc-800/60">
-                            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-[0.14em]">{phase}</span>
+                          <div className="px-3 py-2 bg-zinc-800/50 border-b border-zinc-700/40">
+                            <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-[0.14em]">{phase}</span>
                           </div>
                           {STEP_META.filter(m => m.phase === phase).map(m => {
                             const s = getStepCardState(pipeline, errorStage, m.num);
@@ -1480,9 +1484,9 @@ export default function Home() {
               <p className="text-[12px] text-zinc-500">Product names, headlines, benefits, FAQs, Facebook copy, one-liners — generated using the Stage 1 research.</p>
             </section>
 
-            <section className="border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden divide-y divide-zinc-800/70">
+            <section className="border border-zinc-700/60 rounded-xl bg-zinc-900 overflow-hidden">
               <div className="p-4 space-y-1.5">
-                <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Brand / product name</label>
+                <label className="block text-[10px] font-mono text-zinc-400 uppercase tracking-widest">Brand / product name</label>
                 <input
                   ref={productNameRef}
                   type="text"
@@ -1491,12 +1495,12 @@ export default function Home() {
                   onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
                   placeholder="e.g. WELLENFROH"
                   disabled={pipelineIsStage2Running}
-                  className="w-full bg-transparent text-[14px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40"
+                  className="w-full bg-zinc-950 border border-zinc-700/60 rounded-lg px-3.5 py-2.5 text-[13px] text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/10 transition-colors disabled:opacity-40"
                 />
-                <p className="text-[10px] text-zinc-600 font-mono">Used in all generated copy · pre-filled from Stage 1 suggestions</p>
+                <p className="text-[10px] text-zinc-500 font-mono">Used in all generated copy · pre-filled from Stage 1 suggestions</p>
               </div>
 
-              <div className="p-4 flex items-center gap-3">
+              <div className="p-4 border-t border-zinc-800 flex items-center gap-3">
                 <button
                   onClick={runStage2}
                   disabled={!canRunStage2 || pipelineIsStage2Running}
@@ -1524,7 +1528,7 @@ export default function Home() {
               )}
 
               {stage2Output && !pipelineIsStage2Running && (
-                <div className="p-4 space-y-3 fade-in">
+                <div className="p-4 border-t border-zinc-800 space-y-3 fade-in">
                   <OutputBlock text={stage2Output} />
                   <FeedbackBar runId={runId} stage={2} />
                 </div>
