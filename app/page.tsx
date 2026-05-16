@@ -270,20 +270,36 @@ export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [ambiguousListing, setAmbiguousListing] = useState(false);
-  const [shownStage, setShownStage] = useState(1);
+  const [currentTab, setCurrentTab] = useState<1 | 2 | 3>(1);
+  const [selectedStep, setSelectedStep] = useState<number>(1);
 
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const productNameRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus product name input when Stage 2 panel is revealed
+  // Auto-focus product name input when Stage 2 tab is opened
   useEffect(() => {
-    if (shownStage === 2 && productNameRef.current) {
-      setTimeout(() => {
-        productNameRef.current?.focus();
-        productNameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 80);
+    if (currentTab === 2 && productNameRef.current && !stage2Output) {
+      setTimeout(() => productNameRef.current?.focus(), 80);
     }
-  }, [shownStage]);
+  }, [currentTab, stage2Output]);
+
+  // Auto-select the currently-running or just-completed step for the detail panel
+  const pipelineForEffect = pipeline;
+  useEffect(() => {
+    const m: Partial<Record<PipelineState, number>> = {
+      step1_running: 1, step1_done: 1,
+      step2_running: 2, step2_done: 2,
+      step3_running: 3, step3_done: 3,
+      step4a_running: 4, step4a_done: 4,
+      step4b_running: 5, step4b_done: 5,
+      step4c_running: 6, step4c_done: 6,
+      step5_running: 7, step5_done: 7,
+      step6_running: 8, step6_done: 8,
+      complete: 8,
+    };
+    const target = m[pipelineForEffect];
+    if (target) setSelectedStep(target);
+  }, [pipelineForEffect]);
 
   const allImages = [...scrapedImages, ...userImages];
 
@@ -458,7 +474,8 @@ export default function Home() {
     setProductName("");
     setBrandSlug(null);
     setProductSlug(null);
-    setShownStage(1);
+    setCurrentTab(1);
+    setSelectedStep(1);
 
     const competitorList = competitorUrls
       .split("\n")
@@ -924,8 +941,6 @@ export default function Home() {
   const canRunStage3 =
     pipelineIsStage2Done && (!showImageUploader || hasEnoughImages);
   const isDone = pipelineIsStage3ImagesDone;
-  // Stage 2 panel visible once user clicks Continue or pipeline is already past Stage 1
-  const showStage2Panel = shownStage >= 2 || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone;
 
   const step6Skipped =
     outputs.avatar_revised !== null &&
@@ -959,537 +974,587 @@ export default function Home() {
     pipeline === "stage3_prompts_running" ? "Stage 3 — Building image prompts" :
     pipeline === "stage3_images_running" ? "Stage 3 — Generating images" : "";
 
+  // Static metadata for the 8 steps — drives both the stepper and the master list
+  const STEP_META: { num: number; title: string; short: string; desc: string; phase: "Research" | "Strategy" | "Review" }[] = [
+    { num: 1, title: "Step 1 — Research",            short: "Research",          desc: "Deep market research for the German DTC market", phase: "Research" },
+    { num: 2, title: "Step 2 — Mid Chief Review",    short: "Mid Review",        desc: "Senior editor review of the research document", phase: "Research" },
+    { num: 3, title: "Step 3 — Research (Revised)",  short: "Revised",           desc: "Research revised based on chief review", phase: "Research" },
+    { num: 4, title: "Step 4a — Avatar",             short: "Avatar",            desc: "Ideal customer avatar for the German market", phase: "Strategy" },
+    { num: 5, title: "Step 4b — Offer Brief",        short: "Offer Brief",       desc: "Offer strategy grounded in research and avatar", phase: "Strategy" },
+    { num: 6, title: "Step 4c — Necessary Beliefs",  short: "Beliefs",           desc: "6 beliefs the German prospect must hold before buying", phase: "Strategy" },
+    { num: 7, title: "Step 5 — Final Chief Review",  short: "Final Review",      desc: "Cross-document consistency and argument soundness review", phase: "Review" },
+    { num: 8, title: "Step 6 — Final Revisions",     short: "Final Revisions",   desc: "Documents revised based on final chief review", phase: "Review" },
+  ];
+
+  const filenameMap: Record<number, string> = {
+    1: "RESEARCH.txt", 2: "CHIEF_MID.txt", 3: "RESEARCH_REVISED.txt",
+    4: "AVATAR.txt",   5: "OFFER_BRIEF.txt", 6: "NECESSARY_BELIEFS.txt",
+    7: "CHIEF_FINAL.txt", 8: "FINAL_REVISIONS.txt",
+  };
+
+  function getStepOutput(num: number): string | null {
+    switch (num) {
+      case 1: return outputs.research;
+      case 2: return outputs.chief_mid;
+      case 3: return outputs.research_revised;
+      case 4: return outputs.avatar;
+      case 5: return outputs.offer_brief;
+      case 6: return outputs.necessary_beliefs;
+      case 7: return outputs.chief_final;
+      case 8: return outputs.avatar_revised
+        ? ["=== AVATAR.txt (revised) ===", outputs.avatar_revised,
+           "\n=== OFFER_BRIEF.txt (revised) ===", outputs.offer_brief_revised ?? "",
+           "\n=== NECESSARY_BELIEFS.txt (revised) ===", outputs.necessary_beliefs_revised ?? ""].join("\n\n")
+        : null;
+      default: return null;
+    }
+  }
+
+  async function retryStep(num: number) {
+    setErrorStage(null);
+    setErrorMessage("");
+    if (num === 1) { runPipeline(); return; }
+    const handlers: Record<number, () => Promise<void>> = {
+      2: async () => {
+        if (!outputs.research) return;
+        setPipeline("step2_running");
+        const data = await fetch("/api/pipeline/step2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 2 failed");
+        setOutputs(p => ({ ...p, chief_mid: data.output })); setPipeline("step2_done");
+      },
+      3: async () => {
+        if (!outputs.research || !outputs.chief_mid) return;
+        setPipeline("step3_running");
+        const data = await fetch("/api/pipeline/step3", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research, chief_mid: outputs.chief_mid }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 3 failed");
+        setOutputs(p => ({ ...p, research_revised: data.output })); setPipeline("step3_done");
+      },
+      4: async () => {
+        if (!outputs.research_revised) return;
+        setPipeline("step4a_running");
+        const data = await fetch("/api/pipeline/step4a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 4a failed");
+        setOutputs(p => ({ ...p, avatar: data.output })); setPipeline("step4a_done");
+      },
+      5: async () => {
+        if (!outputs.research_revised || !outputs.avatar) return;
+        setPipeline("step4b_running");
+        const data = await fetch("/api/pipeline/step4b", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised, avatar: outputs.avatar }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 4b failed");
+        setOutputs(p => ({ ...p, offer_brief: data.output })); setPipeline("step4b_done");
+      },
+      6: async () => {
+        if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief) return;
+        setPipeline("step4c_running");
+        const data = await fetch("/api/pipeline/step4c", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised, avatar: outputs.avatar, offer_brief: outputs.offer_brief }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 4c failed");
+        setOutputs(p => ({ ...p, necessary_beliefs: data.output })); setPipeline("step4c_done");
+      },
+      7: async () => {
+        if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
+        setPipeline("step5_running");
+        const data = await fetch("/api/pipeline/step5", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research_revised: outputs.research_revised, avatar: outputs.avatar, offer_brief: outputs.offer_brief, necessary_beliefs: outputs.necessary_beliefs }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 5 failed");
+        setOutputs(p => ({ ...p, chief_final: data.output })); setPipeline("step5_done");
+      },
+      8: async () => {
+        if (!outputs.chief_final || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
+        setPipeline("step6_running");
+        const data = await fetch("/api/pipeline/step6", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chief_final: outputs.chief_final, avatar: outputs.avatar, offer_brief: outputs.offer_brief, necessary_beliefs: outputs.necessary_beliefs }) }).then(r => r.json());
+        if (!data.success) throw new Error(data.error ?? "Step 6 failed");
+        setOutputs(p => ({ ...p, avatar_revised: data.avatar_revised, offer_brief_revised: data.offer_brief_revised, necessary_beliefs_revised: data.necessary_beliefs_revised }));
+        setPipeline("complete");
+      },
+    };
+    try { await handlers[num]?.(); }
+    catch (err) { setError(num, err instanceof Error ? err.message : String(err)); }
+  }
+
+  function copyText(text: string) { navigator.clipboard.writeText(text).catch(() => {}); }
+  function downloadTxt(filename: string, text: string) {
+    const blob = new Blob([text], { type: "text/plain" });
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = u; a.download = filename; a.click();
+    URL.revokeObjectURL(u);
+  }
+
+  const selectedMeta = STEP_META[selectedStep - 1];
+  const selectedOutput = getStepOutput(selectedStep);
+  const selectedState = getStepCardState(pipeline, errorStage, selectedStep);
+  const fileSlug = getFileSlug(brandSlug, productSlug);
+
+  // Tab state computations
+  const tab1State: "idle" | "running" | "done" =
+    isComplete ? "done" :
+    (pipeline !== "idle" && pipeline !== "error" && !pipelineIsStage2Running && !pipelineIsStage2Done && !pipelineIsStage3PromptsRunning && !pipelineIsStage3ImagesRunning && !pipelineIsStage3ImagesDone) ? "running" : "idle";
+  const tab2State: "idle" | "running" | "done" =
+    pipelineIsStage2Done ? "done" : pipelineIsStage2Running ? "running" : "idle";
+  const tab3State: "idle" | "running" | "done" =
+    pipelineIsStage3ImagesDone ? "done" : (pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning) ? "running" : "idle";
+  const tab2Disabled = !isComplete && !pipelineIsStage2Done && !pipelineIsStage2Running;
+  const tab3Disabled = !pipelineIsStage2Done && !pipelineIsStage3ImagesDone;
+
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="max-w-2xl mx-auto px-5 pt-10 pb-20">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-blue-500/30">
 
-        {/* Page header */}
-        <div className="mb-8">
-          <div className="flex items-baseline gap-3 mb-1.5">
-            <h1 className="text-[15px] font-semibold text-zinc-100 tracking-tight">Research Pipeline</h1>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">Stage 1</span>
-              <span className="text-zinc-700 text-[10px]">of 3</span>
+      {/* ============ Sticky top bar ============ */}
+      <header className="sticky top-0 z-30 border-b border-zinc-900 bg-zinc-950/85 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-5 h-12 flex items-center justify-between gap-4">
+          {/* Logo + breadcrumb */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 24 24" className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16M4 12h10M4 18h7" />
+              </svg>
             </div>
-          </div>
-          <p className="text-zinc-500 text-[13px]">Paste a product URL to generate research, avatars, and copy briefs for the German DTC market.</p>
-        </div>
-
-        {/* Inputs */}
-        <div className="space-y-5 mb-8">
-          <div>
-            <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
-              Product URL
-            </label>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
-              placeholder="https://www.aliexpress.com/item/..."
-              disabled={isActive}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
-            />
-          </div>
-
-          <div>
-            <label className={`block font-mono text-[10px] uppercase tracking-widest mb-2 transition-colors duration-150 ${ambiguousListing ? 'text-red-400' : 'text-zinc-500'}`}>
-              Product Description
-              {ambiguousListing ? (
-                <span className="ml-2 normal-case tracking-normal text-red-400 font-sans font-normal">required — listing is ambiguous</span>
-              ) : (
-                <span className="text-zinc-600 tracking-normal normal-case ml-2">optional — overrides scraper</span>
-              )}
-            </label>
-            <textarea
-              ref={descriptionRef}
-              value={productDescription}
-              onChange={(e) => {
-                setProductDescription(e.target.value);
-                if (e.target.value.length >= 10) setAmbiguousListing(false);
-              }}
-              rows={3}
-              placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10. Use when the listing is in another language or unclear."
-              disabled={isActive}
-              className={`w-full bg-zinc-900 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all duration-150 disabled:opacity-40 resize-none ${
-                ambiguousListing
-                  ? 'border-2 border-red-500 focus:border-red-400 ring-2 ring-red-500/20 animate-pulse'
-                  : 'border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10'
-              }`}
-            />
-          </div>
-
-          <details className="group">
-            <summary className="cursor-pointer font-mono text-[11px] text-zinc-600 hover:text-zinc-400 select-none list-none flex items-center gap-1.5">
-              <span className="text-[9px] group-open:rotate-90 transition-transform duration-150 inline-block">▶</span>
-              Competitor URLs
-              <span className="text-zinc-700 ml-1">optional</span>
-            </summary>
-            <div className="mt-2">
-              <textarea
-                value={competitorUrls}
-                onChange={(e) => setCompetitorUrls(e.target.value)}
-                placeholder="One URL per line"
-                rows={3}
-                disabled={isActive}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40 resize-none"
-              />
-            </div>
-          </details>
-        </div>
-
-        {/* CTA + status */}
-        <div className="space-y-3 mb-10">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={runPipeline}
-              disabled={!canStartPipeline || isActive}
-              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-all duration-150"
-            >
-              {isActive ? "Running…" : "Run Pipeline"}
-            </button>
-
-            {isActive && statusLabel && (
-              <span className="font-mono text-[11px] text-zinc-500 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
-                {statusLabel}
-              </span>
-            )}
-
-            {isComplete && !isActive && (
-              <span className="font-mono text-[11px] text-emerald-400">Complete</span>
+            <h1 className="text-[13px] font-semibold text-zinc-100 tracking-tight">Pipeline</h1>
+            {(brandSlug || productSlug) && (
+              <>
+                <span className="text-zinc-700 text-[12px]">/</span>
+                <span className="text-[12px] font-mono text-zinc-500 truncate max-w-[180px]">{brandSlug || productSlug}</span>
+              </>
             )}
           </div>
 
-          {/* Ambiguous listing warning */}
-          {ambiguousListing && (
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-950/40 border border-red-900/50">
-              <span className="text-red-400 text-sm mt-px flex-shrink-0">!</span>
-              <p className="font-mono text-[11px] text-red-400 leading-relaxed">
-                The product listing doesn&apos;t have enough clear information. Please describe the product in the field above.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {showPipeline && (
-          <>
-            {/* Progress bar */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                  {isComplete ? "Stage 1 complete" : isActive ? statusLabel : "Stage 1"}
+          {/* Stage tabs */}
+          <nav className="flex items-center gap-0.5 bg-zinc-900/80 border border-zinc-800 rounded-lg p-0.5">
+            {([
+              { num: 1, label: "Research", state: tab1State, disabled: false },
+              { num: 2, label: "Copy",     state: tab2State, disabled: tab2Disabled },
+              { num: 3, label: "Images",   state: tab3State, disabled: tab3Disabled },
+            ] as const).map(t => (
+              <button
+                key={t.num}
+                disabled={t.disabled}
+                onClick={() => {
+                  if (t.num === 3) {
+                    if (runId) window.location.href = `/stage3?runId=${runId}`;
+                    return;
+                  }
+                  setCurrentTab(t.num);
+                }}
+                className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-all duration-150 ${
+                  currentTab === t.num
+                    ? "bg-zinc-800 text-zinc-100"
+                    : t.disabled
+                    ? "text-zinc-700 cursor-not-allowed"
+                    : "text-zinc-400 hover:text-zinc-100 cursor-pointer"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    t.state === "done" ? "bg-emerald-500" :
+                    t.state === "running" ? "bg-blue-500 animate-pulse" :
+                    t.disabled ? "bg-zinc-800" : "bg-zinc-700"
+                  }`} />
+                  <span className="text-[10px] font-mono text-zinc-600 tabular-nums">{t.num}</span>
+                  {t.label}
                 </span>
-                <span className="text-[10px] font-mono text-zinc-600">{stepsCompleted}/8 steps</span>
-              </div>
-              <div className="h-[2px] bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700 ease-out"
-                  style={{
-                    width: `${(stepsCompleted / 8) * 100}%`,
-                    background: isComplete ? "#10b981" : "#3b82f6",
-                  }}
-                />
-              </div>
-            </div>
+              </button>
+            ))}
+          </nav>
 
-          <div className="border border-zinc-800 rounded-xl overflow-hidden divide-y-0 bg-zinc-900/20">
-            <PhaseHeader label="Research" />
-            <ResearchStepCard
-              stepNum={1}
-              title="Step 1 — Research"
-              description="Deep market research document for the German DTC market"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.research}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={runPipeline}
-            />
-
-            <ResearchStepCard
-              stepNum={2}
-              title="Step 2 — Mid Chief Review"
-              description="Senior editor review of the research document"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.chief_mid}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={() => {
-                // Retry from step 2 — need research
-                if (!outputs.research) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step2_running");
-                fetch("/api/pipeline/step2", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ research: outputs.research }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 2 failed");
-                    setOutputs((prev) => ({ ...prev, chief_mid: data.output }));
-                    setPipeline("step2_done");
-                  })
-                  .catch((err) => setError(2, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <ResearchStepCard
-              stepNum={3}
-              title="Step 3 — Research (Revised)"
-              description="Research revised based on chief review"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.research_revised}
-              slug={getFileSlug(brandSlug, productSlug)}
-              skipped={outputs.chief_mid?.includes("NO REVISIONS REQUIRED") ?? false}
-              onRetry={() => {
-                if (!outputs.research || !outputs.chief_mid) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step3_running");
-                fetch("/api/pipeline/step3", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ research: outputs.research, chief_mid: outputs.chief_mid }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 3 failed");
-                    setOutputs((prev) => ({ ...prev, research_revised: data.output }));
-                    setPipeline("step3_done");
-                  })
-                  .catch((err) => setError(3, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <PhaseHeader label="Strategy" />
-            <ResearchStepCard
-              stepNum={4}
-              title="Step 4a — Avatar"
-              description="Ideal customer avatar for the German market"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.avatar}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={() => {
-                if (!outputs.research_revised) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step4a_running");
-                fetch("/api/pipeline/step4a", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ research: outputs.research_revised }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 4a failed");
-                    setOutputs((prev) => ({ ...prev, avatar: data.output }));
-                    setPipeline("step4a_done");
-                  })
-                  .catch((err) => setError(4, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <ResearchStepCard
-              stepNum={5}
-              title="Step 4b — Offer Brief"
-              description="Offer strategy grounded in research and avatar"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.offer_brief}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={() => {
-                if (!outputs.research_revised || !outputs.avatar) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step4b_running");
-                fetch("/api/pipeline/step4b", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ research: outputs.research_revised, avatar: outputs.avatar }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 4b failed");
-                    setOutputs((prev) => ({ ...prev, offer_brief: data.output }));
-                    setPipeline("step4b_done");
-                  })
-                  .catch((err) => setError(5, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <ResearchStepCard
-              stepNum={6}
-              title="Step 4c — Necessary Beliefs"
-              description="6 beliefs the German prospect must hold before buying"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.necessary_beliefs}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={() => {
-                if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step4c_running");
-                fetch("/api/pipeline/step4c", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    research: outputs.research_revised,
-                    avatar: outputs.avatar,
-                    offer_brief: outputs.offer_brief,
-                  }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 4c failed");
-                    setOutputs((prev) => ({ ...prev, necessary_beliefs: data.output }));
-                    setPipeline("step4c_done");
-                  })
-                  .catch((err) => setError(6, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <PhaseHeader label="Review" />
-            <ResearchStepCard
-              stepNum={7}
-              title="Step 5 — Final Chief Review"
-              description="Cross-document consistency and argument soundness review"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              output={outputs.chief_final}
-              slug={getFileSlug(brandSlug, productSlug)}
-              onRetry={() => {
-                if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step5_running");
-                fetch("/api/pipeline/step5", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    research_revised: outputs.research_revised,
-                    avatar: outputs.avatar,
-                    offer_brief: outputs.offer_brief,
-                    necessary_beliefs: outputs.necessary_beliefs,
-                  }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 5 failed");
-                    setOutputs((prev) => ({ ...prev, chief_final: data.output }));
-                    setPipeline("step5_done");
-                  })
-                  .catch((err) => setError(7, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
-            <ResearchStepCard
-              stepNum={8}
-              title="Step 6 — Final Revisions"
-              description="Documents revised based on final chief review"
-              pipeline={pipeline}
-              errorStage={errorStage}
-              errorMessage={errorMessage}
-              slug={getFileSlug(brandSlug, productSlug)}
-              output={
-                outputs.avatar_revised
-                  ? [
-                      "=== AVATAR.txt (revised) ===",
-                      outputs.avatar_revised,
-                      "\n=== OFFER_BRIEF.txt (revised) ===",
-                      outputs.offer_brief_revised ?? "",
-                      "\n=== NECESSARY_BELIEFS.txt (revised) ===",
-                      outputs.necessary_beliefs_revised ?? "",
-                    ].join("\n\n")
-                  : null
-              }
-              skipped={step6Skipped}
-              onRetry={() => {
-                if (!outputs.chief_final || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
-                setErrorStage(null);
-                setErrorMessage("");
-                setPipeline("step6_running");
-                fetch("/api/pipeline/step6", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chief_final: outputs.chief_final,
-                    avatar: outputs.avatar,
-                    offer_brief: outputs.offer_brief,
-                    necessary_beliefs: outputs.necessary_beliefs,
-                  }),
-                })
-                  .then((r) => r.json())
-                  .then((data) => {
-                    if (!data.success) throw new Error(data.error ?? "Step 6 failed");
-                    setOutputs((prev) => ({
-                      ...prev,
-                      avatar_revised: data.avatar_revised,
-                      offer_brief_revised: data.offer_brief_revised,
-                      necessary_beliefs_revised: data.necessary_beliefs_revised,
-                    }));
-                    setPipeline("complete");
-                  })
-                  .catch((err) => setError(8, err instanceof Error ? err.message : String(err)));
-              }}
-            />
-
+          {/* Right: status / new-run */}
+          <div className="flex items-center gap-3 min-w-[120px] justify-end">
+            {isActive && statusLabel && (
+              <span className="font-mono text-[10px] text-zinc-500 truncate hidden md:inline">{statusLabel}</span>
+            )}
+            {!isActive && (isComplete || pipelineIsStage2Done || pipelineIsStage3ImagesDone) && currentTab === 1 && (
+              <button
+                onClick={() => {
+                  setPipeline("idle"); setUrl(""); setProductDescription(""); setCompetitorUrls("");
+                  setOutputs(EMPTY_OUTPUTS); setBrandSlug(null); setProductSlug(null);
+                  setStage2Output(""); setProductName(""); setImageSlots([]);
+                  setCurrentTab(1); setSelectedStep(1); setRunId(null);
+                }}
+                className="cursor-pointer text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors active:scale-95"
+              >
+                + New run
+              </button>
+            )}
           </div>
-          </>
-        )}
+        </div>
+      </header>
 
-        {/* Download All — below the step cards, shown when Stage 1 done */}
-        {showPipeline && (isComplete || showStage2Panel) && outputs.research_revised && (
-          <div className="mt-3">
-            <button
-              onClick={downloadAll}
-              className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150 active:scale-95"
-            >
-              ↓ Download All (.zip)
-            </button>
-          </div>
-        )}
+      <div className="max-w-6xl mx-auto px-5 py-6">
 
-        {/* Continue to Stage 2 CTA — standalone card, shown after Stage 1 completes */}
-        {isComplete && !showStage2Panel && (
-          <div className="mt-4 px-5 py-4 border border-emerald-900/40 rounded-xl bg-emerald-950/20 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between fade-in">
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
-              <div>
-                <span className="text-[13px] font-medium text-emerald-400">Stage 1 complete</span>
-                <span className="text-[12px] text-zinc-500 ml-2">research &amp; copy briefs ready</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShownStage(2)}
-              className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-mono text-sm rounded-lg transition-all duration-150 flex-shrink-0"
-            >
-              Continue to Stage 2 →
-            </button>
-          </div>
-        )}
+        {/* ====================== STAGE 1: RESEARCH ====================== */}
+        {currentTab === 1 && (
+          <div className="space-y-5 fade-in">
 
-        {/* Stage 2 panel — standalone card below the step cards */}
-        {showStage2Panel && (
-          <div className="mt-4 border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/20 fade-in">
-            {/* Stage 2 header row */}
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-start gap-3">
-              <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 mt-px ${
-                pipelineIsStage2Running
-                  ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse"
-                  : pipelineIsStage2Done
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : "bg-zinc-900 text-zinc-500 border border-zinc-800"
-              }`}>
-                {pipelineIsStage2Done ? "✓" : "2"}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[13px] text-zinc-100">Stage 2 — German Copy</span>
-                  {pipelineIsStage2Running && <span className="text-[10px] font-mono text-blue-400 animate-pulse">running</span>}
-                  {pipelineIsStage2Done && <span className="text-[10px] font-mono text-zinc-600">done</span>}
+            {/* Input panel — visible only when idle */}
+            {!showPipeline && (
+              <section>
+                <div className="flex items-baseline justify-between mb-3">
+                  <h2 className="text-[14px] font-semibold text-zinc-100 tracking-tight">New research run</h2>
+                  <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">8 steps · ~3-4 min</span>
                 </div>
-                <p className="text-[11px] text-zinc-600 font-mono mt-0.5">Product names, headlines, benefits, FAQs, Facebook copy, one-liners</p>
-              </div>
-            </div>
-
-            <div className="px-4 py-4 space-y-3">
-              {/* Not yet started */}
-              {!pipelineIsStage2Running && !stage2Output && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
-                      Working brand / product name
-                      <span className="text-zinc-700 tracking-normal normal-case ml-2">used in all copy outputs</span>
-                    </label>
+                <div className="border border-zinc-800 rounded-xl bg-zinc-900/30 divide-y divide-zinc-800/70">
+                  {/* URL */}
+                  <div className="p-4 space-y-1.5">
+                    <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Product URL</label>
                     <input
-                      ref={productNameRef}
-                      type="text"
-                      value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
-                      placeholder="e.g. WELLENFROH"
-                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors"
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
+                      placeholder="https://www.aliexpress.com/item/..."
+                      disabled={isActive}
+                      className="w-full bg-transparent text-[14px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40"
                     />
-                    {!productName.trim() && (
-                      <p className="mt-1.5 text-[11px] font-mono text-amber-500/80">
-                        Enter a brand name above to enable Stage 2
-                      </p>
-                    )}
                   </div>
-                  <button
-                    onClick={runStage2}
-                    disabled={!canRunStage2}
-                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-all duration-150"
-                  >
-                    Start Stage 2 →
-                  </button>
+
+                  {/* Description */}
+                  <div className="p-4 space-y-1.5">
+                    <label className={`block text-[10px] font-mono uppercase tracking-widest transition-colors ${ambiguousListing ? 'text-red-400' : 'text-zinc-500'}`}>
+                      Description
+                      <span className={`ml-2 normal-case tracking-normal font-sans ${ambiguousListing ? 'text-red-400' : 'text-zinc-700'}`}>
+                        {ambiguousListing ? 'required — listing is ambiguous' : 'optional — overrides scraper'}
+                      </span>
+                    </label>
+                    <textarea
+                      ref={descriptionRef}
+                      value={productDescription}
+                      onChange={(e) => { setProductDescription(e.target.value); if (e.target.value.length >= 10) setAmbiguousListing(false); }}
+                      rows={2}
+                      placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10."
+                      disabled={isActive}
+                      className={`w-full bg-transparent text-[13px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40 resize-none ${ambiguousListing ? 'animate-pulse' : ''}`}
+                    />
+                  </div>
+
+                  {/* Competitors */}
+                  <details className="group">
+                    <summary className="px-4 py-3 cursor-pointer select-none list-none flex items-center gap-2 hover:bg-zinc-900/40 transition-colors">
+                      <span className="text-[9px] text-zinc-600 group-open:rotate-90 transition-transform inline-block">▶</span>
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Competitor URLs</span>
+                      <span className="text-[10px] font-mono text-zinc-700">optional</span>
+                    </summary>
+                    <div className="px-4 pb-4">
+                      <textarea
+                        value={competitorUrls}
+                        onChange={(e) => setCompetitorUrls(e.target.value)}
+                        placeholder="One URL per line"
+                        rows={2}
+                        disabled={isActive}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-md p-2 text-[12px] font-mono text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-zinc-700 transition-colors resize-none"
+                      />
+                    </div>
+                  </details>
+
+                  {/* Run row */}
+                  <div className="p-4 flex items-center justify-between gap-3">
+                    <button
+                      onClick={runPipeline}
+                      disabled={!canStartPipeline || isActive}
+                      className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-medium text-[13px] rounded-md transition-all duration-150 flex items-center gap-2"
+                    >
+                      Run Pipeline
+                      <kbd className="text-[10px] font-mono bg-blue-700/60 px-1 py-0.5 rounded">↵</kbd>
+                    </button>
+                    <span className="text-[11px] text-zinc-600 hidden sm:inline">Generates research + 6 strategy docs</span>
+                  </div>
                 </div>
-              )}
 
-              {/* Running */}
-              {pipelineIsStage2Running && (
-                <p className="text-[11px] text-blue-400 font-mono animate-pulse">Generating German copy kit…</p>
-              )}
+                {ambiguousListing && (
+                  <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-950/40 border border-red-900/50">
+                    <span className="text-red-400 text-sm mt-px flex-shrink-0">!</span>
+                    <p className="font-mono text-[11px] text-red-400 leading-relaxed">
+                      The product listing doesn&apos;t have enough clear information. Please describe the product in the field above.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
 
-              {/* Error */}
+            {/* Pipeline view — visible when running or done */}
+            {showPipeline && (
+              <>
+                {/* Run summary */}
+                <section className="border border-zinc-800 rounded-xl bg-zinc-900/30 p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">URL</span>
+                      {brandSlug && <span className="text-[11px] font-mono text-emerald-400">· {brandSlug}</span>}
+                    </div>
+                    <div className="text-[12px] font-mono text-zinc-300 truncate">{url}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                    <span className={`text-[10px] font-mono uppercase tracking-widest ${
+                      isComplete ? "text-emerald-400" : errorStage !== null ? "text-red-400" : "text-blue-400"
+                    }`}>
+                      {isComplete ? "Complete" : errorStage !== null ? "Error" : "Running"}
+                    </span>
+                    <span className="text-[11px] font-mono text-zinc-500 tabular-nums">{stepsCompleted} of 8</span>
+                  </div>
+                </section>
+
+                {/* Stepper */}
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="hidden sm:grid grid-cols-3 gap-1.5 flex-1 max-w-md">
+                      <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.15em]">Research</span>
+                      <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.15em] text-center">Strategy</span>
+                      <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.15em] text-right">Review</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-600 tabular-nums">{Math.round((stepsCompleted/8) * 100)}%</span>
+                  </div>
+                  <div className="grid grid-cols-8 gap-1.5">
+                    {STEP_META.map(m => {
+                      const s = getStepCardState(pipeline, errorStage, m.num);
+                      const isSel = selectedStep === m.num;
+                      return (
+                        <button
+                          key={m.num}
+                          onClick={() => setSelectedStep(m.num)}
+                          className={`relative rounded-md p-2 text-left transition-all duration-150 cursor-pointer ${
+                            isSel
+                              ? "bg-zinc-800 ring-1 ring-blue-500/50"
+                              : "bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-900"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                              s === "error" ? "bg-red-500" :
+                              s === "running" ? "bg-blue-500 animate-pulse" :
+                              s === "complete" ? "bg-emerald-500" :
+                              "bg-zinc-700"
+                            }`} />
+                            <span className="text-[10px] font-mono text-zinc-500 tabular-nums">{m.num.toString().padStart(2, "0")}</span>
+                          </div>
+                          <div className={`text-[11px] font-medium leading-tight truncate ${
+                            s === "locked" ? "text-zinc-600" : "text-zinc-200"
+                          }`}>{m.short}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Master-detail panel */}
+                <section className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/30">
+                  <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
+
+                    {/* Master: phase-grouped list */}
+                    <div className="overflow-y-auto max-h-[640px]">
+                      {(["Research", "Strategy", "Review"] as const).map(phase => (
+                        <div key={phase}>
+                          <div className="px-3 py-2 bg-zinc-900/60 border-b border-zinc-800/60">
+                            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-[0.14em]">{phase}</span>
+                          </div>
+                          {STEP_META.filter(m => m.phase === phase).map(m => {
+                            const s = getStepCardState(pipeline, errorStage, m.num);
+                            const isSel = selectedStep === m.num;
+                            return (
+                              <button
+                                key={m.num}
+                                onClick={() => setSelectedStep(m.num)}
+                                className={`w-full text-left px-3 py-2.5 flex items-center gap-2.5 border-b border-zinc-800/40 last:border-b-0 transition-colors cursor-pointer ${
+                                  isSel ? "bg-blue-500/[0.07]" : "hover:bg-zinc-900/60"
+                                }`}
+                              >
+                                <span className={`w-4 h-4 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 ${
+                                  s === "error" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+                                  s === "running" ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse" :
+                                  s === "complete" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
+                                  "bg-zinc-900 text-zinc-600 border border-zinc-800"
+                                }`}>
+                                  {s === "complete" ? "✓" : s === "error" ? "!" : m.num}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-[12px] font-medium truncate ${
+                                    isSel ? "text-zinc-100" : s === "locked" ? "text-zinc-600" : "text-zinc-300"
+                                  }`}>{m.short}</div>
+                                </div>
+                                {s === "running" && <span className="text-[8px] font-mono text-blue-400 animate-pulse">●</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Detail: selected step */}
+                    <div className="min-h-[400px] flex flex-col">
+                      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-mono flex-shrink-0 ${
+                            selectedState === "error" ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+                            selectedState === "running" ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse" :
+                            selectedState === "complete" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
+                            "bg-zinc-900 text-zinc-600 border border-zinc-800"
+                          }`}>
+                            {selectedState === "complete" ? "✓" : selectedState === "error" ? "!" : selectedStep}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-semibold text-zinc-100 truncate">{selectedMeta.title}</div>
+                            <div className="text-[11px] text-zinc-500 truncate">{selectedMeta.desc}</div>
+                          </div>
+                        </div>
+                        {selectedOutput && selectedState === "complete" && (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => copyText(selectedOutput)}
+                              className="cursor-pointer px-2.5 py-1 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-100 rounded-md text-[11px] font-mono transition-colors active:scale-95"
+                            >Copy</button>
+                            <button
+                              onClick={() => downloadTxt(`${fileSlug}_${filenameMap[selectedStep]}`, selectedOutput)}
+                              className="cursor-pointer px-2.5 py-1 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-100 rounded-md text-[11px] font-mono transition-colors active:scale-95"
+                            >↓ .txt</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 p-4">
+                        {selectedState === "locked" && (
+                          <div className="h-full flex items-center justify-center min-h-[320px]">
+                            <div className="text-center space-y-1.5">
+                              <div className="text-[12px] font-mono text-zinc-600">Step not started</div>
+                              <div className="text-[11px] text-zinc-700">Waiting for previous steps</div>
+                            </div>
+                          </div>
+                        )}
+                        {selectedState === "running" && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              <span className="text-[12px] font-mono text-blue-400">{statusLabel || "Running…"}</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {[100, 92, 96, 88, 70, 95, 60].map((w, i) => (
+                                <div key={i} className="h-2.5 bg-zinc-800/60 rounded animate-pulse" style={{ width: `${w}%`, animationDelay: `${i * 80}ms` }} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {selectedState === "error" && (
+                          <div className="space-y-3">
+                            <div className="px-3 py-2.5 rounded-lg bg-red-950/40 border border-red-900/50">
+                              <p className="text-[12px] text-red-400 font-mono leading-relaxed">{errorMessage}</p>
+                            </div>
+                            <button
+                              onClick={() => retryStep(selectedStep)}
+                              className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-md text-[12px] transition-colors active:scale-95"
+                            >Retry step {selectedStep}</button>
+                          </div>
+                        )}
+                        {selectedState === "complete" && selectedOutput && (
+                          <pre className="text-[11.5px] font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed max-h-[520px] overflow-y-auto fade-in">{selectedOutput}</pre>
+                        )}
+                        {selectedState === "complete" && !selectedOutput && (
+                          <div className="h-full flex items-center justify-center min-h-[320px]">
+                            <div className="text-[12px] font-mono text-zinc-600">Skipped — no changes required</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Footer actions */}
+                {isComplete && (
+                  <section className="flex flex-wrap items-center gap-3 fade-in">
+                    <button
+                      onClick={() => setCurrentTab(2)}
+                      className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium text-[13px] rounded-md transition-all duration-150"
+                    >Continue to Stage 2 →</button>
+                    <button
+                      onClick={downloadAll}
+                      className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-100 rounded-md font-mono text-[12px] transition-colors active:scale-95"
+                    >↓ Download All (.zip)</button>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ====================== STAGE 2: COPY ====================== */}
+        {currentTab === 2 && (
+          <div className="space-y-5 fade-in">
+            <section>
+              <div className="flex items-baseline justify-between mb-2">
+                <h2 className="text-[14px] font-semibold text-zinc-100 tracking-tight">German copy generation</h2>
+                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Stage 2 of 3</span>
+              </div>
+              <p className="text-[12px] text-zinc-500">Product names, headlines, benefits, FAQs, Facebook copy, one-liners — generated using the Stage 1 research.</p>
+            </section>
+
+            <section className="border border-zinc-800 rounded-xl bg-zinc-900/30 overflow-hidden divide-y divide-zinc-800/70">
+              <div className="p-4 space-y-1.5">
+                <label className="block text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Brand / product name</label>
+                <input
+                  ref={productNameRef}
+                  type="text"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
+                  placeholder="e.g. WELLENFROH"
+                  disabled={pipelineIsStage2Running}
+                  className="w-full bg-transparent text-[14px] text-zinc-100 placeholder-zinc-700 focus:outline-none disabled:opacity-40"
+                />
+                <p className="text-[10px] text-zinc-600 font-mono">Used in all generated copy · pre-filled from Stage 1 suggestions</p>
+              </div>
+
+              <div className="p-4 flex items-center gap-3">
+                <button
+                  onClick={runStage2}
+                  disabled={!canRunStage2 || pipelineIsStage2Running}
+                  className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-medium text-[13px] rounded-md transition-all duration-150"
+                >
+                  {pipelineIsStage2Running ? "Generating…" : stage2Output ? "Re-generate" : "Generate Copy"}
+                </button>
+                {pipelineIsStage2Running && (
+                  <span className="flex items-center gap-2 text-[11px] font-mono text-blue-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    Generating German copy kit…
+                  </span>
+                )}
+                {!productName.trim() && !pipelineIsStage2Running && !stage2Output && (
+                  <span className="text-[11px] font-mono text-amber-500/80">Enter a brand name to enable</span>
+                )}
+              </div>
+
               {errorStage === 12 && (
-                <div className="space-y-2">
-                  <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
-                  <button
-                    onClick={runStage2}
-                    className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
-                  >
-                    Retry Stage 2
-                  </button>
+                <div className="p-4">
+                  <div className="px-3 py-2.5 rounded-lg bg-red-950/40 border border-red-900/50">
+                    <p className="text-[12px] text-red-400 font-mono">{errorMessage}</p>
+                  </div>
                 </div>
               )}
 
-              {/* Output */}
               {stage2Output && !pipelineIsStage2Running && (
-                <div className="space-y-3">
+                <div className="p-4 space-y-3 fade-in">
                   <OutputBlock text={stage2Output} />
                   <FeedbackBar runId={runId} stage={2} />
                 </div>
               )}
+            </section>
 
-              {/* Continue to Stage 3 */}
-              {pipelineIsStage2Done && (
-                <div className="pt-3 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between fade-in">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
-                    <div>
-                      <span className="text-[13px] font-medium text-emerald-400">Stage 2 complete</span>
-                      <span className="text-[12px] text-zinc-500 ml-2">German copy kit ready</span>
-                    </div>
+            {pipelineIsStage2Done && (
+              <section className="border border-emerald-900/40 rounded-xl bg-emerald-950/20 p-4 flex flex-wrap items-center justify-between gap-3 fade-in">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400">✓</span>
+                  <div>
+                    <div className="text-[13px] font-medium text-emerald-400">Stage 2 complete</div>
+                    <div className="text-[11px] text-zinc-500">German copy kit ready · continue to image generation</div>
                   </div>
-                  {runId ? (
-                    <a
-                      href={`/stage3?runId=${runId}`}
-                      className="cursor-pointer flex-shrink-0 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-mono text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-center"
-                    >
-                      Continue to Stage 3 →
-                    </a>
-                  ) : (
-                    <span className="font-mono text-[11px] text-zinc-500 animate-pulse">Saving run…</span>
-                  )}
                 </div>
-              )}
-            </div>
+                {runId ? (
+                  <a
+                    href={`/stage3?runId=${runId}`}
+                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium text-[13px] rounded-md transition-all duration-150"
+                  >Continue to Stage 3 →</a>
+                ) : (
+                  <span className="text-[11px] font-mono text-zinc-500 animate-pulse">Saving run…</span>
+                )}
+              </section>
+            )}
           </div>
         )}
+
       </div>
+
     </main>
   );
 
