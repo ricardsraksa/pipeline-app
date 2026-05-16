@@ -863,7 +863,7 @@ export default function Home() {
         {/* Inputs */}
         <div className="space-y-5 mb-8">
           <div>
-            <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
+            <label className="block font-mono text-[10px] text-[#666] uppercase tracking-[0.15em] mb-2">
               Product URL
             </label>
             <input
@@ -873,14 +873,14 @@ export default function Home() {
               onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
               placeholder="https://www.aliexpress.com/item/..."
               disabled={isActive}
-              className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 transition-colors duration-150"
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 transition-colors duration-150"
             />
           </div>
 
           <div>
-            <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
+            <label className="block font-mono text-[10px] text-[#666] uppercase tracking-[0.15em] mb-2">
               Product Description
-              <span className="ml-2 normal-case text-[#2a2a2a] tracking-normal">optional — overrides scraper</span>
+              <span className="ml-2 normal-case text-[#444] tracking-normal">optional — overrides scraper</span>
             </label>
             <textarea
               value={productDescription}
@@ -888,15 +888,15 @@ export default function Home() {
               rows={3}
               placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10. Use when the listing is in another language or unclear."
               disabled={isActive}
-              className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
+              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
             />
           </div>
 
           <details className="group">
-            <summary className="cursor-pointer font-mono text-[11px] text-[#333] hover:text-[#666] transition-colors duration-150 select-none list-none flex items-center gap-1.5">
+            <summary className="cursor-pointer font-mono text-[11px] text-[#555] hover:text-[#888] transition-colors duration-150 select-none list-none flex items-center gap-1.5">
               <span className="text-[9px] group-open:rotate-90 transition-transform duration-150 inline-block">▶</span>
               Competitor URLs
-              <span className="text-[#222]">optional</span>
+              <span className="text-[#444]">optional</span>
             </summary>
             <div className="mt-2">
               <textarea
@@ -905,7 +905,7 @@ export default function Home() {
                 placeholder="One URL per line"
                 rows={3}
                 disabled={isActive}
-                className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
+                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
               />
             </div>
           </details>

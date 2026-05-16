@@ -53,21 +53,21 @@ export default async function RunPage({ params }: { params: Promise<unknown> }) 
       <div className="max-w-4xl mx-auto px-4 pt-8">
         {/* Page header */}
         <div className="mb-8 pb-8 border-b border-[#111]">
-          <Link href="/history" className="font-mono text-[10px] text-[#333] hover:text-[#666] transition-colors mb-4 block">
+          <Link href="/history" className="font-mono text-[10px] text-[#555] hover:text-[#999] transition-colors mb-4 block">
             ← History
           </Link>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <h1 className="font-mono text-base text-white">{displayName}</h1>
-                <span className="font-mono text-[10px] text-[#333]">#{run.id}</span>
+                <span className="font-mono text-[10px] text-[#555]">#{run.id}</span>
                 <StatusPill status={run.status} />
               </div>
-              <p className="font-mono text-[11px] text-[#333] truncate max-w-lg">
+              <p className="font-mono text-[11px] text-[#555] truncate max-w-lg">
                 {run.product_url}
               </p>
             </div>
-            <p className="font-mono text-[10px] text-[#333] flex-shrink-0">{formatDate(run.created_at)}</p>
+            <p className="font-mono text-[10px] text-[#555] flex-shrink-0">{formatDate(run.created_at)}</p>
           </div>
         </div>
 

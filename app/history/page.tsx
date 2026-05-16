@@ -94,19 +94,19 @@ export default async function HistoryPage() {
                 <Link
                   key={run.id}
                   href={`/history/${run.id}`}
-                  className="group flex items-center gap-4 rounded-lg border border-[#111] hover:border-[#222] bg-[#050505] hover:bg-[#0a0a0a] px-5 py-3.5 transition-all duration-100"
+                  className="group flex items-center gap-4 rounded-lg border border-[#1e1e1e] hover:border-[#333] bg-[#080808] hover:bg-[#0d0d0d] px-5 py-3.5 transition-all duration-100"
                 >
                   {/* Identity */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="font-mono text-[13px] text-[#c8c8c8] group-hover:text-white transition-colors truncate">
+                      <span className="font-mono text-[13px] text-[#d4d4d4] group-hover:text-white transition-colors truncate">
                         {name}
                       </span>
-                      <span className="font-mono text-[9px] text-[#252525] group-hover:text-[#333] flex-shrink-0">
+                      <span className="font-mono text-[9px] text-[#444] group-hover:text-[#666] flex-shrink-0">
                         #{run.id}
                       </span>
                     </div>
-                    <p className="font-mono text-[10px] text-[#252525] group-hover:text-[#2a2a2a] transition-colors truncate">
+                    <p className="font-mono text-[10px] text-[#444] group-hover:text-[#666] transition-colors truncate">
                       {truncateUrl(run.product_url)}
                     </p>
                   </div>
@@ -115,7 +115,7 @@ export default async function HistoryPage() {
                   <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
                     <StatusPill status={run.status} />
                     {run.doc_count > 0 && (
-                      <span className="font-mono text-[10px] text-[#2a2a2a] group-hover:text-[#333] transition-colors">
+                      <span className="font-mono text-[10px] text-[#444] group-hover:text-[#666] transition-colors">
                         {run.doc_count} doc{run.doc_count !== 1 ? "s" : ""}
                       </span>
                     )}
@@ -123,7 +123,7 @@ export default async function HistoryPage() {
 
                   {/* Date */}
                   <div className="flex-shrink-0 text-right">
-                    <p className="font-mono text-[10px] text-[#2e2e2e] group-hover:text-[#404040] transition-colors">
+                    <p className="font-mono text-[10px] text-[#555] group-hover:text-[#888] transition-colors">
                       {formatDate(run.created_at)}
                     </p>
                     <p className="font-mono text-[9px] text-[#2563eb] opacity-0 group-hover:opacity-70 transition-opacity mt-0.5">

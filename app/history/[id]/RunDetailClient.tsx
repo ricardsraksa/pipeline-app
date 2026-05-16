@@ -21,7 +21,7 @@ function CopyBtn({ text }: { text: string }) {
       className={`font-mono text-[10px] px-2.5 py-1 rounded border transition-colors ${
         ok
           ? "border-emerald-800 text-emerald-500 bg-emerald-950/40"
-          : "border-[#1e1e1e] text-[#404040] hover:text-[#737373] hover:border-[#2a2a2a] bg-transparent"
+          : "border-[#333] text-[#666] hover:text-[#aaa] hover:border-[#555] bg-transparent"
       }`}
     >
       {ok ? "Copied ✓" : "Copy"}
@@ -40,7 +40,7 @@ function DlBtn({ filename, text }: { filename: string; text: string }) {
         a.click();
         URL.revokeObjectURL(a.href);
       }}
-      className="font-mono text-[10px] px-2.5 py-1 rounded border border-[#1e1e1e] text-[#404040] hover:text-[#737373] hover:border-[#2a2a2a] transition-colors"
+      className="font-mono text-[10px] px-2.5 py-1 rounded border border-[#333] text-[#666] hover:text-[#aaa] hover:border-[#555] transition-colors"
     >
       ↓ .txt
     </button>
@@ -54,14 +54,14 @@ function CollapsibleText({ text }: { text: string }) {
     <div>
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 font-mono text-[10px] text-[#333] hover:text-[#737373] transition-colors py-1"
+        className="flex items-center gap-2 font-mono text-[10px] text-[#666] hover:text-[#aaa] transition-colors py-1"
       >
         <span className="text-[8px]">{open ? "▼" : "▶"}</span>
         Scraped text — {text.length.toLocaleString()} chars
       </button>
       {open && (
         <div className="mt-2 max-h-64 overflow-y-auto rounded border border-[#1a1a1a] bg-[#080808] p-3">
-          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] text-[#4a4a4a] leading-relaxed">
+          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] text-[#888] leading-relaxed">
             {text}
           </pre>
         </div>
@@ -130,9 +130,9 @@ function DocCard({
   accent?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border overflow-hidden ${accent ? "border-[#1a3a2a] bg-[#090f0a]" : "border-[#141414] bg-[#0c0c0c]"}`}>
-      <div className={`flex items-center justify-between px-4 py-2 border-b ${accent ? "border-[#1a3a2a]" : "border-[#141414]"}`}>
-        <span className={`font-mono text-[10px] uppercase tracking-wider ${accent ? "text-emerald-500" : "text-[#333]"}`}>
+    <div className={`rounded-lg border overflow-hidden ${accent ? "border-[#1a3a2a] bg-[#090f0a]" : "border-[#222] bg-[#0c0c0c]"}`}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${accent ? "border-[#1a3a2a]" : "border-[#222]"}`}>
+        <span className={`font-mono text-[10px] uppercase tracking-wider ${accent ? "text-emerald-500" : "text-[#555]"}`}>
           {label}
         </span>
         <div className="flex items-center gap-1.5">
@@ -167,7 +167,7 @@ function StepRow({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <h3 className="font-mono text-[11px] text-[#404040] uppercase tracking-widest">{stepLabel}</h3>
+        <h3 className="font-mono text-[11px] text-[#666] uppercase tracking-widest">{stepLabel}</h3>
         {hasRevision && (
           <span className="font-mono text-[9px] text-amber-500 bg-amber-950/40 border border-amber-900/40 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
             Revised
@@ -192,7 +192,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
     <section className="space-y-3">
       <div className="flex items-center gap-3">
         <span className="font-mono text-[9px] text-[#2563eb] tracking-[0.25em] uppercase">{label}</span>
-        <div className="flex-1 h-px bg-[#141414]" />
+        <div className="flex-1 h-px bg-[#222]" />
       </div>
       {children}
     </section>
@@ -274,9 +274,9 @@ export default function RunDetailClient({ run }: Props) {
 
       {/* Inputs */}
       <Section label="Inputs">
-        <div className="rounded-lg border border-[#141414] bg-[#0c0c0c] divide-y divide-[#141414]">
+        <div className="rounded-lg border border-[#222] bg-[#0c0c0c] divide-y divide-[#222]">
           <div className="flex items-start gap-4 px-4 py-3">
-            <span className="font-mono text-[9px] text-[#2a2a2a] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+            <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
               Product URL
             </span>
             <a
@@ -290,7 +290,7 @@ export default function RunDetailClient({ run }: Props) {
           </div>
           {run.product_description && (
             <div className="flex items-start gap-4 px-4 py-3">
-              <span className="font-mono text-[9px] text-[#2a2a2a] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+              <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
                 Description
               </span>
               <p className="font-mono text-[11px] text-[#555] leading-relaxed whitespace-pre-wrap">
@@ -300,7 +300,7 @@ export default function RunDetailClient({ run }: Props) {
           )}
           {competitorUrls.length > 0 && (
             <div className="flex items-start gap-4 px-4 py-3">
-              <span className="font-mono text-[9px] text-[#2a2a2a] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+              <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
                 Competitors
               </span>
               <div className="space-y-1">
@@ -324,10 +324,10 @@ export default function RunDetailClient({ run }: Props) {
       {/* Scraper Data */}
       {scraperData && (scraperData.scraped_text || (scraperData.images?.length ?? 0) > 0) && (
         <Section label="Scraper Data">
-          <div className="rounded-lg border border-[#141414] bg-[#0c0c0c] divide-y divide-[#141414]">
+          <div className="rounded-lg border border-[#222] bg-[#0c0c0c] divide-y divide-[#222]">
             {scraperData.images && scraperData.images.length > 0 && (
               <div className="p-4">
-                <p className="font-mono text-[9px] text-[#2a2a2a] uppercase tracking-wider mb-3">
+                <p className="font-mono text-[9px] text-[#555] uppercase tracking-wider mb-3">
                   Product images · {scraperData.images.length}
                 </p>
                 <ImageGrid urls={scraperData.images} cols={4} />
