@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import StageCard from "@/components/StageCard";
+import { useState, useRef, useEffect } from "react";
 import OutputBlock from "@/components/OutputBlock";
-import ImageUploader from "@/components/ImageUploader";
-import ImageGrid from "@/components/ImageGrid";
 import FeedbackBar from "@/components/FeedbackBar";
 import JSZip from "jszip";
 import type { ImagePrompt } from "@/app/api/stage3-prompts/route";
@@ -234,24 +231,6 @@ function ResearchStepCard({
   );
 }
 
-function imageStageCardState(
-  pipeline: string,
-  errorStage: number | null,
-  stageNum: number
-): "locked" | "running" | "complete" | "error" {
-  if (errorStage === stageNum + 10) return "error";
-  if (stageNum === 2) {
-    if (pipeline === "stage2_running") return "running";
-    if (["stage2_done", "stage3_prompts_running", "stage3_prompts_done", "stage3_images_running", "stage3_images_done"].includes(pipeline)) return "complete";
-    return "locked";
-  }
-  if (stageNum === 3) {
-    if (pipeline === "stage3_prompts_running" || pipeline === "stage3_images_running") return "running";
-    if (pipeline === "stage3_images_done") return "complete";
-    return "locked";
-  }
-  return "locked";
-}
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -275,8 +254,20 @@ export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [ambiguousListing, setAmbiguousListing] = useState(false);
+  const [shownStage, setShownStage] = useState(1);
 
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const productNameRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus product name input when Stage 2 panel is revealed
+  useEffect(() => {
+    if (shownStage === 2 && productNameRef.current) {
+      setTimeout(() => {
+        productNameRef.current?.focus();
+        productNameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
+    }
+  }, [shownStage]);
 
   const allImages = [...scrapedImages, ...userImages];
 
@@ -296,41 +287,74 @@ export default function Home() {
   }
 
   function extractBrandSlug(offerBriefText: string): string | null {
-    // Step 1: Find "Brand Name Options" section specifically, then grab the first bullet item
+    // Helper: extract brand name from a single list line (bullet or numbered)
+    function parseBrandLine(line: string): string | null {
+      // Strip leading bullet/number: "- ", "* ", "1. ", "1) "
+      const stripped = line.replace(/^(?:[-*]|\d+[.):])\s+/, "").replace(/\*\*/g, "").trim();
+      if (!stripped) return null;
+      // Take only the part before " - ", " – ", " — ", or " (" (description separator)
+      const name = stripped.split(/\s+[-–—]\s+|\s+\(/)[0].trim();
+      if (name.length > 0 && name.length < 60) return name;
+      return null;
+    }
+
+    // Regex to find first list item (bullet or numbered)
+    const isListLine = (l: string) => /^(?:[-*]|\d+[.):])\s+\S/.test(l);
+
+    // Step 1: Find "Brand Name Options/Suggestions" section, grab first list item
     const optionsMatch = offerBriefText.match(
-      /brand name[^\n]*?options?[^\n]*\n([\s\S]{0,600}?)(?=\n\n\d\.|\n\n\*\*\d\.|\n\n##|$)/i
+      /brand name[^\n]*?(?:options?|suggestions?)[^\n]*\n([\s\S]{0,600}?)(?=\n\n\d\.|\n\n\*\*\d\.|\n\n##|$)/i
     );
     if (optionsMatch) {
       const block = optionsMatch[1];
-      // Find first line that starts with a bullet (- or *)
-      const bulletLine = block.split("\n").find(l => /^[-*]\s+\S/.test(l));
-      if (bulletLine) {
-        const name = bulletLine
-          .replace(/^[-*]\s+/, "")       // strip bullet character
-          .replace(/\*\*/g, "")           // strip markdown bold markers
-          .split(/\s*[-–(]/)[0]           // stop at dash/paren qualifiers like "- recommended"
-          .trim();
-        if (name.length > 0 && name.length < 60) return toSlug(name) || null;
+      const listLine = block.split("\n").find(isListLine);
+      if (listLine) {
+        const name = parseBrandLine(listLine);
+        if (name) return toSlug(name) || null;
       }
     }
-    // Step 2: Broader fallback — any "brand name" or "product name" section, first bullet
-    const sectionMatch = offerBriefText.match(/(?:product name|brand name)[^\n]*\n([\s\S]{0,600}?)(?:\n\n|\n\d\.|\n##)/i);
-    if (!sectionMatch) return null;
-    const block = sectionMatch[1];
-    const bulletLine = block.split("\n").find(l => /^[-*]\s+\S/.test(l));
-    if (bulletLine) {
-      const name = bulletLine
-        .replace(/^[-*]\s+/, "")
-        .replace(/\*\*/g, "")
-        .split(/\s*[-–(]/)[0]
-        .trim();
-      if (name.length > 0 && name.length < 60) return toSlug(name) || null;
+
+    // Step 2: Broader fallback — any "brand name" or "product name" section, first list item
+    const sectionMatch = offerBriefText.match(/(?:product name|brand name)[^\n]*\n([\s\S]{0,600}?)(?:\n\n|\n##)/i);
+    if (sectionMatch) {
+      const block = sectionMatch[1];
+      const listLine = block.split("\n").find(isListLine);
+      if (listLine) {
+        const name = parseBrandLine(listLine);
+        if (name) return toSlug(name) || null;
+      }
+      // Step 3: Last resort — first non-empty, non-header line in block
+      const firstLine = block.split("\n")
+        .map(l => l.replace(/^[-*\d.):\s#*]+/, "").trim())
+        .find(l => l.length > 0 && l.length < 60 && !l.includes(":"));
+      return firstLine ? toSlug(firstLine) || null : null;
     }
-    // Step 3: Last resort — first non-empty, non-header line
-    const firstLine = block.split("\n")
-      .map(l => l.replace(/^[-*\d.*\s#]+/, "").trim())
-      .find(l => l.length > 0 && l.length < 60 && !l.includes(":"));
-    return firstLine ? toSlug(firstLine) || null : null;
+
+    return null;
+  }
+
+  // Same logic as extractBrandSlug but returns the raw (un-slugified) display name
+  function extractRawBrandName(offerBriefText: string): string | null {
+    function parseLine(line: string): string | null {
+      const stripped = line.replace(/^(?:[-*]|\d+[.):])\s+/, "").replace(/\*\*/g, "").trim();
+      if (!stripped) return null;
+      const name = stripped.split(/\s+[-–—]\s+|\s+\(/)[0].trim();
+      return name.length > 0 && name.length < 60 ? name : null;
+    }
+    const isListLine = (l: string) => /^(?:[-*]|\d+[.):])\s+\S/.test(l);
+    const optionsMatch = offerBriefText.match(
+      /brand name[^\n]*?(?:options?|suggestions?)[^\n]*\n([\s\S]{0,600}?)(?=\n\n\d\.|\n\n\*\*\d\.|\n\n##|$)/i
+    );
+    if (optionsMatch) {
+      const listLine = optionsMatch[1].split("\n").find(isListLine);
+      if (listLine) { const n = parseLine(listLine); if (n) return n; }
+    }
+    const sectionMatch = offerBriefText.match(/(?:product name|brand name)[^\n]*\n([\s\S]{0,600}?)(?:\n\n|\n##)/i);
+    if (sectionMatch) {
+      const listLine = sectionMatch[1].split("\n").find(isListLine);
+      if (listLine) { const n = parseLine(listLine); if (n) return n; }
+    }
+    return null;
   }
 
   function extractProductSlug(researchText: string): string | null {
@@ -418,6 +442,7 @@ export default function Home() {
     setProductName("");
     setBrandSlug(null);
     setProductSlug(null);
+    setShownStage(1);
 
     const competitorList = competitorUrls
       .split("\n")
@@ -540,6 +565,9 @@ export default function Home() {
       setOutputs((prev) => ({ ...prev, offer_brief: offerBrief }));
       const bSlug = extractBrandSlug(offerBrief);
       setBrandSlug(bSlug);
+      // Pre-fill Stage 2 product name from the offer brief brand suggestions
+      const rawName = extractRawBrandName(offerBrief);
+      if (rawName) setProductName(rawName);
       setPipeline("step4b_done");
     } catch (err) {
       setError(5, err instanceof Error ? err.message : String(err));
@@ -880,6 +908,8 @@ export default function Home() {
   const canRunStage3 =
     pipelineIsStage2Done && (!showImageUploader || hasEnoughImages);
   const isDone = pipelineIsStage3ImagesDone;
+  // Stage 2 panel visible once user clicks Continue or pipeline is already past Stage 1
+  const showStage2Panel = shownStage >= 2 || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone;
 
   const step6Skipped =
     outputs.avatar_revised !== null &&
@@ -1262,142 +1292,141 @@ export default function Home() {
               }}
             />
 
-            {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && outputs.research_revised && (
-              <div className="px-4 py-3 border-t border-zinc-800">
-                <button
-                  onClick={downloadAll}
-                  className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150"
-                >
-                  ↓ Download All (.zip)
-                </button>
-              </div>
-            )}
+          </div>
+        )}
 
-            {/* Image generation stage (kept from original) */}
-            {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && (
-              <div className="mt-6 border-t border-zinc-800 pt-6 px-4">
-                <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest mb-4">
-                  Image Generation — Optional
-                </p>
+        {/* Download All — below the step cards, shown when Stage 1 done */}
+        {showPipeline && (isComplete || showStage2Panel) && outputs.research_revised && (
+          <div className="mt-3">
+            <button
+              onClick={downloadAll}
+              className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150"
+            >
+              ↓ Download All (.zip)
+            </button>
+          </div>
+        )}
 
-                <div className="space-y-3">
-                  <StageCard
-                    number={2}
-                    title="Stage 2 — German Copy"
-                    description="Product names, headlines, benefits, FAQs, Facebook copy, one-liners"
-                    state={imageStageCardState(pipeline, errorStage, 2)}
-                  >
-                    {pipelineIsStage2Running && (
-                      <p className="text-[11px] text-blue-400 font-mono animate-pulse">Generating German copy kit…</p>
-                    )}
+        {/* Continue to Stage 2 CTA — standalone card, shown after Stage 1 completes */}
+        {isComplete && !showStage2Panel && (
+          <div className="mt-4 px-5 py-4 border border-zinc-800 rounded-xl bg-zinc-900/20 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
+              <span className="font-mono text-[12px] text-emerald-400">Stage 1 complete — research &amp; copy briefs ready</span>
+            </div>
+            <button
+              onClick={() => setShownStage(2)}
+              className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm rounded-lg transition-colors duration-150 flex-shrink-0"
+            >
+              Continue to Stage 2: Copy Generation →
+            </button>
+          </div>
+        )}
 
-                    {errorStage === 12 && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
-                        <button
-                          onClick={runStage2}
-                          className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
-                        >
-                          Retry Stage 2
-                        </button>
-                      </div>
-                    )}
-
-                    {stage2Output && !pipelineIsStage2Running && (
-                      <div className="space-y-3">
-                        <OutputBlock text={stage2Output} />
-                        <FeedbackBar runId={runId} stage={2} />
-                        {pipelineIsStage2Done && (
-                          <div className="space-y-3 pt-1 border-t border-zinc-800 mt-3">
-                            {showImageUploader && allImages.length < 2 && (
-                              <div>
-                                <p className="text-amber-400 text-xs font-mono mb-2">
-                                  Add at least 2 reference images before Stage 3:
-                                </p>
-                                <ImageUploader
-                                  images={userImages}
-                                  onImagesChange={setUserImages}
-                                  minImages={2}
-                                />
-                              </div>
-                            )}
-                            <button
-                              onClick={runStage3}
-                              disabled={!canRunStage3}
-                              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
-                            >
-                              Continue to Stage 3 →
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {pipeline === "complete" && !stage2Output && (
-                      <div className="space-y-3">
-                        {showImageUploader && (
-                          <div>
-                            <p className="text-amber-400 text-xs font-mono mb-2">
-                              Add reference images for Stage 3:
-                            </p>
-                            <ImageUploader
-                              images={userImages}
-                              onImagesChange={setUserImages}
-                              minImages={2}
-                            />
-                          </div>
-                        )}
-                        <div>
-                          <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
-                            Working product name
-                          </label>
-                          <input
-                            type="text"
-                            value={productName}
-                            onChange={(e) => setProductName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
-                            placeholder="e.g. WELLENFROH"
-                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
-                          />
-                        </div>
-                        <button
-                          onClick={runStage2}
-                          disabled={!canRunStage2}
-                          className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
-                        >
-                          Run Stage 2 (German Copy) →
-                        </button>
-                      </div>
-                    )}
-                  </StageCard>
-
-                  <StageCard
-                    number={3}
-                    title="Stage 3 — Image Generation"
-                    description="11 Higgsfield prompts with QC gate, audit loop, and feedback learning"
-                    state={imageStageCardState(pipeline, errorStage, 3)}
-                  >
-                    {/* Stage 3 entry point — navigates to /stage3 page */}
-                    {(pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && runId && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] text-zinc-500 font-mono">
-                          Stage 2 complete. Ready to generate product images.
-                        </p>
-                        <a
-                          href={`/stage3?runId=${runId}`}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
-                        >
-                          Open Image Generation →
-                        </a>
-                      </div>
-                    )}
-                    {pipelineIsStage3ImagesDone && (
-                      <p className="text-[11px] text-emerald-400 font-mono">Images generated.</p>
-                    )}
-                  </StageCard>
+        {/* Stage 2 panel — standalone card below the step cards */}
+        {showStage2Panel && (
+          <div className="mt-4 border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/20">
+            {/* Stage 2 header row */}
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-start gap-3">
+              <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 mt-px ${
+                pipelineIsStage2Running
+                  ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 animate-pulse"
+                  : pipelineIsStage2Done
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-zinc-900 text-zinc-500 border border-zinc-800"
+              }`}>
+                {pipelineIsStage2Done ? "✓" : "2"}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[13px] text-zinc-100">Stage 2 — German Copy</span>
+                  {pipelineIsStage2Running && <span className="text-[10px] font-mono text-blue-400 animate-pulse">running</span>}
+                  {pipelineIsStage2Done && <span className="text-[10px] font-mono text-zinc-600">done</span>}
                 </div>
+                <p className="text-[11px] text-zinc-600 font-mono mt-0.5">Product names, headlines, benefits, FAQs, Facebook copy, one-liners</p>
               </div>
-            )}
+            </div>
+
+            <div className="px-4 py-4 space-y-3">
+              {/* Not yet started */}
+              {!pipelineIsStage2Running && !stage2Output && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
+                      Working brand / product name
+                      <span className="text-zinc-700 tracking-normal normal-case ml-2">used in all copy outputs</span>
+                    </label>
+                    <input
+                      ref={productNameRef}
+                      type="text"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
+                      placeholder="e.g. WELLENFROH"
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors"
+                    />
+                    {!productName.trim() && (
+                      <p className="mt-1.5 text-[11px] font-mono text-amber-500/80">
+                        Enter a brand name above to enable Stage 2
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={runStage2}
+                    disabled={!canRunStage2}
+                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
+                  >
+                    Start Stage 2 →
+                  </button>
+                </div>
+              )}
+
+              {/* Running */}
+              {pipelineIsStage2Running && (
+                <p className="text-[11px] text-blue-400 font-mono animate-pulse">Generating German copy kit…</p>
+              )}
+
+              {/* Error */}
+              {errorStage === 12 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
+                  <button
+                    onClick={runStage2}
+                    className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
+                  >
+                    Retry Stage 2
+                  </button>
+                </div>
+              )}
+
+              {/* Output */}
+              {stage2Output && !pipelineIsStage2Running && (
+                <div className="space-y-3">
+                  <OutputBlock text={stage2Output} />
+                  <FeedbackBar runId={runId} stage={2} />
+                </div>
+              )}
+
+              {/* Continue to Stage 3 */}
+              {pipelineIsStage2Done && (
+                <div className="pt-3 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
+                    <span className="font-mono text-[12px] text-emerald-400">Stage 2 complete — German copy kit ready</span>
+                  </div>
+                  {runId ? (
+                    <a
+                      href={`/stage3?runId=${runId}`}
+                      className="cursor-pointer flex-shrink-0 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm rounded-lg transition-colors duration-150 inline-flex items-center justify-center"
+                    >
+                      Continue to Stage 3: Image Generation →
+                    </a>
+                  ) : (
+                    <span className="font-mono text-[11px] text-zinc-500 animate-pulse">Saving run…</span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
