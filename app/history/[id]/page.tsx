@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Run } from "@/lib/db";
-import type { ImagePrompt } from "@/app/api/stage3-prompts/route";
+import RunDetailClient from "./RunDetailClient";
 
 async function getRun(id: string): Promise<Run | null> {
   try {
@@ -17,160 +18,74 @@ async function getRun(id: string): Promise<Run | null> {
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
     });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
-function FeedbackBadge({ value, label }: { value: string | null; label: string }) {
+function StatusPill({ status }: { status: string | null }) {
+  const s = status ?? "";
+  if (!s) return null;
+  const variants: Record<string, string> = {
+    complete: "bg-emerald-950/60 text-emerald-400 border-emerald-900/50",
+    partial:  "bg-amber-950/60  text-amber-400  border-amber-900/50",
+    failed:   "bg-red-950/60    text-red-400    border-red-900/50",
+  };
+  const cls = variants[s] ?? "bg-[#111] text-[#737373] border-[#222]";
   return (
-    <span className="flex items-center gap-1.5 text-xs font-mono">
-      <span className="text-[#404040]">{label}</span>
-      {value ? (
-        <span className={value === "up" ? "text-[#16a34a]" : "text-[#dc2626]"}>
-          {value === "up" ? "↑ good" : "↓ bad"}
-        </span>
-      ) : (
-        <span className="text-[#333]">no feedback</span>
-      )}
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono border tracking-wider uppercase ${cls}`}>
+      <span className="w-1 h-1 rounded-full bg-current opacity-80" />
+      {s}
     </span>
   );
 }
 
-export default async function RunPage({
-  params,
-}: {
-  params: Promise<unknown>;
-}) {
+export default async function RunPage({ params }: { params: Promise<unknown> }) {
   const { id } = (await params) as { id: string };
   const run = await getRun(id);
-
   if (!run) notFound();
 
-  const imageUrls: string[] = run.image_urls ? JSON.parse(run.image_urls) : [];
-  const stage3Prompts: ImagePrompt[] = run.stage3_prompts
-    ? JSON.parse(run.stage3_prompts)
-    : [];
-
-  const infographicUrls = stage3Prompts
-    .filter((p) => p.category === "INFOGRAPHIC")
-    .map((p) => imageUrls[p.index - 1])
-    .filter(Boolean);
-
-  const contextualUrls = stage3Prompts
-    .filter((p) => p.category === "CONTEXTUAL")
-    .map((p) => imageUrls[p.index - 1])
-    .filter(Boolean);
+  const displayName = run.brand_name ?? run.product_name ?? "(unnamed)";
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] pb-16">
-      <div className="max-w-2xl mx-auto px-4 pt-8">
-        <div className="mb-7">
-          <a
-            href="/history"
-            className="text-xs font-mono text-[#404040] hover:text-[#737373] transition-colors mb-4 block"
-          >
-            ← History
-          </a>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="font-mono text-sm text-[#e5e5e5] mb-1">
-                {run.product_name || "(unnamed)"}
-              </h1>
-              <p className="text-xs text-[#404040] font-mono truncate max-w-md">
-                {run.product_url}
-              </p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-xs text-[#404040] font-mono">{formatDate(run.created_at)}</p>
-              <p className="text-xs font-mono text-[#2563eb] mt-0.5">Run #{run.id}</p>
-            </div>
+    <main className="min-h-screen bg-[#080808] pb-24">
+      {/* Top nav */}
+      <div className="border-b border-[#141414] bg-[#0a0a0a] sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href="/history"
+              className="font-mono text-[10px] text-[#333] hover:text-[#737373] transition-colors flex-shrink-0"
+            >
+              ← History
+            </Link>
+            <span className="text-[#1e1e1e] flex-shrink-0">·</span>
+            <span className="font-mono text-[10px] text-[#404040] truncate">{displayName}</span>
           </div>
+          <span className="font-mono text-[9px] text-[#2a2a2a] flex-shrink-0">Run #{run.id}</span>
+        </div>
+      </div>
 
-          <div className="flex items-center gap-4 mt-4">
-            <FeedbackBadge value={run.feedback_stage1} label="S1" />
-            <FeedbackBadge value={run.feedback_stage2} label="S2" />
-            <FeedbackBadge value={run.feedback_stage3} label="S3" />
-          </div>
-
-          {run.notes && (
-            <p className="mt-3 text-xs text-[#737373] bg-[#111] border border-[#2a2a2a] rounded px-3 py-2">
-              {run.notes}
+      <div className="max-w-4xl mx-auto px-4 pt-8">
+        {/* Page header */}
+        <div className="flex items-start justify-between gap-6 mb-8 pb-8 border-b border-[#141414]">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <h1 className="font-mono text-lg text-[#e5e5e5]">{displayName}</h1>
+              <StatusPill status={run.status} />
+            </div>
+            <p className="font-mono text-[11px] text-[#2a2a2a] truncate max-w-lg">
+              {run.product_url}
             </p>
-          )}
+            <p className="font-mono text-[10px] text-[#252525] mt-1">
+              {formatDate(run.created_at)}
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          {run.stage1_output && (
-            <section>
-              <h2 className="font-mono text-xs text-[#2563eb] tracking-[0.2em] uppercase mb-3">
-                Stage 1 — Research Brief
-              </h2>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-md p-4 max-h-[520px] overflow-y-auto">
-                <pre className="whitespace-pre-wrap break-words text-[#d4d4d4] text-xs leading-relaxed font-mono">
-                  {run.stage1_output}
-                </pre>
-              </div>
-            </section>
-          )}
-
-          {run.stage2_output && (
-            <section>
-              <h2 className="font-mono text-xs text-[#2563eb] tracking-[0.2em] uppercase mb-3">
-                Stage 2 — German Copy
-              </h2>
-              <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-md p-4 max-h-[520px] overflow-y-auto">
-                <pre className="whitespace-pre-wrap break-words text-[#d4d4d4] text-sm leading-relaxed">
-                  {run.stage2_output}
-                </pre>
-              </div>
-            </section>
-          )}
-
-          {imageUrls.length > 0 && (
-            <section>
-              <h2 className="font-mono text-xs text-[#2563eb] tracking-[0.2em] uppercase mb-3">
-                Stage 3 — Generated Images
-              </h2>
-
-              {infographicUrls.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs font-mono text-[#404040] uppercase tracking-widest mb-2">
-                    Infographic
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {infographicUrls.map((url, i) => (
-                      <div key={i} className="aspect-square rounded overflow-hidden border border-[#2a2a2a]">
-                        <img src={url} alt={`Infographic ${i + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {contextualUrls.length > 0 && (
-                <div>
-                  <p className="text-xs font-mono text-[#404040] uppercase tracking-widest mb-2">
-                    Contextual
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {contextualUrls.map((url, i) => (
-                      <div key={i} className="aspect-square rounded overflow-hidden border border-[#2a2a2a]">
-                        <img src={url} alt={`Contextual ${i + 1}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-        </div>
+        {/* All interactive content handled client-side */}
+        <RunDetailClient run={run} />
       </div>
     </main>
   );

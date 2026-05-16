@@ -403,7 +403,7 @@ export default function Home() {
 
     // Scrape
     setPipeline("scraping");
-    const { scraped, competitorScraped } = await scrapeAll();
+    const { scraped, imgs, competitorScraped } = await scrapeAll();
 
     // Step 1 — Research
     setPipeline("step1_running");
@@ -549,6 +549,9 @@ export default function Home() {
 
     // Step 6 — Final Revisions
     setPipeline("step6_running");
+    let avatarRevised: string | null = null;
+    let offerBriefRevised: string | null = null;
+    let necessaryBeliefsRevised: string | null = null;
     try {
       const data = await fetch("/api/pipeline/step6", {
         method: "POST",
@@ -561,16 +564,58 @@ export default function Home() {
         }),
       }).then((r) => r.json());
       if (!data.success) throw new Error(data.error ?? "Step 6 failed");
+      avatarRevised = data.avatar_revised ?? null;
+      offerBriefRevised = data.offer_brief_revised ?? null;
+      necessaryBeliefsRevised = data.necessary_beliefs_revised ?? null;
       setOutputs((prev) => ({
         ...prev,
-        avatar_revised: data.avatar_revised,
-        offer_brief_revised: data.offer_brief_revised,
-        necessary_beliefs_revised: data.necessary_beliefs_revised,
+        avatar_revised: avatarRevised,
+        offer_brief_revised: offerBriefRevised,
+        necessary_beliefs_revised: necessaryBeliefsRevised,
       }));
       setPipeline("complete");
     } catch (err) {
       setError(8, err instanceof Error ? err.message : String(err));
       return;
+    }
+
+    // Save run to DB after pipeline completes
+    try {
+      const revisedSteps: number[] = [];
+      if (avatarRevised && avatarRevised !== avatar) revisedSteps.push(4);
+      if (offerBriefRevised && offerBriefRevised !== offerBrief) revisedSteps.push(5);
+      if (necessaryBeliefsRevised && necessaryBeliefsRevised !== necessaryBeliefs) revisedSteps.push(6);
+
+      const localBrandSlug = extractBrandSlug(offerBrief);
+
+      const saveRes = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_url: url.trim(),
+          product_name: localBrandSlug ?? productSlug ?? productName || url.trim(),
+          product_description: productDescription || null,
+          competitor_urls: competitorList.length > 0 ? competitorList : undefined,
+          scraper_data: { scraped_text: scraped, images: imgs },
+          brand_name: localBrandSlug ?? null,
+          status: "complete",
+          step_research: research,
+          step_chief_mid: chiefMid,
+          step_research_revised: researchRevised,
+          step_avatar: avatar,
+          step_offer_brief: offerBrief,
+          step_necessary_beliefs: necessaryBeliefs,
+          step_chief_final: chiefFinal,
+          step_avatar_revised: avatarRevised,
+          step_offer_brief_revised: offerBriefRevised,
+          step_necessary_beliefs_revised: necessaryBeliefsRevised,
+          revised_steps: revisedSteps,
+        }),
+      });
+      const saveData = await saveRes.json();
+      if (saveData.id) setRunId(Number(saveData.id));
+    } catch {
+      // Non-critical — pipeline is complete regardless
     }
   }
 
@@ -701,20 +746,36 @@ export default function Home() {
       .map((s) => s.imageUrl as string);
 
     try {
-      const saveRes = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_url: url.trim(),
-          product_name: brandSlug ?? productSlug ?? productName,
-          stage1_output: outputs.research_revised ?? outputs.research ?? "",
-          stage2_output: stage2Output,
-          stage3_prompts: prompts,
-          image_urls: imageUrls,
-        }),
-      });
-      const saveData = await saveRes.json();
-      if (saveData.id) setRunId(Number(saveData.id));
+      // If we already have a runId (saved after pipeline), PATCH it with image data
+      // Otherwise POST a new run (e.g. if only stage3 was done)
+      const currentRunId = runId;
+      if (currentRunId) {
+        await fetch(`/api/runs/${currentRunId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            stage2_output: stage2Output,
+            stage3_prompts: prompts,
+            image_urls: imageUrls,
+            status: "complete",
+          }),
+        });
+      } else {
+        const saveRes = await fetch("/api/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_url: url.trim(),
+            product_name: brandSlug ?? productSlug ?? productName,
+            stage1_output: outputs.research_revised ?? outputs.research ?? "",
+            stage2_output: stage2Output,
+            stage3_prompts: prompts,
+            image_urls: imageUrls,
+          }),
+        });
+        const saveData = await saveRes.json();
+        if (saveData.id) setRunId(Number(saveData.id));
+      }
     } catch {
       // Non-critical
     }

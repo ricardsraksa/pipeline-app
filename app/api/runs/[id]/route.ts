@@ -27,6 +27,11 @@ export async function PATCH(
     feedback_stage2?: string | null;
     feedback_stage3?: string | null;
     notes?: string | null;
+    // image update fields
+    stage2_output?: string | null;
+    stage3_prompts?: unknown;
+    image_urls?: string[] | null;
+    status?: string | null;
   };
 
   const db = getDb();
@@ -42,6 +47,10 @@ export async function PATCH(
   if ("feedback_stage2" in body) { fields.push("feedback_stage2 = ?"); values.push(body.feedback_stage2 ?? null); }
   if ("feedback_stage3" in body) { fields.push("feedback_stage3 = ?"); values.push(body.feedback_stage3 ?? null); }
   if ("notes" in body) { fields.push("notes = ?"); values.push(body.notes ?? null); }
+  if ("stage2_output" in body) { fields.push("stage2_output = ?"); values.push(body.stage2_output ?? null); }
+  if ("stage3_prompts" in body) { fields.push("stage3_prompts = ?"); values.push(body.stage3_prompts ? JSON.stringify(body.stage3_prompts) : null); }
+  if ("image_urls" in body) { fields.push("image_urls = ?"); values.push(body.image_urls ? JSON.stringify(body.image_urls) : null); }
+  if ("status" in body) { fields.push("status = ?"); values.push(body.status ?? null); }
 
   if (fields.length === 0) {
     return Response.json({ success: true });
