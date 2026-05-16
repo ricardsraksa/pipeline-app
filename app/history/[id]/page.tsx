@@ -49,38 +49,25 @@ export default async function RunPage({ params }: { params: Promise<unknown> }) 
   const displayName = run.brand_name ?? run.product_name ?? "(unnamed)";
 
   return (
-    <main className="min-h-screen bg-[#080808] pb-24">
-      {/* Top nav */}
-      <div className="border-b border-[#141414] bg-[#0a0a0a] sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/history"
-              className="font-mono text-[10px] text-[#333] hover:text-[#737373] transition-colors flex-shrink-0"
-            >
-              ← History
-            </Link>
-            <span className="text-[#1e1e1e] flex-shrink-0">·</span>
-            <span className="font-mono text-[10px] text-[#404040] truncate">{displayName}</span>
-          </div>
-          <span className="font-mono text-[9px] text-[#2a2a2a] flex-shrink-0">Run #{run.id}</span>
-        </div>
-      </div>
-
+    <main className="min-h-screen bg-black pb-24">
       <div className="max-w-4xl mx-auto px-4 pt-8">
         {/* Page header */}
-        <div className="flex items-start justify-between gap-6 mb-8 pb-8 border-b border-[#141414]">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              <h1 className="font-mono text-lg text-[#e5e5e5]">{displayName}</h1>
-              <StatusPill status={run.status} />
+        <div className="mb-8 pb-8 border-b border-[#111]">
+          <Link href="/history" className="font-mono text-[10px] text-[#333] hover:text-[#666] transition-colors mb-4 block">
+            ← History
+          </Link>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <h1 className="font-mono text-base text-white">{displayName}</h1>
+                <span className="font-mono text-[10px] text-[#333]">#{run.id}</span>
+                <StatusPill status={run.status} />
+              </div>
+              <p className="font-mono text-[11px] text-[#333] truncate max-w-lg">
+                {run.product_url}
+              </p>
             </div>
-            <p className="font-mono text-[11px] text-[#2a2a2a] truncate max-w-lg">
-              {run.product_url}
-            </p>
-            <p className="font-mono text-[10px] text-[#252525] mt-1">
-              {formatDate(run.created_at)}
-            </p>
+            <p className="font-mono text-[10px] text-[#333] flex-shrink-0">{formatDate(run.created_at)}</p>
           </div>
         </div>
 

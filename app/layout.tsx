@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${ibmPlexMono.variable} ${dmSans.variable}`}>
-      <body className="min-h-screen bg-[#0a0a0a]">
+      <body className="min-h-screen bg-black text-white">
         <NavBar />
         {children}
       </body>

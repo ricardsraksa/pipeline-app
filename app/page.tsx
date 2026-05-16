@@ -858,19 +858,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      {/* Top nav */}
-      <div className="border-b border-[#111] bg-black sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 h-12 flex items-center justify-between">
-          <span className="font-mono text-[11px] text-white tracking-[0.2em] uppercase">Pipeline</span>
-          <a
-            href="/history"
-            className="cursor-pointer font-mono text-[11px] text-[#444] hover:text-white transition-colors duration-150"
-          >
-            History →
-          </a>
-        </div>
-      </div>
-
       <div className="max-w-2xl mx-auto px-5 pt-10 pb-20">
 
         {/* Inputs */}

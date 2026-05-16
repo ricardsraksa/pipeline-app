@@ -65,24 +65,7 @@ export default async function HistoryPage() {
   const runs = await getRuns();
 
   return (
-    <main className="min-h-screen bg-[#080808] pb-24">
-      {/* Top nav bar */}
-      <div className="border-b border-[#141414] bg-[#0a0a0a]">
-        <div className="max-w-3xl mx-auto px-4 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[9px] text-[#2563eb] tracking-[0.25em] uppercase">Pipeline App</span>
-            <span className="text-[#1e1e1e]">·</span>
-            <span className="font-mono text-xs text-[#404040]">History</span>
-          </div>
-          <Link
-            href="/"
-            className="font-mono text-[10px] text-[#333] hover:text-[#737373] transition-colors"
-          >
-            ← New run
-          </Link>
-        </div>
-      </div>
-
+    <main className="min-h-screen bg-black pb-24">
       <div className="max-w-3xl mx-auto px-4 pt-10">
         {/* Page header */}
         <div className="mb-8">
@@ -111,7 +94,7 @@ export default async function HistoryPage() {
                 <Link
                   key={run.id}
                   href={`/history/${run.id}`}
-                  className="group flex items-center gap-4 rounded-lg border border-[#141414] hover:border-[#1e2a3a] bg-[#0c0c0c] hover:bg-[#0d1117] px-5 py-3.5 transition-all duration-100"
+                  className="group flex items-center gap-4 rounded-lg border border-[#111] hover:border-[#222] bg-[#050505] hover:bg-[#0a0a0a] px-5 py-3.5 transition-all duration-100"
                 >
                   {/* Identity */}
                   <div className="flex-1 min-w-0">
