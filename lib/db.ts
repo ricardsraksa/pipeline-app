@@ -1,74 +1,55 @@
-import Database from "better-sqlite3";
-import path from "path";
-import fs from "fs";
+import { createClient } from "@libsql/client";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DATA_DIR, "runs.db");
+const url = process.env.TURSO_DATABASE_URL;
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!url || !authToken) {
+  throw new Error("Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN env vars");
 }
 
-let _db: Database.Database | null = null;
+export const db = createClient({ url, authToken });
 
-function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(DB_PATH);
-    _db.exec(`
-      CREATE TABLE IF NOT EXISTS runs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at TEXT NOT NULL,
-        product_url TEXT NOT NULL,
-        product_name TEXT NOT NULL,
-        stage1_output TEXT,
-        stage2_output TEXT,
-        stage3_prompts TEXT,
-        image_urls TEXT,
-        feedback_stage1 TEXT,
-        feedback_stage2 TEXT,
-        feedback_stage3 TEXT,
-        notes TEXT
-      );
-    `);
-
-    // Migration: add new columns if they don't exist
-    const existingColumns = (_db.prepare("PRAGMA table_info(runs)").all() as { name: string }[]).map(
-      (c) => c.name
-    );
-
-    const newColumns: [string, string][] = [
-      ["product_description", "TEXT"],
-      ["competitor_urls", "TEXT"],
-      ["scraper_data", "TEXT"],
-      ["step_research", "TEXT"],
-      ["step_chief_mid", "TEXT"],
-      ["step_research_revised", "TEXT"],
-      ["step_avatar", "TEXT"],
-      ["step_offer_brief", "TEXT"],
-      ["step_necessary_beliefs", "TEXT"],
-      ["step_chief_final", "TEXT"],
-      ["step_avatar_revised", "TEXT"],
-      ["step_offer_brief_revised", "TEXT"],
-      ["step_necessary_beliefs_revised", "TEXT"],
-      ["brand_name", "TEXT"],
-      ["status", "TEXT"],
-      ["revised_steps", "TEXT"],
-      ["image_prompts", "TEXT"],
-      ["generated_images", "TEXT"],
-      ["audit_results", "TEXT"],
-      ["prompt_edits_made", "INTEGER"],
-    ];
-
-    for (const [colName, colType] of newColumns) {
-      if (!existingColumns.includes(colName)) {
-        _db.exec(`ALTER TABLE runs ADD COLUMN ${colName} ${colType}`);
-      }
-    }
-  }
-  return _db;
+export async function initDB() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL,
+      product_url TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      stage1_output TEXT,
+      stage2_output TEXT,
+      stage3_prompts TEXT,
+      image_urls TEXT,
+      feedback_stage1 TEXT,
+      feedback_stage2 TEXT,
+      feedback_stage3 TEXT,
+      notes TEXT,
+      product_description TEXT,
+      competitor_urls TEXT,
+      scraper_data TEXT,
+      step_research TEXT,
+      step_chief_mid TEXT,
+      step_research_revised TEXT,
+      step_avatar TEXT,
+      step_offer_brief TEXT,
+      step_necessary_beliefs TEXT,
+      step_chief_final TEXT,
+      step_avatar_revised TEXT,
+      step_offer_brief_revised TEXT,
+      step_necessary_beliefs_revised TEXT,
+      brand_name TEXT,
+      status TEXT,
+      revised_steps TEXT,
+      image_prompts TEXT,
+      generated_images TEXT,
+      audit_results TEXT,
+      prompt_edits_made INTEGER
+    )
+  `);
 }
 
-export default getDb;
+// Initialize schema on module load
+initDB().catch(console.error);
 
 export interface Run {
   id: number;
@@ -83,10 +64,9 @@ export interface Run {
   feedback_stage2: string | null;
   feedback_stage3: string | null;
   notes: string | null;
-  // New fields
   product_description: string | null;
-  competitor_urls: string | null;       // JSON array of URL strings
-  scraper_data: string | null;          // JSON: { scraped_text: string, images: string[] }
+  competitor_urls: string | null;
+  scraper_data: string | null;
   step_research: string | null;
   step_chief_mid: string | null;
   step_research_revised: string | null;
@@ -99,9 +79,9 @@ export interface Run {
   step_necessary_beliefs_revised: string | null;
   brand_name: string | null;
   status: string | null;
-  revised_steps: string | null;         // JSON array of step numbers
-  image_prompts: string | null;         // JSON array of 11 prompts
-  generated_images: string | null;      // JSON array of {prompt_index, category, image_url, status}
-  audit_results: string | null;         // JSON array of audit verdicts
-  prompt_edits_made: number | null;     // Count of how many prompts user edited
+  revised_steps: string | null;
+  image_prompts: string | null;
+  generated_images: string | null;
+  audit_results: string | null;
+  prompt_edits_made: number | null;
 }

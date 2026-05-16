@@ -1,20 +1,19 @@
 import { NextRequest } from "next/server";
-import getDb from "@/lib/db";
+import { db } from "@/lib/db";
 import type { Run } from "@/lib/db";
 
 export async function GET() {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT id, created_at, product_url, product_name, brand_name, status,
-              feedback_stage1, feedback_stage2, feedback_stage3, notes,
-              step_research, step_chief_mid, step_research_revised,
-              step_avatar, step_offer_brief, step_necessary_beliefs,
-              step_chief_final, step_avatar_revised, step_offer_brief_revised,
-              step_necessary_beliefs_revised, stage2_output, image_urls
-       FROM runs ORDER BY created_at DESC`
-    )
-    .all() as (Pick<
+  const result = await db.execute(
+    `SELECT id, created_at, product_url, product_name, brand_name, status,
+            feedback_stage1, feedback_stage2, feedback_stage3, notes,
+            step_research, step_chief_mid, step_research_revised,
+            step_avatar, step_offer_brief, step_necessary_beliefs,
+            step_chief_final, step_avatar_revised, step_offer_brief_revised,
+            step_necessary_beliefs_revised, stage2_output, image_urls
+     FROM runs ORDER BY created_at DESC`
+  );
+
+  const rows = result.rows as unknown as (Pick<
     Run,
     | "id"
     | "created_at"
@@ -82,37 +81,33 @@ export async function POST(req: NextRequest) {
     status?: string;
     revised_steps?: number[];
     image_prompts?: unknown;
-    // existing fields
     stage1_output?: string;
     stage2_output?: string;
     stage3_prompts?: unknown;
     image_urls?: string[];
   };
 
-  const db = getDb();
-  const result = db
-    .prepare(
-      `INSERT INTO runs (
-        created_at, product_url, product_name,
-        stage1_output, stage2_output, stage3_prompts, image_urls,
-        product_description, competitor_urls, scraper_data,
-        step_research, step_chief_mid, step_research_revised,
-        step_avatar, step_offer_brief, step_necessary_beliefs,
-        step_chief_final, step_avatar_revised, step_offer_brief_revised,
-        step_necessary_beliefs_revised,
-        brand_name, status, revised_steps, image_prompts
-      ) VALUES (
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?,
-        ?, ?, ?, ?
-      )`
-    )
-    .run(
+  const result = await db.execute({
+    sql: `INSERT INTO runs (
+      created_at, product_url, product_name,
+      stage1_output, stage2_output, stage3_prompts, image_urls,
+      product_description, competitor_urls, scraper_data,
+      step_research, step_chief_mid, step_research_revised,
+      step_avatar, step_offer_brief, step_necessary_beliefs,
+      step_chief_final, step_avatar_revised, step_offer_brief_revised,
+      step_necessary_beliefs_revised,
+      brand_name, status, revised_steps, image_prompts
+    ) VALUES (
+      ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      ?,
+      ?, ?, ?, ?
+    )`,
+    args: [
       new Date().toISOString(),
       body.product_url,
       body.product_name,
@@ -136,8 +131,9 @@ export async function POST(req: NextRequest) {
       body.brand_name ?? null,
       body.status ?? null,
       body.revised_steps ? JSON.stringify(body.revised_steps) : null,
-      body.image_prompts ? JSON.stringify(body.image_prompts) : null
-    );
+      body.image_prompts ? JSON.stringify(body.image_prompts) : null,
+    ],
+  });
 
-  return Response.json({ success: true, id: result.lastInsertRowid });
+  return Response.json({ success: true, id: Number(result.lastInsertRowid) });
 }

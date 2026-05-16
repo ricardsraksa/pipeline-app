@@ -1,19 +1,17 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getPrompt } from "@/lib/prompts";
-import getDb from "@/lib/db";
+import { db } from "@/lib/db";
 import type { Run } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-function buildFeedbackBlock(): string {
+async function buildFeedbackBlock(): Promise<string> {
   try {
-    const db = getDb();
-    const rows = db
-      .prepare(
-        `SELECT stage1_output FROM runs WHERE feedback_stage1 = 'up' AND stage1_output IS NOT NULL ORDER BY created_at DESC LIMIT 5`
-      )
-      .all() as Pick<Run, "stage1_output">[];
+    const result = await db.execute(
+      `SELECT stage1_output FROM runs WHERE feedback_stage1 = 'up' AND stage1_output IS NOT NULL ORDER BY created_at DESC LIMIT 5`
+    );
+    const rows = result.rows as unknown as Pick<Run, "stage1_output">[];
 
     if (!rows.length) return "";
 
@@ -27,7 +25,7 @@ function buildFeedbackBlock(): string {
 export async function POST(req: NextRequest) {
   const { url, scraped_text, competitor_urls, competitor_scraped } = await req.json();
 
-  const systemPrompt = getPrompt("stage1") + buildFeedbackBlock();
+  const systemPrompt = getPrompt("stage1") + await buildFeedbackBlock();
 
   const competitorBlock = (() => {
     if (!competitor_urls?.length) return "";
