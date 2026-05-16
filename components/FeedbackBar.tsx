@@ -40,16 +40,16 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
 
   if (saved) {
     return (
-      <div className="mt-3 pt-3 border-t border-[#111]">
-        <span className="font-mono text-[11px] text-[#444]">Feedback saved</span>
+      <div className="mt-3 pt-3 border-t border-zinc-800">
+        <span className="text-zinc-500 text-[11px] font-mono">Feedback saved</span>
       </div>
     );
   }
 
   return (
-    <div className="mt-3 pt-3 border-t border-[#111] space-y-2">
+    <div className="mt-3 pt-3 border-t border-zinc-800 space-y-2">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[10px] text-[#333] uppercase tracking-[0.15em]">
+        <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
           Rate stage {stage}
         </span>
         <button
@@ -57,8 +57,8 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
           disabled={saving}
           className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
             rating === "up"
-              ? "bg-white text-black"
-              : "border border-[#1e1e1e] text-[#444] hover:border-[#333] hover:text-white"
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+              : "border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800/50 hover:text-zinc-200"
           }`}
         >
           ↑
@@ -68,8 +68,8 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
           disabled={saving}
           className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
             rating === "down"
-              ? "bg-[#ff3b30]/15 text-[#ff3b30] ring-1 ring-[#ff3b30]/30"
-              : "border border-[#1e1e1e] text-[#444] hover:border-[#333] hover:text-white"
+              ? "bg-red-500/10 text-red-400 border border-red-500/30"
+              : "border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800/50 hover:text-zinc-200"
           }`}
         >
           ↓
@@ -83,12 +83,12 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
             onChange={(e) => setNotes(e.target.value.slice(0, 200))}
             onKeyDown={(e) => e.key === "Enter" && save(rating)}
             placeholder="Notes (optional)"
-            className="flex-1 bg-[#050505] border border-[#1c1c1c] focus:border-[#333] rounded px-3 py-1.5 font-mono text-[11px] text-white placeholder-[#2a2a2a] focus:outline-none transition-colors duration-150"
+            className="flex-1 w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
           />
           <button
             onClick={() => save(rating)}
             disabled={saving}
-            className="cursor-pointer px-3 py-1.5 bg-white hover:bg-[#e5e5e5] disabled:opacity-40 text-black rounded font-mono text-[11px] transition-colors duration-150"
+            className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
             {saving ? "…" : "Save"}
           </button>

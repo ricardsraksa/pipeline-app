@@ -33,9 +33,9 @@ function StatusPill({ status }: { status: string | null }) {
     partial:  "bg-amber-950/60  text-amber-400  border-amber-900/50",
     failed:   "bg-red-950/60    text-red-400    border-red-900/50",
   };
-  const cls = variants[s] ?? "bg-[#111] text-[#737373] border-[#222]";
+  const cls = variants[s] ?? "bg-zinc-900 text-zinc-500 border-zinc-800";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono border tracking-wider uppercase ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono border tracking-wider uppercase ${cls}`}>
       <span className="w-1 h-1 rounded-full bg-current opacity-80" />
       {s}
     </span>
@@ -65,48 +65,56 @@ export default async function HistoryPage() {
   const runs = await getRuns();
 
   return (
-    <main className="min-h-screen bg-black pb-24">
-      <div className="max-w-3xl mx-auto px-4 pt-10">
+    <main className="min-h-screen bg-zinc-950 pb-24">
+      <div className="max-w-3xl mx-auto px-6 pt-10">
         {/* Page header */}
         <div className="mb-8">
-          <h1 className="font-mono text-base text-[#d4d4d4] mb-1">Run History</h1>
-          <p className="font-mono text-[11px] text-[#333]">
-            {runs.length === 0 ? "No runs yet" : `${runs.length} run${runs.length !== 1 ? "s" : ""} saved`}
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="font-mono text-[11px] text-zinc-100 uppercase tracking-widest">Runs</h1>
+            <span className="font-mono text-[10px] text-zinc-600 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-full">
+              {runs.length}
+            </span>
+          </div>
+          <p className="text-zinc-500 text-sm">
+            {runs.length === 0 ? "No runs yet." : `${runs.length} run${runs.length !== 1 ? "s" : ""} saved.`}
           </p>
         </div>
 
         {/* Empty state */}
         {runs.length === 0 && (
-          <div className="border border-dashed border-[#1a1a1a] rounded-xl py-20 text-center">
-            <p className="font-mono text-sm text-[#222]">No completed runs yet.</p>
-            <Link href="/" className="font-mono text-xs text-[#2563eb] hover:underline mt-2 block">
-              Start a run →
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 py-20 text-center">
+            <p className="font-mono text-sm text-zinc-600 mb-3">No runs yet.</p>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-sm transition-colors"
+            >
+              Start your first run
             </Link>
           </div>
         )}
 
         {/* Run list */}
         {runs.length > 0 && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             {runs.map((run) => {
               const name = run.brand_name ?? run.product_name ?? "(unnamed)";
               return (
                 <Link
                   key={run.id}
                   href={`/history/${run.id}`}
-                  className="group flex items-center gap-4 rounded-lg border border-[#1e1e1e] hover:border-[#333] bg-[#080808] hover:bg-[#0d0d0d] px-5 py-3.5 transition-all duration-100"
+                  className="group flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 hover:border-zinc-700 px-5 py-3.5 transition-all duration-100"
                 >
                   {/* Identity */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 mb-0.5">
-                      <span className="font-mono text-[13px] text-[#d4d4d4] group-hover:text-white transition-colors truncate">
+                      <span className="font-mono text-[13px] text-zinc-100 truncate">
                         {name}
                       </span>
-                      <span className="font-mono text-[9px] text-[#444] group-hover:text-[#666] flex-shrink-0">
+                      <span className="font-mono text-[9px] text-zinc-600 flex-shrink-0">
                         #{run.id}
                       </span>
                     </div>
-                    <p className="font-mono text-[10px] text-[#444] group-hover:text-[#666] transition-colors truncate">
+                    <p className="text-zinc-500 text-[10px] font-mono truncate">
                       {truncateUrl(run.product_url)}
                     </p>
                   </div>
@@ -115,18 +123,18 @@ export default async function HistoryPage() {
                   <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
                     <StatusPill status={run.status} />
                     {run.doc_count > 0 && (
-                      <span className="font-mono text-[10px] text-[#444] group-hover:text-[#666] transition-colors">
+                      <span className="text-zinc-600 text-[10px] font-mono">
                         {run.doc_count} doc{run.doc_count !== 1 ? "s" : ""}
                       </span>
                     )}
                   </div>
 
-                  {/* Date */}
+                  {/* Date + arrow */}
                   <div className="flex-shrink-0 text-right">
-                    <p className="font-mono text-[10px] text-[#555] group-hover:text-[#888] transition-colors">
+                    <p className="text-zinc-500 text-[10px] font-mono">
                       {formatDate(run.created_at)}
                     </p>
-                    <p className="font-mono text-[9px] text-[#2563eb] opacity-0 group-hover:opacity-70 transition-opacity mt-0.5">
+                    <p className="text-blue-400 text-[10px] font-mono opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
                       View →
                     </p>
                   </div>

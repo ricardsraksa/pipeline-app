@@ -155,48 +155,51 @@ function ResearchStepCard({
 
   const isLocked = !isRunning && !isComplete && !isError;
 
+  const badgeCls = isError
+    ? "bg-red-500/10 text-red-400 border border-red-500/30"
+    : isRunning
+    ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+    : isComplete
+    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+    : "bg-zinc-900 text-zinc-600 border border-zinc-800";
+
   return (
-    <div className={`border-b border-[#111] last:border-b-0 py-4 px-4 transition-all duration-150 ${isLocked ? "opacity-25" : ""}`}>
+    <div className={`border-b border-zinc-800 last:border-b-0 py-4 px-4 transition-all duration-150 ${isLocked ? "opacity-30 pointer-events-none" : ""}`}>
       {/* Row header */}
       <div className="flex items-center gap-3">
-        <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 select-none ${
-          isError   ? "bg-[#ff3b30]/15 text-[#ff3b30] ring-1 ring-[#ff3b30]/30" :
-          isRunning ? "bg-white text-black" :
-          isComplete ? "bg-white text-black" :
-          "bg-[#111] text-[#444]"
-        }`}>
-          {isComplete ? "✓" : stepNum}
+        <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 select-none ${badgeCls} ${isRunning ? "animate-pulse" : ""}`}>
+          {isComplete ? "✓" : isError ? "!" : stepNum}
         </span>
-        <span className={`text-[13px] font-mono flex-1 leading-none ${
-          isRunning || isComplete ? "text-white" : "text-[#444]"
+        <span className={`font-mono text-[13px] flex-1 leading-none ${
+          isRunning || isComplete ? "text-zinc-100" : "text-zinc-600"
         }`}>
           {title}
         </span>
         {isRunning && (
-          <span className="text-[10px] font-mono text-white/50 animate-pulse tracking-wider">running</span>
+          <span className="text-[10px] font-mono text-blue-400 animate-pulse">running</span>
         )}
         {isComplete && !isRunning && (
-          <span className="text-[10px] font-mono text-[#444]">
+          <span className="text-[10px] font-mono text-zinc-600">
             {skipped ? "skipped" : "done"}
           </span>
         )}
         {isError && (
-          <span className="text-[10px] font-mono text-[#ff3b30]">error</span>
+          <span className="text-[10px] font-mono text-red-400">error</span>
         )}
       </div>
 
       {/* Description — shown when not locked */}
       {!isLocked && (
-        <p className="text-[11px] text-[#444] font-mono mt-1 pl-8">{description}</p>
+        <p className="text-[11px] text-zinc-600 font-mono mt-0.5 pl-8">{description}</p>
       )}
 
       {/* Error state */}
       {isError && (
         <div className="mt-3 pl-8 space-y-2">
-          <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
+          <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
           <button
             onClick={onRetry}
-            className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#666] hover:text-white transition-colors duration-150"
+            className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
           >
             Retry step {stepNum}
           </button>
@@ -206,21 +209,19 @@ function ResearchStepCard({
       {/* Output */}
       {isComplete && output && (
         <div className="mt-3 pl-8 space-y-2">
-          <div className="max-h-96 overflow-y-auto rounded border border-[#1a1a1a] bg-[#050505]">
-            <pre className="p-3 text-[11px] font-mono text-[#666] whitespace-pre-wrap break-words leading-relaxed">
-              {output}
-            </pre>
+          <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-3 text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+            {output}
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => copyToClipboard(output)}
-              className="cursor-pointer px-3 py-1.5 border border-[#1e1e1e] hover:border-[#333] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
+              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors"
             >
               Copy
             </button>
             <button
               onClick={() => downloadTxt(`${slug}_${filenameMap[stepNum] ?? `step${stepNum}.txt`}`, output)}
-              className="cursor-pointer px-3 py-1.5 border border-[#1e1e1e] hover:border-[#333] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
+              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors"
             >
               ↓ .txt
             </button>
@@ -857,13 +858,23 @@ export default function Home() {
     pipeline === "stage3_images_running" ? "Stage 3 — Generating images" : "";
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="max-w-2xl mx-auto px-5 pt-10 pb-20">
+
+        {/* Page header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">Stage 1</span>
+            <span className="text-zinc-700">·</span>
+            <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Research</span>
+          </div>
+          <p className="text-zinc-500 text-sm">Paste a product URL to generate research, avatars, and copy briefs.</p>
+        </div>
 
         {/* Inputs */}
         <div className="space-y-5 mb-8">
           <div>
-            <label className="block font-mono text-[10px] text-[#666] uppercase tracking-[0.15em] mb-2">
+            <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
               Product URL
             </label>
             <input
@@ -873,14 +884,14 @@ export default function Home() {
               onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
               placeholder="https://www.aliexpress.com/item/..."
               disabled={isActive}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 transition-colors duration-150"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
             />
           </div>
 
           <div>
-            <label className="block font-mono text-[10px] text-[#666] uppercase tracking-[0.15em] mb-2">
+            <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
               Product Description
-              <span className="ml-2 normal-case text-[#444] tracking-normal">optional — overrides scraper</span>
+              <span className="text-zinc-600 tracking-normal normal-case ml-2">optional — overrides scraper</span>
             </label>
             <textarea
               value={productDescription}
@@ -888,15 +899,15 @@ export default function Home() {
               rows={3}
               placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10. Use when the listing is in another language or unclear."
               disabled={isActive}
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40 resize-none"
             />
           </div>
 
           <details className="group">
-            <summary className="cursor-pointer font-mono text-[11px] text-[#555] hover:text-[#888] transition-colors duration-150 select-none list-none flex items-center gap-1.5">
+            <summary className="cursor-pointer font-mono text-[11px] text-zinc-600 hover:text-zinc-400 select-none list-none flex items-center gap-1.5">
               <span className="text-[9px] group-open:rotate-90 transition-transform duration-150 inline-block">▶</span>
               Competitor URLs
-              <span className="text-[#444]">optional</span>
+              <span className="text-zinc-700 ml-1">optional</span>
             </summary>
             <div className="mt-2">
               <textarea
@@ -905,7 +916,7 @@ export default function Home() {
                 placeholder="One URL per line"
                 rows={3}
                 disabled={isActive}
-                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#555] hover:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#444] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40 resize-none"
               />
             </div>
           </details>
@@ -916,25 +927,25 @@ export default function Home() {
           <button
             onClick={runPipeline}
             disabled={!canStartPipeline || isActive}
-            className="cursor-pointer px-5 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black font-mono text-sm rounded-md transition-colors duration-150"
+            className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-colors duration-150"
           >
             {isActive ? "Running…" : "Run Pipeline"}
           </button>
 
           {isActive && statusLabel && (
-            <span className="font-mono text-[11px] text-[#444] flex items-center gap-2">
-              <span className="w-1 h-1 rounded-full bg-white animate-pulse inline-block" />
+            <span className="font-mono text-[11px] text-zinc-500 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
               {statusLabel}
             </span>
           )}
 
           {isComplete && !isActive && (
-            <span className="font-mono text-[11px] text-[#444]">Complete</span>
+            <span className="font-mono text-[11px] text-emerald-400">Complete</span>
           )}
         </div>
 
         {showPipeline && (
-          <div className="border border-[#111] rounded-lg overflow-hidden divide-y-0">
+          <div className="border border-zinc-800 rounded-xl overflow-hidden divide-y-0 bg-zinc-900/20">
             <ResearchStepCard
               stepNum={1}
               title="Step 1 — Research"
@@ -1184,10 +1195,10 @@ export default function Home() {
             />
 
             {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && outputs.research_revised && (
-              <div className="px-4 py-3 border-t border-[#111]">
+              <div className="px-4 py-3 border-t border-zinc-800">
                 <button
                   onClick={downloadAll}
-                  className="cursor-pointer px-4 py-2 border border-[#1e1e1e] hover:border-[#333] rounded-md font-mono text-[11px] text-[#555] hover:text-white transition-colors duration-150"
+                  className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150"
                 >
                   ↓ Download All (.zip)
                 </button>
@@ -1196,8 +1207,8 @@ export default function Home() {
 
             {/* Image generation stage (kept from original) */}
             {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && (
-              <div className="mt-6 border-t border-[#111] pt-6 px-4">
-                <p className="font-mono text-[10px] text-[#333] uppercase tracking-[0.2em] mb-4">
+              <div className="mt-6 border-t border-zinc-800 pt-6 px-4">
+                <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest mb-4">
                   Image Generation — Optional
                 </p>
 
@@ -1209,15 +1220,15 @@ export default function Home() {
                     state={imageStageCardState(pipeline, errorStage, 2)}
                   >
                     {pipelineIsStage2Running && (
-                      <p className="text-[11px] text-[#444] font-mono animate-pulse">Generating German copy kit…</p>
+                      <p className="text-[11px] text-blue-400 font-mono animate-pulse">Generating German copy kit…</p>
                     )}
 
                     {errorStage === 12 && (
                       <div className="space-y-2">
-                        <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
+                        <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
                         <button
                           onClick={runStage2}
-                          className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
+                          className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
                         >
                           Retry Stage 2
                         </button>
@@ -1229,10 +1240,10 @@ export default function Home() {
                         <OutputBlock text={stage2Output} />
                         <FeedbackBar runId={runId} stage={2} />
                         {pipelineIsStage2Done && (
-                          <div className="space-y-3 pt-1 border-t border-[#1a1a1a] mt-3">
+                          <div className="space-y-3 pt-1 border-t border-zinc-800 mt-3">
                             {showImageUploader && allImages.length < 2 && (
                               <div>
-                                <p className="text-xs font-mono text-[#b45309] mb-2">
+                                <p className="text-amber-400 text-xs font-mono mb-2">
                                   Add at least 2 reference images before Stage 3:
                                 </p>
                                 <ImageUploader
@@ -1245,7 +1256,7 @@ export default function Home() {
                             <button
                               onClick={runStage3}
                               disabled={!canRunStage3}
-                              className="cursor-pointer px-4 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black rounded-md font-mono text-sm transition-colors duration-150"
+                              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
                             >
                               Continue to Stage 3 →
                             </button>
@@ -1258,7 +1269,7 @@ export default function Home() {
                       <div className="space-y-3">
                         {showImageUploader && (
                           <div>
-                            <p className="text-xs font-mono text-[#b45309] mb-2">
+                            <p className="text-amber-400 text-xs font-mono mb-2">
                               Add reference images for Stage 3:
                             </p>
                             <ImageUploader
@@ -1269,7 +1280,7 @@ export default function Home() {
                           </div>
                         )}
                         <div>
-                          <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
+                          <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
                             Working product name
                           </label>
                           <input
@@ -1278,13 +1289,13 @@ export default function Home() {
                             onChange={(e) => setProductName(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
                             placeholder="e.g. WELLENFROH"
-                            className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none transition-colors duration-150"
+                            className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
                           />
                         </div>
                         <button
                           onClick={runStage2}
                           disabled={!canRunStage2}
-                          className="cursor-pointer px-4 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black rounded-md font-mono text-sm transition-colors duration-150"
+                          className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
                         >
                           Run Stage 2 (German Copy) →
                         </button>
@@ -1299,15 +1310,15 @@ export default function Home() {
                     state={imageStageCardState(pipeline, errorStage, 3)}
                   >
                     {pipelineIsStage3PromptsRunning && (
-                      <p className="text-[11px] text-[#444] font-mono animate-pulse">Building image prompts…</p>
+                      <p className="text-[11px] text-blue-400 font-mono animate-pulse">Building image prompts…</p>
                     )}
 
                     {errorStage === 13 && (
                       <div className="space-y-2">
-                        <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
+                        <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
                         <button
                           onClick={runStage3}
-                          className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
+                          className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
                         >
                           Retry Stage 3
                         </button>
@@ -1324,12 +1335,12 @@ export default function Home() {
 
                     {isDone && (
                       <div className="mt-3 space-y-2">
-                        <p className="text-[11px] font-mono text-[#555]">
+                        <p className="text-zinc-500 text-[11px] font-mono">
                           {imageSlots.filter((s) => s.status === "done").length} of {imageSlots.length} images generated.
                           {runId && (
                             <a
                               href={`/history/${runId}`}
-                              className="ml-3 text-white hover:underline"
+                              className="ml-3 text-blue-400 hover:text-blue-300"
                             >
                               View run →
                             </a>

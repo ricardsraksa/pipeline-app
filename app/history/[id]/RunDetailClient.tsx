@@ -18,10 +18,10 @@ function CopyBtn({ text }: { text: string }) {
           setTimeout(() => setOk(false), 1400);
         }).catch(() => {});
       }}
-      className={`font-mono text-[10px] px-2.5 py-1 rounded border transition-colors ${
+      className={`cursor-pointer font-mono text-[10px] px-2.5 py-1 rounded border transition-colors ${
         ok
-          ? "border-emerald-800 text-emerald-500 bg-emerald-950/40"
-          : "border-[#333] text-[#666] hover:text-[#aaa] hover:border-[#555] bg-transparent"
+          ? "border-emerald-900/50 text-emerald-400 bg-emerald-950/40"
+          : "border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 bg-transparent"
       }`}
     >
       {ok ? "Copied ✓" : "Copy"}
@@ -40,7 +40,7 @@ function DlBtn({ filename, text }: { filename: string; text: string }) {
         a.click();
         URL.revokeObjectURL(a.href);
       }}
-      className="font-mono text-[10px] px-2.5 py-1 rounded border border-[#333] text-[#666] hover:text-[#aaa] hover:border-[#555] transition-colors"
+      className="cursor-pointer font-mono text-[10px] px-2.5 py-1 rounded border border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-colors"
     >
       ↓ .txt
     </button>
@@ -54,14 +54,14 @@ function CollapsibleText({ text }: { text: string }) {
     <div>
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-2 font-mono text-[10px] text-[#666] hover:text-[#aaa] transition-colors py-1"
+        className="flex items-center gap-2 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors py-1 cursor-pointer"
       >
         <span className="text-[8px]">{open ? "▼" : "▶"}</span>
         Scraped text — {text.length.toLocaleString()} chars
       </button>
       {open && (
-        <div className="mt-2 max-h-64 overflow-y-auto rounded border border-[#1a1a1a] bg-[#080808] p-3">
-          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] text-[#888] leading-relaxed">
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+          <pre className="whitespace-pre-wrap break-words font-mono text-[10px] text-zinc-400 leading-relaxed">
             {text}
           </pre>
         </div>
@@ -82,7 +82,7 @@ function ImageGrid({ urls, cols = 4 }: { urls: string[]; cols?: number }) {
           <button
             key={i}
             onClick={() => setLb(u)}
-            className="group aspect-square rounded-md overflow-hidden border border-[#1a1a1a] hover:border-[#2563eb]/40 transition-colors bg-[#0c0c0c]"
+            className="cursor-pointer group aspect-square rounded-lg overflow-hidden border border-zinc-800 hover:border-zinc-600 transition-colors bg-zinc-900"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -95,12 +95,12 @@ function ImageGrid({ urls, cols = 4 }: { urls: string[]; cols?: number }) {
       </div>
       {lb && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
           onClick={() => setLb(null)}
         >
           <button
             onClick={() => setLb(null)}
-            className="absolute top-5 right-5 font-mono text-xs text-[#737373] hover:text-white"
+            className="cursor-pointer absolute top-5 right-5 font-mono text-xs text-zinc-500 hover:text-zinc-100"
           >
             ✕
           </button>
@@ -130,9 +130,9 @@ function DocCard({
   accent?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border overflow-hidden ${accent ? "border-[#1a3a2a] bg-[#090f0a]" : "border-[#222] bg-[#0c0c0c]"}`}>
-      <div className={`flex items-center justify-between px-4 py-2 border-b ${accent ? "border-[#1a3a2a]" : "border-[#222]"}`}>
-        <span className={`font-mono text-[10px] uppercase tracking-wider ${accent ? "text-emerald-500" : "text-[#555]"}`}>
+    <div className={`rounded-lg border overflow-hidden ${accent ? "border-emerald-900/50 bg-emerald-950/20" : "border-zinc-800 bg-zinc-900/40"}`}>
+      <div className={`flex items-center justify-between px-4 py-2 border-b ${accent ? "border-emerald-900/50" : "border-zinc-800"}`}>
+        <span className={`font-mono text-[10px] uppercase tracking-widest ${accent ? "text-emerald-400" : "text-zinc-500"}`}>
           {label}
         </span>
         <div className="flex items-center gap-1.5">
@@ -140,8 +140,8 @@ function DocCard({
           <DlBtn filename={filename} text={text} />
         </div>
       </div>
-      <div className="max-h-[380px] overflow-y-auto p-4">
-        <pre className={`whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed ${accent ? "text-[#c8c8c8]" : "text-[#737373]"}`}>
+      <div className="max-h-[380px] overflow-y-auto">
+        <pre className={`p-4 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed ${accent ? "text-zinc-300" : "text-zinc-400"}`}>
           {text}
         </pre>
       </div>
@@ -167,9 +167,9 @@ function StepRow({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <h3 className="font-mono text-[11px] text-[#666] uppercase tracking-widest">{stepLabel}</h3>
+        <h3 className="font-mono text-[11px] text-zinc-500 uppercase tracking-widest">{stepLabel}</h3>
         {hasRevision && (
-          <span className="font-mono text-[9px] text-amber-500 bg-amber-950/40 border border-amber-900/40 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+          <span className="text-[9px] font-mono bg-amber-950/40 text-amber-400 border border-amber-900/40 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
             Revised
           </span>
         )}
@@ -191,8 +191,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[9px] text-[#2563eb] tracking-[0.25em] uppercase">{label}</span>
-        <div className="flex-1 h-px bg-[#222]" />
+        <span className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">{label}</span>
+        <div className="bg-zinc-800 h-px flex-1" />
       </div>
       {children}
     </section>
@@ -266,7 +266,7 @@ export default function RunDetailClient({ run }: Props) {
       <div className="flex justify-end">
         <button
           onClick={handleDownloadAll}
-          className="font-mono text-xs bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-4 py-2 rounded-md transition-colors"
+          className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors"
         >
           ↓ Download All (.zip)
         </button>
@@ -274,33 +274,33 @@ export default function RunDetailClient({ run }: Props) {
 
       {/* Inputs */}
       <Section label="Inputs">
-        <div className="rounded-lg border border-[#222] bg-[#0c0c0c] divide-y divide-[#222]">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800">
           <div className="flex items-start gap-4 px-4 py-3">
-            <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
               Product URL
             </span>
             <a
               href={run.product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-[11px] text-[#2563eb] hover:underline break-all"
+              className="text-sm text-blue-400 hover:underline break-all"
             >
               {run.product_url}
             </a>
           </div>
           {run.product_description && (
             <div className="flex items-start gap-4 px-4 py-3">
-              <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
                 Description
               </span>
-              <p className="font-mono text-[11px] text-[#555] leading-relaxed whitespace-pre-wrap">
+              <p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
                 {run.product_description}
               </p>
             </div>
           )}
           {competitorUrls.length > 0 && (
             <div className="flex items-start gap-4 px-4 py-3">
-              <span className="font-mono text-[9px] text-[#555] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
                 Competitors
               </span>
               <div className="space-y-1">
@@ -310,7 +310,7 @@ export default function RunDetailClient({ run }: Props) {
                     href={u}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block font-mono text-[11px] text-[#2563eb] hover:underline break-all"
+                    className="block text-sm text-blue-400 hover:underline break-all"
                   >
                     {u}
                   </a>
@@ -324,10 +324,10 @@ export default function RunDetailClient({ run }: Props) {
       {/* Scraper Data */}
       {scraperData && (scraperData.scraped_text || (scraperData.images?.length ?? 0) > 0) && (
         <Section label="Scraper Data">
-          <div className="rounded-lg border border-[#222] bg-[#0c0c0c] divide-y divide-[#222]">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800">
             {scraperData.images && scraperData.images.length > 0 && (
               <div className="p-4">
-                <p className="font-mono text-[9px] text-[#555] uppercase tracking-wider mb-3">
+                <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-3">
                   Product images · {scraperData.images.length}
                 </p>
                 <ImageGrid urls={scraperData.images} cols={4} />

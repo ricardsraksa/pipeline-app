@@ -16,31 +16,34 @@ export default function StageCard({ number, title, description, state, children 
   const isComplete = state === "complete";
   const isError = state === "error";
 
+  const badgeCls = isError
+    ? "bg-red-500/10 text-red-400 border border-red-500/30"
+    : isRunning
+    ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+    : isComplete
+    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+    : "bg-zinc-900 text-zinc-600 border border-zinc-800";
+
   return (
-    <div className={`border border-[#111] rounded-md transition-all duration-150 ${isLocked ? "opacity-25" : ""}`}>
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#111]">
-        <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 ${
-          isError   ? "bg-[#ff3b30]/15 text-[#ff3b30] ring-1 ring-[#ff3b30]/30" :
-          isRunning ? "bg-white text-black" :
-          isComplete ? "bg-white text-black" :
-          "bg-[#111] text-[#444]"
-        }`}>
+    <div className={`rounded-xl border border-zinc-800 bg-zinc-900/40 transition-all duration-150 ${isLocked ? "opacity-40 pointer-events-none" : ""}`}>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
+        <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 ${badgeCls} ${isRunning ? "animate-pulse" : ""}`}>
           {isComplete ? "✓" : isError ? "!" : number}
         </span>
-        <div className="flex-1">
-          <span className={`font-mono text-[13px] ${isRunning || isComplete ? "text-white" : "text-[#444]"}`}>
+        <div className="flex-1 min-w-0">
+          <span className={`font-mono text-[13px] ${isRunning || isComplete ? "text-zinc-100" : "text-zinc-500"}`}>
             {title}
           </span>
-          <p className="font-mono text-[10px] text-[#333] mt-0.5">{description}</p>
+          <p className="font-mono text-[10px] text-zinc-600 mt-0.5 truncate">{description}</p>
         </div>
         {isRunning && (
-          <span className="font-mono text-[10px] text-white/50 animate-pulse tracking-wider">running</span>
+          <span className="font-mono text-[10px] text-blue-400 animate-pulse">running</span>
         )}
         {isComplete && (
-          <span className="font-mono text-[10px] text-[#444]">done</span>
+          <span className="font-mono text-[10px] text-zinc-600">done</span>
         )}
         {isError && (
-          <span className="font-mono text-[10px] text-[#ff3b30]">error</span>
+          <span className="font-mono text-[10px] text-red-400">error</span>
         )}
       </div>
       {!isLocked && children && (
