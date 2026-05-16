@@ -73,6 +73,14 @@ interface StepCardProps {
   children?: React.ReactNode;
 }
 
+function PhaseHeader({ label }: { label: string }) {
+  return (
+    <div className="px-4 py-2 border-b border-zinc-800/80 bg-zinc-900/50 flex items-center gap-2.5">
+      <span className="text-[9px] uppercase tracking-[0.14em] text-zinc-600 font-mono">{label}</span>
+    </div>
+  );
+}
+
 function getStepCardState(
   pipeline: PipelineState,
   errorStage: number | null,
@@ -120,6 +128,8 @@ function ResearchStepCard({
   onRetry,
   children,
 }: StepCardProps) {
+  const [outputExpanded, setOutputExpanded] = useState(false);
+
   const cardState = getStepCardState(pipeline, errorStage, stepNum);
   const isRunning = cardState === "running";
   const isComplete = cardState === "complete";
@@ -161,24 +171,30 @@ function ResearchStepCard({
     : "bg-zinc-900 text-zinc-600 border border-zinc-800";
 
   return (
-    <div className={`border-b border-zinc-800 last:border-b-0 py-4 px-4 transition-all duration-150 ${isLocked ? "opacity-30 pointer-events-none" : ""}`}>
+    <div className={`border-b border-zinc-800 last:border-b-0 py-3.5 px-4 transition-all duration-150 ${isLocked ? "opacity-20 pointer-events-none" : ""}`}>
       {/* Row header */}
       <div className="flex items-center gap-3">
         <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 select-none ${badgeCls} ${isRunning ? "animate-pulse" : ""}`}>
           {isComplete ? "✓" : isError ? "!" : stepNum}
         </span>
-        <span className={`font-mono text-[13px] flex-1 leading-none ${
-          isRunning || isComplete ? "text-zinc-100" : "text-zinc-600"
+        <span className={`text-[13px] font-medium flex-1 leading-none ${
+          isRunning || isComplete ? "text-zinc-100" : "text-zinc-500"
         }`}>
           {title}
         </span>
         {isRunning && (
-          <span className="text-[10px] font-mono text-blue-400 animate-pulse">running</span>
+          <span className="text-[10px] font-mono text-blue-400 animate-pulse">running…</span>
         )}
-        {isComplete && !isRunning && (
-          <span className="text-[10px] font-mono text-zinc-600">
-            {skipped ? "skipped" : "done"}
-          </span>
+        {isComplete && !isRunning && output && !skipped && (
+          <button
+            onClick={() => setOutputExpanded(v => !v)}
+            className="cursor-pointer text-[10px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors duration-150"
+          >
+            {outputExpanded ? "hide ↑" : "view ↓"}
+          </button>
+        )}
+        {isComplete && !isRunning && (!output || skipped) && (
+          <span className="text-[10px] font-mono text-zinc-600">{skipped ? "skipped" : "done"}</span>
         )}
         {isError && (
           <span className="text-[10px] font-mono text-red-400">error</span>
@@ -187,7 +203,7 @@ function ResearchStepCard({
 
       {/* Description — shown when not locked */}
       {!isLocked && (
-        <p className="text-[11px] text-zinc-600 font-mono mt-0.5 pl-8">{description}</p>
+        <p className="text-[11px] text-zinc-500 mt-0.5 pl-8">{description}</p>
       )}
 
       {/* Error state */}
@@ -196,29 +212,29 @@ function ResearchStepCard({
           <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
           <button
             onClick={onRetry}
-            className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
+            className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors active:scale-95"
           >
             Retry step {stepNum}
           </button>
         </div>
       )}
 
-      {/* Output */}
-      {isComplete && output && (
-        <div className="mt-3 pl-8 space-y-2">
-          <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-3 text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+      {/* Output — collapsible */}
+      {isComplete && output && outputExpanded && (
+        <div className="mt-3 pl-8 space-y-2 fade-in">
+          <div className="bg-zinc-950 rounded-lg border border-zinc-800 p-3 text-[11px] font-mono text-zinc-400 whitespace-pre-wrap break-words leading-relaxed max-h-80 overflow-y-auto">
             {output}
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => copyToClipboard(output)}
-              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors"
+              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors active:scale-95"
             >
               Copy
             </button>
             <button
               onClick={() => downloadTxt(`${slug}_${filenameMap[stepNum] ?? `step${stepNum}.txt`}`, output)}
-              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors"
+              className="cursor-pointer px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[11px] font-mono transition-colors active:scale-95"
             >
               ↓ .txt
             </button>
@@ -917,6 +933,18 @@ export default function Home() {
     outputs.offer_brief_revised === outputs.offer_brief &&
     outputs.necessary_beliefs_revised === outputs.necessary_beliefs;
 
+  const stepsCompleted =
+    pipeline === "idle" ? 0 :
+    pipeline === "scraping" || pipeline === "step1_running" ? 0 :
+    pipeline === "step1_done" || pipeline === "step2_running" ? 1 :
+    pipeline === "step2_done" || pipeline === "step3_running" ? 2 :
+    pipeline === "step3_done" || pipeline === "step4a_running" ? 3 :
+    pipeline === "step4a_done" || pipeline === "step4b_running" ? 4 :
+    pipeline === "step4b_done" || pipeline === "step4c_running" ? 5 :
+    pipeline === "step4c_done" || pipeline === "step5_running" ? 6 :
+    pipeline === "step5_done" || pipeline === "step6_running" ? 7 :
+    8;
+
   const statusLabel =
     pipeline === "scraping"        ? "Fetching product page" :
     pipeline === "step1_running"   ? "Step 1 — Generating research" :
@@ -937,12 +965,14 @@ export default function Home() {
 
         {/* Page header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">Stage 1</span>
-            <span className="text-zinc-700">·</span>
-            <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Research</span>
+          <div className="flex items-baseline gap-3 mb-1.5">
+            <h1 className="text-[15px] font-semibold text-zinc-100 tracking-tight">Research Pipeline</h1>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">Stage 1</span>
+              <span className="text-zinc-700 text-[10px]">of 3</span>
+            </div>
           </div>
-          <p className="text-zinc-500 text-sm">Paste a product URL to generate research, avatars, and copy briefs.</p>
+          <p className="text-zinc-500 text-[13px]">Paste a product URL to generate research, avatars, and copy briefs for the German DTC market.</p>
         </div>
 
         {/* Inputs */}
@@ -1014,7 +1044,7 @@ export default function Home() {
             <button
               onClick={runPipeline}
               disabled={!canStartPipeline || isActive}
-              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-colors duration-150"
+              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-all duration-150"
             >
               {isActive ? "Running…" : "Run Pipeline"}
             </button>
@@ -1043,7 +1073,28 @@ export default function Home() {
         </div>
 
         {showPipeline && (
+          <>
+            {/* Progress bar */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  {isComplete ? "Stage 1 complete" : isActive ? statusLabel : "Stage 1"}
+                </span>
+                <span className="text-[10px] font-mono text-zinc-600">{stepsCompleted}/8 steps</span>
+              </div>
+              <div className="h-[2px] bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700 ease-out"
+                  style={{
+                    width: `${(stepsCompleted / 8) * 100}%`,
+                    background: isComplete ? "#10b981" : "#3b82f6",
+                  }}
+                />
+              </div>
+            </div>
+
           <div className="border border-zinc-800 rounded-xl overflow-hidden divide-y-0 bg-zinc-900/20">
+            <PhaseHeader label="Research" />
             <ResearchStepCard
               stepNum={1}
               title="Step 1 — Research"
@@ -1116,6 +1167,7 @@ export default function Home() {
               }}
             />
 
+            <PhaseHeader label="Strategy" />
             <ResearchStepCard
               stepNum={4}
               title="Step 4a — Avatar"
@@ -1207,6 +1259,7 @@ export default function Home() {
               }}
             />
 
+            <PhaseHeader label="Review" />
             <ResearchStepCard
               stepNum={7}
               title="Step 5 — Final Chief Review"
@@ -1293,6 +1346,7 @@ export default function Home() {
             />
 
           </div>
+          </>
         )}
 
         {/* Download All — below the step cards, shown when Stage 1 done */}
@@ -1300,7 +1354,7 @@ export default function Home() {
           <div className="mt-3">
             <button
               onClick={downloadAll}
-              className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150"
+              className="cursor-pointer px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg font-mono text-[11px] transition-colors duration-150 active:scale-95"
             >
               ↓ Download All (.zip)
             </button>
@@ -1309,23 +1363,26 @@ export default function Home() {
 
         {/* Continue to Stage 2 CTA — standalone card, shown after Stage 1 completes */}
         {isComplete && !showStage2Panel && (
-          <div className="mt-4 px-5 py-4 border border-zinc-800 rounded-xl bg-zinc-900/20 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between">
+          <div className="mt-4 px-5 py-4 border border-emerald-900/40 rounded-xl bg-emerald-950/20 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between fade-in">
             <div className="flex items-center gap-2.5">
               <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
-              <span className="font-mono text-[12px] text-emerald-400">Stage 1 complete — research &amp; copy briefs ready</span>
+              <div>
+                <span className="text-[13px] font-medium text-emerald-400">Stage 1 complete</span>
+                <span className="text-[12px] text-zinc-500 ml-2">research &amp; copy briefs ready</span>
+              </div>
             </div>
             <button
               onClick={() => setShownStage(2)}
-              className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm rounded-lg transition-colors duration-150 flex-shrink-0"
+              className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-mono text-sm rounded-lg transition-all duration-150 flex-shrink-0"
             >
-              Continue to Stage 2: Copy Generation →
+              Continue to Stage 2 →
             </button>
           </div>
         )}
 
         {/* Stage 2 panel — standalone card below the step cards */}
         {showStage2Panel && (
-          <div className="mt-4 border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/20">
+          <div className="mt-4 border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/20 fade-in">
             {/* Stage 2 header row */}
             <div className="px-4 py-3 border-b border-zinc-800 flex items-start gap-3">
               <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 mt-px ${
@@ -1374,7 +1431,7 @@ export default function Home() {
                   <button
                     onClick={runStage2}
                     disabled={!canRunStage2}
-                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-colors duration-150"
+                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-lg font-mono text-sm transition-all duration-150"
                   >
                     Start Stage 2 →
                   </button>
@@ -1409,17 +1466,20 @@ export default function Home() {
 
               {/* Continue to Stage 3 */}
               {pipelineIsStage2Done && (
-                <div className="pt-3 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between">
+                <div className="pt-3 border-t border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:justify-between fade-in">
                   <div className="flex items-center gap-2.5">
                     <span className="w-5 h-5 flex items-center justify-center rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 flex-shrink-0">✓</span>
-                    <span className="font-mono text-[12px] text-emerald-400">Stage 2 complete — German copy kit ready</span>
+                    <div>
+                      <span className="text-[13px] font-medium text-emerald-400">Stage 2 complete</span>
+                      <span className="text-[12px] text-zinc-500 ml-2">German copy kit ready</span>
+                    </div>
                   </div>
                   {runId ? (
                     <a
                       href={`/stage3?runId=${runId}`}
-                      className="cursor-pointer flex-shrink-0 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-sm rounded-lg transition-colors duration-150 inline-flex items-center justify-center"
+                      className="cursor-pointer flex-shrink-0 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-mono text-sm rounded-lg transition-all duration-150 inline-flex items-center justify-center"
                     >
-                      Continue to Stage 3: Image Generation →
+                      Continue to Stage 3 →
                     </a>
                   ) : (
                     <span className="font-mono text-[11px] text-zinc-500 animate-pulse">Saving run…</span>
