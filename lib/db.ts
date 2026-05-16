@@ -54,6 +54,9 @@ function getDb(): Database.Database {
       ["status", "TEXT"],
       ["revised_steps", "TEXT"],
       ["image_prompts", "TEXT"],
+      ["generated_images", "TEXT"],
+      ["audit_results", "TEXT"],
+      ["prompt_edits_made", "INTEGER"],
     ];
 
     for (const [colName, colType] of newColumns) {
@@ -97,5 +100,8 @@ export interface Run {
   brand_name: string | null;
   status: string | null;
   revised_steps: string | null;         // JSON array of step numbers
-  image_prompts: string | null;         // JSON, future-ready
+  image_prompts: string | null;         // JSON array of 11 prompts
+  generated_images: string | null;      // JSON array of {prompt_index, category, image_url, status}
+  audit_results: string | null;         // JSON array of audit verdicts
+  prompt_edits_made: number | null;     // Count of how many prompts user edited
 }

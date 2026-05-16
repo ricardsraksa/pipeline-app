@@ -1306,48 +1306,25 @@ export default function Home() {
                   <StageCard
                     number={3}
                     title="Stage 3 — Image Generation"
-                    description="7 Higgsfield prompts (3 infographic + 4 contextual), generated sequentially"
+                    description="11 Higgsfield prompts with QC gate, audit loop, and feedback learning"
                     state={imageStageCardState(pipeline, errorStage, 3)}
                   >
-                    {pipelineIsStage3PromptsRunning && (
-                      <p className="text-[11px] text-blue-400 font-mono animate-pulse">Building image prompts…</p>
-                    )}
-
-                    {errorStage === 13 && (
+                    {/* Stage 3 entry point — navigates to /stage3 page */}
+                    {(pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && runId && (
                       <div className="space-y-2">
-                        <p className="text-[11px] text-red-400 font-mono">{errorMessage}</p>
-                        <button
-                          onClick={runStage3}
-                          className="cursor-pointer px-3 py-1.5 border border-red-900/50 text-red-400 hover:bg-red-950/40 rounded-lg text-xs transition-colors"
-                        >
-                          Retry Stage 3
-                        </button>
-                      </div>
-                    )}
-
-                    {imageSlots.length > 0 && (
-                      <ImageGrid
-                        slots={imageSlots}
-                        currentIndex={currentImageIndex}
-                        onRetry={retryImage}
-                      />
-                    )}
-
-                    {isDone && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-zinc-500 text-[11px] font-mono">
-                          {imageSlots.filter((s) => s.status === "done").length} of {imageSlots.length} images generated.
-                          {runId && (
-                            <a
-                              href={`/history/${runId}`}
-                              className="ml-3 text-blue-400 hover:text-blue-300"
-                            >
-                              View run →
-                            </a>
-                          )}
+                        <p className="text-[11px] text-zinc-500 font-mono">
+                          Stage 2 complete. Ready to generate product images.
                         </p>
-                        <FeedbackBar runId={runId} stage={3} />
+                        <a
+                          href={`/stage3?runId=${runId}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                        >
+                          Open Image Generation →
+                        </a>
                       </div>
+                    )}
+                    {pipelineIsStage3ImagesDone && (
+                      <p className="text-[11px] text-emerald-400 font-mono">Images generated.</p>
                     )}
                   </StageCard>
                 </div>
