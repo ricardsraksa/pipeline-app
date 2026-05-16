@@ -293,16 +293,40 @@ export default function Home() {
   }
 
   function extractBrandSlug(offerBriefText: string): string | null {
-    // Look for recommended name (marked with *, (recommended), or listed first under "Product Name"/"Brand Name" section
+    // Step 1: Find "Brand Name Options" section specifically, then grab the first bullet item
+    const optionsMatch = offerBriefText.match(
+      /brand name[^\n]*?options?[^\n]*\n([\s\S]{0,600}?)(?=\n\n\d\.|\n\n\*\*\d\.|\n\n##|$)/i
+    );
+    if (optionsMatch) {
+      const block = optionsMatch[1];
+      // Find first line that starts with a bullet (- or *)
+      const bulletLine = block.split("\n").find(l => /^[-*]\s+\S/.test(l));
+      if (bulletLine) {
+        const name = bulletLine
+          .replace(/^[-*]\s+/, "")       // strip bullet character
+          .replace(/\*\*/g, "")           // strip markdown bold markers
+          .split(/\s*[-–(]/)[0]           // stop at dash/paren qualifiers like "- recommended"
+          .trim();
+        if (name.length > 0 && name.length < 60) return toSlug(name) || null;
+      }
+    }
+    // Step 2: Broader fallback — any "brand name" or "product name" section, first bullet
     const sectionMatch = offerBriefText.match(/(?:product name|brand name)[^\n]*\n([\s\S]{0,600}?)(?:\n\n|\n\d\.|\n##)/i);
     if (!sectionMatch) return null;
     const block = sectionMatch[1];
-    // Try to find a recommended marker first
-    const recommended = block.match(/\*\*?([^*\n]+?)\*\*?[^\n]*(?:recommend|preferred)/i)
-      ?? block.match(/([^\n]+?)(?:\s*[-–]\s*|\s*\()(?:recommend|preferred)/i);
-    if (recommended) return toSlug(recommended[1].trim()) || null;
-    // Otherwise take the first non-empty line that looks like a name
-    const firstLine = block.split("\n").map(l => l.replace(/^[-*\d.\s]+/, "").trim()).find(l => l.length > 0 && l.length < 60);
+    const bulletLine = block.split("\n").find(l => /^[-*]\s+\S/.test(l));
+    if (bulletLine) {
+      const name = bulletLine
+        .replace(/^[-*]\s+/, "")
+        .replace(/\*\*/g, "")
+        .split(/\s*[-–(]/)[0]
+        .trim();
+      if (name.length > 0 && name.length < 60) return toSlug(name) || null;
+    }
+    // Step 3: Last resort — first non-empty, non-header line
+    const firstLine = block.split("\n")
+      .map(l => l.replace(/^[-*\d.*\s#]+/, "").trim())
+      .find(l => l.length > 0 && l.length < 60 && !l.includes(":"));
     return firstLine ? toSlug(firstLine) || null : null;
   }
 
