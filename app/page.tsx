@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import StageCard from "@/components/StageCard";
 import OutputBlock from "@/components/OutputBlock";
 import ImageUploader from "@/components/ImageUploader";
@@ -274,6 +274,9 @@ export default function Home() {
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState<number | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
+  const [ambiguousListing, setAmbiguousListing] = useState(false);
+
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const allImages = [...scrapedImages, ...userImages];
 
@@ -424,6 +427,23 @@ export default function Home() {
     // Scrape
     setPipeline("scraping");
     const { scraped, imgs, competitorScraped } = await scrapeAll();
+
+    // Validate scraped data is sufficient before starting the research step
+    const hasContent = scraped.length > 50;
+    const hasImages = imgs.length >= 1;
+    const isAmbiguous = !hasContent || !hasImages;
+
+    if (isAmbiguous && !productDescription.trim()) {
+      setAmbiguousListing(true);
+      setPipeline("idle");
+      // Scroll to and focus the Product Description field so the user sees what to fill in
+      setTimeout(() => {
+        descriptionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        descriptionRef.current?.focus();
+      }, 100);
+      return;
+    }
+    setAmbiguousListing(false);
 
     // Step 1 — Research
     setPipeline("step1_running");
@@ -913,17 +933,29 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
+            <label className={`block font-mono text-[10px] uppercase tracking-widest mb-2 transition-colors duration-150 ${ambiguousListing ? 'text-red-400' : 'text-zinc-500'}`}>
               Product Description
-              <span className="text-zinc-600 tracking-normal normal-case ml-2">optional — overrides scraper</span>
+              {ambiguousListing ? (
+                <span className="ml-2 normal-case tracking-normal text-red-400 font-sans font-normal">required — listing is ambiguous</span>
+              ) : (
+                <span className="text-zinc-600 tracking-normal normal-case ml-2">optional — overrides scraper</span>
+              )}
             </label>
             <textarea
+              ref={descriptionRef}
               value={productDescription}
-              onChange={(e) => setProductDescription(e.target.value)}
+              onChange={(e) => {
+                setProductDescription(e.target.value);
+                if (e.target.value.length >= 10) setAmbiguousListing(false);
+              }}
               rows={3}
               placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10. Use when the listing is in another language or unclear."
               disabled={isActive}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40 resize-none"
+              className={`w-full bg-zinc-900 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all duration-150 disabled:opacity-40 resize-none ${
+                ambiguousListing
+                  ? 'border-2 border-red-500 focus:border-red-400 ring-2 ring-red-500/20 animate-pulse'
+                  : 'border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10'
+              }`}
             />
           </div>
 
@@ -947,24 +979,36 @@ export default function Home() {
         </div>
 
         {/* CTA + status */}
-        <div className="flex items-center gap-4 mb-10">
-          <button
-            onClick={runPipeline}
-            disabled={!canStartPipeline || isActive}
-            className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-colors duration-150"
-          >
-            {isActive ? "Running…" : "Run Pipeline"}
-          </button>
+        <div className="space-y-3 mb-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={runPipeline}
+              disabled={!canStartPipeline || isActive}
+              className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white font-mono text-sm rounded-lg transition-colors duration-150"
+            >
+              {isActive ? "Running…" : "Run Pipeline"}
+            </button>
 
-          {isActive && statusLabel && (
-            <span className="font-mono text-[11px] text-zinc-500 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
-              {statusLabel}
-            </span>
-          )}
+            {isActive && statusLabel && (
+              <span className="font-mono text-[11px] text-zinc-500 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
+                {statusLabel}
+              </span>
+            )}
 
-          {isComplete && !isActive && (
-            <span className="font-mono text-[11px] text-emerald-400">Complete</span>
+            {isComplete && !isActive && (
+              <span className="font-mono text-[11px] text-emerald-400">Complete</span>
+            )}
+          </div>
+
+          {/* Ambiguous listing warning */}
+          {ambiguousListing && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-950/40 border border-red-900/50">
+              <span className="text-red-400 text-sm mt-px flex-shrink-0">!</span>
+              <p className="font-mono text-[11px] text-red-400 leading-relaxed">
+                The product listing doesn&apos;t have enough clear information. Please describe the product in the field above.
+              </p>
+            </div>
           )}
         </div>
 
