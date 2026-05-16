@@ -19,7 +19,6 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
   async function save(selectedRating: "up" | "down") {
     if (!runId) return;
     setSaving(true);
-
     const field = `feedback_stage${stage}` as const;
     try {
       await fetch(`/api/runs/${runId}`, {
@@ -41,44 +40,41 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
 
   if (saved) {
     return (
-      <div className="flex items-center gap-2 pt-3 border-t border-[#1a1a1a] mt-3">
-        <span className="text-xs font-mono text-[#16a34a]">Feedback saved</span>
+      <div className="mt-3 pt-3 border-t border-[#111]">
+        <span className="font-mono text-[11px] text-[#444]">Feedback saved</span>
       </div>
     );
   }
 
   return (
-    <div className="pt-3 border-t border-[#1a1a1a] mt-3 space-y-2">
+    <div className="mt-3 pt-3 border-t border-[#111] space-y-2">
       <div className="flex items-center gap-3">
-        <span className="text-xs font-mono text-[#404040] uppercase tracking-wider">
-          Stage {stage} quality
+        <span className="font-mono text-[10px] text-[#333] uppercase tracking-[0.15em]">
+          Rate stage {stage}
         </span>
         <button
           onClick={() => handleRating("up")}
           disabled={saving}
-          className={[
-            "w-7 h-7 rounded text-sm transition-colors",
+          className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
             rating === "up"
-              ? "bg-[#16a34a]/20 text-[#16a34a] border border-[#16a34a]/40"
-              : "bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-[#737373] hover:text-[#e5e5e5]",
-          ].join(" ")}
+              ? "bg-white text-black"
+              : "border border-[#1e1e1e] text-[#444] hover:border-[#333] hover:text-white"
+          }`}
         >
           ↑
         </button>
         <button
           onClick={() => handleRating("down")}
           disabled={saving}
-          className={[
-            "w-7 h-7 rounded text-sm transition-colors",
+          className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
             rating === "down"
-              ? "bg-[#dc2626]/20 text-[#dc2626] border border-[#dc2626]/40"
-              : "bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-[#737373] hover:text-[#e5e5e5]",
-          ].join(" ")}
+              ? "bg-[#ff3b30]/15 text-[#ff3b30] ring-1 ring-[#ff3b30]/30"
+              : "border border-[#1e1e1e] text-[#444] hover:border-[#333] hover:text-white"
+          }`}
         >
           ↓
         </button>
       </div>
-
       {rating && (
         <div className="flex items-center gap-2">
           <input
@@ -86,15 +82,15 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
             value={notes}
             onChange={(e) => setNotes(e.target.value.slice(0, 200))}
             onKeyDown={(e) => e.key === "Enter" && save(rating)}
-            placeholder="What worked or didn't? (optional)"
-            className="flex-1 bg-[#111] border border-[#2a2a2a] rounded px-3 py-1.5 text-xs text-[#e5e5e5] placeholder-[#404040] focus:outline-none focus:border-[#2563eb]"
+            placeholder="Notes (optional)"
+            className="flex-1 bg-[#050505] border border-[#1c1c1c] focus:border-[#333] rounded px-3 py-1.5 font-mono text-[11px] text-white placeholder-[#2a2a2a] focus:outline-none transition-colors duration-150"
           />
           <button
             onClick={() => save(rating)}
             disabled={saving}
-            className="px-3 py-1.5 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 rounded text-xs font-mono text-white transition-colors"
+            className="cursor-pointer px-3 py-1.5 bg-white hover:bg-[#e5e5e5] disabled:opacity-40 text-black rounded font-mono text-[11px] transition-colors duration-150"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? "…" : "Save"}
           </button>
         </div>
       )}

@@ -153,81 +153,76 @@ function ResearchStepCard({
     8: "FINAL_REVISIONS.txt",
   };
 
+  const isLocked = !isRunning && !isComplete && !isError;
+
   return (
-    <div
-      className={`border rounded-lg p-4 space-y-3 transition-colors ${
-        isError
-          ? "border-[#dc2626] bg-[#0f0f0f]"
-          : isRunning
-          ? "border-[#2563eb] bg-[#0a0f1e]"
-          : isComplete
-          ? "border-[#1a3a2a] bg-[#0a0f0a]"
-          : "border-[#1a1a1a] bg-[#0a0a0a] opacity-50"
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <span
-          className={`text-xs font-mono px-1.5 py-0.5 rounded ${
-            isError
-              ? "bg-[#dc2626] text-white"
-              : isRunning
-              ? "bg-[#2563eb] text-white"
-              : isComplete
-              ? "bg-[#16a34a] text-white"
-              : "bg-[#1a1a1a] text-[#404040]"
-          }`}
-        >
-          {stepNum}
+    <div className={`border-b border-[#111] last:border-b-0 py-4 px-4 transition-all duration-150 ${isLocked ? "opacity-25" : ""}`}>
+      {/* Row header */}
+      <div className="flex items-center gap-3">
+        <span className={`w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono flex-shrink-0 select-none ${
+          isError   ? "bg-[#ff3b30]/15 text-[#ff3b30] ring-1 ring-[#ff3b30]/30" :
+          isRunning ? "bg-white text-black" :
+          isComplete ? "bg-white text-black" :
+          "bg-[#111] text-[#444]"
+        }`}>
+          {isComplete ? "✓" : stepNum}
         </span>
-        <span className="text-sm font-mono text-[#e5e5e5]">{title}</span>
+        <span className={`text-[13px] font-mono flex-1 leading-none ${
+          isRunning || isComplete ? "text-white" : "text-[#444]"
+        }`}>
+          {title}
+        </span>
         {isRunning && (
-          <span className="text-xs font-mono text-[#2563eb] animate-pulse ml-auto">
-            Running...
-          </span>
+          <span className="text-[10px] font-mono text-white/50 animate-pulse tracking-wider">running</span>
         )}
         {isComplete && !isRunning && (
-          <span className="text-xs font-mono text-[#16a34a] ml-auto">
-            {skipped ? "Skipped (no revisions needed)" : "Done"}
+          <span className="text-[10px] font-mono text-[#444]">
+            {skipped ? "skipped" : "done"}
           </span>
+        )}
+        {isError && (
+          <span className="text-[10px] font-mono text-[#ff3b30]">error</span>
         )}
       </div>
 
-      <p className="text-xs text-[#404040] font-mono">{description}</p>
+      {/* Description — shown when not locked */}
+      {!isLocked && (
+        <p className="text-[11px] text-[#444] font-mono mt-1 pl-8">{description}</p>
+      )}
 
+      {/* Error state */}
       {isError && (
-        <div className="space-y-2">
-          <p className="text-xs text-[#dc2626] font-mono">Error: {errorMessage}</p>
+        <div className="mt-3 pl-8 space-y-2">
+          <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
           <button
             onClick={onRetry}
-            className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
+            className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#666] hover:text-white transition-colors duration-150"
           >
-            Retry Step {stepNum}
+            Retry step {stepNum}
           </button>
         </div>
       )}
 
+      {/* Output */}
       {isComplete && output && (
-        <div className="space-y-2">
-          <div
-            className="bg-[#111] border border-[#1a1a1a] rounded p-3 overflow-y-auto"
-            style={{ maxHeight: "400px" }}
-          >
-            <pre className="text-xs font-mono text-[#a0a0a0] whitespace-pre-wrap break-words">
+        <div className="mt-3 pl-8 space-y-2">
+          <div className="max-h-96 overflow-y-auto rounded border border-[#1a1a1a] bg-[#050505]">
+            <pre className="p-3 text-[11px] font-mono text-[#666] whitespace-pre-wrap break-words leading-relaxed">
               {output}
             </pre>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => copyToClipboard(output)}
-              className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
+              className="cursor-pointer px-3 py-1.5 border border-[#1e1e1e] hover:border-[#333] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
             >
               Copy
             </button>
             <button
               onClick={() => downloadTxt(`${slug}_${filenameMap[stepNum] ?? `step${stepNum}.txt`}`, output)}
-              className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
+              className="cursor-pointer px-3 py-1.5 border border-[#1e1e1e] hover:border-[#333] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
             >
-              Download .txt
+              ↓ .txt
             </button>
           </div>
         </div>
@@ -847,106 +842,112 @@ export default function Home() {
     outputs.offer_brief_revised === outputs.offer_brief &&
     outputs.necessary_beliefs_revised === outputs.necessary_beliefs;
 
-  return (
-    <main className="min-h-screen bg-[#0a0a0a] pb-16">
-      <div className="max-w-2xl mx-auto px-4 pt-8">
-        <div className="mb-7">
-          <p className="text-[#404040] text-sm">
-            Enter a product URL to run the 8-step Mark Builds Brands research pipeline for the
-            German DTC market.
-          </p>
-        </div>
+  const statusLabel =
+    pipeline === "scraping"        ? "Fetching product page" :
+    pipeline === "step1_running"   ? "Step 1 — Generating research" :
+    pipeline === "step2_running"   ? "Step 2 — Running mid chief review" :
+    pipeline === "step3_running"   ? "Step 3 — Revising research" :
+    pipeline === "step4a_running"  ? "Step 4a — Building avatar" :
+    pipeline === "step4b_running"  ? "Step 4b — Writing offer brief" :
+    pipeline === "step4c_running"  ? "Step 4c — Identifying necessary beliefs" :
+    pipeline === "step5_running"   ? "Step 5 — Running final chief review" :
+    pipeline === "step6_running"   ? "Step 6 — Applying final revisions" :
+    pipeline === "stage2_running"  ? "Stage 2 — Generating German copy" :
+    pipeline === "stage3_prompts_running" ? "Stage 3 — Building image prompts" :
+    pipeline === "stage3_images_running" ? "Stage 3 — Generating images" : "";
 
-        <div className="space-y-3 mb-6">
+  return (
+    <main className="min-h-screen bg-black text-white">
+      {/* Top nav */}
+      <div className="border-b border-[#111] bg-black sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-5 h-12 flex items-center justify-between">
+          <span className="font-mono text-[11px] text-white tracking-[0.2em] uppercase">Pipeline</span>
+          <a
+            href="/history"
+            className="cursor-pointer font-mono text-[11px] text-[#444] hover:text-white transition-colors duration-150"
+          >
+            History →
+          </a>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-5 pt-10 pb-20">
+
+        {/* Inputs */}
+        <div className="space-y-5 mb-8">
           <div>
-            <label className="block text-xs font-mono text-[#737373] uppercase tracking-wider mb-1.5">
+            <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
               Product URL
             </label>
             <input
-              type="text"
+              type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && canStartPipeline && runPipeline()}
               placeholder="https://www.aliexpress.com/item/..."
               disabled={isActive}
-              className="w-full bg-[#111] border border-[#2a2a2a] rounded-md px-3 py-2.5 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb] disabled:opacity-40 transition-colors"
+              className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 transition-colors duration-150"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-mono text-[#737373] uppercase tracking-wider mb-1.5">
-              Product Description <span className="normal-case text-[#333]">(optional)</span>
+            <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
+              Product Description
+              <span className="ml-2 normal-case text-[#2a2a2a] tracking-normal">optional — overrides scraper</span>
             </label>
-            <p className="text-xs text-[#333] mb-1.5">
-              Describe what the product actually is. Use this when the listing is unclear or in a language Claude may misread. This overrides the scraper's product identification.
-            </p>
             <textarea
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
-              rows={4}
-              placeholder="e.g. Children's swimming goggle set including goggles, swim cap, and nose clip. Made from soft silicone. Target ages 4-10."
-              className="w-full bg-[#111] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb] resize-none transition-colors"
+              rows={3}
+              placeholder="e.g. Children's swimming goggle set, soft silicone, ages 4–10. Use when the listing is in another language or unclear."
+              disabled={isActive}
+              className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
             />
           </div>
 
           <details className="group">
-            <summary className="cursor-pointer text-xs font-mono text-[#404040] hover:text-[#737373] transition-colors select-none list-none">
-              ↳ Competitor URLs (optional)
+            <summary className="cursor-pointer font-mono text-[11px] text-[#333] hover:text-[#666] transition-colors duration-150 select-none list-none flex items-center gap-1.5">
+              <span className="text-[9px] group-open:rotate-90 transition-transform duration-150 inline-block">▶</span>
+              Competitor URLs
+              <span className="text-[#222]">optional</span>
             </summary>
             <div className="mt-2">
               <textarea
                 value={competitorUrls}
                 onChange={(e) => setCompetitorUrls(e.target.value)}
-                placeholder="One competitor URL per line..."
+                placeholder="One URL per line"
                 rows={3}
                 disabled={isActive}
-                className="w-full bg-[#111] border border-[#2a2a2a] rounded-md px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb] disabled:opacity-40 resize-none transition-colors"
+                className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] hover:border-[#222] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none disabled:opacity-40 resize-none transition-colors duration-150"
               />
             </div>
           </details>
         </div>
 
-        <div className="mb-8 flex items-center gap-3">
+        {/* CTA + status */}
+        <div className="flex items-center gap-4 mb-10">
           <button
             onClick={runPipeline}
             disabled={!canStartPipeline || isActive}
-            className="px-4 py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#1a1a1a] disabled:text-[#3a3a3a] text-white rounded font-mono text-sm transition-colors"
+            className="cursor-pointer px-5 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black font-mono text-sm rounded-md transition-colors duration-150"
           >
-            {pipeline === "scraping"
-              ? "Scraping..."
-              : isActive
-              ? "Running..."
-              : "Start Pipeline"}
+            {isActive ? "Running…" : "Run Pipeline"}
           </button>
 
-          {isActive && (
-            <span className="text-xs font-mono text-[#737373] flex items-center gap-1.5">
-              <span className="pulse-dot w-1.5 h-1.5 rounded-full bg-[#737373] inline-block" />
-              {pipeline === "scraping"
-                ? "Fetching product page..."
-                : pipeline === "step1_running"
-                ? "Generating research..."
-                : pipeline === "step2_running"
-                ? "Running mid chief review..."
-                : pipeline === "step3_running"
-                ? "Revising research..."
-                : pipeline === "step4a_running"
-                ? "Building avatar..."
-                : pipeline === "step4b_running"
-                ? "Writing offer brief..."
-                : pipeline === "step4c_running"
-                ? "Identifying necessary beliefs..."
-                : pipeline === "step5_running"
-                ? "Running final chief review..."
-                : pipeline === "step6_running"
-                ? "Applying final revisions..."
-                : "Processing..."}
+          {isActive && statusLabel && (
+            <span className="font-mono text-[11px] text-[#444] flex items-center gap-2">
+              <span className="w-1 h-1 rounded-full bg-white animate-pulse inline-block" />
+              {statusLabel}
             </span>
+          )}
+
+          {isComplete && !isActive && (
+            <span className="font-mono text-[11px] text-[#444]">Complete</span>
           )}
         </div>
 
         {showPipeline && (
-          <div className="space-y-3">
+          <div className="border border-[#111] rounded-lg overflow-hidden divide-y-0">
             <ResearchStepCard
               stepNum={1}
               title="Step 1 — Research"
@@ -1196,21 +1197,21 @@ export default function Home() {
             />
 
             {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && outputs.research_revised && (
-              <div className="pt-2">
+              <div className="px-4 py-3 border-t border-[#111]">
                 <button
                   onClick={downloadAll}
-                  className="px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white rounded font-mono text-sm transition-colors"
+                  className="cursor-pointer px-4 py-2 border border-[#1e1e1e] hover:border-[#333] rounded-md font-mono text-[11px] text-[#555] hover:text-white transition-colors duration-150"
                 >
-                  Download All (.zip)
+                  ↓ Download All (.zip)
                 </button>
               </div>
             )}
 
             {/* Image generation stage (kept from original) */}
             {(isComplete || pipelineIsStage2Running || pipelineIsStage2Done || pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning || pipelineIsStage3ImagesDone) && (
-              <div className="mt-8 border-t border-[#1a1a1a] pt-6">
-                <p className="text-xs font-mono text-[#737373] uppercase tracking-wider mb-4">
-                  Image Generation (Optional)
+              <div className="mt-6 border-t border-[#111] pt-6 px-4">
+                <p className="font-mono text-[10px] text-[#333] uppercase tracking-[0.2em] mb-4">
+                  Image Generation — Optional
                 </p>
 
                 <div className="space-y-3">
@@ -1221,15 +1222,15 @@ export default function Home() {
                     state={imageStageCardState(pipeline, errorStage, 2)}
                   >
                     {pipelineIsStage2Running && (
-                      <p className="text-xs text-[#404040] font-mono">Generating German copy kit...</p>
+                      <p className="text-[11px] text-[#444] font-mono animate-pulse">Generating German copy kit…</p>
                     )}
 
                     {errorStage === 12 && (
                       <div className="space-y-2">
-                        <p className="text-xs text-[#dc2626] font-mono">Error: {errorMessage}</p>
+                        <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
                         <button
                           onClick={runStage2}
-                          className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
+                          className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
                         >
                           Retry Stage 2
                         </button>
@@ -1257,7 +1258,7 @@ export default function Home() {
                             <button
                               onClick={runStage3}
                               disabled={!canRunStage3}
-                              className="px-4 py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#1a1a1a] disabled:text-[#3a3a3a] text-white rounded font-mono text-sm transition-colors"
+                              className="cursor-pointer px-4 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black rounded-md font-mono text-sm transition-colors duration-150"
                             >
                               Continue to Stage 3 →
                             </button>
@@ -1281,7 +1282,7 @@ export default function Home() {
                           </div>
                         )}
                         <div>
-                          <label className="block text-xs font-mono text-[#737373] uppercase tracking-wider mb-1.5">
+                          <label className="block font-mono text-[10px] text-[#444] uppercase tracking-[0.15em] mb-2">
                             Working product name
                           </label>
                           <input
@@ -1290,13 +1291,13 @@ export default function Home() {
                             onChange={(e) => setProductName(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && canRunStage2 && runStage2()}
                             placeholder="e.g. WELLENFROH"
-                            className="w-full bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#333] focus:outline-none focus:border-[#2563eb]"
+                            className="w-full bg-[#050505] border border-[#1c1c1c] focus:border-[#333] rounded-md px-4 py-3 text-sm font-mono text-white placeholder-[#2a2a2a] focus:outline-none transition-colors duration-150"
                           />
                         </div>
                         <button
                           onClick={runStage2}
                           disabled={!canRunStage2}
-                          className="px-4 py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#1a1a1a] disabled:text-[#3a3a3a] text-white rounded font-mono text-sm transition-colors"
+                          className="cursor-pointer px-4 py-2.5 bg-white hover:bg-[#e5e5e5] disabled:bg-[#111] disabled:text-[#333] disabled:cursor-not-allowed text-black rounded-md font-mono text-sm transition-colors duration-150"
                         >
                           Run Stage 2 (German Copy) →
                         </button>
@@ -1311,15 +1312,15 @@ export default function Home() {
                     state={imageStageCardState(pipeline, errorStage, 3)}
                   >
                     {pipelineIsStage3PromptsRunning && (
-                      <p className="text-xs text-[#404040] font-mono">Generating image prompts...</p>
+                      <p className="text-[11px] text-[#444] font-mono animate-pulse">Building image prompts…</p>
                     )}
 
                     {errorStage === 13 && (
                       <div className="space-y-2">
-                        <p className="text-xs text-[#dc2626] font-mono">Error: {errorMessage}</p>
+                        <p className="text-[11px] text-[#ff3b30] font-mono">{errorMessage}</p>
                         <button
                           onClick={runStage3}
-                          className="px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-xs font-mono text-[#737373] hover:text-[#e5e5e5] transition-colors"
+                          className="cursor-pointer px-3 py-1.5 border border-[#222] hover:border-[#444] rounded text-[11px] font-mono text-[#555] hover:text-white transition-colors duration-150"
                         >
                           Retry Stage 3
                         </button>
@@ -1335,15 +1336,13 @@ export default function Home() {
                     )}
 
                     {isDone && (
-                      <div>
-                        <p className="text-xs font-mono text-[#16a34a] mt-3">
-                          Image generation complete —{" "}
-                          {imageSlots.filter((s) => s.status === "done").length} of{" "}
-                          {imageSlots.length} images generated.
+                      <div className="mt-3 space-y-2">
+                        <p className="text-[11px] font-mono text-[#555]">
+                          {imageSlots.filter((s) => s.status === "done").length} of {imageSlots.length} images generated.
                           {runId && (
                             <a
                               href={`/history/${runId}`}
-                              className="ml-3 text-[#2563eb] hover:underline"
+                              className="ml-3 text-white hover:underline"
                             >
                               View run →
                             </a>
@@ -1361,4 +1360,5 @@ export default function Home() {
       </div>
     </main>
   );
+
 }
