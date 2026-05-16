@@ -588,7 +588,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product_url: url.trim(),
-          product_name: localBrandSlug ?? productSlug ?? productName || url.trim(),
+          product_name: (localBrandSlug ?? productSlug ?? productName) || url.trim(),
           product_description: productDescription || null,
           competitor_urls: competitorList.length > 0 ? competitorList : undefined,
           scraper_data: { scraped_text: scraped, images: imgs },
