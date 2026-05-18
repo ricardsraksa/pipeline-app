@@ -982,6 +982,16 @@ export default function Home() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Stage 2 failed");
       setStage2Output(data.output);
+      // Save stage2_output to DB immediately so Stage 3 page can read it
+      if (runId) {
+        try {
+          await fetch(`/api/runs/${runId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stage2_output: data.output }),
+          });
+        } catch { /* non-critical */ }
+      }
       setPipeline("stage2_done");
     } catch (err) {
       setError(12, err instanceof Error ? err.message : String(err));
