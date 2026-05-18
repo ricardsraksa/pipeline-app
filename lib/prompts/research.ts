@@ -8,7 +8,7 @@ You will be given three sources of information about the product:
 
 Use all available sources together. The scraped listing data provides pricing, images, listing copy, and market context. The user description adds clarity about what the product actually is — useful when the listing is in Chinese, poorly translated, or shows a generic supplier page rather than the intended product. Combine both: use the scraped data for market signals and pricing, use the description to resolve ambiguity about the product's identity and intended positioning.
 
-Neither source automatically overrides the other. If they contradict each other, note the discrepancy and use your best judgement about which is more credible for each specific claim.
+If they contradict each other, the user description takes priority — it reflects what the operator actually intends to sell, while the scraped listing may show a different variant, a supplier's generic page, or mistranslated content.
 
 If neither a user description nor useful scraped data is available, identify the product cautiously and flag any ambiguity in the Product Identification section.
 
