@@ -79,6 +79,34 @@ const EMPTY_OUTPUTS: Outputs = {
   necessary_beliefs_revised: null,
 };
 
+type Step1SubStep =
+  | "identify_running" | "identify_done"
+  | "market_running"   | "market_done"
+  | "competitive_running" | "competitive_done"
+  | "product_running"  | "product_done"
+  | "visual_running"   | "visual_done"
+  | null;
+
+const STEP1_SUBSTEPS: { key: string; label: string }[] = [
+  { key: "identify",    label: "Product identification" },
+  { key: "market",      label: "Market overview & pain points" },
+  { key: "competitive", label: "Competitive landscape" },
+  { key: "product",     label: "Product analysis & sophistication" },
+  { key: "visual",      label: "Visual brand strategy" },
+];
+
+const STEP1_SUBSTEP_ORDER = ["identify", "market", "competitive", "product", "visual"];
+
+function isSubStepComplete(current: Step1SubStep, target: string): boolean {
+  if (!current) return false;
+  const [name, status] = current.split("_");
+  const curIdx = STEP1_SUBSTEP_ORDER.indexOf(name);
+  const tgtIdx = STEP1_SUBSTEP_ORDER.indexOf(target);
+  if (tgtIdx < curIdx) return true;
+  if (tgtIdx === curIdx && status === "done") return true;
+  return false;
+}
+
 interface StepCardProps {
   stepNum: number;
   title: string;
@@ -294,6 +322,7 @@ export default function Home() {
   const [selectedStep, setSelectedStep] = useState<number>(1);
   const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [step1SubStep, setStep1SubStep] = useState<Step1SubStep>(null);
 
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const productNameRef = useRef<HTMLInputElement>(null);
@@ -615,8 +644,9 @@ export default function Home() {
     }
     setAmbiguousListing(false);
 
-    // Step 1 — Research
+    // Step 1 — Research (5 sequential sub-calls, streamed via SSE)
     setPipeline("step1_running");
+    setStep1SubStep(null);
     let research = "";
     try {
       const res = await fetch("/api/pipeline/step1", {
@@ -630,9 +660,31 @@ export default function Home() {
           competitor_scraped: competitorScraped,
         }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error ?? "Step 1 failed");
-      research = data.output;
+      if (!res.body) throw new Error("No response body from step 1");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          let parsed: Record<string, unknown>;
+          try { parsed = JSON.parse(line.slice(6)); } catch { continue; }
+          if (parsed.type === "progress") {
+            setStep1SubStep(parsed.substep as Step1SubStep);
+          } else if (parsed.type === "done") {
+            if (!parsed.success) throw new Error((parsed.error as string) ?? "Step 1 failed");
+            research = parsed.output as string;
+          } else if (parsed.type === "error") {
+            throw new Error((parsed.message as string) ?? "Step 1 failed");
+          }
+        }
+      }
+      if (!research) throw new Error("Step 1 produced no output");
       setOutputs((prev) => ({ ...prev, research }));
       const pSlug = extractProductSlug(research);
       setProductSlug(pSlug);
@@ -1613,7 +1665,36 @@ export default function Home() {
                             </div>
                           </div>
                         )}
-                        {selectedState === "running" && (
+                        {selectedState === "running" && selectedStep === 1 && (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                              <span className="text-[12px] font-mono text-blue-400">Running 5 research sub-calls…</span>
+                            </div>
+                            <div className="space-y-2.5">
+                              {STEP1_SUBSTEPS.map(({ key, label }) => {
+                                const running = step1SubStep === `${key}_running`;
+                                const done = isSubStepComplete(step1SubStep, key);
+                                return (
+                                  <div key={key} className="flex items-center gap-2.5">
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${
+                                      done    ? "bg-emerald-400" :
+                                      running ? "bg-blue-400 animate-pulse" :
+                                                "bg-zinc-700"
+                                    }`} />
+                                    <span className={`text-[11px] font-mono transition-colors duration-300 ${
+                                      done    ? "text-emerald-400" :
+                                      running ? "text-blue-300" :
+                                                "text-zinc-600"
+                                    }`}>{label}</span>
+                                    {done && <span className="text-[10px] font-mono text-emerald-600">✓</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {selectedState === "running" && selectedStep !== 1 && (
                           <div className="space-y-3">
                             <div className="flex items-center gap-2">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />

@@ -35,7 +35,7 @@ async function reviseDoc(original: string, docType: string, changes: string): Pr
   const userMessage = `Document type: ${docType}\n\nOriginal document:\n\n${original}\n\n---\n\nRequired changes:\n\n${changes}`;
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 4000,
     system: REVISE_DOC_PROMPT,
     messages: [{ role: "user", content: userMessage }],

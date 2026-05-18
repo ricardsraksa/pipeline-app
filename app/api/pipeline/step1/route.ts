@@ -1,46 +1,79 @@
 import { NextRequest } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-import { RESEARCH_PROMPT } from "@/lib/prompts/research";
+import {
+  runIdentify,
+  runMarket,
+  runCompetitive,
+  runProductAnalysis,
+  runVisual,
+  type ResearchInputs,
+} from "@/lib/research/runner";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+export const maxDuration = 300; // 5 min — these 5 calls can take a while
 
 export async function POST(req: NextRequest) {
-  const { product_url, product_description, scraped_text, competitor_urls, competitor_scraped } = await req.json();
+  const body = await req.json();
+  const inputs: ResearchInputs = {
+    product_url: body.product_url,
+    product_description: body.product_description,
+    scraped_text: body.scraped_text,
+    competitor_urls: body.competitor_urls,
+    competitor_scraped: body.competitor_scraped,
+  };
 
-  const competitorUrlsBlock = competitor_urls?.length
-    ? competitor_urls.join("\n")
-    : "None provided";
+  const encoder = new TextEncoder();
 
-  const competitorDataBlock = competitor_scraped?.length
-    ? competitor_scraped
-        .map((c: { url: string; text: string }) => `Competitor: ${c.url}\nContent: ${c.text.slice(0, 1500)}\n`)
-        .join("\n")
-    : "(not available)";
+  const stream = new ReadableStream({
+    async start(controller) {
+      function emit(data: Record<string, unknown>) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      }
 
-  const productDescriptionBlock = product_description?.trim()
-    ? product_description.trim()
-    : "Not provided";
+      try {
+        // ── 1. Identify ──────────────────────────────────────────────────────
+        emit({ type: "progress", substep: "identify_running" });
+        const identify = await runIdentify(inputs);
+        emit({ type: "progress", substep: "identify_done" });
 
-  const userMessage = [
-    `PRODUCT URL: ${product_url}`,
-    `\nUSER DESCRIPTION (clarifying context — use alongside scraped data):\n${productDescriptionBlock}`,
-    `\nSCRAPED DATA (listing content, pricing, images):\n${scraped_text || "(not available)"}`,
-    `\nCOMPETITOR URLS:\n${competitorUrlsBlock}`,
-    `\nCOMPETITOR DATA:\n${competitorDataBlock}`,
-  ].join("");
+        // ── 2. Market ────────────────────────────────────────────────────────
+        emit({ type: "progress", substep: "market_running" });
+        const market = await runMarket(inputs, identify);
+        emit({ type: "progress", substep: "market_done" });
 
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8000,
-      system: RESEARCH_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
-    });
+        // ── 3. Competitive ───────────────────────────────────────────────────
+        emit({ type: "progress", substep: "competitive_running" });
+        const competitive = await runCompetitive(inputs, identify, market);
+        emit({ type: "progress", substep: "competitive_done" });
 
-    const output = message.content.find((b) => b.type === "text")?.text ?? "";
-    return Response.json({ success: true, output });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return Response.json({ success: false, error: msg }, { status: 500 });
-  }
+        // ── 4. Product Analysis ──────────────────────────────────────────────
+        emit({ type: "progress", substep: "product_running" });
+        const productAnalysis = await runProductAnalysis(inputs, identify, market, competitive);
+        emit({ type: "progress", substep: "product_done" });
+
+        // ── 5. Visual Strategy ───────────────────────────────────────────────
+        emit({ type: "progress", substep: "visual_running" });
+        const visual = await runVisual(inputs, identify, market, competitive);
+        emit({ type: "progress", substep: "visual_done" });
+
+        // ── Merge into RESEARCH.txt ──────────────────────────────────────────
+        const output = [identify, market, competitive, productAnalysis, visual]
+          .filter(Boolean)
+          .join("\n\n");
+
+        emit({ type: "done", output, success: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        emit({ type: "error", message, success: false });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
