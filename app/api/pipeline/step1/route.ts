@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
 
   const productDescriptionBlock = product_description?.trim()
     ? product_description.trim()
-    : "Not provided — use scraped data as the source";
+    : "Not provided";
 
   const userMessage = [
     `PRODUCT URL: ${product_url}`,
-    `\nPRODUCT DESCRIPTION (user-provided ground truth):\n${productDescriptionBlock}`,
-    `\nSCRAPED DATA:\n${scraped_text || "(not available)"}`,
+    `\nUSER DESCRIPTION (clarifying context — use alongside scraped data):\n${productDescriptionBlock}`,
+    `\nSCRAPED DATA (listing content, pricing, images):\n${scraped_text || "(not available)"}`,
     `\nCOMPETITOR URLS:\n${competitorUrlsBlock}`,
     `\nCOMPETITOR DATA:\n${competitorDataBlock}`,
   ].join("");

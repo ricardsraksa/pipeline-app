@@ -1404,7 +1404,7 @@ export default function Home() {
                     <label className={`block text-[10px] font-mono uppercase tracking-widest transition-colors ${ambiguousListing ? 'text-red-400' : 'text-zinc-400'}`}>
                       Description
                       <span className={`ml-2 normal-case tracking-normal font-sans text-[11px] ${ambiguousListing ? 'text-red-400' : 'text-zinc-600'}`}>
-                        {ambiguousListing ? 'required — listing is ambiguous' : 'optional — overrides scraper'}
+                        {ambiguousListing ? 'required — listing is ambiguous' : 'optional — supplements scraper'}
                       </span>
                     </label>
                     <textarea
