@@ -26,6 +26,26 @@ type PipelineState =
   | "stage3_images_done"
   | "error";
 
+interface HistoryRun {
+  id: number;
+  created_at: string;
+  product_url: string;
+  product_name: string;
+  brand_name: string | null;
+  status: string | null;
+  doc_count: number;
+  step_research: string | null;
+  step_chief_mid: string | null;
+  step_research_revised: string | null;
+  step_avatar: string | null;
+  step_offer_brief: string | null;
+  step_necessary_beliefs: string | null;
+  step_chief_final: string | null;
+  step_avatar_revised: string | null;
+  step_offer_brief_revised: string | null;
+  step_necessary_beliefs_revised: string | null;
+}
+
 interface ImageSlot {
   prompt: ImagePrompt;
   imageUrl?: string;
@@ -270,8 +290,10 @@ export default function Home() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number | null>(null);
   const [runId, setRunId] = useState<number | null>(null);
   const [ambiguousListing, setAmbiguousListing] = useState(false);
-  const [currentTab, setCurrentTab] = useState<1 | 2 | 3>(1);
+  const [currentTab, setCurrentTab] = useState<1 | 2 | 3 | 4>(1);
   const [selectedStep, setSelectedStep] = useState<number>(1);
+  const [historyRuns, setHistoryRuns] = useState<HistoryRun[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const productNameRef = useRef<HTMLInputElement>(null);
@@ -301,12 +323,88 @@ export default function Home() {
     if (target) setSelectedStep(target);
   }, [pipelineForEffect]);
 
+  // Load history when the History tab is opened
+  useEffect(() => {
+    if (currentTab !== 4) return;
+    setHistoryLoading(true);
+    fetch("/api/runs")
+      .then((r) => r.json())
+      .then((d) => { setHistoryRuns(d.runs ?? []); setHistoryLoading(false); })
+      .catch(() => setHistoryLoading(false));
+  }, [currentTab]);
+
   const allImages = [...scrapedImages, ...userImages];
 
   function setError(stage: number, msg: string) {
     setErrorStage(stage);
     setErrorMessage(msg);
     setPipeline("error");
+  }
+
+  function getLastCompletedStep(run: HistoryRun): number {
+    if (run.step_avatar_revised || run.step_offer_brief_revised || run.step_necessary_beliefs_revised) return 8;
+    if (run.step_chief_final) return 7;
+    if (run.step_necessary_beliefs) return 6;
+    if (run.step_offer_brief) return 5;
+    if (run.step_avatar) return 4;
+    if (run.step_research_revised) return 3;
+    if (run.step_chief_mid) return 2;
+    if (run.step_research) return 1;
+    return 0;
+  }
+
+  async function loadRun(id: number) {
+    try {
+      const res = await fetch(`/api/runs/${id}`);
+      const { run } = await res.json();
+      if (!run) return;
+
+      setUrl(run.product_url ?? "");
+      setProductDescription(run.product_description ?? "");
+      setCompetitorUrls(
+        run.competitor_urls
+          ? (JSON.parse(run.competitor_urls) as string[]).join("\n")
+          : ""
+      );
+      setOutputs({
+        research: run.step_research ?? null,
+        chief_mid: run.step_chief_mid ?? null,
+        research_revised: run.step_research_revised ?? null,
+        avatar: run.step_avatar ?? null,
+        offer_brief: run.step_offer_brief ?? null,
+        necessary_beliefs: run.step_necessary_beliefs ?? null,
+        chief_final: run.step_chief_final ?? null,
+        avatar_revised: run.step_avatar_revised ?? null,
+        offer_brief_revised: run.step_offer_brief_revised ?? null,
+        necessary_beliefs_revised: run.step_necessary_beliefs_revised ?? null,
+      });
+      if (run.brand_name) setBrandSlug(run.brand_name);
+      if (run.product_name) setProductSlug(run.product_name);
+      setRunId(id);
+
+      const lastStep = getLastCompletedStep(run as HistoryRun);
+      const stateMap: Record<number, PipelineState> = {
+        1: "step1_done", 2: "step2_done", 3: "step3_done",
+        4: "step4a_done", 5: "step4b_done", 6: "step4c_done",
+        7: "step5_done", 8: "complete",
+      };
+
+      if (run.status === "complete" || lastStep === 8) {
+        setPipeline("complete");
+        setErrorStage(null);
+        setErrorMessage("");
+      } else {
+        const resumeStep = lastStep + 1;
+        setPipeline(stateMap[lastStep] ?? "step1_done");
+        setErrorStage(resumeStep);
+        setErrorMessage("Run stopped here — click Retry to continue");
+      }
+
+      setSelectedStep(Math.max(1, lastStep));
+      setCurrentTab(1);
+    } catch {
+      // silently fail — not critical
+    }
   }
 
   function toSlug(text: string): string {
@@ -477,6 +575,20 @@ export default function Home() {
     setCurrentTab(1);
     setSelectedStep(1);
 
+    // Local run ID used throughout this execution to patch incrementally
+    let liveRunId: number | null = null;
+
+    async function patchRun(fields: Record<string, unknown>) {
+      if (!liveRunId) return;
+      try {
+        await fetch(`/api/runs/${liveRunId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fields),
+        });
+      } catch { /* non-critical */ }
+    }
+
     const competitorList = competitorUrls
       .split("\n")
       .map((u) => u.trim())
@@ -525,6 +637,23 @@ export default function Home() {
       const pSlug = extractProductSlug(research);
       setProductSlug(pSlug);
       setPipeline("step1_done");
+      // Create run record now that we have the first real output
+      try {
+        const saveRes = await fetch("/api/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_url: url.trim(),
+            product_name: pSlug ?? url.trim(),
+            product_description: productDescription || null,
+            competitor_urls: competitorUrls.split("\n").map(u => u.trim()).filter(Boolean),
+            status: "in_progress",
+            step_research: research,
+          }),
+        });
+        const saveData = await saveRes.json();
+        if (saveData.id) { liveRunId = Number(saveData.id); setRunId(liveRunId); }
+      } catch { /* non-critical */ }
     } catch (err) {
       setError(1, err instanceof Error ? err.message : String(err));
       return;
@@ -543,7 +672,9 @@ export default function Home() {
       chiefMid = data.output;
       setOutputs((prev) => ({ ...prev, chief_mid: chiefMid }));
       setPipeline("step2_done");
+      await patchRun({ step_chief_mid: chiefMid });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(2, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -561,7 +692,9 @@ export default function Home() {
       researchRevised = data.output;
       setOutputs((prev) => ({ ...prev, research_revised: data.output }));
       setPipeline("step3_done");
+      await patchRun({ step_research_revised: researchRevised });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(3, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -579,7 +712,9 @@ export default function Home() {
       avatar = data.output;
       setOutputs((prev) => ({ ...prev, avatar: data.output }));
       setPipeline("step4a_done");
+      await patchRun({ step_avatar: avatar });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(4, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -602,7 +737,9 @@ export default function Home() {
       const rawName = extractRawBrandName(offerBrief);
       if (rawName) setProductName(rawName);
       setPipeline("step4b_done");
+      await patchRun({ step_offer_brief: offerBrief, brand_name: bSlug });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(5, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -620,7 +757,9 @@ export default function Home() {
       necessaryBeliefs = data.output;
       setOutputs((prev) => ({ ...prev, necessary_beliefs: data.output }));
       setPipeline("step4c_done");
+      await patchRun({ step_necessary_beliefs: necessaryBeliefs });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(6, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -643,7 +782,9 @@ export default function Home() {
       chiefFinal = data.output;
       setOutputs((prev) => ({ ...prev, chief_final: data.output }));
       setPipeline("step5_done");
+      await patchRun({ step_chief_final: chiefFinal });
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(7, err instanceof Error ? err.message : String(err));
       return;
     }
@@ -676,11 +817,12 @@ export default function Home() {
       }));
       setPipeline("complete");
     } catch (err) {
+      await patchRun({ status: "failed" });
       setError(8, err instanceof Error ? err.message : String(err));
       return;
     }
 
-    // Save run to DB after pipeline completes
+    // Finalise run record
     try {
       const revisedSteps: number[] = [];
       if (avatarRevised && avatarRevised !== avatar) revisedSteps.push(4);
@@ -689,32 +831,50 @@ export default function Home() {
 
       const localBrandSlug = extractBrandSlug(offerBrief);
 
-      const saveRes = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_url: url.trim(),
-          product_name: (localBrandSlug ?? productSlug ?? productName) || url.trim(),
-          product_description: productDescription || null,
-          competitor_urls: competitorList.length > 0 ? competitorList : undefined,
-          scraper_data: { scraped_text: scraped, images: imgs },
-          brand_name: localBrandSlug ?? null,
-          status: "complete",
-          step_research: research,
-          step_chief_mid: chiefMid,
-          step_research_revised: researchRevised,
-          step_avatar: avatar,
-          step_offer_brief: offerBrief,
-          step_necessary_beliefs: necessaryBeliefs,
-          step_chief_final: chiefFinal,
-          step_avatar_revised: avatarRevised,
-          step_offer_brief_revised: offerBriefRevised,
-          step_necessary_beliefs_revised: necessaryBeliefsRevised,
-          revised_steps: revisedSteps,
-        }),
-      });
-      const saveData = await saveRes.json();
-      if (saveData.id) setRunId(Number(saveData.id));
+      if (liveRunId) {
+        // Patch the existing run with final step outputs + complete status
+        await fetch(`/api/runs/${liveRunId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_name: (localBrandSlug ?? productSlug ?? productName) || url.trim(),
+            brand_name: localBrandSlug ?? null,
+            status: "complete",
+            step_avatar_revised: avatarRevised,
+            step_offer_brief_revised: offerBriefRevised,
+            step_necessary_beliefs_revised: necessaryBeliefsRevised,
+            revised_steps: revisedSteps,
+          }),
+        });
+      } else {
+        // Fallback: no run record was created (e.g. step 1 save failed) — create one now
+        const saveRes = await fetch("/api/runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_url: url.trim(),
+            product_name: (localBrandSlug ?? productSlug ?? productName) || url.trim(),
+            product_description: productDescription || null,
+            competitor_urls: competitorList.length > 0 ? competitorList : undefined,
+            scraper_data: { scraped_text: scraped, images: imgs },
+            brand_name: localBrandSlug ?? null,
+            status: "complete",
+            step_research: research,
+            step_chief_mid: chiefMid,
+            step_research_revised: researchRevised,
+            step_avatar: avatar,
+            step_offer_brief: offerBrief,
+            step_necessary_beliefs: necessaryBeliefs,
+            step_chief_final: chiefFinal,
+            step_avatar_revised: avatarRevised,
+            step_offer_brief_revised: offerBriefRevised,
+            step_necessary_beliefs_revised: necessaryBeliefsRevised,
+            revised_steps: revisedSteps,
+          }),
+        });
+        const saveData = await saveRes.json();
+        if (saveData.id) setRunId(Number(saveData.id));
+      }
     } catch {
       // Non-critical — pipeline is complete regardless
     }
@@ -1014,6 +1174,18 @@ export default function Home() {
     setErrorStage(null);
     setErrorMessage("");
     if (num === 1) { runPipeline(); return; }
+
+    async function patchRetry(fields: Record<string, unknown>) {
+      if (!runId) return;
+      try {
+        await fetch(`/api/runs/${runId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fields),
+        });
+      } catch { /* non-critical */ }
+    }
+
     const handlers: Record<number, () => Promise<void>> = {
       2: async () => {
         if (!outputs.research) return;
@@ -1021,6 +1193,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 2 failed");
         setOutputs(p => ({ ...p, chief_mid: data.output })); setPipeline("step2_done");
+        await patchRetry({ step_chief_mid: data.output, status: "in_progress" });
       },
       3: async () => {
         if (!outputs.research || !outputs.chief_mid) return;
@@ -1028,6 +1201,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step3", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research, chief_mid: outputs.chief_mid }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 3 failed");
         setOutputs(p => ({ ...p, research_revised: data.output })); setPipeline("step3_done");
+        await patchRetry({ step_research_revised: data.output, status: "in_progress" });
       },
       4: async () => {
         if (!outputs.research_revised) return;
@@ -1035,6 +1209,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step4a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 4a failed");
         setOutputs(p => ({ ...p, avatar: data.output })); setPipeline("step4a_done");
+        await patchRetry({ step_avatar: data.output, status: "in_progress" });
       },
       5: async () => {
         if (!outputs.research_revised || !outputs.avatar) return;
@@ -1042,6 +1217,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step4b", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised, avatar: outputs.avatar }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 4b failed");
         setOutputs(p => ({ ...p, offer_brief: data.output })); setPipeline("step4b_done");
+        await patchRetry({ step_offer_brief: data.output, status: "in_progress" });
       },
       6: async () => {
         if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief) return;
@@ -1049,6 +1225,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step4c", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research: outputs.research_revised, avatar: outputs.avatar, offer_brief: outputs.offer_brief }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 4c failed");
         setOutputs(p => ({ ...p, necessary_beliefs: data.output })); setPipeline("step4c_done");
+        await patchRetry({ step_necessary_beliefs: data.output, status: "in_progress" });
       },
       7: async () => {
         if (!outputs.research_revised || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
@@ -1056,6 +1233,7 @@ export default function Home() {
         const data = await fetch("/api/pipeline/step5", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research_revised: outputs.research_revised, avatar: outputs.avatar, offer_brief: outputs.offer_brief, necessary_beliefs: outputs.necessary_beliefs }) }).then(r => r.json());
         if (!data.success) throw new Error(data.error ?? "Step 5 failed");
         setOutputs(p => ({ ...p, chief_final: data.output })); setPipeline("step5_done");
+        await patchRetry({ step_chief_final: data.output, status: "in_progress" });
       },
       8: async () => {
         if (!outputs.chief_final || !outputs.avatar || !outputs.offer_brief || !outputs.necessary_beliefs) return;
@@ -1064,10 +1242,19 @@ export default function Home() {
         if (!data.success) throw new Error(data.error ?? "Step 6 failed");
         setOutputs(p => ({ ...p, avatar_revised: data.avatar_revised, offer_brief_revised: data.offer_brief_revised, necessary_beliefs_revised: data.necessary_beliefs_revised }));
         setPipeline("complete");
+        await patchRetry({
+          step_avatar_revised: data.avatar_revised ?? null,
+          step_offer_brief_revised: data.offer_brief_revised ?? null,
+          step_necessary_beliefs_revised: data.necessary_beliefs_revised ?? null,
+          status: "complete",
+        });
       },
     };
     try { await handlers[num]?.(); }
-    catch (err) { setError(num, err instanceof Error ? err.message : String(err)); }
+    catch (err) {
+      await patchRetry({ status: "failed" });
+      setError(num, err instanceof Error ? err.message : String(err));
+    }
   }
 
   function copyText(text: string) { navigator.clipboard.writeText(text).catch(() => {}); }
@@ -1152,6 +1339,14 @@ export default function Home() {
                 </span>
               </button>
             ))}
+            <button
+              onClick={() => setCurrentTab(4)}
+              className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-all duration-150 cursor-pointer ${
+                currentTab === 4 ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              History
+            </button>
           </nav>
 
           {/* Right: status / new-run */}
@@ -1554,6 +1749,122 @@ export default function Home() {
                 )}
               </section>
             )}
+          </div>
+        )}
+
+        {/* ====================== HISTORY ====================== */}
+        {currentTab === 4 && (
+          <div className="space-y-5 fade-in">
+            <section>
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-[14px] font-semibold text-zinc-100 tracking-tight">Run history</h2>
+                <button
+                  onClick={() => {
+                    setHistoryLoading(true);
+                    fetch("/api/runs").then(r => r.json()).then(d => { setHistoryRuns(d.runs ?? []); setHistoryLoading(false); }).catch(() => setHistoryLoading(false));
+                  }}
+                  className="cursor-pointer text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors"
+                >↻ Refresh</button>
+              </div>
+
+              {historyLoading && (
+                <div className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-8 flex items-center justify-center">
+                  <span className="text-[12px] font-mono text-zinc-600 animate-pulse">Loading runs…</span>
+                </div>
+              )}
+
+              {!historyLoading && historyRuns.length === 0 && (
+                <div className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-8 flex items-center justify-center">
+                  <span className="text-[12px] font-mono text-zinc-600">No runs yet</span>
+                </div>
+              )}
+
+              {!historyLoading && historyRuns.length > 0 && (
+                <div className="border border-zinc-700/60 rounded-xl bg-zinc-900 overflow-hidden">
+                  {/* Table header */}
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2.5 border-b border-zinc-800 bg-zinc-800/40">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Run</span>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Steps</span>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Status</span>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest"></span>
+                  </div>
+
+                  {historyRuns.map((run, i) => {
+                    const isFailed = run.status === "failed";
+                    const isComplete = run.status === "complete";
+                    const isInProgress = run.status === "in_progress";
+                    const canResume = isFailed || isInProgress;
+                    const lastStep = getLastCompletedStep(run);
+                    const date = new Date(run.created_at);
+                    const dateStr = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                    const timeStr = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+                    return (
+                      <div
+                        key={run.id}
+                        className={`grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-4 py-3 border-b border-zinc-800/50 last:border-b-0 transition-colors ${
+                          i % 2 === 0 ? "" : "bg-zinc-800/10"
+                        }`}
+                      >
+                        {/* Product info */}
+                        <div className="min-w-0">
+                          <div className="text-[12px] font-medium text-zinc-200 truncate">
+                            {run.brand_name || run.product_name || run.product_url}
+                          </div>
+                          <div className="text-[10px] font-mono text-zinc-600 truncate mt-0.5">
+                            {dateStr} · {timeStr} · <span className="text-zinc-700">{run.product_url}</span>
+                          </div>
+                        </div>
+
+                        {/* Step count */}
+                        <div className="text-[11px] font-mono text-zinc-500 tabular-nums whitespace-nowrap">
+                          {lastStep}<span className="text-zinc-700">/8</span>
+                        </div>
+
+                        {/* Status badge */}
+                        <div>
+                          {isComplete && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <span className="w-1 h-1 rounded-full bg-emerald-500" />complete
+                            </span>
+                          )}
+                          {isFailed && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">
+                              <span className="w-1 h-1 rounded-full bg-red-500" />failed
+                            </span>
+                          )}
+                          {isInProgress && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />in progress
+                            </span>
+                          )}
+                          {!isComplete && !isFailed && !isInProgress && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-500 border border-zinc-700/40">
+                              <span className="w-1 h-1 rounded-full bg-zinc-600" />unknown
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Action */}
+                        <div>
+                          {canResume ? (
+                            <button
+                              onClick={() => loadRun(run.id)}
+                              className="cursor-pointer px-2.5 py-1 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white rounded-md text-[11px] font-medium transition-all duration-150 whitespace-nowrap"
+                            >Resume →</button>
+                          ) : isComplete ? (
+                            <button
+                              onClick={() => loadRun(run.id)}
+                              className="cursor-pointer px-2.5 py-1 border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/60 text-zinc-400 hover:text-zinc-100 rounded-md text-[11px] font-mono transition-colors active:scale-95 whitespace-nowrap"
+                            >View</button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           </div>
         )}
 

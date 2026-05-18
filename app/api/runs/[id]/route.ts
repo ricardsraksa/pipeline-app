@@ -39,6 +39,19 @@ export async function PATCH(
     generated_images?: string | null;
     audit_results?: string | null;
     prompt_edits_made?: number | null;
+    product_name?: string | null;
+    brand_name?: string | null;
+    revised_steps?: unknown;
+    step_research?: string | null;
+    step_chief_mid?: string | null;
+    step_research_revised?: string | null;
+    step_avatar?: string | null;
+    step_offer_brief?: string | null;
+    step_necessary_beliefs?: string | null;
+    step_chief_final?: string | null;
+    step_avatar_revised?: string | null;
+    step_offer_brief_revised?: string | null;
+    step_necessary_beliefs_revised?: string | null;
   };
 
   const existing = await db.execute({
@@ -64,6 +77,19 @@ export async function PATCH(
   if ("generated_images" in body) { fields.push("generated_images = ?"); values.push(body.generated_images ?? null); }
   if ("audit_results" in body)    { fields.push("audit_results = ?");    values.push(body.audit_results ?? null); }
   if ("prompt_edits_made" in body){ fields.push("prompt_edits_made = ?");values.push(body.prompt_edits_made ?? null); }
+  if ("product_name" in body)                 { fields.push("product_name = ?");                 values.push(body.product_name ?? null); }
+  if ("brand_name" in body)                   { fields.push("brand_name = ?");                   values.push(body.brand_name ?? null); }
+  if ("revised_steps" in body)                { fields.push("revised_steps = ?");                values.push(body.revised_steps ? JSON.stringify(body.revised_steps) : null); }
+  if ("step_research" in body)                { fields.push("step_research = ?");                values.push(body.step_research ?? null); }
+  if ("step_chief_mid" in body)               { fields.push("step_chief_mid = ?");               values.push(body.step_chief_mid ?? null); }
+  if ("step_research_revised" in body)        { fields.push("step_research_revised = ?");        values.push(body.step_research_revised ?? null); }
+  if ("step_avatar" in body)                  { fields.push("step_avatar = ?");                  values.push(body.step_avatar ?? null); }
+  if ("step_offer_brief" in body)             { fields.push("step_offer_brief = ?");             values.push(body.step_offer_brief ?? null); }
+  if ("step_necessary_beliefs" in body)       { fields.push("step_necessary_beliefs = ?");       values.push(body.step_necessary_beliefs ?? null); }
+  if ("step_chief_final" in body)             { fields.push("step_chief_final = ?");             values.push(body.step_chief_final ?? null); }
+  if ("step_avatar_revised" in body)          { fields.push("step_avatar_revised = ?");          values.push(body.step_avatar_revised ?? null); }
+  if ("step_offer_brief_revised" in body)     { fields.push("step_offer_brief_revised = ?");     values.push(body.step_offer_brief_revised ?? null); }
+  if ("step_necessary_beliefs_revised" in body){ fields.push("step_necessary_beliefs_revised = ?");values.push(body.step_necessary_beliefs_revised ?? null); }
 
   if (fields.length === 0) {
     return Response.json({ success: true });
