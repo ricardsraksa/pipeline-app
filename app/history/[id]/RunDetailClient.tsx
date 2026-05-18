@@ -3,6 +3,7 @@
 import { useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
+import EditableOutput from "@/components/EditableOutput";
 
 interface Props { run: Run }
 
@@ -347,58 +348,118 @@ export default function RunDetailClient({ run }: Props) {
         <Section label="Pipeline Steps">
           <div className="space-y-4">
             {run.step_research && (
-              <StepRow
-                stepLabel="Step 1 — Research"
-                text={run.step_research}
-                filename={`${slug}_RESEARCH.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_research"
+                stage="stage1"
+                originalValue={run.step_research}
+                editedValue={run.stage1_research_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 1 — Research Brief"
+                monospace
               />
             )}
             {run.step_chief_mid && (
-              <StepRow
-                stepLabel="Step 2 — Mid Chief Review"
-                text={run.step_chief_mid}
-                filename={`${slug}_CHIEF_MID.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_chief_mid"
+                stage="stage1"
+                originalValue={run.step_chief_mid}
+                editedValue={run.stage1_chief_mid_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 2 — Chief Marketer Analysis"
+                monospace
               />
             )}
             {run.step_research_revised && (
-              <StepRow
-                stepLabel="Step 3 — Research Revised"
+              <DocCard
+                label="Step 3 — Research Revised"
                 text={run.step_research_revised}
                 filename={`${slug}_RESEARCH_REVISED.txt`}
               />
             )}
             {run.step_avatar && (
-              <StepRow
-                stepLabel="Step 4a — Avatar"
-                text={run.step_avatar}
-                filename={`${slug}_AVATAR.txt`}
-                revised={run.step_avatar_revised}
-                revisedFilename={`${slug}_AVATAR_REVISED.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_avatar"
+                stage="stage1"
+                originalValue={run.step_avatar}
+                editedValue={run.stage1_avatar_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4a — Customer Avatar"
+                monospace
+              />
+            )}
+            {run.step_avatar_revised && (
+              <EditableOutput
+                runId={run.id}
+                field="stage1_avatar_revised"
+                stage="stage1"
+                originalValue={run.step_avatar_revised}
+                editedValue={run.stage1_avatar_revised_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4a — Revised Avatar"
+                monospace
               />
             )}
             {run.step_offer_brief && (
-              <StepRow
-                stepLabel="Step 4b — Offer Brief"
-                text={run.step_offer_brief}
-                filename={`${slug}_OFFER_BRIEF.txt`}
-                revised={run.step_offer_brief_revised}
-                revisedFilename={`${slug}_OFFER_BRIEF_REVISED.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_offer_brief"
+                stage="stage1"
+                originalValue={run.step_offer_brief}
+                editedValue={run.stage1_offer_brief_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4b — Offer Brief"
+                monospace
+              />
+            )}
+            {run.step_offer_brief_revised && (
+              <EditableOutput
+                runId={run.id}
+                field="stage1_offer_brief_revised"
+                stage="stage1"
+                originalValue={run.step_offer_brief_revised}
+                editedValue={run.stage1_offer_brief_revised_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4b — Revised Offer Brief"
+                monospace
               />
             )}
             {run.step_necessary_beliefs && (
-              <StepRow
-                stepLabel="Step 4c — Necessary Beliefs"
-                text={run.step_necessary_beliefs}
-                filename={`${slug}_NECESSARY_BELIEFS.txt`}
-                revised={run.step_necessary_beliefs_revised}
-                revisedFilename={`${slug}_NECESSARY_BELIEFS_REVISED.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_necessary_beliefs"
+                stage="stage1"
+                originalValue={run.step_necessary_beliefs}
+                editedValue={run.stage1_necessary_beliefs_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4c — Necessary Beliefs"
+                monospace
+              />
+            )}
+            {run.step_necessary_beliefs_revised && (
+              <EditableOutput
+                runId={run.id}
+                field="stage1_necessary_beliefs_revised"
+                stage="stage1"
+                originalValue={run.step_necessary_beliefs_revised}
+                editedValue={run.stage1_necessary_beliefs_revised_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 4c — Revised Necessary Beliefs"
+                monospace
               />
             )}
             {run.step_chief_final && (
-              <StepRow
-                stepLabel="Step 5 — Final Chief Review"
-                text={run.step_chief_final}
-                filename={`${slug}_CHIEF_FINAL.txt`}
+              <EditableOutput
+                runId={run.id}
+                field="stage1_chief_final"
+                stage="stage1"
+                originalValue={run.step_chief_final}
+                editedValue={run.stage1_chief_final_edited}
+                editedAt={run.stage1_edited_at}
+                label="Step 5 — Final Chief Review"
+                monospace
               />
             )}
           </div>
@@ -408,11 +469,15 @@ export default function RunDetailClient({ run }: Props) {
       {/* Stage 2 — German Copy */}
       {run.stage2_output && (
         <Section label="Stage 2 — German Copy">
-          <DocCard
+          <EditableOutput
+            runId={run.id}
+            field="stage2_copy"
+            stage="stage2"
+            originalValue={run.stage2_output}
+            editedValue={run.stage2_copy_edited}
+            editedAt={run.stage2_edited_at}
             label="German Copy Kit"
-            text={run.stage2_output}
-            filename={`${slug}_STAGE2_GERMAN_COPY.txt`}
-            accent
+            monospace={false}
           />
         </Section>
       )}

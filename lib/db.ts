@@ -48,8 +48,32 @@ export async function initDB() {
   `);
 }
 
+async function migrateDB() {
+  const newColumns = [
+    "stage1_research_edited TEXT",
+    "stage1_chief_mid_edited TEXT",
+    "stage1_avatar_edited TEXT",
+    "stage1_offer_brief_edited TEXT",
+    "stage1_necessary_beliefs_edited TEXT",
+    "stage1_chief_final_edited TEXT",
+    "stage1_avatar_revised_edited TEXT",
+    "stage1_offer_brief_revised_edited TEXT",
+    "stage1_necessary_beliefs_revised_edited TEXT",
+    "stage2_copy_edited TEXT",
+    "stage3_image_prompts_edited TEXT",
+    "stage1_edited_at TEXT",
+    "stage2_edited_at TEXT",
+    "stage3_edited_at TEXT",
+  ];
+  for (const col of newColumns) {
+    try {
+      await db.execute(`ALTER TABLE runs ADD COLUMN ${col}`);
+    } catch { /* column already exists — safe to ignore */ }
+  }
+}
+
 // Initialize schema on module load
-initDB().catch(console.error);
+initDB().then(() => migrateDB()).catch(console.error);
 
 export interface Run {
   id: number;
@@ -84,4 +108,19 @@ export interface Run {
   generated_images: string | null;
   audit_results: string | null;
   prompt_edits_made: number | null;
+  // User-edited versions (null = not yet edited, use original)
+  stage1_research_edited: string | null;
+  stage1_chief_mid_edited: string | null;
+  stage1_avatar_edited: string | null;
+  stage1_offer_brief_edited: string | null;
+  stage1_necessary_beliefs_edited: string | null;
+  stage1_chief_final_edited: string | null;
+  stage1_avatar_revised_edited: string | null;
+  stage1_offer_brief_revised_edited: string | null;
+  stage1_necessary_beliefs_revised_edited: string | null;
+  stage2_copy_edited: string | null;
+  stage3_image_prompts_edited: string | null;
+  stage1_edited_at: string | null;
+  stage2_edited_at: string | null;
+  stage3_edited_at: string | null;
 }

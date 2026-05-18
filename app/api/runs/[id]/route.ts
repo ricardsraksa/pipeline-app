@@ -21,12 +21,26 @@ export async function GET(
   return Response.json({ run });
 }
 
+const EDITABLE_FIELDS = [
+  "stage1_research",
+  "stage1_chief_mid",
+  "stage1_avatar",
+  "stage1_offer_brief",
+  "stage1_necessary_beliefs",
+  "stage1_chief_final",
+  "stage1_avatar_revised",
+  "stage1_offer_brief_revised",
+  "stage1_necessary_beliefs_revised",
+  "stage2_copy",
+  "stage3_image_prompts",
+] as const;
+
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
   const { id } = (await context.params) as { id: string };
-  const body = await req.json() as {
+  const body = await req.json() as { type?: string } & {
     feedback_stage1?: string | null;
     feedback_stage2?: string | null;
     feedback_stage3?: string | null;
@@ -60,6 +74,22 @@ export async function PATCH(
   });
   if (!existing.rows.length) {
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Handle field_edit requests
+  if (body.type === "field_edit") {
+    const { field, value, stage } = body as { type: string; field: string; value: string; stage: string };
+    if (!EDITABLE_FIELDS.includes(field as typeof EDITABLE_FIELDS[number])) {
+      return Response.json({ error: "Unknown field" }, { status: 400 });
+    }
+    const editedCol = `${field}_edited`;
+    const editedAtCol = `${stage}_edited_at`;
+    const ts = new Date().toISOString();
+    await db.execute({
+      sql: `UPDATE runs SET ${editedCol} = ?, ${editedAtCol} = ? WHERE id = ?`,
+      args: [value, ts, Number(id)],
+    });
+    return Response.json({ success: true });
   }
 
   const fields: string[] = [];

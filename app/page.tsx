@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import OutputBlock from "@/components/OutputBlock";
+import EditableOutput from "@/components/EditableOutput";
 import FeedbackBar from "@/components/FeedbackBar";
 import JSZip from "jszip";
 import type { ImagePrompt } from "@/app/api/stage3-prompts/route";
@@ -295,6 +296,18 @@ function ResearchStepCard({
   );
 }
 
+
+// Maps step number → editable field name (null = not individually editable)
+const STEP_FIELD_MAP: Record<number, { field: string; label: string } | null> = {
+  1: { field: "stage1_research",              label: "Research Brief" },
+  2: { field: "stage1_chief_mid",             label: "Chief Marketer Analysis" },
+  3: null, // research_revised — not in whitelist
+  4: { field: "stage1_avatar",                label: "Customer Avatar" },
+  5: { field: "stage1_offer_brief",           label: "Offer Brief" },
+  6: { field: "stage1_necessary_beliefs",     label: "Necessary Beliefs" },
+  7: { field: "stage1_chief_final",           label: "Final Chief Review" },
+  8: null, // multiple revised fields — rendered individually below
+};
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -1718,9 +1731,36 @@ export default function Home() {
                             >Retry step {selectedStep}</button>
                           </div>
                         )}
-                        {selectedState === "complete" && selectedOutput && (
-                          <pre className="text-[11.5px] font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed max-h-[520px] overflow-y-auto fade-in">{selectedOutput}</pre>
-                        )}
+                        {selectedState === "complete" && selectedOutput && (() => {
+                          const fieldMeta = STEP_FIELD_MAP[selectedStep];
+                          if (selectedStep === 8) {
+                            // Step 8 — three separate editable fields
+                            return (
+                              <div className="space-y-4 fade-in">
+                                {outputs.avatar_revised && runId && (
+                                  <EditableOutput runId={runId} field="stage1_avatar_revised" stage="stage1" originalValue={outputs.avatar_revised} editedValue={null} label="Revised Avatar" monospace />
+                                )}
+                                {outputs.offer_brief_revised && runId && (
+                                  <EditableOutput runId={runId} field="stage1_offer_brief_revised" stage="stage1" originalValue={outputs.offer_brief_revised} editedValue={null} label="Revised Offer Brief" monospace />
+                                )}
+                                {outputs.necessary_beliefs_revised && runId && (
+                                  <EditableOutput runId={runId} field="stage1_necessary_beliefs_revised" stage="stage1" originalValue={outputs.necessary_beliefs_revised} editedValue={null} label="Revised Necessary Beliefs" monospace />
+                                )}
+                              </div>
+                            );
+                          }
+                          if (fieldMeta && runId) {
+                            return (
+                              <div className="fade-in">
+                                <EditableOutput runId={runId} field={fieldMeta.field} stage="stage1" originalValue={selectedOutput} editedValue={null} label={fieldMeta.label} monospace />
+                              </div>
+                            );
+                          }
+                          // Fallback for step 3 (research_revised) or missing runId
+                          return (
+                            <pre className="text-[11.5px] font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed max-h-[520px] overflow-y-auto fade-in">{selectedOutput}</pre>
+                          );
+                        })()}
                         {selectedState === "complete" && !selectedOutput && (
                           <div className="h-full flex items-center justify-center min-h-[320px]">
                             <div className="text-[12px] font-mono text-zinc-600">Skipped — no changes required</div>
@@ -1805,7 +1845,11 @@ export default function Home() {
 
               {stage2Output && !pipelineIsStage2Running && (
                 <div className="p-4 border-t border-zinc-800 space-y-3 fade-in">
-                  <OutputBlock text={stage2Output} />
+                  {runId ? (
+                    <EditableOutput runId={runId} field="stage2_copy" stage="stage2" originalValue={stage2Output} editedValue={null} label="German Copy" monospace={false} />
+                  ) : (
+                    <OutputBlock text={stage2Output} />
+                  )}
                   <FeedbackBar runId={runId} stage={2} />
                 </div>
               )}
