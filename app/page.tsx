@@ -1404,14 +1404,6 @@ export default function Home() {
                 </span>
               </button>
             ))}
-            <button
-              onClick={() => setCurrentTab(4)}
-              className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-all duration-150 cursor-pointer ${
-                currentTab === 4 ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-100"
-              }`}
-            >
-              History
-            </button>
           </nav>
 
           {/* Right: status / new-run */}
