@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import OutputBlock from "@/components/OutputBlock";
 import EditableOutput from "@/components/EditableOutput";
 import FeedbackBar from "@/components/FeedbackBar";
+import ImageUploadZone from "@/components/ImageUploadZone";
 import JSZip from "jszip";
 import type { ImagePrompt } from "@/app/api/stage3-prompts/route";
 
@@ -324,7 +325,6 @@ export default function Home() {
   // Image generation state (kept from original)
   const [scrapedImages, setScrapedImages] = useState<string[]>([]);
   const [userImages, setUserImages] = useState<string[]>([]);
-  const [showImageUploader, setShowImageUploader] = useState(false);
   const [productName, setProductName] = useState("");
   const [stage2Output, setStage2Output] = useState("");
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
@@ -423,6 +423,11 @@ export default function Home() {
       if (run.brand_name) setBrandSlug(run.brand_name);
       if (run.product_name) setProductSlug(run.product_name);
       setRunId(id);
+      // Restore scraped images so the Product Images section is accurate
+      try {
+        const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null;
+        if (scraperData?.images) setScrapedImages(scraperData.images as string[]);
+      } catch { /* non-critical */ }
 
       const lastStep = getLastCompletedStep(run as HistoryRun);
       const stateMap: Record<number, PipelineState> = {
@@ -592,9 +597,8 @@ export default function Home() {
       }
 
       setScrapedImages(imgs);
-      if (imgs.length < 2) setShowImageUploader(true);
     } catch {
-      setShowImageUploader(true);
+      // scrapeAll has internal try-catch; this outer catch is a safety net
     }
 
     return { scraped, imgs, competitorScraped };
@@ -609,7 +613,7 @@ export default function Home() {
     setStage2Output("");
     setImageSlots([]);
     setScrapedImages([]);
-    setShowImageUploader(false);
+    setUserImages([]);
     setRunId(null);
     setProductName("");
     setBrandSlug(null);
@@ -1093,6 +1097,7 @@ export default function Home() {
             stage2_output: stage2Output,
             stage3_prompts: prompts,
             image_urls: imageUrls,
+            uploaded_image_count: userImages.length,
             status: "complete",
           }),
         });
@@ -1172,9 +1177,8 @@ export default function Home() {
   const canRunStage2 =
     (isComplete || pipelineIsStage2Done || pipelineIsStage3ImagesDone) &&
     productName.trim().length > 0;
-  const hasEnoughImages = allImages.length >= 2;
-  const canRunStage3 =
-    pipelineIsStage2Done && (!showImageUploader || hasEnoughImages);
+  const hasImages = allImages.length >= 1;
+  const canRunStage3 = pipelineIsStage2Done && hasImages;
   const isDone = pipelineIsStage3ImagesDone;
 
   const step6Skipped =
@@ -1354,7 +1358,7 @@ export default function Home() {
   const tab3State: "idle" | "running" | "done" =
     pipelineIsStage3ImagesDone ? "done" : (pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning) ? "running" : "idle";
   const tab2Disabled = !isComplete && !pipelineIsStage2Done && !pipelineIsStage2Running;
-  const tab3Disabled = !pipelineIsStage2Done && !pipelineIsStage3ImagesDone;
+  const tab3Disabled = (!pipelineIsStage2Done && !pipelineIsStage3ImagesDone) || (pipelineIsStage2Done && !hasImages);
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-blue-500/30">
@@ -1390,7 +1394,7 @@ export default function Home() {
                 disabled={t.disabled}
                 onClick={() => {
                   if (t.num === 3) {
-                    if (runId) window.location.href = `/stage3?runId=${runId}`;
+                    if (runId && hasImages) window.location.href = `/stage3?runId=${runId}`;
                     return;
                   }
                   setCurrentTab(t.num);
@@ -1427,6 +1431,7 @@ export default function Home() {
                   setPipeline("idle"); setUrl(""); setProductDescription(""); setCompetitorUrls("");
                   setOutputs(EMPTY_OUTPUTS); setBrandSlug(null); setProductSlug(null);
                   setStage2Output(""); setProductName(""); setImageSlots([]);
+                  setScrapedImages([]); setUserImages([]);
                   setCurrentTab(1); setSelectedStep(1); setRunId(null);
                 }}
                 className="cursor-pointer text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors active:scale-95"
@@ -1554,6 +1559,63 @@ export default function Home() {
                     <span className="text-[11px] font-mono text-zinc-500 tabular-nums">{stepsCompleted} of 8</span>
                   </div>
                 </section>
+
+                {/* Product Images — shown once scraping is complete */}
+                {(pipeline as string) !== 'scraping' && (
+                  <section className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-4 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-[13px] font-medium text-zinc-200">Product Images</h2>
+                      {allImages.length > 0 ? (
+                        <span className="font-mono text-[10px] bg-zinc-800 text-emerald-400 border border-emerald-900/40 px-1.5 py-0.5 rounded">
+                          {allImages.length} image{allImages.length !== 1 ? 's' : ''} ready
+                        </span>
+                      ) : (
+                        <span className="font-mono text-[10px] bg-amber-950/60 text-amber-400 border border-amber-900/40 px-1.5 py-0.5 rounded">
+                          0 images
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Warning when scraper found nothing */}
+                    {scrapedImages.length === 0 && (
+                      <p className="font-mono text-[11px] text-amber-400/90">
+                        No images found — upload product photos to continue to Stage 3
+                      </p>
+                    )}
+
+                    {/* Scraped thumbnails */}
+                    {scrapedImages.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">From scraper</p>
+                        <div className="flex flex-wrap gap-2">
+                          {scrapedImages.map((imgUrl, i) => (
+                            <div key={i} className="w-[72px] h-[72px] flex-shrink-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-800">
+                              <img
+                                src={imgUrl}
+                                alt={`Product ${i + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload zone */}
+                    <div className="space-y-2">
+                      {scrapedImages.length > 0 && (
+                        <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">Add more images</p>
+                      )}
+                      <ImageUploadZone
+                        images={userImages}
+                        onAdd={(base64s) => setUserImages((prev) => [...prev, ...base64s])}
+                        onRemove={(i) => setUserImages((prev) => prev.filter((_, idx) => idx !== i))}
+                      />
+                    </div>
+                  </section>
+                )}
 
                 {/* Stepper */}
                 <section>
@@ -1866,14 +1928,27 @@ export default function Home() {
                     <div className="text-[11px] text-zinc-500">German copy kit ready · continue to image generation</div>
                   </div>
                 </div>
-                {runId ? (
-                  <a
-                    href={`/stage3?runId=${runId}`}
-                    className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium text-[13px] rounded-md transition-all duration-150"
-                  >Continue to Stage 3 →</a>
-                ) : (
-                  <span className="text-[11px] font-mono text-zinc-500 animate-pulse">Saving run…</span>
-                )}
+                <div className="flex flex-col items-end gap-1">
+                  {runId ? (
+                    hasImages ? (
+                      <a
+                        href={`/stage3?runId=${runId}`}
+                        className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium text-[13px] rounded-md transition-all duration-150"
+                      >Continue to Stage 3 →</a>
+                    ) : (
+                      <button
+                        disabled
+                        title="Upload at least one product image first"
+                        className="px-4 py-2 bg-zinc-800 text-zinc-600 font-medium text-[13px] rounded-md opacity-50 cursor-not-allowed"
+                      >Continue to Stage 3 →</button>
+                    )
+                  ) : (
+                    <span className="text-[11px] font-mono text-zinc-500 animate-pulse">Saving run…</span>
+                  )}
+                  {!hasImages && (
+                    <span className="font-mono text-[10px] text-amber-400/80">Upload at least one product image to continue</span>
+                  )}
+                </div>
               </section>
             )}
           </div>

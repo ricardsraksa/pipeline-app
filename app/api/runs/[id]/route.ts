@@ -53,6 +53,7 @@ export async function PATCH(
     generated_images?: string | null;
     audit_results?: string | null;
     prompt_edits_made?: number | null;
+    uploaded_image_count?: number | null;
     product_name?: string | null;
     brand_name?: string | null;
     revised_steps?: unknown;
@@ -106,7 +107,8 @@ export async function PATCH(
   if ("image_prompts" in body)    { fields.push("image_prompts = ?");    values.push(body.image_prompts ?? null); }
   if ("generated_images" in body) { fields.push("generated_images = ?"); values.push(body.generated_images ?? null); }
   if ("audit_results" in body)    { fields.push("audit_results = ?");    values.push(body.audit_results ?? null); }
-  if ("prompt_edits_made" in body){ fields.push("prompt_edits_made = ?");values.push(body.prompt_edits_made ?? null); }
+  if ("prompt_edits_made" in body)     { fields.push("prompt_edits_made = ?");      values.push(body.prompt_edits_made ?? null); }
+  if ("uploaded_image_count" in body)  { fields.push("uploaded_image_count = ?");  values.push(body.uploaded_image_count ?? null); }
   if ("product_name" in body)                 { fields.push("product_name = ?");                 values.push(body.product_name ?? null); }
   if ("brand_name" in body)                   { fields.push("brand_name = ?");                   values.push(body.brand_name ?? null); }
   if ("revised_steps" in body)                { fields.push("revised_steps = ?");                values.push(body.revised_steps ? JSON.stringify(body.revised_steps) : null); }
