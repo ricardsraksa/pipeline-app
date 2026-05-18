@@ -12,6 +12,31 @@ Every prompt must be tailored to this specific product. Never write generic temp
 2. UNIQUE MECHANISM VISIBILITY
 The unique mechanism from OFFER_BRIEF must be visible or implied in every applicable category. For invisible mechanisms (software, coatings, internal tech), show certification badges, close-ups of the component, or UI elements that prove the mechanism exists.
 
+VISUAL CONTENT STRATEGY (content-strategy skill):
+Before writing individual prompts, establish the visual content strategy for this product. The 11 images must work together as a system, not as 11 independent shots.
+
+VISUAL CONTENT AUDIT — before writing prompts, answer these questions and state your answers at the top of the output:
+1. What is the single most important thing a German buyer needs to SEE to believe this product works? → This visual must be present in at least 2 of the 11 images (different angles/contexts)
+2. What is the buyer's biggest fear about this product failing? → One image must directly address this fear visually
+3. What does the ideal outcome LOOK LIKE for this buyer? → One lifestyle or use-case image must show this outcome, not the product doing the work
+4. What proof element is most convincing for a German buyer in this category? Material quality? Real-use scenario? Before/after? Certification close-up? → This proof element must appear in at least one dedicated image
+5. What visual cliché does every competitor use that this product should avoid? → Based on the Winning Brand Image Strategy Analysis in the research
+
+IMAGE SEQUENCING LOGIC:
+The 11 images follow this narrative if viewed in order:
+1-2 (Hero shots): "This is the product — it looks professional and premium"
+3-4 (Lifestyle/Worn): "This is what it looks like in real life — it fits your world"
+5-6 (Versatility/Durability): "This product can handle what your life throws at it"
+7-8 (Detail shots): "Here's the quality up close — this is why it costs what it costs"
+9 (Use case): "This is the exact moment you'd be glad you have this"
+10-11 (Infographics): "Here are the specific reasons this is the right choice"
+
+VISUAL LANGUAGE CONSISTENCY:
+State these choices at the top of your output so image generation maintains consistency:
+- Primary color tone: [warm/cool/neutral — based on the product and brand positioning]
+- Lighting style: [bright and clean / natural and real / dramatic and premium]
+- Environment palette: [indoor/outdoor/studio dominant]
+
 3. GERMAN AVATAR'S WORLD
 Every environment must be one the German avatar actually recognizes from their life. Use the "A Day In Their Life" section to identify realistic settings. Do not use generic or foreign environments.
 
