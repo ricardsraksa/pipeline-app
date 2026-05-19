@@ -19,6 +19,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function mapScraperError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("captcha could not be solved") || lower.includes("captcha / verification detected") || lower.includes("captcha")) {
+    return "AliExpress/Alibaba blocked the scrape with a captcha. Run this scrape locally with SCRAPER_HEADLESS=false to solve it manually, or try again later.";
+  }
+  if (lower.includes("missing required environment variables")) {
+    return "R2 storage is not configured. Add R2_* environment variables in Render settings.";
+  }
+  if (lower.includes("no images downloaded")) {
+    return "Scraper found no product images. Verify the URL is a valid product page.";
+  }
+  if (lower.includes("timed out") || lower.includes("timeout")) {
+    return "Scrape timed out. The page may be slow or blocked. Try again.";
+  }
+  return `Scraper failed: ${raw.slice(0, 200)}`;
+}
+
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
   if (!url) return Response.json({ success: false, error: "URL required" }, { status: 400 });
@@ -26,6 +43,7 @@ export async function POST(req: NextRequest) {
   // Preferred path: dedicated Python scraper service (Playwright-based)
   const scraperServiceUrl = process.env.SCRAPER_SERVICE_URL;
   if (scraperServiceUrl) {
+    let rawError: string | null = null;
     try {
       const svcRes = await axios.post(
         `${scraperServiceUrl.replace(/\/$/, "")}/scrape`,
@@ -34,22 +52,29 @@ export async function POST(req: NextRequest) {
       );
       const body = svcRes.data ?? {};
       if (body.success) {
+        const images: string[] = body.images ?? [];
+        if (images.length === 0) {
+          return Response.json({ success: false, error: "No images found" });
+        }
         return Response.json({
           success: true,
-          scraped_text: body.scraped_text ?? "",
-          images: body.images ?? [],
-          title: body.title ?? "",
-          description: body.description ?? "",
-          specs: body.specs ?? {},
-          platform: body.platform ?? "",
+          data: {
+            scraped_text: body.scraped_text ?? "",
+            images,
+            title: body.title ?? "",
+            description: body.description ?? "",
+            specs: body.specs ?? {},
+            platform: body.platform ?? "",
+          },
         });
       }
-      // If the service returned success=false, fall through to legacy fallback below
-      console.warn("scraper service returned failure, falling back:", body.error);
+      rawError = typeof body.error === "string" && body.error.length > 0
+        ? body.error
+        : "Scraper service returned failure";
     } catch (err) {
-      console.warn("scraper service call failed, falling back:", err instanceof Error ? err.message : err);
-      // fall through to legacy fallback
+      rawError = err instanceof Error ? err.message : String(err);
     }
+    return Response.json({ success: false, error: mapScraperError(rawError) });
   }
 
   try {
@@ -132,8 +157,10 @@ export async function POST(req: NextRequest) {
 
     return Response.json({
       success: true,
-      scraped_text,
-      images: imageUrls.slice(0, 5),
+      data: {
+        scraped_text,
+        images: imageUrls.slice(0, 5),
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

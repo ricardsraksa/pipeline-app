@@ -9,7 +9,8 @@ export async function GET() {
             step_research, step_chief_mid, step_research_revised,
             step_avatar, step_offer_brief, step_necessary_beliefs,
             step_chief_final, step_avatar_revised, step_offer_brief_revised,
-            step_necessary_beliefs_revised, stage2_output, image_urls
+            step_necessary_beliefs_revised, stage2_output, image_urls,
+            current_step, last_updated_at
      FROM runs ORDER BY created_at DESC`
   );
 

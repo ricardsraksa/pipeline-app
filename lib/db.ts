@@ -67,12 +67,61 @@ async function migrateDB() {
     "uploaded_image_count INTEGER DEFAULT 0",
     "scraped_image_urls TEXT",
     "approved_image_urls TEXT",
+    // Pipeline execution tracking
+    "current_step TEXT",
+    "started_at TEXT",
+    "last_updated_at TEXT",
+    "completed_at TEXT",
+    "error_message TEXT",
   ];
   for (const col of newColumns) {
     try {
       await db.execute(`ALTER TABLE runs ADD COLUMN ${col}`);
     } catch { /* column already exists — safe to ignore */ }
   }
+}
+
+// ── DB helper functions ───────────────────────────────────────────────────────
+
+export async function getRun(id: number): Promise<Run | null> {
+  const result = await db.execute({ sql: "SELECT * FROM runs WHERE id = ?", args: [id] });
+  if (!result.rows.length) return null;
+  return result.rows[0] as unknown as Run;
+}
+
+export async function createRun(data: {
+  product_url: string;
+  product_name?: string;
+  product_description?: string | null;
+  competitor_urls?: string[] | null;
+  status?: string;
+}): Promise<number> {
+  const result = await db.execute({
+    sql: `INSERT INTO runs (created_at, product_url, product_name, product_description, competitor_urls, status, started_at, last_updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      new Date().toISOString(),
+      data.product_url,
+      data.product_name ?? data.product_url,
+      data.product_description ?? null,
+      data.competitor_urls ? JSON.stringify(data.competitor_urls) : null,
+      data.status ?? "pending",
+      new Date().toISOString(),
+      new Date().toISOString(),
+    ],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+export async function updateRun(id: number, fields: Partial<Run & { error_message: string | null }>): Promise<void> {
+  const entries = Object.entries(fields).filter(([, v]) => v !== undefined);
+  if (!entries.length) return;
+  const setClauses = entries.map(([k]) => `${k} = ?`).join(", ");
+  const values = entries.map(([, v]) => v);
+  await db.execute({
+    sql: `UPDATE runs SET ${setClauses} WHERE id = ?`,
+    args: [...values, id],
+  });
 }
 
 // Initialize schema on module load
@@ -129,4 +178,10 @@ export interface Run {
   uploaded_image_count: number | null;
   scraped_image_urls: string | null;
   approved_image_urls: string | null;
+  // Pipeline execution tracking
+  current_step: string | null;
+  started_at: string | null;
+  last_updated_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
 }
