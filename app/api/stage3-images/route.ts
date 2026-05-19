@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         sql: "SELECT approved_image_urls FROM runs WHERE id = ?",
         args: [runId],
       });
-      const row = result.rows[0] as { approved_image_urls: string | null } | undefined;
+      const row = result.rows[0] as unknown as { approved_image_urls: string | null } | undefined;
       const approvedUrls: string[] = row?.approved_image_urls
         ? JSON.parse(row.approved_image_urls)
         : [];
