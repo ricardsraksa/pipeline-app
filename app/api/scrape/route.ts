@@ -23,6 +23,35 @@ export async function POST(req: NextRequest) {
   const { url } = await req.json();
   if (!url) return Response.json({ success: false, error: "URL required" }, { status: 400 });
 
+  // Preferred path: dedicated Python scraper service (Playwright-based)
+  const scraperServiceUrl = process.env.SCRAPER_SERVICE_URL;
+  if (scraperServiceUrl) {
+    try {
+      const svcRes = await axios.post(
+        `${scraperServiceUrl.replace(/\/$/, "")}/scrape`,
+        { url },
+        { timeout: 300000, headers: { "Content-Type": "application/json" } },
+      );
+      const body = svcRes.data ?? {};
+      if (body.success) {
+        return Response.json({
+          success: true,
+          scraped_text: body.scraped_text ?? "",
+          images: body.images ?? [],
+          title: body.title ?? "",
+          description: body.description ?? "",
+          specs: body.specs ?? {},
+          platform: body.platform ?? "",
+        });
+      }
+      // If the service returned success=false, fall through to legacy fallback below
+      console.warn("scraper service returned failure, falling back:", body.error);
+    } catch (err) {
+      console.warn("scraper service call failed, falling back:", err instanceof Error ? err.message : err);
+      // fall through to legacy fallback
+    }
+  }
+
   try {
     const firecrawlKey = process.env.FIRECRAWL_API_KEY;
 
