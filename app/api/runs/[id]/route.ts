@@ -67,6 +67,8 @@ export async function PATCH(
     step_avatar_revised?: string | null;
     step_offer_brief_revised?: string | null;
     step_necessary_beliefs_revised?: string | null;
+    scraped_image_urls?: string[] | null;
+    approved_image_urls?: string[] | null;
   };
 
   const existing = await db.execute({
@@ -75,6 +77,16 @@ export async function PATCH(
   });
   if (!existing.rows.length) {
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Handle image_approval requests
+  if (body.type === "image_approval") {
+    const { approved_urls } = body as { type: string; approved_urls: string[] };
+    await db.execute({
+      sql: "UPDATE runs SET approved_image_urls = ? WHERE id = ?",
+      args: [JSON.stringify(approved_urls), Number(id)],
+    });
+    return Response.json({ success: true });
   }
 
   // Handle field_edit requests
@@ -108,7 +120,9 @@ export async function PATCH(
   if ("generated_images" in body) { fields.push("generated_images = ?"); values.push(body.generated_images ?? null); }
   if ("audit_results" in body)    { fields.push("audit_results = ?");    values.push(body.audit_results ?? null); }
   if ("prompt_edits_made" in body)     { fields.push("prompt_edits_made = ?");      values.push(body.prompt_edits_made ?? null); }
-  if ("uploaded_image_count" in body)  { fields.push("uploaded_image_count = ?");  values.push(body.uploaded_image_count ?? null); }
+  if ("uploaded_image_count" in body)   { fields.push("uploaded_image_count = ?");    values.push(body.uploaded_image_count ?? null); }
+  if ("scraped_image_urls" in body)     { fields.push("scraped_image_urls = ?");      values.push(body.scraped_image_urls ? JSON.stringify(body.scraped_image_urls) : null); }
+  if ("approved_image_urls" in body)    { fields.push("approved_image_urls = ?");     values.push(body.approved_image_urls ? JSON.stringify(body.approved_image_urls) : null); }
   if ("product_name" in body)                 { fields.push("product_name = ?");                 values.push(body.product_name ?? null); }
   if ("brand_name" in body)                   { fields.push("brand_name = ?");                   values.push(body.brand_name ?? null); }
   if ("revised_steps" in body)                { fields.push("revised_steps = ?");                values.push(body.revised_steps ? JSON.stringify(body.revised_steps) : null); }

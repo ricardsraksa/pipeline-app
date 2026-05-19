@@ -5,6 +5,7 @@ import OutputBlock from "@/components/OutputBlock";
 import EditableOutput from "@/components/EditableOutput";
 import FeedbackBar from "@/components/FeedbackBar";
 import ImageUploadZone from "@/components/ImageUploadZone";
+import ImageReviewGrid from "@/components/ImageReviewGrid";
 import JSZip from "jszip";
 import type { ImagePrompt } from "@/app/api/stage3-prompts/route";
 
@@ -325,6 +326,7 @@ export default function Home() {
   // Image generation state (kept from original)
   const [scrapedImages, setScrapedImages] = useState<string[]>([]);
   const [userImages, setUserImages] = useState<string[]>([]);
+  const [approvedImageUrls, setApprovedImageUrls] = useState<string[]>([]);
   const [productName, setProductName] = useState("");
   const [stage2Output, setStage2Output] = useState("");
   const [imageSlots, setImageSlots] = useState<ImageSlot[]>([]);
@@ -427,6 +429,11 @@ export default function Home() {
       try {
         const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null;
         if (scraperData?.images) setScrapedImages(scraperData.images as string[]);
+      } catch { /* non-critical */ }
+      // Restore approved image URLs
+      try {
+        const approved = run.approved_image_urls ? JSON.parse(run.approved_image_urls) : [];
+        setApprovedImageUrls(approved);
       } catch { /* non-critical */ }
 
       const lastStep = getLastCompletedStep(run as HistoryRun);
@@ -614,6 +621,7 @@ export default function Home() {
     setImageSlots([]);
     setScrapedImages([]);
     setUserImages([]);
+    setApprovedImageUrls([]);
     setRunId(null);
     setProductName("");
     setBrandSlug(null);
@@ -721,7 +729,12 @@ export default function Home() {
           }),
         });
         const saveData = await saveRes.json();
-        if (saveData.id) { liveRunId = Number(saveData.id); setRunId(liveRunId); }
+        if (saveData.id) {
+          liveRunId = Number(saveData.id);
+          setRunId(liveRunId);
+          // Persist scraped image URLs so the review grid can save approvals against this run
+          await patchRun({ scraped_image_urls: imgs });
+        }
       } catch { /* non-critical */ }
     } catch (err) {
       setError(1, err instanceof Error ? err.message : String(err));
@@ -1026,13 +1039,13 @@ export default function Home() {
       setImageSlots(slots);
       setPipeline("stage3_prompts_done");
 
-      await generateImagesSequentially(prompts, slots);
+      await generateImagesSequentially(prompts, slots, approvedImageUrls);
     } catch (err) {
       setError(13, err instanceof Error ? err.message : String(err));
     }
   }
 
-  async function generateImagesSequentially(prompts: ImagePrompt[], initialSlots: ImageSlot[]) {
+  async function generateImagesSequentially(prompts: ImagePrompt[], initialSlots: ImageSlot[], imageUrls: string[]) {
     setPipeline("stage3_images_running");
     const slots = [...initialSlots];
 
@@ -1048,7 +1061,7 @@ export default function Home() {
           const res = await fetch("/api/stage3-images", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt_obj: prompt, images: allImages }),
+            body: JSON.stringify({ prompt_obj: prompt, images: imageUrls, runId }),
           });
           const data = await res.json();
           if (data.success && data.image_url) {
@@ -1136,7 +1149,7 @@ export default function Home() {
       const res = await fetch("/api/stage3-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt_obj: imageSlots[slotIndex].prompt, images: allImages }),
+        body: JSON.stringify({ prompt_obj: imageSlots[slotIndex].prompt, images: approvedImageUrls, runId }),
       });
       const data = await res.json();
       if (data.success && data.image_url) {
@@ -1177,8 +1190,8 @@ export default function Home() {
   const canRunStage2 =
     (isComplete || pipelineIsStage2Done || pipelineIsStage3ImagesDone) &&
     productName.trim().length > 0;
-  const hasImages = allImages.length >= 1;
-  const canRunStage3 = pipelineIsStage2Done && hasImages;
+  const hasApprovedImages = approvedImageUrls.length >= 1;
+  const canRunStage3 = pipelineIsStage2Done && hasApprovedImages;
   const isDone = pipelineIsStage3ImagesDone;
 
   const step6Skipped =
@@ -1358,7 +1371,7 @@ export default function Home() {
   const tab3State: "idle" | "running" | "done" =
     pipelineIsStage3ImagesDone ? "done" : (pipelineIsStage3PromptsRunning || pipelineIsStage3ImagesRunning) ? "running" : "idle";
   const tab2Disabled = !isComplete && !pipelineIsStage2Done && !pipelineIsStage2Running;
-  const tab3Disabled = (!pipelineIsStage2Done && !pipelineIsStage3ImagesDone) || (pipelineIsStage2Done && !hasImages);
+  const tab3Disabled = (!pipelineIsStage2Done && !pipelineIsStage3ImagesDone) || (pipelineIsStage2Done && !hasApprovedImages);
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-blue-500/30">
@@ -1394,7 +1407,7 @@ export default function Home() {
                 disabled={t.disabled}
                 onClick={() => {
                   if (t.num === 3) {
-                    if (runId && hasImages) window.location.href = `/stage3?runId=${runId}`;
+                    if (runId && hasApprovedImages) window.location.href = `/stage3?runId=${runId}`;
                     return;
                   }
                   setCurrentTab(t.num);
@@ -1431,7 +1444,7 @@ export default function Home() {
                   setPipeline("idle"); setUrl(""); setProductDescription(""); setCompetitorUrls("");
                   setOutputs(EMPTY_OUTPUTS); setBrandSlug(null); setProductSlug(null);
                   setStage2Output(""); setProductName(""); setImageSlots([]);
-                  setScrapedImages([]); setUserImages([]);
+                  setScrapedImages([]); setUserImages([]); setApprovedImageUrls([]);
                   setCurrentTab(1); setSelectedStep(1); setRunId(null);
                 }}
                 className="cursor-pointer text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors active:scale-95"
@@ -1563,49 +1576,41 @@ export default function Home() {
                 {/* Product Images — shown once scraping is complete */}
                 {(pipeline as string) !== 'scraping' && (
                   <section className="border border-zinc-700/60 rounded-xl bg-zinc-900 p-4 space-y-4">
-                    {/* Header */}
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-[13px] font-medium text-zinc-200">Product Images</h2>
-                      {allImages.length > 0 ? (
-                        <span className="font-mono text-[10px] bg-zinc-800 text-emerald-400 border border-emerald-900/40 px-1.5 py-0.5 rounded">
-                          {allImages.length} image{allImages.length !== 1 ? 's' : ''} ready
-                        </span>
-                      ) : (
-                        <span className="font-mono text-[10px] bg-amber-950/60 text-amber-400 border border-amber-900/40 px-1.5 py-0.5 rounded">
-                          0 images
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Warning when scraper found nothing */}
-                    {scrapedImages.length === 0 && (
+                    {allImages.length === 0 && (
                       <p className="font-mono text-[11px] text-amber-400/90">
                         No images found — upload product photos to continue to Stage 3
                       </p>
                     )}
 
-                    {/* Scraped thumbnails */}
-                    {scrapedImages.length > 0 && (
+                    {/* Review grid — shows scraped + uploaded, user ticks to approve */}
+                    {runId && allImages.length > 0 && (
+                      <ImageReviewGrid
+                        runId={runId}
+                        scrapedUrls={scrapedImages}
+                        approvedUrls={approvedImageUrls}
+                        onApprovedChange={setApprovedImageUrls}
+                        uploadedUrls={userImages}
+                      />
+                    )}
+
+                    {/* Fallback thumbnails while run record is not yet created */}
+                    {!runId && allImages.length > 0 && (
                       <div className="space-y-2">
-                        <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">From scraper</p>
+                        <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">Product Images</p>
                         <div className="flex flex-wrap gap-2">
-                          {scrapedImages.map((imgUrl, i) => (
+                          {allImages.map((imgUrl, i) => (
                             <div key={i} className="w-[72px] h-[72px] flex-shrink-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-800">
-                              <img
-                                src={imgUrl}
-                                alt={`Product ${i + 1}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                              />
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={imgUrl} alt={`Product ${i + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Upload zone */}
+                    {/* Upload zone — always visible for adding more */}
                     <div className="space-y-2">
-                      {scrapedImages.length > 0 && (
+                      {allImages.length > 0 && (
                         <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">Add more images</p>
                       )}
                       <ImageUploadZone
@@ -1930,7 +1935,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {runId ? (
-                    hasImages ? (
+                    hasApprovedImages ? (
                       <a
                         href={`/stage3?runId=${runId}`}
                         className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-medium text-[13px] rounded-md transition-all duration-150"
@@ -1938,15 +1943,15 @@ export default function Home() {
                     ) : (
                       <button
                         disabled
-                        title="Upload at least one product image first"
+                        title="Approve at least one product image first"
                         className="px-4 py-2 bg-zinc-800 text-zinc-600 font-medium text-[13px] rounded-md opacity-50 cursor-not-allowed"
                       >Continue to Stage 3 →</button>
                     )
                   ) : (
                     <span className="text-[11px] font-mono text-zinc-500 animate-pulse">Saving run…</span>
                   )}
-                  {!hasImages && (
-                    <span className="font-mono text-[10px] text-amber-400/80">Upload at least one product image to continue</span>
+                  {!hasApprovedImages && (
+                    <span className="font-mono text-[10px] text-amber-400/80">Approve at least one product image above before running Stage 3</span>
                   )}
                 </div>
               </section>

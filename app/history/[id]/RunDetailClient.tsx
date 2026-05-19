@@ -4,6 +4,7 @@ import { useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 import EditableOutput from "@/components/EditableOutput";
+import ImageReviewGrid from "@/components/ImageReviewGrid";
 
 interface Props { run: Run }
 
@@ -219,6 +220,18 @@ export default function RunDetailClient({ run }: Props) {
     catch { return []; }
   })();
 
+  const scrapedImageUrls: string[] = (() => {
+    try {
+      if (run.scraped_image_urls) return JSON.parse(run.scraped_image_urls);
+      return scraperData?.images ?? [];
+    } catch { return scraperData?.images ?? []; }
+  })();
+
+  const approvedImageUrls: string[] = (() => {
+    try { return run.approved_image_urls ? JSON.parse(run.approved_image_urls) : []; }
+    catch { return []; }
+  })();
+
   async function handleDownloadAll() {
     const zip = new JSZip();
 
@@ -326,12 +339,18 @@ export default function RunDetailClient({ run }: Props) {
       {scraperData && (scraperData.scraped_text || (scraperData.images?.length ?? 0) > 0) && (
         <Section label="Scraper Data">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 divide-y divide-zinc-800">
-            {scraperData.images && scraperData.images.length > 0 && (
+            {scrapedImageUrls.length > 0 && (
               <div className="p-4">
-                <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-3">
-                  Product images · {scraperData.images.length}
+                <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">
+                  Product images · {scrapedImageUrls.length} scraped · {approvedImageUrls.length} approved
                 </p>
-                <ImageGrid urls={scraperData.images} cols={4} />
+                <ImageReviewGrid
+                  runId={run.id}
+                  scrapedUrls={scrapedImageUrls}
+                  approvedUrls={approvedImageUrls}
+                  onApprovedChange={() => {}}
+                  readOnly
+                />
               </div>
             )}
             {scraperData.scraped_text && (

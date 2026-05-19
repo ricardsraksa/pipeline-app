@@ -65,6 +65,8 @@ async function migrateDB() {
     "stage2_edited_at TEXT",
     "stage3_edited_at TEXT",
     "uploaded_image_count INTEGER DEFAULT 0",
+    "scraped_image_urls TEXT",
+    "approved_image_urls TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -125,4 +127,6 @@ export interface Run {
   stage2_edited_at: string | null;
   stage3_edited_at: string | null;
   uploaded_image_count: number | null;
+  scraped_image_urls: string | null;
+  approved_image_urls: string | null;
 }
