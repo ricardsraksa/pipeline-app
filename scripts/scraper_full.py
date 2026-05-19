@@ -122,7 +122,10 @@ def clean_image_urls(urls: list[str]) -> list[str]:
     for u in urls:
         if not u or len(u) < 20:
             continue
+        # Strip query strings (analytics params), keep the path intact
         base = re.sub(r"\?.*$", "", u)
+        # Strip trailing size suffix added by AliExpress (e.g. _350x350.jpg_480x480.jpg)
+        # Only strip the LAST suffix to get original-size image
         base = re.sub(r"_\d+x\d+\.(jpg|jpeg|png|webp)$", r".\1", base, flags=re.IGNORECASE)
         if base not in seen:
             seen.add(base)
@@ -144,19 +147,135 @@ async def download_image_bytes(page: Page, url: str) -> tuple[bytes | None, str 
         return None, str(e)
 
 
+async def detect_and_wait_for_captcha(page: Page, max_wait_seconds: int = 300) -> bool:
+    """
+    Detect if a captcha/verification challenge is on the page and pause for manual solving.
+
+    Returns True if the page is clear (no captcha, or captcha was solved), False if timed out.
+    Common AliExpress/Alibaba captcha indicators:
+      - "nc_iframe" slider captcha
+      - "punish" or "verification" in URL
+      - Specific text on the page
+    """
+    captcha_selectors = [
+        "iframe[id*='nc_iframe']",
+        "iframe[id*='captcha']",
+        "iframe[src*='captcha']",
+        "iframe[src*='punish']",
+        "[class*='nc-container']",
+        "[class*='captcha']",
+        "[id*='baxia']",
+    ]
+
+    captcha_text_phrases = [
+        "verify", "verification", "slide to verify", "drag the slider",
+        "are you human", "security check", "please verify",
+    ]
+
+    # Check URL for verification redirects
+    current_url = page.url.lower()
+    url_blocked = any(kw in current_url for kw in ["punish", "verification", "_____tmd_____"])
+
+    # Check for captcha elements
+    has_captcha_element = False
+    for selector in captcha_selectors:
+        try:
+            count = await page.locator(selector).count()
+            if count > 0:
+                has_captcha_element = True
+                break
+        except Exception:
+            continue
+
+    # Check page text content
+    has_captcha_text = False
+    try:
+        body_text = await page.evaluate("() => document.body ? document.body.innerText.toLowerCase().substring(0, 2000) : ''")
+        has_captcha_text = any(phrase in body_text for phrase in captcha_text_phrases)
+    except Exception:
+        pass
+
+    if not (url_blocked or has_captcha_element or has_captcha_text):
+        return True  # No captcha detected, page is clear
+
+    # Captcha detected
+    print("\n" + "=" * 70)
+    print("  CAPTCHA / VERIFICATION DETECTED")
+    print("=" * 70)
+    print("  AliExpress is asking for human verification.")
+    print("  → Switch to the browser window and solve the captcha manually.")
+    print(f"  → The scraper will resume automatically once the page loads correctly.")
+    print(f"  → Timeout: {max_wait_seconds} seconds")
+    print("=" * 70 + "\n")
+
+    if HEADLESS:
+        print("  [error] Cannot solve captcha in headless mode.")
+        print("  [error] Re-run with SCRAPER_HEADLESS=false to solve manually.")
+        return False
+
+    # Poll every 2 seconds to see if the user solved the captcha
+    elapsed = 0
+    poll_interval = 2
+    while elapsed < max_wait_seconds:
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+
+        # Re-check: is the captcha gone?
+        try:
+            current_url = page.url.lower()
+            url_still_blocked = any(kw in current_url for kw in ["punish", "verification", "_____tmd_____"])
+
+            still_has_element = False
+            for selector in captcha_selectors:
+                try:
+                    count = await page.locator(selector).count()
+                    if count > 0:
+                        still_has_element = True
+                        break
+                except Exception:
+                    continue
+
+            if not url_still_blocked and not still_has_element:
+                print(f"  [ok] Captcha cleared after {elapsed}s. Continuing...")
+                await page.wait_for_timeout(2000)  # Let page settle
+                return True
+        except Exception:
+            continue
+
+        if elapsed % 30 == 0:
+            print(f"  [waiting] Still waiting for captcha ({elapsed}s / {max_wait_seconds}s)...")
+
+    print(f"  [timeout] Captcha not solved after {max_wait_seconds}s. Aborting.")
+    return False
+
+
 # ---------------------------------------------------------------------------
 # AliExpress scraper
 # ---------------------------------------------------------------------------
 
 async def scrape_aliexpress(page: Page, url: str) -> dict:
+    """
+    Verified data sources:
+      - Images: window._d_c_.DCData.imagePathList (set on page load)
+      - Title: document.title -- strip " - AliExpress" suffix
+      - Specs: .specification--prop--* (each with --title and --desc children)
+      - Description: meta[name="description"]
+    """
     print(f"  [aliexpress] Loading page...")
     await page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
+    # Check for captcha and wait for manual solve if needed
+    captcha_ok = await detect_and_wait_for_captcha(page)
+    if not captcha_ok:
+        raise RuntimeError("AliExpress captcha could not be solved -- aborting scrape")
+
+    # Wait for the spec section to render (signals page is fully loaded)
     try:
         await page.wait_for_selector("[class*='specification--prop'], [class*='product-price']", timeout=15000)
     except Exception:
         print("  [warn] Page did not render expected elements -- continuing anyway")
 
+    # Allow late JS to run
     await page.wait_for_timeout(2000)
 
     result = {
@@ -168,6 +287,7 @@ async def scrape_aliexpress(page: Page, url: str) -> dict:
         "image_urls": [],
     }
 
+    # 1. Extract images from window._d_c_.DCData.imagePathList
     try:
         image_list = await page.evaluate(
             "() => (window._d_c_ && window._d_c_.DCData && window._d_c_.DCData.imagePathList) || []"
@@ -178,13 +298,16 @@ async def scrape_aliexpress(page: Page, url: str) -> dict:
     except Exception as e:
         print(f"  [warn] Image extraction from DCData failed: {e}")
 
+    # 2. Extract title from document.title
     try:
         page_title = await page.evaluate("() => document.title || ''")
+        # AliExpress format: "Product Name - AliExpress NNN"
         title = re.split(r"\s*-\s*AliExpress", page_title, maxsplit=1)[0].strip()
         result["title"] = title
     except Exception as e:
         print(f"  [warn] Title extraction failed: {e}")
 
+    # 3. Extract specs from DOM
     try:
         specs = await page.evaluate("""
             () => {
@@ -195,6 +318,7 @@ async def scrape_aliexpress(page: Page, url: str) -> dict:
                     const descEl = prop.querySelector('[class*="specification--desc--"]');
                     if (titleEl && descEl) {
                         const key = titleEl.textContent.trim();
+                        // Prefer title attribute (clean), fall back to textContent
                         const val = descEl.getAttribute('title') || descEl.textContent.trim();
                         if (key && val) result[key] = val;
                     }
@@ -208,6 +332,7 @@ async def scrape_aliexpress(page: Page, url: str) -> dict:
     except Exception as e:
         print(f"  [warn] Specs extraction failed: {e}")
 
+    # 4. Extract description from meta tag (most reliable)
     try:
         meta_desc = await page.evaluate(
             "() => { const m = document.querySelector('meta[name=\"description\"]'); return m ? m.content : ''; }"
@@ -225,10 +350,22 @@ async def scrape_aliexpress(page: Page, url: str) -> dict:
 # ---------------------------------------------------------------------------
 
 async def scrape_alibaba(page: Page, url: str) -> dict:
+    """
+    Alibaba uses different data structures. This is a best-effort scrape using
+    multiple fallback strategies. Verify selectors on a real Alibaba product page
+    if results are poor.
+    """
     print(f"  [alibaba] Loading page...")
     await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+
+    # Check for captcha and wait for manual solve if needed
+    captcha_ok = await detect_and_wait_for_captcha(page)
+    if not captcha_ok:
+        raise RuntimeError("Alibaba captcha could not be solved -- aborting scrape")
+
     await page.wait_for_timeout(3000)
 
+    # Scroll to trigger lazy-loaded content
     await page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
     await page.wait_for_timeout(2000)
     await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
@@ -245,6 +382,7 @@ async def scrape_alibaba(page: Page, url: str) -> dict:
         "image_urls": [],
     }
 
+    # 1. Title from page title or h1
     try:
         title_data = await page.evaluate("""
             () => {
@@ -257,19 +395,23 @@ async def scrape_alibaba(page: Page, url: str) -> dict:
                 };
             }
         """)
+        # Prefer og:title, then h1, then page title with site name stripped
         title = title_data.get("og") or title_data.get("h1") or title_data.get("title", "")
         title = re.split(r"\s*[-|]\s*Alibaba", title, maxsplit=1)[0].strip()
         result["title"] = title
     except Exception as e:
         print(f"  [warn] Title extraction failed: {e}")
 
+    # 2. Images -- try multiple sources
     try:
         image_data = await page.evaluate("""
             () => {
                 const urls = new Set();
+                // Try og:image
                 document.querySelectorAll('meta[property="og:image"]').forEach(m => {
                     if (m.content) urls.add(m.content);
                 });
+                // Gallery / main product images
                 document.querySelectorAll('img').forEach(img => {
                     const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || '';
                     if (src && (src.includes('alicdn.com') || src.includes('alibaba'))) {
@@ -285,10 +427,12 @@ async def scrape_alibaba(page: Page, url: str) -> dict:
     except Exception as e:
         print(f"  [warn] Image extraction failed: {e}")
 
+    # 3. Specs from any tables or attribute lists
     try:
         specs = await page.evaluate("""
             () => {
                 const result = {};
+                // Try table-based specs
                 document.querySelectorAll('table tr').forEach(row => {
                     const cells = row.querySelectorAll('td, th');
                     if (cells.length >= 2) {
@@ -299,6 +443,7 @@ async def scrape_alibaba(page: Page, url: str) -> dict:
                         }
                     }
                 });
+                // Try definition lists
                 const dts = document.querySelectorAll('dl dt');
                 const dds = document.querySelectorAll('dl dd');
                 for (let i = 0; i < Math.min(dts.length, dds.length); i++) {
@@ -315,6 +460,7 @@ async def scrape_alibaba(page: Page, url: str) -> dict:
     except Exception as e:
         print(f"  [warn] Specs extraction failed: {e}")
 
+    # 4. Description from meta tag
     try:
         meta_desc = await page.evaluate(
             "() => { const m = document.querySelector('meta[name=\"description\"]'); return m ? m.content : ''; }"
@@ -371,7 +517,7 @@ def upload_to_r2(image_paths: list[Path], product_slug: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 async def scrape_and_upload(url: str) -> dict:
-    validate_env()
+    validate_env()  # Fail fast if R2 config is missing
 
     platform = detect_platform(url)
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -398,6 +544,7 @@ async def scrape_and_upload(url: str) -> dict:
             else:
                 data = await scrape_alibaba(page, url)
 
+            # Clean and deduplicate image URLs
             data["image_urls"] = clean_image_urls(data["image_urls"])[:MAX_IMAGES]
             if len(data["image_urls"]) >= MAX_IMAGES:
                 print(f"  [info] Image list capped at MAX_IMAGES ({MAX_IMAGES})")
@@ -410,6 +557,7 @@ async def scrape_and_upload(url: str) -> dict:
             downloaded_paths = []
             failures = []
 
+            # Reuse the same browser context for downloads (preserves cookies/UA)
             download_page = await context.new_page()
             for i, img_url in enumerate(data["image_urls"]):
                 ext = img_url.split(".")[-1].split("?")[0].lower()
