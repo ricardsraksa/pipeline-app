@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
-import { getLastCompletedStage } from "@/lib/pipeline-runner";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+type LastStage = "none" | "scrape" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+
+function getLastCompletedStage(run: RunStatus): LastStage {
+  if (run.outputs.stage2Output && run.status === "completed") return "stage3-images";
+  if (run.status === "awaiting_qc") return "stage3-prompts";
+  if (run.outputs.stage2Output) return "stage2";
+  if (run.outputs.necessaryBeliefs || run.outputs.chiefFinal) return "stage1";
+  if (run.images.scrapedUrls.length > 0) return "scrape";
+  return "none";
+}
 
 function isStuck(run: RunStatus): boolean {
   if (!run.timestamps.lastUpdatedAt) return false;
@@ -123,17 +133,7 @@ export default function RunPage() {
     if (run.status === "pending") return;
     scrolledRef.current = true;
 
-    const safeRun = {
-      generated_images: null,
-      image_prompts: null,
-      stage2_output: run.outputs.stage2Output,
-      step_necessary_beliefs: run.outputs.necessaryBeliefs,
-      step_chief_final: run.outputs.chiefFinal,
-      scraper_data: run.images.scrapedUrls.length > 0 ? "x" : null,
-      step_avatar_revised: run.outputs.avatarRevised,
-    } as Parameters<typeof getLastCompletedStage>[0];
-
-    const lastStage = getLastCompletedStage(safeRun as any);
+    const lastStage = getLastCompletedStage(run);
     const targetId: Record<string, string> = {
       "stage3-images": "stage-3-section",
       "stage3-prompts": "stage-3-section",
