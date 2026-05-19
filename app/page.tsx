@@ -653,9 +653,9 @@ export default function Home() {
     const { scraped, imgs, competitorScraped } = await scrapeAll();
 
     // Validate scraped data is sufficient before starting the research step
+    // Images are not required here — user can upload them manually in the review grid
     const hasContent = scraped.length > 50;
-    const hasImages = imgs.length >= 1;
-    const isAmbiguous = !hasContent || !hasImages;
+    const isAmbiguous = !hasContent;
 
     if (isAmbiguous && !productDescription.trim()) {
       setAmbiguousListing(true);
