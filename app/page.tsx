@@ -1094,7 +1094,7 @@ export default function Home() {
     setCurrentImageIndex(null);
     setPipeline("stage3_images_done");
 
-    const imageUrls = slots
+    const generatedImageUrls = slots
       .filter((s) => s.status === "done" && s.imageUrl)
       .map((s) => s.imageUrl as string);
 
@@ -1109,7 +1109,7 @@ export default function Home() {
           body: JSON.stringify({
             stage2_output: stage2Output,
             stage3_prompts: prompts,
-            image_urls: imageUrls,
+            image_urls: generatedImageUrls,
             uploaded_image_count: userImages.length,
             status: "complete",
           }),
@@ -1124,7 +1124,7 @@ export default function Home() {
             stage1_output: outputs.research_revised ?? outputs.research ?? "",
             stage2_output: stage2Output,
             stage3_prompts: prompts,
-            image_urls: imageUrls,
+            image_urls: generatedImageUrls,
           }),
         });
         const saveData = await saveRes.json();
