@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
   const userMessage = [
     `PRODUCT URL: ${url}`,
     scraped_text ? `\nSCRAPED PRODUCT TEXT:\n${scraped_text}` : "\nSCRAPED PRODUCT TEXT: (not available)",
+    "\n\nIMPORTANT: Scraped product descriptions are often minimal (just a short meta description) because full descriptions are behind login walls or lazy-loaded content. This is normal and expected.\n\nWhen the product description is short or generic:\n- Use web search aggressively to find detailed product information, reviews, and specifications\n- Search for the exact product name + brand on Amazon.de, Reddit, and review sites\n- Look for similar products in the category to understand common features and positioning\n- Prioritize specs and title over the description — they are more reliable\n\nDo NOT refuse to proceed or ask for more information from the user. Work with what you have and fill gaps through research.",
     competitorBlock,
     "\n\nProduce the full research brief now.",
   ]
