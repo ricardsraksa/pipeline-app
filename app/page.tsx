@@ -652,21 +652,6 @@ export default function Home() {
     setPipeline("scraping");
     const { scraped, imgs, competitorScraped } = await scrapeAll();
 
-    // Validate scraped data is sufficient before starting the research step
-    // Images are not required here — user can upload them manually in the review grid
-    const hasContent = scraped.length > 50;
-    const isAmbiguous = !hasContent;
-
-    if (isAmbiguous && !productDescription.trim()) {
-      setAmbiguousListing(true);
-      setPipeline("idle");
-      // Scroll to and focus the Product Description field so the user sees what to fill in
-      setTimeout(() => {
-        descriptionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        descriptionRef.current?.focus();
-      }, 100);
-      return;
-    }
     setAmbiguousListing(false);
 
     // Step 1 — Research (5 sequential sub-calls, streamed via SSE)
