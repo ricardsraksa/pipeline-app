@@ -72,10 +72,10 @@ function StatusPill({ status, stuck }: { status: string | null; stuck?: boolean 
   const tone: Tone = stuck ? "warn" : meta.tone;
 
   const tones: Record<Tone, string> = {
-    active:  "bg-[color:rgb(61_107_150_/_0.08)]  text-[var(--color-accent)]  border-[color:rgb(61_107_150_/_0.25)]",
-    success: "bg-[color:rgb(58_117_84_/_0.08)]   text-[var(--color-success)] border-[color:rgb(58_117_84_/_0.25)]",
-    warn:    "bg-[color:rgb(138_101_48_/_0.08)]  text-[var(--color-warn)]    border-[color:rgb(138_101_48_/_0.25)]",
-    danger:  "bg-[color:rgb(138_58_58_/_0.08)]   text-[var(--color-error)]   border-[color:rgb(138_58_58_/_0.25)]",
+    active:  "bg-[color:rgb(107_158_200_/_0.12)] text-[var(--color-accent)]  border-[color:rgb(107_158_200_/_0.28)]",
+    success: "bg-[color:rgb(90_158_117_/_0.12)]  text-[var(--color-success)] border-[color:rgb(90_158_117_/_0.28)]",
+    warn:    "bg-[color:rgb(184_144_74_/_0.12)]  text-[var(--color-warn)]    border-[color:rgb(184_144_74_/_0.28)]",
+    danger:  "bg-[color:rgb(184_96_96_/_0.12)]   text-[var(--color-error)]   border-[color:rgb(184_96_96_/_0.28)]",
     muted:   "bg-[var(--color-surface-2)]         text-[var(--color-text-3)]  border-[var(--color-border)]",
   };
 
@@ -198,7 +198,7 @@ export default async function HistoryPage() {
                   className={[
                     "cursor-pointer grid md:grid-cols-[1fr_140px_120px_100px] grid-cols-1 gap-2 md:gap-4 px-5 py-3 transition-colors duration-150",
                     isActive
-                      ? "bg-[color:rgb(61_107_150_/_0.04)] hover:bg-[color:rgb(61_107_150_/_0.07)]"
+                      ? "bg-[color:rgb(107_158_200_/_0.05)] hover:bg-[color:rgb(107_158_200_/_0.09)]"
                       : "hover:bg-[var(--color-surface-2)]",
                   ].join(" ")}
                 >

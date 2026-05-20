@@ -6,29 +6,29 @@
  */
 
 @theme inline {
-  /* Surfaces */
-  --color-bg:           #f4f4f6;        /* page background — warm off-white */
-  --color-surface:      #ffffff;        /* card surface — pure white */
-  --color-surface-2:    #efeff1;        /* elevated / hover surface */
-  --color-surface-3:    #e6e6e9;        /* deeper hover state */
+  /* Surfaces — medium dark, not ultra black */
+  --color-bg:           #1c1c1f;        /* page bg — warm charcoal, like Claude chat */
+  --color-surface:      #242428;        /* card surface */
+  --color-surface-2:    #2c2c30;        /* elevated / hover surface */
+  --color-surface-3:    #353539;        /* deeper hover */
 
   /* Borders */
-  --color-border:       #e2e2e6;
-  --color-border-hover: #cecdd3;
-  --color-border-strong:#b8b7be;
+  --color-border:       #38383d;
+  --color-border-hover: #48484e;
+  --color-border-strong:#5c5c63;
 
   /* Text */
-  --color-text:         #18181b;        /* near-black */
-  --color-text-2:       #52525c;        /* secondary */
-  --color-text-3:       #7f7f8c;        /* tertiary */
-  --color-text-4:       #adadb8;        /* placeholder / disabled */
+  --color-text:         #ececee;        /* near-white */
+  --color-text-2:       #9d9da8;        /* secondary */
+  --color-text-3:       #6c6c76;        /* tertiary */
+  --color-text-4:       #48484f;        /* placeholder / disabled */
 
   /* Accent + semantic — muted, no neon */
-  --color-accent:       #3d6b96;        /* muted steel blue */
-  --color-accent-dim:   #2e5478;        /* deeper steel blue */
-  --color-success:      #3a7554;        /* muted forest green */
-  --color-warn:         #8a6530;        /* muted amber */
-  --color-error:        #8a3a3a;        /* muted burgundy */
+  --color-accent:       #6b9ec8;        /* soft steel blue */
+  --color-accent-dim:   #5585ae;        /* deeper steel blue */
+  --color-success:      #5a9e75;        /* soft forest green */
+  --color-warn:         #b8904a;        /* soft amber */
+  --color-error:        #b86060;        /* soft muted red */
 
   --font-mono: var(--font-ibm-plex-mono);
   --font-sans: var(--font-dm-sans);
@@ -45,7 +45,7 @@ html, body {
 
 /* Selection */
 ::selection {
-  background: rgba(61, 107, 150, 0.18);
+  background: rgba(107, 158, 200, 0.20);
   color: var(--color-text);
 }
 
@@ -53,12 +53,12 @@ html, body {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #d0d0d6;
+  background: #48484e;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #b8b7be; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb:hover { background: #5c5c63; background-clip: padding-box; border: 2px solid transparent; }
 
 /* Focus ring — visible for keyboard a11y but quiet */
 :focus-visible {
@@ -93,7 +93,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -110,7 +110,7 @@ kbd.kbd {
   font-size: 10px;
   line-height: 1;
   color: var(--color-text-2);
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--color-border);
   border-bottom-width: 2px;
   border-radius: 4px;

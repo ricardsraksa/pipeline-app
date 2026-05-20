@@ -256,7 +256,7 @@ export default function Home() {
 
         {/* Error */}
         {error && (
-          <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-[color:rgb(138_58_58_/_0.06)] border border-[color:rgb(138_58_58_/_0.22)] fade-in">
+          <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-[color:rgb(184_96_96_/_0.10)] border border-[color:rgb(184_96_96_/_0.28)] fade-in">
             <Icon.Alert className="w-4 h-4 text-[var(--color-error)] flex-shrink-0 mt-px" />
             <p className="text-[12px] text-[var(--color-error)] leading-relaxed">{error}</p>
           </div>
