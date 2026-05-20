@@ -14,7 +14,7 @@ export async function initDB() {
     CREATE TABLE IF NOT EXISTS runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       created_at TEXT NOT NULL,
-      product_url TEXT NOT NULL,
+      product_url TEXT,
       product_name TEXT NOT NULL,
       stage1_output TEXT,
       stage2_output TEXT,
@@ -77,6 +77,8 @@ async function migrateDB() {
     "stage1_one_pager TEXT",
     "stage1_one_pager_edited TEXT",
     "stage1_one_pager_edited_at TEXT",
+    // Source images: user-uploaded reference photos that drive Stage 1 vision
+    "uploaded_source_images TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -135,21 +137,34 @@ export async function getRun(id: number): Promise<Run | null> {
 }
 
 export async function createRun(data: {
-  product_url: string;
+  /** Optional in the new description-first flow. Stored as "" when absent so we
+   *  remain compatible with existing tables that still have a NOT NULL constraint. */
+  product_url?: string | null;
   product_name?: string;
   product_description?: string | null;
   competitor_urls?: string[] | null;
+  uploaded_source_images?: string[] | null;
   status?: string;
 }): Promise<number> {
+  const url = data.product_url ?? "";
+  // Compute a sensible display name: description excerpt → URL → fallback.
+  const fallbackName =
+    data.product_description
+      ? data.product_description.trim().split(/\s+/).slice(0, 6).join(" ")
+      : url || "(unnamed run)";
   const result = await db.execute({
-    sql: `INSERT INTO runs (created_at, product_url, product_name, product_description, competitor_urls, status, started_at, last_updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (
+            created_at, product_url, product_name, product_description,
+            competitor_urls, uploaded_source_images, status,
+            started_at, last_updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       new Date().toISOString(),
-      data.product_url,
-      data.product_name ?? data.product_url,
+      url,
+      data.product_name ?? fallbackName,
       data.product_description ?? null,
-      data.competitor_urls ? JSON.stringify(data.competitor_urls) : null,
+      data.competitor_urls && data.competitor_urls.length ? JSON.stringify(data.competitor_urls) : null,
+      data.uploaded_source_images && data.uploaded_source_images.length ? JSON.stringify(data.uploaded_source_images) : null,
       data.status ?? "pending",
       new Date().toISOString(),
       new Date().toISOString(),
@@ -175,6 +190,7 @@ initDB().then(() => migrateDB()).catch(console.error);
 export interface Run {
   id: number;
   created_at: string;
+  /** May be empty string when the user didn't supply a URL (description-only flow). */
   product_url: string;
   product_name: string;
   stage1_output: string | null;
@@ -233,4 +249,6 @@ export interface Run {
   stage1_one_pager: string | null;
   stage1_one_pager_edited: string | null;
   stage1_one_pager_edited_at: string | null;
+  // JSON array of R2 URLs uploaded by the user at run-start time
+  uploaded_source_images: string | null;
 }

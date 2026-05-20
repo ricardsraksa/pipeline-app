@@ -544,15 +544,21 @@ export default function RunPage() {
                 </h1>
                 <span className="font-mono text-[12px] text-[var(--color-text-4)]">#{runId}</span>
               </div>
-              <a
-                href={run.meta.productUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-accent)] transition-colors max-w-full truncate"
-              >
-                <span className="truncate">{run.meta.productUrl}</span>
-                <Icon.ExternalLink className="w-3 h-3 flex-shrink-0" />
-              </a>
+              {run.meta.productUrl ? (
+                <a
+                  href={run.meta.productUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-accent)] transition-colors max-w-full truncate"
+                >
+                  <span className="truncate">{run.meta.productUrl}</span>
+                  <Icon.ExternalLink className="w-3 h-3 flex-shrink-0" />
+                </a>
+              ) : (
+                <span className="font-mono text-[11px] text-[var(--color-text-4)]">
+                  Description-only run
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <div className="flex items-center gap-1.5">
@@ -568,6 +574,43 @@ export default function RunPage() {
 
         {/* Progress */}
         <PipelineProgress run={run} />
+
+        {/* Submitted inputs (description + source images) */}
+        {(run.meta.productDescription || run.meta.uploadedSourceImages.length > 0) && (
+          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4 space-y-3">
+            {run.meta.productDescription && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-3)] mb-1.5">
+                  Description
+                </p>
+                <p className="text-[12px] text-[var(--color-text-2)] leading-relaxed whitespace-pre-wrap">
+                  {run.meta.productDescription}
+                </p>
+              </div>
+            )}
+            {run.meta.uploadedSourceImages.length > 0 && (
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-3)] mb-1.5">
+                  Source images · {run.meta.uploadedSourceImages.length}
+                </p>
+                <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+                  {run.meta.uploadedSourceImages.map((url, i) => (
+                    <a
+                      key={url + i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-square rounded-md overflow-hidden border border-[var(--color-border)] bg-[var(--color-bg)] hover:border-[var(--color-border-hover)] transition-colors"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Source ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Resume banner */}
         {showResumeBanner && (

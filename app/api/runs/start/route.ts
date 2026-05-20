@@ -5,21 +5,45 @@ import { runPipeline } from "@/lib/pipeline-runner";
 export const maxDuration = 10;
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as {
-    url?: string;
+  const body = (await req.json()) as {
     productDescription?: string;
+    sourceImages?: string[];
+    productUrl?: string;
     competitorUrls?: string[];
+    // Back-compat alias from the old form (treated the same as productUrl)
+    url?: string;
   };
 
-  const url = body.url?.trim();
-  if (!url) {
-    return NextResponse.json({ error: "URL required" }, { status: 400 });
+  const productDescription = body.productDescription?.trim() ?? "";
+  if (productDescription.length < 20) {
+    return NextResponse.json(
+      { error: "Product description required (minimum 20 characters)" },
+      { status: 400 }
+    );
   }
 
+  const sourceImages =
+    Array.isArray(body.sourceImages) ? body.sourceImages.filter(Boolean) : [];
+  if (sourceImages.length === 0) {
+    return NextResponse.json(
+      { error: "At least one source image required" },
+      { status: 400 }
+    );
+  }
+  if (sourceImages.length > 10) {
+    return NextResponse.json({ error: "Max 10 source images" }, { status: 400 });
+  }
+
+  const productUrl = (body.productUrl ?? body.url ?? "").trim();
+  const competitorUrls = Array.isArray(body.competitorUrls)
+    ? body.competitorUrls.map((u) => u.trim()).filter(Boolean).slice(0, 5)
+    : [];
+
   const runId = await createRun({
-    product_url: url,
-    product_description: body.productDescription ?? null,
-    competitor_urls: body.competitorUrls?.filter(Boolean) ?? null,
+    product_url: productUrl || null,
+    product_description: productDescription,
+    competitor_urls: competitorUrls.length ? competitorUrls : null,
+    uploaded_source_images: sourceImages,
     status: "pending",
   });
 

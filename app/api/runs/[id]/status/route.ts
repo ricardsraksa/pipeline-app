@@ -49,6 +49,9 @@ export async function GET(
       productUrl: run.product_url,
       productName: run.product_name,
       brandName: run.brand_name,
+      productDescription: run.product_description,
+      uploadedSourceImages: safeJson(run.uploaded_source_images) ?? [],
+      competitorUrls: safeJson(run.competitor_urls) ?? [],
     },
     timestamps: {
       startedAt: run.started_at,

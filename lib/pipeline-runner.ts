@@ -193,19 +193,70 @@ export function getLastCompletedStage(run: Run): LastStage {
 // ── Core stage runners ────────────────────────────────────────────────────────
 
 async function runScrape(runId: number, run: Run): Promise<void> {
-  await updateRun(runId, { status: "scraping", current_step: "Scraping product page", last_updated_at: now() });
+  const hasProductUrl = Boolean(run.product_url && run.product_url.trim());
+  const competitorUrls: string[] = safeJson<string[]>(run.competitor_urls, []);
+  const hasCompetitorUrls = competitorUrls.length > 0;
+
+  // If no URLs at all, skip the whole scrape step — the new description-first
+  // flow may legitimately have nothing to scrape.
+  if (!hasProductUrl && !hasCompetitorUrls) {
+    await updateRun(runId, {
+      status: "stage1",
+      current_step: "No URL provided — skipping scrape",
+      last_updated_at: now(),
+    });
+    return;
+  }
+
+  await updateRun(runId, {
+    status: "scraping",
+    current_step: hasProductUrl
+      ? "Scraping product page"
+      : "Scraping competitor pages",
+    last_updated_at: now(),
+  });
 
   const baseUrl = getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/scrape`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: run.product_url }),
-  });
-  const scrapeData = await res.json();
-  if (!scrapeData.success) throw new Error(scrapeData.error ?? "Scrape failed");
 
-  const d = scrapeData.data ?? scrapeData;
-  const competitorUrls: string[] = safeJson<string[]>(run.competitor_urls, []);
+  // Scrape the product URL when provided. Failures are non-fatal in the new
+  // flow because the user description is the source of truth.
+  let productScrapedText = "";
+  let productImages: string[] = [];
+  if (hasProductUrl) {
+    try {
+      const res = await fetch(`${baseUrl}/api/scrape`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: run.product_url }),
+      });
+      const scrapeData = await res.json();
+      if (scrapeData.success) {
+        const d = scrapeData.data ?? scrapeData;
+        productScrapedText = d.scraped_text ?? "";
+        productImages = Array.isArray(d.images) ? d.images : [];
+      } else {
+        console.warn(`Product scrape failed for run ${runId}:`, scrapeData.error);
+        const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
+        await updateRun(runId, {
+          notes: JSON.stringify({
+            ...existingNotes,
+            productScrapeError: scrapeData.error ?? "Scraper returned failure",
+          }),
+          last_updated_at: now(),
+        });
+      }
+    } catch (err) {
+      console.warn(`Product scrape exception for run ${runId}:`, err);
+      const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
+      await updateRun(runId, {
+        notes: JSON.stringify({
+          ...existingNotes,
+          productScrapeError: err instanceof Error ? err.message : "Network error",
+        }),
+        last_updated_at: now(),
+      });
+    }
+  }
 
   let competitorScraped: { url: string; text: string }[] = [];
   const competitorErrors: { url: string; error: string }[] = [];
@@ -239,8 +290,8 @@ async function runScrape(runId: number, run: Run): Promise<void> {
   }
 
   await updateRun(runId, {
-    scraper_data: JSON.stringify({ scraped_text: d.scraped_text ?? "", images: d.images ?? [] }),
-    scraped_image_urls: JSON.stringify(d.images ?? []),
+    scraper_data: JSON.stringify({ scraped_text: productScrapedText, images: productImages }),
+    scraped_image_urls: JSON.stringify(productImages),
     last_updated_at: now(),
   });
 
@@ -277,6 +328,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     scraped_text: scraperData.scraped_text ?? "",
     competitor_urls: safeJson<string[]>(run.competitor_urls, []),
     competitor_scraped: scraperData.competitor_scraped ?? [],
+    source_image_urls: safeJson<string[]>(run.uploaded_source_images, []),
   };
 
   // ── Sub-step 1-5: Research modules (skip if already in DB) ──

@@ -33,6 +33,9 @@ export interface RunStatus {
     productUrl: string;
     productName: string | null;
     brandName: string | null;
+    productDescription: string | null;
+    uploadedSourceImages: string[];
+    competitorUrls: string[];
   };
   timestamps: {
     startedAt: string | null;
