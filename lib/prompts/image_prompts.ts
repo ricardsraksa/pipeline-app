@@ -66,12 +66,15 @@ Example negative constraint for a cat fountain with cat lifestyle shots:
 
 MODEL SELECTION:
 
-You decide which Higgsfield model is best for each prompt. General guidance (not strict rules — override when you have a good reason):
-- nano_banana_pro — Best for photorealistic product photography, hero shots, lifestyle shots, anything where realism is the priority
-- gpt_image_2 — Best for infographics, feature callouts, comparison layouts, before/after splits, anything with text overlays or graphic design elements
-- Other models — Use if you judge them better suited (call models_explore at runtime if needed)
+Pick exactly one of these Higgsfield platform model IDs for every prompt. Other names will be rejected by the API.
 
-Make the call per prompt based on what the image actually needs. Don't default blindly.
+- nano_banana_2 — Best for photorealistic product photography, hero shots, lifestyle shots, detail close-ups, anything where realism is the priority
+- nano_banana_flash — Faster, less detailed Nano variant. Use for simpler scenes when you want speed
+- marketing_studio_image — Best for infographics, feature callouts, comparison layouts, before/after splits, anything with text overlays or graphic design elements
+- flux_2 — Good general-purpose alternative; use for stylised or atmospheric scenes where Nano underperforms
+- soul — Niche; only choose if you have a specific stylistic reason
+
+Default to nano_banana_2 for realistic photography and marketing_studio_image for graphic / text-heavy images. Don't invent model names — only use the IDs listed above.
 
 ASPECT RATIO:
 
@@ -350,7 +353,7 @@ CRITICAL RULES:
 - Fidelity Lock and Negative Constraint Block are product-specific — generate them fresh for each product based on source images and product description.
 - Every template must reference at least one source image URL in source_image_references.
 - All images use 1:1 aspect ratio.
-- You choose the best model per prompt. Realistic photography defaults toward nano_banana_pro, text-heavy infographics default toward gpt_image_2, but override either default whenever a different model would produce a better result.`
+- You choose the best Higgsfield model per prompt from the allowed list above (nano_banana_2, nano_banana_flash, marketing_studio_image, flux_2, soul). Realistic photography defaults toward nano_banana_2; text-heavy infographics default toward marketing_studio_image. Never invent new model IDs.`
 
 export function buildImagePromptsUserMessage(params: {
   research: string
