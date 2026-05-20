@@ -87,6 +87,47 @@ async function migrateDB() {
 
 // ── DB helper functions ───────────────────────────────────────────────────────
 
+// Lightweight row shape for the history list — no heavy text fields, so loading
+// is fast even with hundreds of runs in the DB.
+export interface RunSummary {
+  id: number;
+  created_at: string;
+  product_url: string;
+  product_name: string | null;
+  brand_name: string | null;
+  status: string | null;
+  current_step: string | null;
+  last_updated_at: string | null;
+  doc_count: number;
+}
+
+export async function listRuns(): Promise<RunSummary[]> {
+  // Pull just the fields the list view needs. doc_count is computed from
+  // CASE-WHEN-NOT-NULL across the step fields so we don't ship MBs of text.
+  const result = await db.execute(`
+    SELECT
+      id, created_at, product_url, product_name, brand_name, status,
+      current_step, last_updated_at,
+      (
+        (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_research_revised      IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_avatar                IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_offer_brief           IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_necessary_beliefs     IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_chief_final           IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_avatar_revised        IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_offer_brief_revised   IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN step_necessary_beliefs_revised IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN stage1_one_pager           IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN stage2_output              IS NOT NULL THEN 1 ELSE 0 END)
+      ) AS doc_count
+    FROM runs
+    ORDER BY created_at DESC
+  `);
+  return result.rows as unknown as RunSummary[];
+}
+
 export async function getRun(id: number): Promise<Run | null> {
   const result = await db.execute({ sql: "SELECT * FROM runs WHERE id = ?", args: [id] });
   if (!result.rows.length) return null;

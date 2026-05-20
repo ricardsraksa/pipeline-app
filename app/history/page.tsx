@@ -1,30 +1,14 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { listRuns, type RunSummary } from "@/lib/db";
 
-interface RunSummary {
-  id: number;
-  created_at: string;
-  product_url: string;
-  product_name: string;
-  brand_name: string | null;
-  status: string | null;
-  doc_count: number;
-  feedback_stage1: string | null;
-  feedback_stage2: string | null;
-  feedback_stage3: string | null;
-  notes: string | null;
-  current_step: string | null;
-  last_updated_at: string | null;
-}
-
+// Server components run in the same process as the API. Skip the HTTP roundtrip
+// and read from the DB directly — much faster, doesn't depend on INTERNAL_API_URL.
 async function getRuns(): Promise<RunSummary[]> {
   try {
-    const baseUrl = process.env.INTERNAL_API_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/runs`, { cache: "no-store" });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.runs ?? [];
-  } catch {
+    return await listRuns();
+  } catch (err) {
+    console.error("Failed to load runs:", err);
     return [];
   }
 }

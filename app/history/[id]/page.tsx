@@ -1,19 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import type { Run } from "@/lib/db";
+import { getRun } from "@/lib/db";
+import { Icon } from "@/components/ui/Icon";
 import RunDetailClient from "./RunDetailClient";
-
-async function getRun(id: string): Promise<Run | null> {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/runs/${id}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.run ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function formatDate(iso: string): string {
   try {
@@ -24,56 +13,81 @@ function formatDate(iso: string): string {
   } catch { return iso; }
 }
 
+type Tone = "active" | "success" | "warn" | "danger" | "muted";
+const STATUS_META: Record<string, { label: string; tone: Tone }> = {
+  pending:       { label: "Pending",      tone: "muted" },
+  scraping:      { label: "Scraping",     tone: "active" },
+  stage1:        { label: "Stage 1",      tone: "active" },
+  stage2:        { label: "Stage 2",      tone: "active" },
+  awaiting_user: { label: "Needs review", tone: "warn"   },
+  awaiting_qc:   { label: "Awaiting QC",  tone: "warn"   },
+  complete:      { label: "Complete",     tone: "success"},
+  completed:     { label: "Complete",     tone: "success"},
+  partial:       { label: "Partial",      tone: "warn"   },
+  failed:        { label: "Failed",       tone: "danger" },
+};
+
 function StatusPill({ status }: { status: string | null }) {
-  const s = status ?? "";
-  if (!s) return null;
-  const variants: Record<string, string> = {
-    complete: "bg-emerald-950/60 text-emerald-400 border-emerald-900/50",
-    partial:  "bg-amber-950/60  text-amber-400  border-amber-900/50",
-    failed:   "bg-red-950/60    text-red-400    border-red-900/50",
+  if (!status) return null;
+  const meta = STATUS_META[status] ?? { label: status, tone: "muted" as Tone };
+  const tones: Record<Tone, string> = {
+    active:  "bg-[color:rgb(107_158_200_/_0.12)] text-[var(--color-accent)]  border-[color:rgb(107_158_200_/_0.28)]",
+    success: "bg-[color:rgb(90_158_117_/_0.12)]  text-[var(--color-success)] border-[color:rgb(90_158_117_/_0.28)]",
+    warn:    "bg-[color:rgb(184_144_74_/_0.12)]  text-[var(--color-warn)]    border-[color:rgb(184_144_74_/_0.28)]",
+    danger:  "bg-[color:rgb(184_96_96_/_0.12)]   text-[var(--color-error)]   border-[color:rgb(184_96_96_/_0.28)]",
+    muted:   "bg-[var(--color-surface-2)]         text-[var(--color-text-3)]  border-[var(--color-border)]",
   };
-  const cls = variants[s] ?? "bg-zinc-900 text-zinc-500 border-zinc-800";
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono border tracking-wider uppercase ${cls}`}>
-      <span className="w-1 h-1 rounded-full bg-current opacity-80" />
-      {s}
+    <span className={`inline-flex items-center gap-1.5 px-2 h-5 rounded-full text-[10px] font-mono uppercase tracking-[0.12em] border ${tones[meta.tone]}`}>
+      <span className="w-1 h-1 rounded-full bg-current" />
+      {meta.label}
     </span>
   );
 }
 
-export default async function RunPage({ params }: { params: Promise<unknown> }) {
+export default async function HistoryRunPage({ params }: { params: Promise<unknown> }) {
   const { id } = (await params) as { id: string };
-  const run = await getRun(id);
+  const numericId = Number.parseInt(id, 10);
+  if (!Number.isFinite(numericId)) notFound();
+
+  // Server components run in the same process as the API — go straight to DB,
+  // no HTTP roundtrip, no env-var dependency, much faster.
+  const run = await getRun(numericId);
   if (!run) notFound();
 
   const displayName = run.brand_name ?? run.product_name ?? "(unnamed)";
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-24">
-      <div className="max-w-4xl mx-auto px-6 pt-8">
-        {/* Page header */}
-        <div className="mb-8 pb-8 border-b border-zinc-800">
-          <Link href="/history" className="font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors mb-4 block">
-            ← Back to runs
+    <main className="min-h-[calc(100vh-3rem)] pb-24">
+      <div className="max-w-4xl mx-auto px-5 pt-6">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-[11px] mb-4">
+          <Link href="/history" className="cursor-pointer inline-flex items-center gap-1 text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors">
+            <Icon.ArrowLeft className="w-3 h-3" />
+            Runs
           </Link>
-          <div className="flex items-start justify-between gap-4">
+          <span className="text-[var(--color-text-4)]">/</span>
+          <span className="text-[var(--color-text-2)] font-mono">#{run.id}</span>
+        </div>
+
+        {/* Header */}
+        <div className="mb-8 pb-6 border-b border-[var(--color-border)]">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-xl font-semibold text-zinc-100">{displayName}</h1>
-                <span className="font-mono text-[10px] text-zinc-600 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
-                  #{run.id}
-                </span>
+              <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                <h1 className="text-[22px] font-semibold tracking-tight text-[var(--color-text)]">{displayName}</h1>
                 <StatusPill status={run.status} />
               </div>
-              <p className="text-zinc-500 text-sm font-mono truncate max-w-lg">
+              <p className="font-mono text-[12px] text-[var(--color-text-3)] truncate max-w-lg">
                 {run.product_url}
               </p>
             </div>
-            <p className="text-zinc-500 text-xs font-mono flex-shrink-0">{formatDate(run.created_at)}</p>
+            <p className="font-mono text-[11px] text-[var(--color-text-4)] flex-shrink-0">
+              {formatDate(run.created_at)}
+            </p>
           </div>
         </div>
 
-        {/* All interactive content handled client-side */}
         <RunDetailClient run={run} />
       </div>
     </main>
