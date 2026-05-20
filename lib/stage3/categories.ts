@@ -6,16 +6,15 @@ export interface CategoryDef {
   aspect_ratio: string
 }
 
+// 9 template-based image categories. Order matches the Stage 3 system prompt templates.
 export const IMAGE_CATEGORIES: CategoryDef[] = [
-  { id: 'hero_studio', label: '1. Hero Studio', description: 'Clean studio shot, neutral/gradient background, product only, dramatic lighting', default_model: 'marketing_studio_image', aspect_ratio: '1:1' },
-  { id: 'hero_angle', label: '2. Hero Angle (3/4)', description: 'Same studio treatment, 3/4 angle showing depth and dimension', default_model: 'marketing_studio_image', aspect_ratio: '1:1' },
-  { id: 'lifestyle', label: '3. Lifestyle', description: 'Product in natural aspirational setting, human conveys emotional outcome if present', default_model: 'marketing_studio_image', aspect_ratio: '1:1' },
-  { id: 'worn_in_use', label: '4. Worn/In-Use', description: 'Product actively worn or used by ONE person, mechanism visible in use', default_model: 'flux_2', aspect_ratio: '1:1' },
-  { id: 'versatility', label: '5. Versatility', description: 'TWO instances of product in TWO different realistic contexts, one frame', default_model: 'flux_2', aspect_ratio: '1:1' },
-  { id: 'durability', label: '6. Durability', description: 'Most demanding realistic condition this product would actually face', default_model: 'flux_2', aspect_ratio: '1:1' },
-  { id: 'detail_a', label: '7. Detail A', description: 'Macro of most visually unique physical feature', default_model: 'nano_banana_flash', aspect_ratio: '1:1' },
-  { id: 'detail_b', label: '8. Detail B', description: 'Macro of second functional feature, tells engineering/craft story', default_model: 'nano_banana_flash', aspect_ratio: '1:1' },
-  { id: 'use_case', label: '9. Use Case', description: 'Single most specific real-world scenario the German avatar recognizes instantly', default_model: 'marketing_studio_image', aspect_ratio: '1:1' },
-  { id: 'infographic_features', label: '10. Infographic A (Features)', description: 'Product with 2-3 key features highlighted, German text labels, circular magnified insets', default_model: 'flux_2_pro', aspect_ratio: '1:1' },
-  { id: 'infographic_benefits', label: '11. Infographic B (Benefits)', description: 'Product in context with 2-3 benefit callouts, German text, icons, social-ready', default_model: 'flux_2_pro', aspect_ratio: '1:1' },
+  { id: 'hero_studio',            label: '1. Hero Studio Product',        description: 'Premium ecommerce hero, clean studio environment, product centered',           default_model: 'nano_banana_pro', aspect_ratio: '1:1' },
+  { id: 'lifestyle',              label: '2. Lifestyle Use-Case',         description: 'Product in a realistic setting with natural use by target customer',           default_model: 'nano_banana_pro', aspect_ratio: '1:1' },
+  { id: 'problem_solution',       label: '3. Problem / Solution',         description: 'Visual contrast of the problem and the product solving it',                    default_model: 'gpt_image_2',     aspect_ratio: '1:1' },
+  { id: 'feature_callout',        label: '4. Feature Callout',            description: 'Product with 3 concise feature callouts in a clean educational layout',       default_model: 'gpt_image_2',     aspect_ratio: '1:1' },
+  { id: 'benefit_visualization',  label: '5. Benefit Visualization',      description: 'Single benefit framed as a strong scroll-stopping ad visual',                  default_model: 'nano_banana_pro', aspect_ratio: '1:1' },
+  { id: 'before_after',           label: '6. Before / After Outcome',     description: 'Split or contrast composition showing the positive outcome',                   default_model: 'gpt_image_2',     aspect_ratio: '1:1' },
+  { id: 'comparison',             label: '7. Comparison',                 description: 'Side-by-side comparison of the product vs. the common alternative',           default_model: 'gpt_image_2',     aspect_ratio: '1:1' },
+  { id: 'ugc_native',             label: '8. UGC / Native Ad',            description: 'Authentic creator-style social media shot of the product in real life',       default_model: 'nano_banana_pro', aspect_ratio: '1:1' },
+  { id: 'review_social_proof',    label: '9. Review / Social Proof',      description: 'Product with a trust / review cue, conversion-focused visual',                 default_model: 'nano_banana_pro', aspect_ratio: '1:1' },
 ]

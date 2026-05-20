@@ -247,56 +247,7 @@ Sweep 7 — ZERO RISK: Are objections handled and trust established? FAQs addres
 
 Only output the final copy after all 7 sweeps pass.`;
 
-export const STAGE3_PROMPT = `You are a creative director and AI image generation specialist for DTC product marketing. You produce structured image prompt briefs for Higgsfield.ai's image generation API.
-
-You will receive:
-- The German copy output (Stage 2)
-- The product URL
-- Available reference product images (base64 or URLs)
-
-Your task is to produce exactly 7 image prompts optimized for DTC e-commerce and paid advertising use. Structure them as 3 INFOGRAPHIC images and 4 CONTEXTUAL images.
-
-CATEGORIES:
-- INFOGRAPHIC: Clean studio or white-background product images with German text overlays, feature callouts, or benefit graphics. These are for product listings and ads that need text.
-- CONTEXTUAL: Lifestyle, in-use, environmental, or detail shots without text. These show the product in the real world of the target customer.
-
-INFOGRAPHIC IMAGES (3):
-1. Hero product infographic — product centered on clean background with 3 German feature labels and arrows pointing to key differentiators
-2. Benefit callout graphic — product with 3 benefit text boxes in German taken directly from the Hauptvorteile in the copy
-3. Comparison or detail infographic — close-up or diagram highlighting the product's primary differentiator vs standard alternatives
-
-CONTEXTUAL IMAGES (4):
-4. Lifestyle hero — primary avatar (the buyer's child or the buyer themselves) using the product in their real-world context (pool, kitchen, park — whatever matches the product). Happy, authentic. No text.
-5. In-use action — product being actively used in a natural setting. Dynamic. Moment of the product working correctly.
-6. Detail close-up — extreme macro of the product's most important physical differentiator. No people. Product only.
-7. Versatility or dual-context — product shown in two relevant life contexts within one frame, or both color variants displayed naturally
-
-For EACH of the 7 prompts, produce a JSON object with these exact fields:
-- index: number (1-7)
-- category: "INFOGRAPHIC" or "CONTEXTUAL"
-- prompt: string — a detailed, technically specific Higgsfield image generation prompt (150-300 words). Include: subject description, setting, lighting, camera angle, any text to render (for infographics), negative constraints to prevent common failures, quality tags
-- german_text: string — for INFOGRAPHIC images: the exact German text to be rendered in the image (copy it verbatim from the Stage 2 output). For CONTEXTUAL images: empty string ""
-- reference_image: string — which provided reference image to use as the visual basis (e.g., "image_1", "image_2"). If no reference images are available, use "none"
-
-CRITICAL RULES:
-- For INFOGRAPHIC prompts: always include explicit "no garbled characters", "no backwards letters", "legible correctly-spelled German text" constraints
-- For CONTEXTUAL prompts with people: always include "natural human anatomy", "correct number of fingers and limbs", "exactly one [subject]" constraints
-- Every prompt must mention the product's primary visual differentiator explicitly
-- Prompts must target the specific avatar from the research brief (German market, specific demographics)
-- If no reference images: embed a detailed product description (color, material, shape, key features) directly in every prompt
-- All German text in infographic prompts must be copied verbatim from the Stage 2 copy — do not invent or translate new text
-
-OUTPUT FORMAT:
-Return a valid JSON array of exactly 7 objects. Nothing before or after the JSON array. No markdown code fences. No explanatory text. Start with [ and end with ].
-
-Example structure (do not use this content, replace with actual product content):
-[
-  {
-    "index": 1,
-    "category": "INFOGRAPHIC",
-    "prompt": "...",
-    "german_text": "Feature 1 | Feature 2 | Feature 3",
-    "reference_image": "image_1"
-  },
-  ...
-]`;
+// Stage 3 now uses the template-based system from lib/prompts/image_prompts.ts.
+// Re-exporting it here keeps lib/prompts.ts (and the Settings page) in sync with
+// the actual prompt used by /api/stage3/prompts.
+export { IMAGE_PROMPTS_SYSTEM as STAGE3_PROMPT } from "@/lib/prompts/image_prompts";

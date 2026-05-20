@@ -186,14 +186,16 @@ function QCGate({
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">Review Image Prompts</h2>
-        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Review and edit the 11 prompts before generating. Changes are saved as learning data.</p>
+        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Review and edit the 9 prompts before generating. Changes are saved as learning data.</p>
       </div>
       <div className="space-y-4">
         {prompts.map((prompt, i) => {
           const cat = IMAGE_CATEGORIES.find(c => c.id === prompt.category)
           const isEdited = prompt.prompt !== originalPrompts[i]?.prompt
-          const refImg = productImages[prompt.reference_image_index]
-          const isInfographic = prompt.category === 'infographic_features' || prompt.category === 'infographic_benefits'
+          const refImg =
+            (prompt.source_image_references && prompt.source_image_references[0]) ||
+            (prompt.reference_image_index != null ? productImages[prompt.reference_image_index] : productImages[0])
+          const germanText = prompt.german_text || prompt.german_text_used || ''
 
           return (
             <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] p-4 space-y-3">
@@ -244,10 +246,21 @@ function QCGate({
                   </button>
                 )}
               </div>
-              {isInfographic && prompt.german_text_used && (
+              {germanText && (
                 <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3">
                   <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">German text used</p>
-                  <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)]">{prompt.german_text_used}</p>
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)]">{germanText}</p>
+                </div>
+              )}
+              {prompt.source_image_references && prompt.source_image_references.length > 0 && (
+                <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3">
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-2">Source images referenced</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prompt.source_image_references.map((url, j) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={j} src={url} alt={`ref ${j + 1}`} className="w-10 h-10 object-cover rounded border border-[var(--color-border)]" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -536,6 +549,11 @@ function Stage3Page() {
 
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
+    let uploadedImages: string[] = []
+    try {
+      uploadedImages = run.uploaded_source_images ? JSON.parse(run.uploaded_source_images) : []
+    } catch { uploadedImages = [] }
+    const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
 
     fetch('/api/stage3/prompts', {
       method: 'POST',
@@ -546,7 +564,9 @@ function Stage3Page() {
         offer_brief: run.step_offer_brief_revised ?? run.step_offer_brief ?? '',
         necessary_beliefs: run.step_necessary_beliefs_revised ?? run.step_necessary_beliefs ?? '',
         copy: run.stage2_output ?? '',
+        one_pager: onePager,
         product_images: productImages,
+        uploaded_images: uploadedImages,
       }),
     })
       .then(r => r.json())
@@ -590,9 +610,11 @@ function Stage3Page() {
       updatedImages[i] = { url: null, status: 'generating' }
       setImages([...updatedImages])
 
-      const refImages = p.reference_image_index != null
-        ? [productImages[p.reference_image_index]].filter(Boolean)
-        : productImages.slice(0, 1)
+      const refImages = (p.source_image_references && p.source_image_references.length > 0)
+        ? p.source_image_references
+        : (p.reference_image_index != null
+            ? [productImages[p.reference_image_index]].filter(Boolean)
+            : productImages.slice(0, 1))
 
       try {
         const res = await fetch('/api/stage3/generate', {
@@ -649,7 +671,7 @@ function Stage3Page() {
             category: p.category,
             prompt_used: p.prompt,
             product_description: productDesc,
-            german_text_used: p.german_text_used,
+            german_text_used: p.german_text || p.german_text_used || null,
           }),
         })
         const data = await res.json()
@@ -702,9 +724,11 @@ function Stage3Page() {
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
     const p = prompts[index]
-    const refImages = p.reference_image_index != null
-      ? [productImages[p.reference_image_index]].filter(Boolean)
-      : productImages.slice(0, 1)
+    const refImages = (p.source_image_references && p.source_image_references.length > 0)
+      ? p.source_image_references
+      : (p.reference_image_index != null
+          ? [productImages[p.reference_image_index]].filter(Boolean)
+          : productImages.slice(0, 1))
 
     const originalIssue = auditResults[index]?.issues?.join(', ') ?? ''
 
@@ -729,7 +753,7 @@ function Stage3Page() {
       const auditRes = await fetch('/api/stage3/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: genData.image_url, category: p.category, prompt_used: newPrompt, product_description: productDesc, german_text_used: p.german_text_used }),
+        body: JSON.stringify({ image_url: genData.image_url, category: p.category, prompt_used: newPrompt, product_description: productDesc, german_text_used: p.german_text || p.german_text_used || null }),
       })
       const auditData = await auditRes.json()
 
@@ -781,7 +805,7 @@ function Stage3Page() {
       {phase === 'loading' && <LoadingState message="Loading run data…" />}
       {phase === 'A_generating' && (
         <LoadingState
-          message="Generating 11 image prompts…"
+          message="Generating 9 image prompts…"
           subtitle="Claude is analyzing your research and copy to craft targeted Higgsfield prompts."
         />
       )}
