@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { IMAGE_PROMPTS_SYSTEM } from "@/lib/prompts/image_prompts";
 
 const PROMPTS_PATH = path.join(process.cwd(), "data", "prompts.json");
 
@@ -247,7 +248,8 @@ Sweep 7 — ZERO RISK: Are objections handled and trust established? FAQs addres
 
 Only output the final copy after all 7 sweeps pass.`;
 
-// Stage 3 now uses the template-based system from lib/prompts/image_prompts.ts.
-// Re-exporting it here keeps lib/prompts.ts (and the Settings page) in sync with
-// the actual prompt used by /api/stage3/prompts.
-export { IMAGE_PROMPTS_SYSTEM as STAGE3_PROMPT } from "@/lib/prompts/image_prompts";
+// Stage 3 uses the template-based system from lib/prompts/image_prompts.ts.
+// Re-exported here so getPrompt() and the Settings page (which imports
+// STAGE3_PROMPT as the default) stay in sync with the actual prompt that
+// /api/stage3/prompts uses at runtime.
+export const STAGE3_PROMPT = IMAGE_PROMPTS_SYSTEM;

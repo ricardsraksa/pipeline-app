@@ -94,7 +94,7 @@ async function migrateDB() {
 export interface RunSummary {
   id: number;
   created_at: string;
-  product_url: string;
+  product_url: string | null;
   product_name: string | null;
   brand_name: string | null;
   status: string | null;

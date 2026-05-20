@@ -76,7 +76,8 @@ function StatusBadge({ status, stuck }: { status: string | null; stuck?: boolean
   );
 }
 
-function truncateUrl(url: string, max = 56): string {
+function truncateUrl(url: string | null | undefined, max = 56): string {
+  if (!url) return "(no URL — uploaded images)";
   try {
     const u = new URL(url);
     const d = u.hostname.replace(/^www\./, "") + u.pathname;

@@ -285,19 +285,28 @@ export default function RunDetailClient({ run }: Props) {
       {/* Inputs */}
       <Section label="Inputs">
         <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] divide-y divide-[var(--color-border)]">
-          <div className="flex items-start gap-4 px-4 py-3">
-            <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
-              Product URL
-            </span>
-            <a
-              href={run.product_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-[var(--color-accent)] hover:underline break-all"
-            >
-              {run.product_url}
-            </a>
-          </div>
+          {run.product_url ? (
+            <div className="flex items-start gap-4 px-4 py-3">
+              <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+                Product URL
+              </span>
+              <a
+                href={run.product_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[var(--color-accent)] hover:underline break-all"
+              >
+                {run.product_url}
+              </a>
+            </div>
+          ) : (
+            <div className="flex items-start gap-4 px-4 py-3">
+              <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
+                Source
+              </span>
+              <span className="text-sm text-[var(--color-text-3)]">No URL — uploaded source images</span>
+            </div>
+          )}
           {run.product_description && (
             <div className="flex items-start gap-4 px-4 py-3">
               <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-wider w-28 flex-shrink-0 pt-0.5">
