@@ -342,9 +342,12 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     if (!research) throw new Error("Stage 1 produced no output");
 
     const productName = extractProductName(research);
+    // Only persist a name we actually extracted. Don't fall back to product_url
+    // (it can be null in the description-first flow, and a raw URL is a bad
+    // display name even when present).
     await updateRun(runId, {
       step_research: research,
-      product_name: productName ?? run.product_url,
+      ...(productName ? { product_name: productName } : {}),
       last_updated_at: now(),
     });
   }

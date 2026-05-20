@@ -8,8 +8,8 @@ import { VISUAL_PROMPT } from "@/lib/prompts/research/visual";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export interface ResearchInputs {
-  /** May be empty in the description-first flow. */
-  product_url: string;
+  /** May be null in the description-first flow (user provided description + images instead). */
+  product_url: string | null;
   product_description?: string;
   scraped_text?: string;
   competitor_urls?: string[];
