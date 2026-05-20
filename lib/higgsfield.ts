@@ -17,8 +17,11 @@ const POLL_TIMEOUT_MS = 180_000;
 export type HiggsfieldModel =
   | "marketing_studio_image"
   | "flux_2"
+  | "flux_2_pro"
   | "nano_banana_flash"
   | "nano_banana_2"
+  | "nano_banana_pro"
+  | "gpt_image_2"
   | "soul";
 
 export interface GenerationRequest {
