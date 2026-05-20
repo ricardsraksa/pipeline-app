@@ -415,6 +415,48 @@ function FeedbackButtons({
   );
 }
 
+// ── Failure recovery helpers ──────────────────────────────────────────────────
+
+type FailableStage = "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+
+const STAGE_SECTION_ID: Record<FailableStage, string> = {
+  stage1: "stage-1-section",
+  stage2: "stage-2-section",
+  "stage3-prompts": "stage-3-section",
+  "stage3-images": "stage-3-section",
+};
+
+const STAGE_DISPLAY_NAME: Record<FailableStage, string> = {
+  stage1: "Stage 1",
+  stage2: "Stage 2",
+  "stage3-prompts": "Stage 3 Prompts",
+  "stage3-images": "Stage 3 Images",
+};
+
+function getFailedStage(run: RunStatus): FailableStage {
+  if (!run.outputs.onePager) return "stage1";
+  if (!run.outputs.stage2Output) return "stage2";
+  // Stage 3 outputs aren't exposed via the polling endpoint, so we can't
+  // distinguish stage3-prompts vs stage3-images here. Fall back to prompts —
+  // restarting prompts also clears any partial image generation.
+  return "stage3-prompts";
+}
+
+function getPreviousStage(stage: FailableStage): FailableStage | null {
+  if (stage === "stage2") return "stage1";
+  if (stage === "stage3-prompts") return "stage2";
+  if (stage === "stage3-images") return "stage3-prompts";
+  return null;
+}
+
+function scrollToStage(stage: FailableStage | null) {
+  if (!stage) return;
+  document.getElementById(STAGE_SECTION_ID[stage])?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RunPage() {
@@ -423,6 +465,7 @@ export default function RunPage() {
   const run = useRunPolling(runId);
   const scrolledRef = useRef(false);
   const [resuming, setResuming] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   // Auto-scroll to last completed stage on initial load
   useEffect(() => {
@@ -455,6 +498,26 @@ export default function RunPage() {
       setTimeout(() => setResuming(false), 1200);
     } catch {
       setResuming(false);
+    }
+  }
+
+  async function handleRestartStage(stage: FailableStage) {
+    if (!runId || restarting) return;
+    setRestarting(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}/restart-stage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(`Restart failed: ${data.error ?? "unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Restart failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTimeout(() => setRestarting(false), 1200);
     }
   }
 
@@ -638,6 +701,42 @@ export default function RunPage() {
             </button>
           </div>
         )}
+
+        {/* Go-back / restart row — only when the run actually failed (not just stuck) */}
+        {isFailed && (() => {
+          const failedStage = getFailedStage(run);
+          const previousStage = getPreviousStage(failedStage);
+          return (
+            <div className="flex gap-3 flex-wrap fade-in">
+              {previousStage && (
+                <button
+                  onClick={() => scrollToStage(previousStage)}
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
+                >
+                  <Icon.ArrowLeft className="w-3.5 h-3.5" />
+                  Go back to {STAGE_DISPLAY_NAME[previousStage]}
+                </button>
+              )}
+              <button
+                onClick={() => handleRestartStage(failedStage)}
+                disabled={restarting}
+                className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-accent)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
+              >
+                {restarting ? (
+                  <>
+                    <Icon.Loader className="w-3.5 h-3.5" />
+                    Restarting&hellip;
+                  </>
+                ) : (
+                  <>
+                    <Icon.Refresh className="w-3.5 h-3.5" />
+                    Restart {STAGE_DISPLAY_NAME[failedStage]}
+                  </>
+                )}
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Competitor scrape errors */}
         {run.scrapeErrors && run.scrapeErrors.length > 0 && (

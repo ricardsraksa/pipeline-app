@@ -89,6 +89,14 @@ export const Icon = {
       <path d="M8 5v14l11-7z" />
     </svg>
   ),
+  Refresh: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M3 12a9 9 0 0 1 15.5-6.4L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-15.5 6.4L3 16" />
+      <path d="M3 21v-5h5" />
+    </svg>
+  ),
   Alert: (p: IconProps) => (
     <svg {...base(p)}>
       <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
