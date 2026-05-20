@@ -38,6 +38,8 @@ export async function GET(
       onePagerEdited: run.stage1_one_pager_edited,
       onePagerEditedAt: run.stage1_one_pager_edited_at,
       stage2Output: run.stage2_output,
+      stage2OutputEdited: run.stage2_copy_edited,
+      stage2EditedAt: run.stage2_edited_at,
     },
     images: {
       scrapedUrls: safeJson(run.scraped_image_urls) ?? [],

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
+import AIRegenerate from "@/components/AIRegenerate";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -658,9 +659,20 @@ export default function RunPage() {
         {(hasOnePager || run.status === "stage1" || run.status === "scraping") && (
           <Section id="stage-1-section" label="Stage 1 — Research summary">
             {hasOnePager ? (
-              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
-                <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
-              </div>
+              <>
+                <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+                  <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+                </div>
+                {runId !== null && (
+                  <div className="flex justify-end pt-1">
+                    <AIRegenerate
+                      runId={runId}
+                      stage="stage1"
+                      onRegenerated={() => window.location.reload()}
+                    />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-10 text-center bg-[var(--color-surface)]/40">
                 <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />
@@ -679,9 +691,18 @@ export default function RunPage() {
           <Section id="stage-2-section" label="Stage 2 — German Copy">
             {outputs.stage2Output ? (
               <>
-                <OutputBlock label="German Copy Kit" text={outputs.stage2Output} filename="STAGE2_GERMAN_COPY.txt" />
+                <OutputBlock
+                  label={outputs.stage2OutputEdited ? "German Copy Kit (edited)" : "German Copy Kit"}
+                  text={outputs.stage2OutputEdited ?? outputs.stage2Output}
+                  filename="STAGE2_GERMAN_COPY.txt"
+                />
                 {runId !== null && (
-                  <div className="flex justify-end pt-1">
+                  <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
+                    <AIRegenerate
+                      runId={runId}
+                      stage="stage2"
+                      onRegenerated={() => window.location.reload()}
+                    />
                     <FeedbackButtons runId={runId} stage="stage2" current={run.feedback?.stage2 ?? null} />
                   </div>
                 )}

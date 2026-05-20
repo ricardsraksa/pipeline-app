@@ -22,6 +22,8 @@ export interface RunStatus {
     onePagerEdited: string | null;
     onePagerEditedAt: string | null;
     stage2Output: string | null;
+    stage2OutputEdited: string | null;
+    stage2EditedAt: string | null;
   };
   images: {
     scrapedUrls: string[];
