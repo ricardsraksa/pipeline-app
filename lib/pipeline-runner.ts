@@ -206,6 +206,7 @@ async function runScrape(runId: number, run: Run): Promise<void> {
   const competitorUrls: string[] = safeJson<string[]>(run.competitor_urls, []);
 
   let competitorScraped: { url: string; text: string }[] = [];
+  const competitorErrors: { url: string; error: string }[] = [];
   if (competitorUrls.length > 0) {
     const results = await Promise.allSettled(
       competitorUrls.map((u) =>
@@ -216,13 +217,23 @@ async function runScrape(runId: number, run: Run): Promise<void> {
         }).then((r) => r.json())
       )
     );
-    competitorScraped = results
-      .map((r, i) => {
-        if (r.status !== "fulfilled" || !r.value.success) return null;
-        const cd = r.value.data ?? r.value;
-        return cd.scraped_text ? { url: competitorUrls[i], text: cd.scraped_text } : null;
-      })
-      .filter(Boolean) as { url: string; text: string }[];
+    results.forEach((r, i) => {
+      const url = competitorUrls[i];
+      if (r.status !== "fulfilled") {
+        competitorErrors.push({ url, error: r.reason?.message ?? "Network error" });
+        return;
+      }
+      if (!r.value.success) {
+        competitorErrors.push({ url, error: r.value.error ?? "Scraper returned failure" });
+        return;
+      }
+      const cd = r.value.data ?? r.value;
+      if (cd.scraped_text) {
+        competitorScraped.push({ url, text: cd.scraped_text });
+      } else {
+        competitorErrors.push({ url, error: "No text scraped from page" });
+      }
+    });
   }
 
   await updateRun(runId, {
@@ -239,10 +250,19 @@ async function runScrape(runId: number, run: Run): Promise<void> {
       last_updated_at: now(),
     });
   }
+
+  // Surface competitor scrape errors in run notes so the UI can show them
+  if (competitorErrors.length > 0) {
+    const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
+    await updateRun(runId, {
+      notes: JSON.stringify({ ...existingNotes, scrapeErrors: competitorErrors }),
+      last_updated_at: now(),
+    });
+  }
 }
 
 async function runStage1(runId: number, run: Run): Promise<void> {
-  await updateRun(runId, { status: "stage1", current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
+  await updateRun(runId, { status: "stage1", last_updated_at: now() });
 
   const scraperData = safeJson<{
     scraped_text?: string;
@@ -257,132 +277,165 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     competitor_scraped: scraperData.competitor_scraped ?? [],
   };
 
-  await updateRun(runId, { current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
-  const identify = await runIdentify(inputs);
+  // ── Sub-step 1-5: Research modules (skip if already in DB) ──
+  let research = run.step_research ?? "";
+  if (!research) {
+    await updateRun(runId, { current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
+    const identify = await runIdentify(inputs);
 
-  await updateRun(runId, { current_step: "Stage 1: Market overview (2/5)", last_updated_at: now() });
-  const market = await runMarket(inputs, identify);
+    await updateRun(runId, { current_step: "Stage 1: Market overview (2/5)", last_updated_at: now() });
+    const market = await runMarket(inputs, identify);
 
-  await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
-  const competitive = await runCompetitive(inputs, identify, market);
+    await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
+    const competitive = await runCompetitive(inputs, identify, market);
 
-  await updateRun(runId, { current_step: "Stage 1: Product analysis (4/5)", last_updated_at: now() });
-  const productAnalysis = await runProductAnalysis(inputs, identify, market, competitive);
+    await updateRun(runId, { current_step: "Stage 1: Product analysis (4/5)", last_updated_at: now() });
+    const productAnalysis = await runProductAnalysis(inputs, identify, market, competitive);
 
-  await updateRun(runId, { current_step: "Stage 1: Visual strategy (5/5)", last_updated_at: now() });
-  const visual = await runVisual(inputs, identify, market, competitive);
+    await updateRun(runId, { current_step: "Stage 1: Visual strategy (5/5)", last_updated_at: now() });
+    const visual = await runVisual(inputs, identify, market, competitive);
 
-  const research = [identify, market, competitive, productAnalysis, visual].filter(Boolean).join("\n\n");
-  if (!research) throw new Error("Stage 1 produced no output");
+    research = [identify, market, competitive, productAnalysis, visual].filter(Boolean).join("\n\n");
+    if (!research) throw new Error("Stage 1 produced no output");
 
-  const productName = extractProductName(research);
-  await updateRun(runId, {
-    step_research: research,
-    product_name: productName ?? run.product_url,
-    current_step: "Stage 1: Mid chief review (6/8)",
-    last_updated_at: now(),
-  });
-
-  // Step 2: Chief mid review
-  const chiefMid = await anthropicMessage({
-    system: CHIEF_MID_PROMPT,
-    user: `RESEARCH.txt to review:\n\n${research}`,
-    maxTokens: 4000,
-    label: "chief mid review",
-  });
-  await updateRun(runId, { step_chief_mid: chiefMid, current_step: "Stage 1: Revising research (7/8)", last_updated_at: now() });
-
-  // Step 3: Research revised
-  let researchRevised = research;
-  if (chiefMid && !chiefMid.includes("NO REVISIONS REQUIRED")) {
-    const revised = await anthropicMessage({
-      system: REVISE_RESEARCH_PROMPT,
-      user: `RESEARCH.txt (original):\n\n${research}\n\n---\n\nCHIEF_MID.txt (review):\n\n${chiefMid}`,
-      maxTokens: 8000,
-      label: "revise research",
+    const productName = extractProductName(research);
+    await updateRun(runId, {
+      step_research: research,
+      product_name: productName ?? run.product_url,
+      last_updated_at: now(),
     });
-    if (revised) researchRevised = revised;
   }
-  await updateRun(runId, { step_research_revised: researchRevised, current_step: "Stage 1: Building avatar (8/8)", last_updated_at: now() });
 
-  // Step 4a: Avatar
-  const avatar = await anthropicMessage({
-    system: AVATAR_PROMPT,
-    user: `RESEARCH.txt:\n\n${researchRevised}`,
-    maxTokens: 3500,
-    label: "avatar",
-  });
-  if (!avatar) throw new Error("Stage 1: avatar generation returned empty");
-  await updateRun(runId, { step_avatar: avatar, current_step: "Stage 1: Writing offer brief", last_updated_at: now() });
+  // ── Sub-step 6: Chief mid review (skip if already in DB) ──
+  let chiefMid = run.step_chief_mid ?? "";
+  if (!chiefMid) {
+    await updateRun(runId, { current_step: "Stage 1: Mid chief review (6/8)", last_updated_at: now() });
+    chiefMid = await anthropicMessage({
+      system: CHIEF_MID_PROMPT,
+      user: `RESEARCH.txt to review:\n\n${research}`,
+      maxTokens: 4000,
+      label: "chief mid review",
+    });
+    await updateRun(runId, { step_chief_mid: chiefMid, last_updated_at: now() });
+  }
 
-  // Step 4b: Offer brief
-  const offerBrief = await anthropicMessage({
-    system: OFFER_BRIEF_PROMPT,
-    user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}`,
-    maxTokens: 3500,
-    label: "offer brief",
-  });
-  if (!offerBrief) throw new Error("Stage 1: offer brief returned empty");
-  const brandName = extractBrandName(offerBrief);
-  await updateRun(runId, {
-    step_offer_brief: offerBrief,
-    brand_name: brandName,
-    current_step: "Stage 1: Identifying necessary beliefs",
-    last_updated_at: now(),
-  });
-
-  // Step 4c: Necessary beliefs
-  const necessaryBeliefs = await anthropicMessage({
-    system: NECESSARY_BELIEFS_PROMPT,
-    user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
-    maxTokens: 3500,
-    label: "necessary beliefs",
-  });
-  if (!necessaryBeliefs) throw new Error("Stage 1: necessary beliefs returned empty");
-  await updateRun(runId, { step_necessary_beliefs: necessaryBeliefs, current_step: "Stage 1: Final chief review", last_updated_at: now() });
-
-  // Step 5: Chief final
-  const chiefFinal = await anthropicMessage({
-    system: CHIEF_FINAL_PROMPT,
-    user: [
-      `RESEARCH.txt (revised):\n\n${researchRevised}`,
-      `\n\n---\n\nAVATAR.txt:\n\n${avatar}`,
-      `\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
-      `\n\n---\n\nNECESSARY_BELIEFS.txt:\n\n${necessaryBeliefs}`,
-    ].join(""),
-    maxTokens: 4000,
-    label: "chief final review",
-  });
-  await updateRun(runId, { step_chief_final: chiefFinal, current_step: "Stage 1: Applying final revisions", last_updated_at: now() });
-
-  // Step 6: Revisions
-  let avatarRevised = avatar;
-  let offerBriefRevised = offerBrief;
-  let necessaryBeliefsRevised = necessaryBeliefs;
-  if (!chiefFinal.includes("NO REVISIONS REQUIRED")) {
-    const revisions = parseRevisions(chiefFinal);
-    for (const rev of revisions) {
-      if (rev.docName === "AVATAR.txt") avatarRevised = await reviseDoc(avatar, "AVATAR.txt", rev.changes);
-      else if (rev.docName === "OFFER_BRIEF.txt") offerBriefRevised = await reviseDoc(offerBrief, "OFFER_BRIEF.txt", rev.changes);
-      else if (rev.docName === "NECESSARY_BELIEFS.txt") necessaryBeliefsRevised = await reviseDoc(necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
+  // ── Sub-step 7: Research revised (skip if already in DB) ──
+  let researchRevised = run.step_research_revised ?? "";
+  if (!researchRevised) {
+    await updateRun(runId, { current_step: "Stage 1: Revising research (7/8)", last_updated_at: now() });
+    researchRevised = research;
+    if (chiefMid && !chiefMid.includes("NO REVISIONS REQUIRED")) {
+      const revised = await anthropicMessage({
+        system: REVISE_RESEARCH_PROMPT,
+        user: `RESEARCH.txt (original):\n\n${research}\n\n---\n\nCHIEF_MID.txt (review):\n\n${chiefMid}`,
+        maxTokens: 8000,
+        label: "revise research",
+      });
+      if (revised) researchRevised = revised;
     }
+    await updateRun(runId, { step_research_revised: researchRevised, last_updated_at: now() });
   }
-  await updateRun(runId, {
-    step_avatar_revised: avatarRevised,
-    step_offer_brief_revised: offerBriefRevised,
-    step_necessary_beliefs_revised: necessaryBeliefsRevised,
-    last_updated_at: now(),
-  });
+
+  // ── Sub-step 4a: Avatar (skip if already in DB) ──
+  let avatar = run.step_avatar ?? "";
+  if (!avatar) {
+    await updateRun(runId, { current_step: "Stage 1: Building avatar (8/8)", last_updated_at: now() });
+    avatar = await anthropicMessage({
+      system: AVATAR_PROMPT,
+      user: `RESEARCH.txt:\n\n${researchRevised}`,
+      maxTokens: 3500,
+      label: "avatar",
+    });
+    if (!avatar) throw new Error("Stage 1: avatar generation returned empty");
+    await updateRun(runId, { step_avatar: avatar, last_updated_at: now() });
+  }
+
+  // ── Sub-step 4b: Offer brief (skip if already in DB) ──
+  let offerBrief = run.step_offer_brief ?? "";
+  if (!offerBrief) {
+    await updateRun(runId, { current_step: "Stage 1: Writing offer brief", last_updated_at: now() });
+    offerBrief = await anthropicMessage({
+      system: OFFER_BRIEF_PROMPT,
+      user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}`,
+      maxTokens: 3500,
+      label: "offer brief",
+    });
+    if (!offerBrief) throw new Error("Stage 1: offer brief returned empty");
+    const brandName = extractBrandName(offerBrief);
+    await updateRun(runId, {
+      step_offer_brief: offerBrief,
+      brand_name: brandName,
+      last_updated_at: now(),
+    });
+  }
+
+  // ── Sub-step 4c: Necessary beliefs (skip if already in DB) ──
+  let necessaryBeliefs = run.step_necessary_beliefs ?? "";
+  if (!necessaryBeliefs) {
+    await updateRun(runId, { current_step: "Stage 1: Identifying necessary beliefs", last_updated_at: now() });
+    necessaryBeliefs = await anthropicMessage({
+      system: NECESSARY_BELIEFS_PROMPT,
+      user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
+      maxTokens: 3500,
+      label: "necessary beliefs",
+    });
+    if (!necessaryBeliefs) throw new Error("Stage 1: necessary beliefs returned empty");
+    await updateRun(runId, { step_necessary_beliefs: necessaryBeliefs, last_updated_at: now() });
+  }
+
+  // ── Sub-step 5: Chief final (skip if already in DB) ──
+  let chiefFinal = run.step_chief_final ?? "";
+  if (!chiefFinal) {
+    await updateRun(runId, { current_step: "Stage 1: Final chief review", last_updated_at: now() });
+    chiefFinal = await anthropicMessage({
+      system: CHIEF_FINAL_PROMPT,
+      user: [
+        `RESEARCH.txt (revised):\n\n${researchRevised}`,
+        `\n\n---\n\nAVATAR.txt:\n\n${avatar}`,
+        `\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
+        `\n\n---\n\nNECESSARY_BELIEFS.txt:\n\n${necessaryBeliefs}`,
+      ].join(""),
+      maxTokens: 4000,
+      label: "chief final review",
+    });
+    await updateRun(runId, { step_chief_final: chiefFinal, last_updated_at: now() });
+  }
+
+  // ── Sub-step 6: Final revisions (skip if revised docs already in DB) ──
+  const hasRevisedDocs =
+    run.step_avatar_revised || run.step_offer_brief_revised || run.step_necessary_beliefs_revised;
+  if (!hasRevisedDocs) {
+    await updateRun(runId, { current_step: "Stage 1: Applying final revisions", last_updated_at: now() });
+    let avatarRevised = avatar;
+    let offerBriefRevised = offerBrief;
+    let necessaryBeliefsRevised = necessaryBeliefs;
+    if (chiefFinal && !chiefFinal.includes("NO REVISIONS REQUIRED")) {
+      const revisions = parseRevisions(chiefFinal);
+      for (const rev of revisions) {
+        if (rev.docName === "AVATAR.txt") avatarRevised = await reviseDoc(avatar, "AVATAR.txt", rev.changes);
+        else if (rev.docName === "OFFER_BRIEF.txt") offerBriefRevised = await reviseDoc(offerBrief, "OFFER_BRIEF.txt", rev.changes);
+        else if (rev.docName === "NECESSARY_BELIEFS.txt") necessaryBeliefsRevised = await reviseDoc(necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
+      }
+    }
+    await updateRun(runId, {
+      step_avatar_revised: avatarRevised,
+      step_offer_brief_revised: offerBriefRevised,
+      step_necessary_beliefs_revised: necessaryBeliefsRevised,
+      last_updated_at: now(),
+    });
+  }
 }
 
 async function runStage2(runId: number, run: Run): Promise<void> {
-  await updateRun(runId, { status: "stage2", current_step: "Stage 2: Generating German copy", last_updated_at: now() });
+  await updateRun(runId, { status: "stage2", current_step: "Stage 2: Preparing prompt", last_updated_at: now() });
 
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
   if (!stage1Output) throw new Error("No Stage 1 output to run Stage 2");
 
   const systemPrompt = getPrompt("stage2") + await buildStage2FeedbackBlock();
   const productName = run.brand_name ?? run.product_name ?? "";
+
+  await updateRun(runId, { current_step: "Stage 2: Generating German copy (≈30–60s)", last_updated_at: now() });
 
   const output = await anthropicMessage({
     system: systemPrompt,
@@ -392,7 +445,11 @@ async function runStage2(runId: number, run: Run): Promise<void> {
   });
   if (!output) throw new Error("Stage 2 produced no output");
 
-  await updateRun(runId, { stage2_output: output, last_updated_at: now() });
+  await updateRun(runId, {
+    stage2_output: output,
+    current_step: "Stage 2: Saving output",
+    last_updated_at: now(),
+  });
 }
 
 // ── Main pipeline entry point ─────────────────────────────────────────────────
@@ -436,6 +493,7 @@ export async function runPipeline(runId: number): Promise<void> {
       status: "awaiting_user",
       current_step: "Awaiting image approval for Stage 3",
       last_updated_at: now(),
+      completed_at: now(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

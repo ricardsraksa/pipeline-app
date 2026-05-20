@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 
-const APP_VERSION = "v2.5";
+const APP_VERSION = "v2.6";
 
 const links = [
   { href: "/", label: "Pipeline", icon: Icon.Pipeline },

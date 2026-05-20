@@ -34,6 +34,12 @@ export interface RunStatus {
     lastUpdatedAt: string | null;
     completedAt: string | null;
   };
+  feedback: {
+    stage1: string | null;
+    stage2: string | null;
+    stage3: string | null;
+  };
+  scrapeErrors: { url: string; error: string }[];
 }
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "awaiting_user", "awaiting_qc"]);

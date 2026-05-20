@@ -10,10 +10,10 @@ import type { Run } from '@/lib/db'
 
 function VerdictBadge({ verdict }: { verdict: string }) {
   if (verdict === 'pass')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-950/90 text-emerald-400 border border-emerald-900/50">✓ Pass</span>
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(90_158_117_/_0.12)] text-[var(--color-success)] border border-[color:rgb(90_158_117_/_0.28)]">✓ Pass</span>
   if (verdict === 'minor_issue')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-amber-950/90 text-amber-400 border border-amber-900/50">~ Minor</span>
-  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-red-950/90 text-red-400 border border-red-900/50">✕ Fail</span>
+    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(184_144_74_/_0.12)] text-[var(--color-warn)] border border-[color:rgb(184_144_74_/_0.28)]">~ Minor</span>
+  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(184_96_96_/_0.12)] text-[var(--color-error)] border border-[color:rgb(184_96_96_/_0.28)]">✕ Fail</span>
 }
 
 interface ImageSlot {
@@ -40,7 +40,7 @@ function ImageCell({
   const catIndex = IMAGE_CATEGORIES.findIndex(c => c.id === prompt.category)
 
   return (
-    <div className="aspect-square rounded-xl border border-zinc-800 overflow-hidden relative bg-zinc-900 group">
+    <div className="aspect-square rounded-xl border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface)] group">
       {image.status === 'done' && image.url ? (
         <>
           <img src={image.url} alt={cat?.label ?? prompt.category} className="w-full h-full object-cover" />
@@ -52,13 +52,13 @@ function ImageCell({
           {auditResult?.requires_regeneration && regenCount < 3 && (
             <button
               onClick={onRegenerate}
-              className="absolute bottom-2 right-2 px-2 py-1 bg-red-950/80 border border-red-800 text-red-400 text-[10px] font-mono rounded cursor-pointer hover:bg-red-900/80 transition-colors"
+              className="absolute bottom-2 right-2 px-2 py-1 bg-[color:rgb(184_96_96_/_0.12)] border border-[color:rgb(184_96_96_/_0.30)] text-[var(--color-error)] text-[10px] font-mono rounded cursor-pointer hover:bg-[color:rgb(184_96_96_/_0.18)] transition-colors"
             >
               Regenerate
             </button>
           )}
           {regenCount >= 3 && auditResult?.requires_regeneration && (
-            <div className="absolute bottom-2 right-2 px-2 py-1 bg-zinc-900/90 text-zinc-500 text-[9px] font-mono rounded">
+            <div className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-surface)]/90 text-[var(--color-text-3)] text-[9px] font-mono rounded">
               Max retries
             </div>
           )}
@@ -68,34 +68,34 @@ function ImageCell({
           {auditResult && auditResult.issues.length > 0 && (
             <button
               onClick={() => setShowDetails(v => !v)}
-              className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-zinc-400 text-[9px] font-mono flex items-center justify-center cursor-pointer hover:bg-black/80"
+              className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-[var(--color-text-2)] text-[9px] font-mono flex items-center justify-center cursor-pointer hover:bg-black/80"
             >
               i
             </button>
           )}
           {showDetails && auditResult && (
             <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
-              <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-wider mb-1">Issues</p>
+              <p className="font-mono text-[9px] text-[var(--color-text-2)] uppercase tracking-wider mb-1">Issues</p>
               {auditResult.issues.map((issue, i) => (
-                <p key={i} className="text-[10px] text-zinc-300 font-mono leading-relaxed">• {issue}</p>
+                <p key={i} className="text-[10px] text-[var(--color-text-2)] font-mono leading-relaxed">• {issue}</p>
               ))}
-              <button onClick={() => setShowDetails(false)} className="mt-auto text-[9px] text-zinc-600 hover:text-zinc-400 font-mono cursor-pointer">close</button>
+              <button onClick={() => setShowDetails(false)} className="mt-auto text-[9px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] font-mono cursor-pointer">close</button>
             </div>
           )}
         </>
       ) : image.status === 'generating' ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-pulse" />
         </div>
       ) : image.status === 'error' ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1">
-          <span className="text-red-400 font-mono text-[10px]">Failed</span>
-          <span className="text-zinc-600 text-[9px] text-center font-mono">{image.error?.slice(0, 60)}</span>
+          <span className="text-[var(--color-error)] font-mono text-[10px]">Failed</span>
+          <span className="text-[var(--color-text-3)] text-[9px] text-center font-mono">{image.error?.slice(0, 60)}</span>
         </div>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="font-mono text-zinc-700 text-lg">{catIndex + 1}</span>
-          <span className="font-mono text-zinc-700 text-[9px] text-center px-2">{cat?.label}</span>
+          <span className="font-mono text-[var(--color-text-4)] text-lg">{catIndex + 1}</span>
+          <span className="font-mono text-[var(--color-text-4)] text-[9px] text-center px-2">{cat?.label}</span>
         </div>
       )}
     </div>
@@ -121,10 +121,10 @@ function PhaseIndicator({ phase }: { phase: Stage3Phase }) {
         const isDone = currentIdx > stepOrder
         return (
           <div key={step.id} className="flex items-center gap-2">
-            {i > 0 && <div className="w-6 h-px bg-zinc-800" />}
+            {i > 0 && <div className="w-6 h-px bg-[var(--color-surface-2)]" />}
             <div className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-blue-500' : isDone ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
-              <span className={`font-mono text-[10px] uppercase tracking-widest ${isActive ? 'text-blue-400' : isDone ? 'text-emerald-400' : 'text-zinc-600'}`}>
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-accent)]' : isDone ? 'bg-[var(--color-success)]' : 'bg-[var(--color-surface-3)]'}`} />
+              <span className={`font-mono text-[10px] uppercase tracking-widest ${isActive ? 'text-[var(--color-accent)]' : isDone ? 'text-[var(--color-success)]' : 'text-[var(--color-text-3)]'}`}>
                 {step.label}
               </span>
             </div>
@@ -138,9 +138,9 @@ function PhaseIndicator({ phase }: { phase: Stage3Phase }) {
 function LoadingState({ message, subtitle }: { message: string; subtitle?: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-      <p className="font-mono text-sm text-zinc-300">{message}</p>
-      {subtitle && <p className="font-mono text-[11px] text-zinc-600 max-w-sm text-center">{subtitle}</p>}
+      <div className="w-3 h-3 rounded-full bg-[var(--color-accent)] animate-pulse" />
+      <p className="font-mono text-sm text-[var(--color-text-2)]">{message}</p>
+      {subtitle && <p className="font-mono text-[11px] text-[var(--color-text-3)] max-w-sm text-center">{subtitle}</p>}
     </div>
   )
 }
@@ -148,8 +148,8 @@ function LoadingState({ message, subtitle }: { message: string; subtitle?: strin
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <p className="font-mono text-sm text-red-400">Error</p>
-      <p className="font-mono text-[11px] text-zinc-600 max-w-md text-center">{message}</p>
+      <p className="font-mono text-sm text-[var(--color-error)]">Error</p>
+      <p className="font-mono text-[11px] text-[var(--color-text-3)] max-w-md text-center">{message}</p>
     </div>
   )
 }
@@ -170,8 +170,8 @@ function QCGate({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-zinc-100 text-lg font-medium mb-1">Review Image Prompts</h2>
-        <p className="font-mono text-[11px] text-zinc-500">Review and edit the 11 prompts before generating. Changes are saved as learning data.</p>
+        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Review Image Prompts</h2>
+        <p className="font-mono text-[11px] text-[var(--color-text-3)]">Review and edit the 11 prompts before generating. Changes are saved as learning data.</p>
       </div>
       <div className="space-y-4">
         {prompts.map((prompt, i) => {
@@ -181,11 +181,11 @@ function QCGate({
           const isInfographic = prompt.category === 'infographic_features' || prompt.category === 'infographic_benefits'
 
           return (
-            <div key={i} className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3">
+            <div key={i} className="bg-[var(--color-surface)]/40 border border-[var(--color-border)] rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-[10px] text-zinc-300 font-medium">{cat?.label ?? prompt.category}</span>
-                <span className="font-mono text-[9px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">{prompt.model}</span>
-                <span className="font-mono text-[9px] bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded">{prompt.aspect_ratio}</span>
+                <span className="font-mono text-[10px] text-[var(--color-text-2)] font-medium">{cat?.label ?? prompt.category}</span>
+                <span className="font-mono text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] px-2 py-0.5 rounded">{prompt.model}</span>
+                <span className="font-mono text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-3)] px-2 py-0.5 rounded">{prompt.aspect_ratio}</span>
                 {refImg && (
                   <img
                     src={refImg}
@@ -195,7 +195,7 @@ function QCGate({
                   />
                 )}
                 {cat && (
-                  <span className="font-mono text-[9px] text-zinc-600">{cat.description}</span>
+                  <span className="font-mono text-[9px] text-[var(--color-text-3)]">{cat.description}</span>
                 )}
               </div>
               <textarea
@@ -206,10 +206,10 @@ function QCGate({
                   updated[i] = { ...prompt, prompt: e.target.value }
                   onPromptsChange(updated)
                 }}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
+                className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-border-hover)] focus:ring-1 focus:ring-[var(--color-accent)]/15 rounded-lg px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder-[var(--color-text-4)] focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
               />
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] text-zinc-700">{prompt.prompt.length} chars</span>
+                <span className="font-mono text-[9px] text-[var(--color-text-4)]">{prompt.prompt.length} chars</span>
                 {isEdited && (
                   <button
                     onClick={() => {
@@ -217,16 +217,16 @@ function QCGate({
                       updated[i] = { ...prompt, prompt: originalPrompts[i].prompt }
                       onPromptsChange(updated)
                     }}
-                    className="px-3 py-1 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-[10px] font-mono transition-colors cursor-pointer"
+                    className="px-3 py-1 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-[10px] font-mono transition-colors cursor-pointer"
                   >
                     Reset to Original
                   </button>
                 )}
               </div>
               {isInfographic && prompt.german_text_used && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
-                  <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest mb-1">German text used</p>
-                  <p className="font-mono text-[10px] text-zinc-400">{prompt.german_text_used}</p>
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-3">
+                  <p className="font-mono text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">German text used</p>
+                  <p className="font-mono text-[10px] text-[var(--color-text-2)]">{prompt.german_text_used}</p>
                 </div>
               )}
             </div>
@@ -235,7 +235,7 @@ function QCGate({
       </div>
       <button
         onClick={onApprove}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        className="px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)] text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
       >
         Approve All & Generate Images →
       </button>
@@ -256,13 +256,13 @@ function GeneratingPhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-zinc-100 text-lg font-medium mb-1">Generating Images</h2>
+        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Generating Images</h2>
         {generatingIndex != null ? (
-          <p className="font-mono text-[11px] text-blue-400 animate-pulse">
+          <p className="font-mono text-[11px] text-[var(--color-accent)] animate-pulse">
             Generating image {generatingIndex + 1} of {prompts.length} — {cat?.label ?? prompts[generatingIndex]?.category}
           </p>
         ) : (
-          <p className="font-mono text-[11px] text-zinc-500">Starting generation…</p>
+          <p className="font-mono text-[11px] text-[var(--color-text-3)]">Starting generation…</p>
         )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -295,13 +295,13 @@ function AuditingPhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-zinc-100 text-lg font-medium mb-1">Auditing Images</h2>
+        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Auditing Images</h2>
         {auditingIndex != null ? (
-          <p className="font-mono text-[11px] text-blue-400 animate-pulse">
+          <p className="font-mono text-[11px] text-[var(--color-accent)] animate-pulse">
             Auditing image {auditingIndex + 1} of {prompts.length}…
           </p>
         ) : (
-          <p className="font-mono text-[11px] text-zinc-500">Completing audit…</p>
+          <p className="font-mono text-[11px] text-[var(--color-text-3)]">Completing audit…</p>
         )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -319,7 +319,7 @@ function AuditingPhase({
               />
               {isAuditing && !result && (
                 <div className="absolute top-2 right-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-pulse" />
                 </div>
               )}
             </div>
@@ -352,11 +352,11 @@ function CompletePhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-zinc-100 text-lg font-medium mb-1">Image Generation Complete</h2>
+        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Image Generation Complete</h2>
         <div className="flex items-center gap-4 font-mono text-[11px]">
-          <span className="text-emerald-400">{passed} passed</span>
-          {minor > 0 && <span className="text-amber-400">{minor} minor issues</span>}
-          {failed > 0 && <span className="text-red-400">{failed} failed</span>}
+          <span className="text-[var(--color-success)]">{passed} passed</span>
+          {minor > 0 && <span className="text-[var(--color-warn)]">{minor} minor issues</span>}
+          {failed > 0 && <span className="text-[var(--color-error)]">{failed} failed</span>}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -375,7 +375,7 @@ function CompletePhase({
         {run?.id && (
           <Link
             href={`/history/${run.id}`}
-            className="px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-sm transition-colors cursor-pointer"
+            className="px-4 py-2 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-sm transition-colors cursor-pointer"
           >
             View Run History →
           </Link>
@@ -409,40 +409,40 @@ function RegenModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-2xl w-full space-y-4">
+      <div className="relative bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 max-w-2xl w-full space-y-4">
         <div>
-          <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">Image {index + 1}{cat ? ` — ${cat.label}` : ''}</p>
-          <p className="text-zinc-100 text-sm font-medium mt-0.5">Attempt {regenCount + 1} of 3</p>
+          <p className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image {index + 1}{cat ? ` — ${cat.label}` : ''}</p>
+          <p className="text-[var(--color-text)] text-sm font-medium mt-0.5">Attempt {regenCount + 1} of 3</p>
         </div>
         {auditResult && auditResult.issues.length > 0 && (
           <div className="space-y-1">
-            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Issues</p>
+            <p className="font-mono text-[9px] text-[var(--color-text-3)] uppercase tracking-widest">Issues</p>
             {auditResult.issues.map((issue, i) => (
-              <p key={i} className="text-[11px] text-red-400 font-mono">• {issue}</p>
+              <p key={i} className="text-[11px] text-[var(--color-error)] font-mono">• {issue}</p>
             ))}
           </div>
         )}
         <div>
-          <label className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest block mb-2">Edit Prompt</label>
+          <label className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest block mb-2">Edit Prompt</label>
           <textarea
             value={prompt}
             rows={8}
             onChange={e => onChange(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
+            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-border-hover)] focus:ring-1 focus:ring-[var(--color-accent)]/15 rounded-lg px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder-[var(--color-text-4)] focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
           />
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+            className="px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)] disabled:bg-[var(--color-surface-2)] disabled:text-[var(--color-text-3)] text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
           >
             {loading ? 'Regenerating…' : 'Regenerate Image'}
           </button>
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200 rounded-lg text-sm transition-colors cursor-pointer"
+            className="px-4 py-2 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-sm transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -732,19 +732,19 @@ function Stage3Page() {
   }, [run, prompts, regenCounts, auditResults])
 
   return (
-    <main className="min-h-screen bg-zinc-950">
+    <main className="min-h-screen bg-[var(--color-bg)]">
       {/* Top bar */}
-      <div className="border-b border-zinc-800 bg-zinc-950">
+      <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6 h-11 flex items-center gap-4">
-          <Link href="/" className="font-mono text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">← Pipeline</Link>
-          <div className="w-px h-3.5 bg-zinc-800" />
-          <span className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">Stage 3</span>
-          <span className="text-zinc-700">·</span>
-          <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Image Generation</span>
+          <Link href="/" className="font-mono text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors">← Pipeline</Link>
+          <div className="w-px h-3.5 bg-[var(--color-surface-2)]" />
+          <span className="font-mono text-[10px] text-[var(--color-accent)] uppercase tracking-widest">Stage 3</span>
+          <span className="text-[var(--color-text-4)]">·</span>
+          <span className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image Generation</span>
           {run && (
             <>
-              <div className="w-px h-3.5 bg-zinc-800" />
-              <span className="font-mono text-[10px] text-zinc-600">{run.brand_name ?? run.product_name ?? `Run #${run.id}`}</span>
+              <div className="w-px h-3.5 bg-[var(--color-surface-2)]" />
+              <span className="font-mono text-[10px] text-[var(--color-text-3)]">{run.brand_name ?? run.product_name ?? `Run #${run.id}`}</span>
             </>
           )}
         </div>
@@ -815,7 +815,7 @@ function Stage3Page() {
 
 export default function Stage3PageWrapper() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-zinc-950" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[var(--color-bg)]" />}>
       <Stage3Page />
     </Suspense>
   )

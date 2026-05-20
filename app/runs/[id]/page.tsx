@@ -291,6 +291,69 @@ function Section({
   );
 }
 
+function FeedbackButtons({
+  runId,
+  stage,
+  current,
+}: {
+  runId: number;
+  stage: "stage1" | "stage2" | "stage3";
+  current: string | null;
+}) {
+  const [value, setValue] = useState<string | null>(current);
+  const [saving, setSaving] = useState(false);
+
+  async function set(next: "up" | "down" | null) {
+    setSaving(true);
+    const prev = value;
+    setValue(next);
+    try {
+      const res = await fetch(`/api/runs/${runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [`feedback_${stage}`]: next }),
+      });
+      if (!res.ok) setValue(prev);
+    } catch {
+      setValue(prev);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="font-mono text-[10px] text-[var(--color-text-3)] mr-1">Was this useful?</span>
+      <button
+        onClick={() => set(value === "up" ? null : "up")}
+        disabled={saving}
+        aria-label="Mark useful"
+        className={[
+          "cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150",
+          value === "up"
+            ? "border-[color:rgb(90_158_117_/_0.35)] bg-[color:rgb(90_158_117_/_0.10)] text-[var(--color-success)]"
+            : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-hover)]",
+        ].join(" ")}
+      >
+        <Icon.ThumbsUp className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => set(value === "down" ? null : "down")}
+        disabled={saving}
+        aria-label="Mark not useful"
+        className={[
+          "cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150",
+          value === "down"
+            ? "border-[color:rgb(184_96_96_/_0.35)] bg-[color:rgb(184_96_96_/_0.10)] text-[var(--color-error)]"
+            : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-hover)]",
+        ].join(" ")}
+      >
+        <Icon.ThumbsDown className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RunPage() {
@@ -486,6 +549,29 @@ export default function RunPage() {
           </div>
         )}
 
+        {/* Competitor scrape errors */}
+        {run.scrapeErrors && run.scrapeErrors.length > 0 && (
+          <div className="rounded-xl border border-[color:rgb(184_144_74_/_0.28)] bg-[color:rgb(184_144_74_/_0.05)] px-4 py-3 fade-in">
+            <div className="flex items-start gap-2.5">
+              <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] text-[var(--color-text)] font-medium mb-1">
+                  {run.scrapeErrors.length} competitor URL{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be scraped
+                </p>
+                <ul className="space-y-0.5">
+                  {run.scrapeErrors.map((e, i) => (
+                    <li key={i} className="font-mono text-[10px] text-[var(--color-text-3)] truncate">
+                      <span className="text-[var(--color-text-2)]">{e.url}</span>
+                      <span className="mx-1.5 text-[var(--color-text-4)]">·</span>
+                      {e.error}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Scraped images */}
         {run.images.scrapedUrls.length > 0 && (
           <Section id="scrape-section" label="Scrape" count={run.images.scrapedUrls.length}>
@@ -544,7 +630,14 @@ export default function RunPage() {
         {(outputs.stage2Output || run.status === "stage2") && (
           <Section id="stage-2-section" label="Stage 2 — German Copy">
             {outputs.stage2Output ? (
-              <OutputBlock label="German Copy Kit" text={outputs.stage2Output} filename="STAGE2_GERMAN_COPY.txt" />
+              <>
+                <OutputBlock label="German Copy Kit" text={outputs.stage2Output} filename="STAGE2_GERMAN_COPY.txt" />
+                {runId !== null && (
+                  <div className="flex justify-end pt-1">
+                    <FeedbackButtons runId={runId} stage="stage2" current={run.feedback?.stage2 ?? null} />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center bg-[var(--color-surface)]/40">
                 <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />

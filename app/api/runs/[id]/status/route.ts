@@ -50,5 +50,14 @@ export async function GET(
       lastUpdatedAt: run.last_updated_at,
       completedAt: run.completed_at,
     },
+    feedback: {
+      stage1: run.feedback_stage1,
+      stage2: run.feedback_stage2,
+      stage3: run.feedback_stage3,
+    },
+    scrapeErrors: (() => {
+      try { return run.notes ? JSON.parse(run.notes)?.scrapeErrors ?? [] : []; }
+      catch { return []; }
+    })(),
   });
 }

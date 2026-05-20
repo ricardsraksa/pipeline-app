@@ -127,4 +127,16 @@ export const Icon = {
       <path d="M16 13H8M16 17H8M10 9H8" />
     </svg>
   ),
+  ThumbsUp: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M7 10v12" />
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l5-7c1.1 0 2 .9 2 2v.88z" />
+    </svg>
+  ),
+  ThumbsDown: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M17 14V2" />
+      <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-5 7c-1.1 0-2-.9-2-2v-.88z" />
+    </svg>
+  ),
 };
