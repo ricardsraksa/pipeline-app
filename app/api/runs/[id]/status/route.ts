@@ -34,6 +34,9 @@ export async function GET(
       avatarRevised: run.step_avatar_revised,
       offerBriefRevised: run.step_offer_brief_revised,
       necessaryBeliefsRevised: run.step_necessary_beliefs_revised,
+      onePager: run.stage1_one_pager,
+      onePagerEdited: run.stage1_one_pager_edited,
+      onePagerEditedAt: run.stage1_one_pager_edited_at,
       stage2Output: run.stage2_output,
     },
     images: {

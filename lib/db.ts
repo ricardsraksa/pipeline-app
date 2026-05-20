@@ -73,6 +73,10 @@ async function migrateDB() {
     "last_updated_at TEXT",
     "completed_at TEXT",
     "error_message TEXT",
+    // Stage 1 one-pager synthesis (the only Stage 1 output shown to user)
+    "stage1_one_pager TEXT",
+    "stage1_one_pager_edited TEXT",
+    "stage1_one_pager_edited_at TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -184,4 +188,8 @@ export interface Run {
   last_updated_at: string | null;
   completed_at: string | null;
   error_message: string | null;
+  // Stage 1 one-pager — the only Stage 1 output the user sees
+  stage1_one_pager: string | null;
+  stage1_one_pager_edited: string | null;
+  stage1_one_pager_edited_at: string | null;
 }

@@ -16,6 +16,7 @@ import { OFFER_BRIEF_PROMPT } from "./prompts/offer_brief";
 import { NECESSARY_BELIEFS_PROMPT } from "./prompts/necessary_beliefs";
 import { CHIEF_FINAL_PROMPT } from "./prompts/chief_final";
 import { REVISE_DOC_PROMPT } from "./prompts/revise_doc";
+import { ONE_PAGER_PROMPT } from "./prompts/one_pager";
 import { getPrompt } from "./prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -183,7 +184,8 @@ export function getLastCompletedStage(run: Run): LastStage {
   if (run.generated_images) return "stage3-images";
   if (run.image_prompts) return "stage3-prompts";
   if (run.stage2_output) return "stage2";
-  if (run.step_necessary_beliefs || run.step_chief_final) return "stage1";
+  // Stage 1 is only "complete" once the one-pager exists (it's the final sub-step now)
+  if (run.stage1_one_pager) return "stage1";
   if (run.scraper_data) return "scrape";
   return "none";
 }
@@ -424,6 +426,47 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       last_updated_at: now(),
     });
   }
+
+  // ── Sub-step 7: One-pager synthesis (the only Stage 1 output user sees) ──
+  if (!run.stage1_one_pager) {
+    await updateRun(runId, { current_step: "Stage 1: Synthesizing one-pager summary", last_updated_at: now() });
+
+    // Refetch to get the just-written revisions
+    const fresh = await getRun(runId);
+    const researchForOnePager = fresh?.step_research_revised ?? research;
+    const avatarForOnePager = fresh?.step_avatar_revised ?? avatar;
+    const offerForOnePager = fresh?.step_offer_brief_revised ?? offerBrief;
+    const beliefsForOnePager = fresh?.step_necessary_beliefs_revised ?? necessaryBeliefs;
+
+    const onePager = await anthropicMessage({
+      system: ONE_PAGER_PROMPT,
+      user: [
+        "Here are the research documents for this product. Synthesize them into the one-pager.",
+        "",
+        "PRODUCT RESEARCH (identification, market, competitive, product analysis, visual):",
+        researchForOnePager,
+        "",
+        "---",
+        "",
+        "CUSTOMER AVATAR:",
+        avatarForOnePager,
+        "",
+        "---",
+        "",
+        "OFFER BRIEF:",
+        offerForOnePager,
+        "",
+        "---",
+        "",
+        "NECESSARY BELIEFS:",
+        beliefsForOnePager,
+      ].join("\n"),
+      maxTokens: 2000,
+      label: "one-pager synthesis",
+    });
+    if (!onePager) throw new Error("Stage 1: one-pager synthesis returned empty");
+    await updateRun(runId, { stage1_one_pager: onePager, last_updated_at: now() });
+  }
 }
 
 async function runStage2(runId: number, run: Run): Promise<void> {
@@ -546,11 +589,11 @@ export async function resumePipeline(runId: number): Promise<void> {
     }
 
     if (lastStage === "stage1") {
-      // Check if stage1 is actually complete (all docs present) or partial
+      // Check if stage1 is actually complete (one-pager is the final sub-step now)
       if (!run.step_research_revised || !run.step_avatar || !run.step_offer_brief ||
           !run.step_necessary_beliefs || !run.step_chief_final ||
-          !run.step_avatar_revised) {
-        // Stage 1 was partially done — re-run it
+          !run.step_avatar_revised || !run.stage1_one_pager) {
+        // Stage 1 was partially done — re-run (granular skipping inside runStage1)
         const freshRun = await getRun(runId);
         if (!freshRun) throw new Error("Run not found");
         await runStage1(runId, freshRun);
@@ -562,6 +605,7 @@ export async function resumePipeline(runId: number): Promise<void> {
         status: "awaiting_user",
         current_step: "Awaiting image approval for Stage 3",
         last_updated_at: now(),
+        completed_at: now(),
       });
       return;
     }

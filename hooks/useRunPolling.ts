@@ -18,6 +18,9 @@ export interface RunStatus {
     avatarRevised: string | null;
     offerBriefRevised: string | null;
     necessaryBeliefsRevised: string | null;
+    onePager: string | null;
+    onePagerEdited: string | null;
+    onePagerEditedAt: string | null;
     stage2Output: string | null;
   };
   images: {

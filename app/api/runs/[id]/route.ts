@@ -33,6 +33,7 @@ const EDITABLE_FIELDS = [
   "stage1_necessary_beliefs_revised",
   "stage2_copy",
   "stage3_image_prompts",
+  "stage1_one_pager",
 ] as const;
 
 export async function PATCH(

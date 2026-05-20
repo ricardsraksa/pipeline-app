@@ -245,6 +245,8 @@ export default function RunDetailClient({ run }: Props) {
     if (scraperData) zip.file("scraper_data.json", JSON.stringify(scraperData, null, 2));
 
     const files: [string | null, string][] = [
+      [run.stage1_one_pager_edited ?? run.stage1_one_pager, `${slug}_STAGE1_ONE_PAGER.md`],
+      // Underlying Stage 1 research docs — kept for record-keeping
       [run.step_research,                `${slug}_RESEARCH.txt`],
       [run.step_chief_mid,               `${slug}_CHIEF_MID.txt`],
       [run.step_research_revised,        `${slug}_RESEARCH_REVISED.txt`],
@@ -268,10 +270,6 @@ export default function RunDetailClient({ run }: Props) {
     a.click();
     URL.revokeObjectURL(a.href);
   }
-
-  const hasAnyStep =
-    run.step_research || run.step_chief_mid || run.step_research_revised ||
-    run.step_avatar || run.step_offer_brief || run.step_necessary_beliefs || run.step_chief_final;
 
   return (
     <div className="space-y-10">
@@ -362,126 +360,19 @@ export default function RunDetailClient({ run }: Props) {
         </Section>
       )}
 
-      {/* Pipeline Steps */}
-      {hasAnyStep && (
-        <Section label="Pipeline Steps">
-          <div className="space-y-4">
-            {run.step_research && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_research"
-                stage="stage1"
-                originalValue={run.step_research}
-                editedValue={run.stage1_research_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 1 — Research Brief"
-                monospace
-              />
-            )}
-            {run.step_chief_mid && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_chief_mid"
-                stage="stage1"
-                originalValue={run.step_chief_mid}
-                editedValue={run.stage1_chief_mid_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 2 — Chief Marketer Analysis"
-                monospace
-              />
-            )}
-            {run.step_research_revised && (
-              <DocCard
-                label="Step 3 — Research Revised"
-                text={run.step_research_revised}
-                filename={`${slug}_RESEARCH_REVISED.txt`}
-              />
-            )}
-            {run.step_avatar && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_avatar"
-                stage="stage1"
-                originalValue={run.step_avatar}
-                editedValue={run.stage1_avatar_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4a — Customer Avatar"
-                monospace
-              />
-            )}
-            {run.step_avatar_revised && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_avatar_revised"
-                stage="stage1"
-                originalValue={run.step_avatar_revised}
-                editedValue={run.stage1_avatar_revised_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4a — Revised Avatar"
-                monospace
-              />
-            )}
-            {run.step_offer_brief && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_offer_brief"
-                stage="stage1"
-                originalValue={run.step_offer_brief}
-                editedValue={run.stage1_offer_brief_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4b — Offer Brief"
-                monospace
-              />
-            )}
-            {run.step_offer_brief_revised && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_offer_brief_revised"
-                stage="stage1"
-                originalValue={run.step_offer_brief_revised}
-                editedValue={run.stage1_offer_brief_revised_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4b — Revised Offer Brief"
-                monospace
-              />
-            )}
-            {run.step_necessary_beliefs && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_necessary_beliefs"
-                stage="stage1"
-                originalValue={run.step_necessary_beliefs}
-                editedValue={run.stage1_necessary_beliefs_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4c — Necessary Beliefs"
-                monospace
-              />
-            )}
-            {run.step_necessary_beliefs_revised && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_necessary_beliefs_revised"
-                stage="stage1"
-                originalValue={run.step_necessary_beliefs_revised}
-                editedValue={run.stage1_necessary_beliefs_revised_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 4c — Revised Necessary Beliefs"
-                monospace
-              />
-            )}
-            {run.step_chief_final && (
-              <EditableOutput
-                runId={run.id}
-                field="stage1_chief_final"
-                stage="stage1"
-                originalValue={run.step_chief_final}
-                editedValue={run.stage1_chief_final_edited}
-                editedAt={run.stage1_edited_at}
-                label="Step 5 — Final Chief Review"
-                monospace
-              />
-            )}
-          </div>
+      {/* Stage 1 — only the synthesised one-pager is shown */}
+      {run.stage1_one_pager && (
+        <Section label="Stage 1 — Research summary">
+          <EditableOutput
+            runId={run.id}
+            field="stage1_one_pager"
+            stage="stage1"
+            originalValue={run.stage1_one_pager}
+            editedValue={run.stage1_one_pager_edited}
+            editedAt={run.stage1_one_pager_edited_at}
+            label="Research one-pager"
+            monospace={false}
+          />
         </Section>
       )}
 

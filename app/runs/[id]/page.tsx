@@ -37,7 +37,7 @@ function getStageState(run: RunStatus, stage: Stage): StageState {
       if (run.status === "pending") return "pending";
       return "pending";
     case "stage1":
-      if (run.outputs.necessaryBeliefs || run.outputs.chiefFinal) return "complete";
+      if (run.outputs.onePager) return "complete";
       if (run.status === "stage1") return "running";
       if (run.outputs.research) return "running";
       return "pending";
@@ -59,7 +59,7 @@ function getLastCompletedStage(run: RunStatus): LastStage {
   if (run.outputs.stage2Output && run.status === "completed") return "stage3-images";
   if (run.status === "awaiting_qc") return "stage3-prompts";
   if (run.outputs.stage2Output) return "stage2";
-  if (run.outputs.necessaryBeliefs || run.outputs.chiefFinal) return "stage1";
+  if (run.outputs.onePager) return "stage1";
   if (run.images.scrapedUrls.length > 0) return "scrape";
   return "none";
 }
@@ -262,6 +262,68 @@ function OutputBlock({ label, text, filename }: { label: string; text: string; f
   );
 }
 
+// Minimal markdown renderer for the Stage 1 one-pager.
+// Handles # H1, ## H2, numbered lists, bulleted lists, and paragraphs.
+function OnePagerMarkdown({ text }: { text: string }) {
+  const lines = text.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let listBuffer: { type: "ol" | "ul"; items: string[] } | null = null;
+
+  const flushList = () => {
+    if (!listBuffer) return;
+    const ListTag = listBuffer.type;
+    const cls =
+      listBuffer.type === "ol"
+        ? "list-decimal pl-5 space-y-1.5"
+        : "list-disc pl-5 space-y-1.5";
+    blocks.push(
+      <ListTag key={`list-${blocks.length}`} className={cls}>
+        {listBuffer.items.map((it, i) => (
+          <li key={i} className="text-[13px] text-[var(--color-text-2)] leading-relaxed">{it}</li>
+        ))}
+      </ListTag>
+    );
+    listBuffer = null;
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { flushList(); continue; }
+    const h1 = line.match(/^# +(.+)$/);
+    const h2 = line.match(/^## +(.+)$/);
+    const ol = line.match(/^\d+\.\s+(.+)$/);
+    const ul = line.match(/^[-*]\s+(.+)$/);
+    if (h1) {
+      flushList();
+      blocks.push(
+        <h1 key={`h1-${blocks.length}`} className="text-[20px] font-semibold tracking-tight text-[var(--color-text)] mb-1">
+          {h1[1]}
+        </h1>
+      );
+    } else if (h2) {
+      flushList();
+      blocks.push(
+        <h2 key={`h2-${blocks.length}`} className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-3)] mt-5 mb-2">
+          {h2[1]}
+        </h2>
+      );
+    } else if (ol) {
+      if (!listBuffer || listBuffer.type !== "ol") { flushList(); listBuffer = { type: "ol", items: [] }; }
+      listBuffer.items.push(ol[1]);
+    } else if (ul) {
+      if (!listBuffer || listBuffer.type !== "ul") { flushList(); listBuffer = { type: "ul", items: [] }; }
+      listBuffer.items.push(ul[1]);
+    } else {
+      flushList();
+      blocks.push(
+        <p key={`p-${blocks.length}`} className="text-[13px] text-[var(--color-text-2)] leading-relaxed">{line}</p>
+      );
+    }
+  }
+  flushList();
+  return <div className="space-y-1">{blocks}</div>;
+}
+
 function Section({
   id,
   label,
@@ -405,6 +467,8 @@ export default function RunPage() {
     const zip = new JSZip();
     const { outputs } = run;
     const files: [string | null, string][] = [
+      [outputs.onePagerEdited ?? outputs.onePager, `${slug}_STAGE1_ONE_PAGER.md`],
+      // Underlying Stage 1 research docs — included in the export for record-keeping
       [outputs.research,                  `${slug}_RESEARCH.txt`],
       [outputs.chiefMid,                  `${slug}_CHIEF_MID.txt`],
       [outputs.researchRevised,           `${slug}_RESEARCH_REVISED.txt`],
@@ -456,12 +520,8 @@ export default function RunPage() {
   const displayName = run.meta.brandName ?? run.meta.productName ?? `Run #${runId}`;
   const elapsed = elapsedTime(run.timestamps.startedAt, run.timestamps.completedAt);
 
-  // Count Stage 1 docs we have
-  const stage1Docs = [
-    outputs.research, outputs.chiefMid, outputs.researchRevised, outputs.avatar,
-    outputs.avatarRevised, outputs.offerBrief, outputs.offerBriefRevised,
-    outputs.necessaryBeliefs, outputs.necessaryBeliefsRevised, outputs.chiefFinal,
-  ].filter(Boolean).length;
+  // Stage 1's user-facing output is now a single synthesised one-pager.
+  const hasOnePager = Boolean(outputs.onePager);
 
   return (
     <main className="min-h-[calc(100vh-3rem)]">
@@ -594,35 +654,23 @@ export default function RunPage() {
           </Section>
         )}
 
-        {/* Stage 1 outputs */}
-        {(outputs.research || run.status === "stage1" || run.status === "scraping") && (
-          <Section id="stage-1-section" label="Stage 1 — Research" count={stage1Docs > 0 ? stage1Docs : undefined}>
-            <div className="space-y-2">
-              {outputs.research && <OutputBlock label="Research Brief" text={outputs.research} filename="RESEARCH.txt" />}
-              {outputs.chiefMid && <OutputBlock label="Mid Chief Review" text={outputs.chiefMid} filename="CHIEF_MID.txt" />}
-              {outputs.researchRevised && <OutputBlock label="Research (Revised)" text={outputs.researchRevised} filename="RESEARCH_REVISED.txt" />}
-              {outputs.avatar && <OutputBlock label="Customer Avatar" text={outputs.avatar} filename="AVATAR.txt" />}
-              {outputs.offerBrief && <OutputBlock label="Offer Brief" text={outputs.offerBrief} filename="OFFER_BRIEF.txt" />}
-              {outputs.necessaryBeliefs && <OutputBlock label="Necessary Beliefs" text={outputs.necessaryBeliefs} filename="NECESSARY_BELIEFS.txt" />}
-              {outputs.chiefFinal && <OutputBlock label="Final Chief Review" text={outputs.chiefFinal} filename="CHIEF_FINAL.txt" />}
-              {outputs.avatarRevised && outputs.avatarRevised !== outputs.avatar && (
-                <OutputBlock label="Avatar (Revised)" text={outputs.avatarRevised} filename="AVATAR_REVISED.txt" />
-              )}
-              {outputs.offerBriefRevised && outputs.offerBriefRevised !== outputs.offerBrief && (
-                <OutputBlock label="Offer Brief (Revised)" text={outputs.offerBriefRevised} filename="OFFER_BRIEF_REVISED.txt" />
-              )}
-              {outputs.necessaryBeliefsRevised && outputs.necessaryBeliefsRevised !== outputs.necessaryBeliefs && (
-                <OutputBlock label="Necessary Beliefs (Revised)" text={outputs.necessaryBeliefsRevised} filename="NECESSARY_BELIEFS_REVISED.txt" />
-              )}
-              {!outputs.research && (
-                <div className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-8 text-center bg-[var(--color-surface)]/40">
-                  <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />
-                  <p className="text-[12px] text-[var(--color-text-3)]">
-                    {run.status === "scraping" ? "Scraping product page…" : "Waiting for Stage 1…"}
-                  </p>
-                </div>
-              )}
-            </div>
+        {/* Stage 1 — single one-pager (underlying research stays in DB for Stage 2/3) */}
+        {(hasOnePager || run.status === "stage1" || run.status === "scraping") && (
+          <Section id="stage-1-section" label="Stage 1 — Research summary">
+            {hasOnePager ? (
+              <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-5">
+                <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-[var(--color-border)] px-4 py-10 text-center bg-[var(--color-surface)]/40">
+                <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />
+                <p className="text-[12px] text-[var(--color-text-3)]">
+                  {run.status === "scraping"
+                    ? "Scraping product page…"
+                    : run.currentStep ?? "Researching the product…"}
+                </p>
+              </div>
+            )}
           </Section>
         )}
 
