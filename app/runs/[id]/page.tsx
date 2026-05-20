@@ -235,7 +235,7 @@ function OutputBlock({ label, text, filename }: { label: string; text: string; f
             className={[
               "cursor-pointer inline-flex items-center gap-1 h-6 px-2 rounded text-[10px] font-mono border transition-colors duration-150",
               copied
-                ? "border-[color:rgb(74_222_128_/_0.30)] text-[var(--color-success)]"
+                ? "border-[color:rgb(22_163_74_/_0.35)] text-[var(--color-success)]"
                 : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-hover)]",
             ].join(" ")}
             aria-label="Copy to clipboard"
@@ -447,7 +447,7 @@ export default function RunPage() {
 
         {/* Resume banner */}
         {showResumeBanner && (
-          <div className="rounded-xl border border-[color:rgb(251_191_36_/_0.30)] bg-[color:rgb(251_191_36_/_0.06)] px-4 py-3.5 fade-in">
+          <div className="rounded-xl border border-[color:rgb(217_119_6_/_0.30)] bg-[color:rgb(217_119_6_/_0.06)] px-4 py-3.5 fade-in">
             <div className="flex items-start gap-2.5">
               <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
@@ -560,7 +560,7 @@ export default function RunPage() {
             <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-4">
               {run.status === "awaiting_user" ? (
                 <div className="flex items-start gap-3">
-                  <span className="grid place-items-center w-8 h-8 rounded-md bg-[color:rgb(251_191_36_/_0.10)] border border-[color:rgb(251_191_36_/_0.25)] flex-shrink-0">
+                  <span className="grid place-items-center w-8 h-8 rounded-md bg-[color:rgb(217_119_6_/_0.08)] border border-[color:rgb(217_119_6_/_0.25)] flex-shrink-0">
                     <Icon.Image className="w-4 h-4 text-[var(--color-warn)]" />
                   </span>
                   <div className="flex-1">

@@ -1,34 +1,34 @@
 @import "tailwindcss";
 
 /*
- * Design system — Linear/Vercel/Raycast inspired.
- * Dark only. Single accent (blue-500). Mono labels, sans body.
+ * Design system — clean neutral light theme.
+ * Off-white backgrounds, soft borders, muted text hierarchy.
  */
 
 @theme inline {
   /* Surfaces */
-  --color-bg:           #08080a;        /* page background */
-  --color-surface:      #0f1014;        /* card surface */
-  --color-surface-2:    #15171c;        /* elevated surface */
-  --color-surface-3:    #1c1f25;        /* hover state */
+  --color-bg:           #f4f4f6;        /* page background — warm off-white */
+  --color-surface:      #ffffff;        /* card surface — pure white */
+  --color-surface-2:    #efeff1;        /* elevated / hover surface */
+  --color-surface-3:    #e6e6e9;        /* deeper hover state */
 
   /* Borders */
-  --color-border:       #1f2127;
-  --color-border-hover: #2a2d34;
-  --color-border-strong:#34373e;
+  --color-border:       #e2e2e6;
+  --color-border-hover: #cecdd3;
+  --color-border-strong:#b8b7be;
 
   /* Text */
-  --color-text:         #ededf0;
-  --color-text-2:       #9fa3ad;
-  --color-text-3:       #6b6f7a;
-  --color-text-4:       #4a4d55;
+  --color-text:         #18181b;        /* near-black */
+  --color-text-2:       #52525c;        /* secondary */
+  --color-text-3:       #7f7f8c;        /* tertiary */
+  --color-text-4:       #adadb8;        /* placeholder / disabled */
 
   /* Accent + semantic */
-  --color-accent:       #4f8bff;        /* indigo-blue, Linear-style */
-  --color-accent-dim:   #3b6fd6;
-  --color-success:      #4ade80;
-  --color-warn:         #fbbf24;
-  --color-error:        #f87171;
+  --color-accent:       #2563eb;        /* blue-600 — strong on white */
+  --color-accent-dim:   #1d4ed8;        /* blue-700 */
+  --color-success:      #16a34a;
+  --color-warn:         #d97706;
+  --color-error:        #dc2626;
 
   --font-mono: var(--font-ibm-plex-mono);
   --font-sans: var(--font-dm-sans);
@@ -49,16 +49,16 @@ html, body {
   color: var(--color-text);
 }
 
-/* Scrollbar — subtle, Linear-style */
+/* Scrollbar — subtle, light-mode */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #25272d;
+  background: #d0d0d6;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #34373e; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb:hover { background: #b8b7be; background-clip: padding-box; border: 2px solid transparent; }
 
 /* Focus ring — visible for keyboard a11y but quiet */
 :focus-visible {
@@ -93,7 +93,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -110,7 +110,7 @@ kbd.kbd {
   font-size: 10px;
   line-height: 1;
   color: var(--color-text-2);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--color-border);
   border-bottom-width: 2px;
   border-radius: 4px;
