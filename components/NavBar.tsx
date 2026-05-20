@@ -1,42 +1,80 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon } from "@/components/ui/Icon";
+
+const APP_VERSION = "v2.2";
 
 const links = [
-  { href: "/", label: "Pipeline" },
-  { href: "/history", label: "History" },
-  { href: "/settings", label: "Settings" },
+  { href: "/", label: "Pipeline", icon: Icon.Pipeline },
+  { href: "/history", label: "History", icon: Icon.History },
+  { href: "/settings", label: "Settings", icon: Icon.Settings },
 ];
 
 export default function NavBar() {
   const pathname = usePathname();
+
   return (
-    <nav className="border-b border-zinc-800 bg-zinc-950 sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-6 flex items-center gap-1 h-11">
-        <div className="flex items-center gap-3 mr-4">
-          <span className="font-mono text-[11px] text-zinc-100 tracking-[0.2em] uppercase font-medium">
+    <nav className="sticky top-0 z-40 border-b border-[var(--color-border)] bg-[var(--color-bg)]/85 backdrop-blur-xl">
+      <div className="max-w-6xl mx-auto px-5 h-12 flex items-center gap-1">
+        {/* Brand */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 mr-3 group"
+          aria-label="Home"
+        >
+          <span
+            className="grid place-items-center w-5 h-5 rounded-md text-white"
+            style={{
+              background: "linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dim) 100%)",
+            }}
+          >
+            <Icon.Pipeline className="w-3 h-3" strokeWidth={2.4} />
+          </span>
+          <span className="font-mono text-[11px] tracking-[0.18em] uppercase text-[var(--color-text)] font-medium">
             Pipeline
           </span>
-          <div className="w-px h-3.5 bg-zinc-800" />
-        </div>
-        {links.map(({ href, label }) => {
+        </Link>
+
+        <span className="h-3.5 w-px bg-[var(--color-border)] mx-1" aria-hidden />
+
+        {/* Nav items */}
+        {links.map(({ href, label, icon: ItemIcon }) => {
           const active = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
               className={[
-                "font-mono text-[11px] px-3 py-1.5 rounded-md transition-colors duration-150",
+                "cursor-pointer inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] transition-colors duration-150",
                 active
-                  ? "text-zinc-100 bg-zinc-800"
-                  : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50",
+                  ? "bg-[var(--color-surface-2)] text-[var(--color-text)]"
+                  : "text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]",
               ].join(" ")}
+              aria-current={active ? "page" : undefined}
             >
-              {label}
+              <ItemIcon className="w-3.5 h-3.5" />
+              <span className="font-sans">{label}</span>
             </Link>
           );
         })}
-        <span className="ml-auto font-mono text-[10px] text-zinc-700 select-none">v2.1</span>
+
+        {/* Right side */}
+        <div className="ml-auto flex items-center gap-3">
+          <a
+            href="https://cloud.higgsfield.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden md:inline-flex items-center gap-1 text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors"
+          >
+            Higgsfield
+            <Icon.ExternalLink className="w-3 h-3" />
+          </a>
+          <span className="font-mono text-[10px] text-[var(--color-text-4)] select-none" aria-label="App version">
+            {APP_VERSION}
+          </span>
+        </div>
       </div>
     </nav>
   );
