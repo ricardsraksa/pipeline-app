@@ -57,19 +57,19 @@ export default function ImageUploader({
       <div
         {...getRootProps()}
         className={[
-          "border border-dashed rounded-md p-6 text-center cursor-pointer transition-colors",
+          "border-dashed border-2 rounded-lg p-[26px] text-center cursor-pointer transition-colors",
           isDragActive
-            ? "border-[#2563eb] bg-[#2563eb]/5"
-            : "border-[#333] hover:border-[#444]",
+            ? "border-[var(--color-accent)] bg-[var(--color-accent-weak)]"
+            : "border-[var(--color-border-strong)] bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:bg-[var(--color-soft)]",
         ].join(" ")}
       >
         <input {...getInputProps()} />
-        <p className="text-sm text-[#737373]">
+        <p className="text-[13px] font-[500] text-[var(--color-text-2)]">
           {isDragActive
             ? "Drop images here..."
             : "Drag & drop product images, or click to select"}
         </p>
-        <p className="text-xs text-[#404040] mt-1">JPG, PNG, WebP — up to 8 images</p>
+        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] mt-1">JPG, PNG, WebP — up to 8 images</p>
       </div>
 
       <div className="flex gap-2">
@@ -79,32 +79,33 @@ export default function ImageUploader({
           onChange={(e) => setUrlInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addUrl()}
           placeholder="Or paste an image URL..."
-          className="flex-1 bg-[#111] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-[#e5e5e5] placeholder-[#404040] focus:outline-none focus:border-[#2563eb]"
+          className="flex-1 border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[9px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] placeholder:text-[var(--color-text-4)]"
         />
         <button
           onClick={addUrl}
-          className="px-3 py-2 bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] rounded text-sm text-[#737373] hover:text-[#e5e5e5] transition-colors"
+          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
         >
           Add
         </button>
       </div>
 
       {images.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-[10px]">
           {images.map((img, i) => (
             <div key={i} className="relative group aspect-square">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={img}
                 alt={`ref ${i + 1}`}
-                className="w-full h-full object-cover rounded border border-[#2a2a2a]"
+                className="w-full h-full object-cover rounded-[9px] border border-[var(--color-border)]"
               />
               <button
                 onClick={() => removeImage(i)}
-                className="absolute top-1 right-1 w-5 h-5 bg-black/80 rounded text-[#dc2626] text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                className="cursor-pointer absolute top-1 right-1 w-5 h-5 bg-black/70 rounded text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-[var(--color-red)]"
               >
                 ×
               </button>
-              <span className="absolute bottom-1 left-1 text-xs font-mono text-white/60 bg-black/60 px-1 rounded">
+              <span className="absolute bottom-1 left-1 text-xs font-[var(--font-ibm-plex-mono)] text-white/60 bg-black/50 px-1 rounded">
                 {i + 1}
               </span>
             </div>
@@ -113,7 +114,7 @@ export default function ImageUploader({
       )}
 
       {images.length < minImages && (
-        <p className="text-xs text-[#b45309]">
+        <p className="text-xs text-[var(--color-warn)]">
           Add at least {minImages} reference images before running Stage 3.
         </p>
       )}

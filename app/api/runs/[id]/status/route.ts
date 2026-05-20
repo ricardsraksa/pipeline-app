@@ -17,10 +17,16 @@ export async function GET(
     try { return JSON.parse(s); } catch { return null; }
   };
 
+  // Scraping is an internal implementation detail — never expose it to the UI.
+  const status = run.status === "scraping" ? "stage1" : run.status;
+  const currentStep = run.status === "scraping"
+    ? "Stage 1: Product Identification (1/6)"
+    : run.current_step;
+
   return NextResponse.json({
     runId: run.id,
-    status: run.status,
-    currentStep: run.current_step,
+    status,
+    currentStep,
     error: run.error_message,
     // Stage outputs
     outputs: {

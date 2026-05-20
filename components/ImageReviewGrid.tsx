@@ -22,13 +22,11 @@ export default function ImageReviewGrid({
 }: ImageReviewGridProps) {
   const allUrls = [...scrapedUrls, ...uploadedUrls]
 
-  // Local mirror of approved set — synced from parent on mount / scrapedUrls change
   const [local, setLocal] = useState<Set<string>>(() => new Set(approvedUrls))
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Keep local in sync when parent changes (e.g. loadRun restores approved set)
   useEffect(() => {
     setLocal(new Set(approvedUrls))
   }, [approvedUrls.join(",")])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -111,46 +109,43 @@ export default function ImageReviewGrid({
       {/* Header row */}
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <div className="space-y-0.5">
-          <h3 className="text-[13px] font-medium text-zinc-200">Product Images</h3>
-          <p className="font-mono text-[10px] text-zinc-500">
-            Tick the images you want to use for Stage 3. You can review while Stage 1 runs.
+          <h3 className="text-[13px] font-[600] text-[var(--color-text)]">Product Images</h3>
+          <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)]">
+            Tick the images you want to use for Stage 3.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Save state indicator */}
           {saveState === "pending" || saveState === "saving" ? (
-            <span className="font-mono text-[10px] text-zinc-500 animate-pulse">Saving…</span>
+            <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] animate-pulse">Saving…</span>
           ) : saveState === "saved" ? (
-            <span className="font-mono text-[10px] text-emerald-400">Saved</span>
+            <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-green)]">Saved</span>
           ) : saveState === "error" ? (
             <span className="flex items-center gap-1.5">
-              <span className="font-mono text-[10px] text-red-400">Save failed</span>
+              <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-error)]">Save failed</span>
               <button
                 onClick={retryUpdate}
-                className="font-mono text-[10px] text-zinc-400 underline hover:text-zinc-200 cursor-pointer transition-colors"
+                className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)] underline hover:text-[var(--color-text)] cursor-pointer transition-colors"
               >
                 retry
               </button>
             </span>
           ) : null}
 
-          {/* Counter */}
-          <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
+          <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
             {approvedCount} of {allUrls.length} approved
           </span>
 
-          {/* Helper buttons */}
           {!readOnly && (
             <div className="flex items-center gap-1.5">
               <button
                 onClick={approveAll}
-                className="font-mono text-[10px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                className="cursor-pointer font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)] border border-[var(--color-border)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] px-2 py-0.5 rounded transition-colors"
               >
                 Approve all
               </button>
               <button
                 onClick={clearAll}
-                className="font-mono text-[10px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                className="cursor-pointer font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)] border border-[var(--color-border)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] px-2 py-0.5 rounded transition-colors"
               >
                 Clear all
               </button>
@@ -170,18 +165,18 @@ export default function ImageReviewGrid({
               onClick={() => toggle(url)}
               disabled={readOnly}
               title={readOnly ? undefined : isApproved ? "Click to reject" : "Click to approve"}
-              className={`relative group rounded-lg border p-1.5 transition-all duration-150 text-left overflow-hidden ${
+              className={`relative group rounded-[9px] border p-1.5 transition-all duration-150 text-left overflow-hidden ${
                 readOnly
                   ? "cursor-default"
                   : "cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
               } ${
                 isApproved
-                  ? "border-emerald-700 ring-1 ring-emerald-900/50 bg-zinc-900"
-                  : "border-zinc-800 bg-zinc-900"
+                  ? "border-[var(--color-green)] ring-1 ring-[var(--color-green)]/30 bg-[var(--color-surface)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)]"
               }`}
             >
               {/* Thumbnail */}
-              <div className="aspect-square w-full overflow-hidden rounded-md bg-zinc-800">
+              <div className="aspect-square w-full overflow-hidden rounded-md bg-[var(--color-surface-2)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={url}
@@ -198,8 +193,8 @@ export default function ImageReviewGrid({
                 <div
                   className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
                     isApproved
-                      ? "border-emerald-500 bg-emerald-500"
-                      : "border-zinc-500 bg-zinc-900/80"
+                      ? "border-[var(--color-green)] bg-[var(--color-green)]"
+                      : "border-[var(--color-border-strong)] bg-[var(--color-surface)]/80"
                   }`}
                 >
                   {isApproved && (
@@ -212,14 +207,14 @@ export default function ImageReviewGrid({
 
               {/* Approved badge — top-right */}
               {isApproved && (
-                <span className="absolute top-2 right-2 text-[9px] bg-emerald-900/60 text-emerald-400 px-1.5 py-0.5 rounded-full font-mono border border-emerald-800/60">
+                <span className="absolute top-2 right-2 text-[9px] bg-[var(--color-green-bg)] text-[var(--color-green)] px-1.5 py-0.5 rounded-full font-[var(--font-ibm-plex-mono)] border border-[var(--color-green)]/30">
                   Approved
                 </span>
               )}
 
               {/* Uploaded badge */}
               {isUploaded && (
-                <span className="absolute bottom-2 left-2 text-[9px] bg-zinc-800/90 text-zinc-400 px-1.5 py-0.5 rounded font-mono">
+                <span className="absolute bottom-2 left-2 text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-3)] px-1.5 py-0.5 rounded font-[var(--font-ibm-plex-mono)] border border-[var(--color-border)]">
                   Uploaded
                 </span>
               )}
@@ -227,7 +222,7 @@ export default function ImageReviewGrid({
               {/* Hover tooltip (non-readOnly only) */}
               {!readOnly && (
                 <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <span className="bg-black/70 text-[9px] font-mono text-white px-2 py-0.5 rounded">
+                  <span className="bg-black/60 text-[9px] font-[var(--font-ibm-plex-mono)] text-white px-2 py-0.5 rounded">
                     {isApproved ? "Click to reject" : "Click to approve"}
                   </span>
                 </div>

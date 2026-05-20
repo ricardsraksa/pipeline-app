@@ -200,21 +200,10 @@ async function runScrape(runId: number, run: Run): Promise<void> {
   // If no URLs at all, skip the whole scrape step — the new description-first
   // flow may legitimately have nothing to scrape.
   if (!hasProductUrl && !hasCompetitorUrls) {
-    await updateRun(runId, {
-      status: "stage1",
-      current_step: "No URL provided — skipping scrape",
-      last_updated_at: now(),
-    });
     return;
   }
 
-  await updateRun(runId, {
-    status: "scraping",
-    current_step: hasProductUrl
-      ? "Scraping product page"
-      : "Scraping competitor pages",
-    last_updated_at: now(),
-  });
+  // Scraping runs silently — no status/current_step updates so the UI never shows a scraping state.
 
   const baseUrl = getBaseUrl();
 
@@ -573,6 +562,9 @@ export async function runPipeline(runId: number): Promise<void> {
         return;
       }
     }
+
+    // Set stage1 status immediately so the UI never sees a "scraping" state.
+    await updateRun(runId, { status: "stage1", current_step: "Stage 1: Product Identification (1/6)", last_updated_at: now() });
 
     await runScrape(runId, run);
 

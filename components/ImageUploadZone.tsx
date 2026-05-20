@@ -48,16 +48,16 @@ export default function ImageUploadZone({
       {/* Drop zone */}
       <div
         {...getRootProps()}
-        className={`border border-dashed rounded-lg px-4 py-5 flex flex-col items-center gap-2 cursor-pointer transition-colors ${
+        className={`border-dashed border-2 rounded-lg p-[26px] text-center flex flex-col items-center gap-2 cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-blue-500/70 bg-blue-500/5'
-            : 'border-zinc-700 bg-zinc-900 hover:border-zinc-600 hover:bg-zinc-800/50'
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent-weak)]'
+            : 'border-[var(--color-border-strong)] bg-[var(--color-surface-2)] hover:border-[var(--color-accent)] hover:bg-[var(--color-soft)]'
         }`}
       >
         <input {...getInputProps()} />
-        {/* Upload icon (inline SVG — lucide Upload shape) */}
+        {/* Upload icon */}
         <svg
-          className={`w-5 h-5 transition-colors ${isDragActive ? 'text-blue-400' : 'text-zinc-500'}`}
+          className={`w-5 h-5 transition-colors ${isDragActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-3)]'}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -69,25 +69,26 @@ export default function ImageUploadZone({
           <polyline points="17 8 12 3 7 8" />
           <line x1="12" y1="3" x2="12" y2="15" />
         </svg>
-        <p className={`font-mono text-[11px] text-center transition-colors ${isDragActive ? 'text-blue-400' : 'text-zinc-500'}`}>
+        <p className={`text-[13px] font-[500] transition-colors ${isDragActive ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-2)]'}`}>
           {isDragActive ? 'Drop images here…' : label}
         </p>
-        <p className="font-mono text-[10px] text-zinc-700">JPEG · PNG · WebP</p>
+        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">JPEG · PNG · WebP</p>
       </div>
 
       {/* Uploaded thumbnails */}
       {images.length > 0 && (
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-[10px]">
           {images.map((src, i) => (
             <div key={i} className="relative group aspect-square">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
                 alt={`Upload ${i + 1}`}
-                className="w-full h-full object-cover rounded-lg border border-zinc-800"
+                className="w-full h-full object-cover rounded-[9px] border border-[var(--color-border)]"
               />
               <button
                 onClick={(e) => { e.stopPropagation(); onRemove(i) }}
-                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/80 text-zinc-300 text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-red-900/80 hover:text-red-300"
+                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-[var(--color-red)]"
                 title="Remove"
               >
                 ×

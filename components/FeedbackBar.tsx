@@ -40,25 +40,25 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
 
   if (saved) {
     return (
-      <div className="mt-3 pt-3 border-t border-zinc-800">
-        <span className="text-zinc-500 text-[11px] font-mono">Feedback saved</span>
+      <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+        <span className="text-[var(--color-text-3)] text-[11px] font-[var(--font-ibm-plex-mono)]">Feedback saved</span>
       </div>
     );
   }
 
   return (
-    <div className="mt-3 pt-3 border-t border-zinc-800 space-y-2">
+    <div className="mt-3 pt-3 border-t border-[var(--color-border)] space-y-2">
       <div className="flex items-center gap-3">
-        <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
+        <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">
           Rate stage {stage}
         </span>
         <button
           onClick={() => handleRating("up")}
           disabled={saving}
-          className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
+          className={`cursor-pointer w-7 h-7 rounded border font-[var(--font-ibm-plex-mono)] text-xs transition-colors duration-150 ${
             rating === "up"
-              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-              : "border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800/50 hover:text-zinc-200"
+              ? "bg-[var(--color-green-bg)] text-[var(--color-green)] border-[var(--color-green)]/50"
+              : "border-[var(--color-border)] text-[var(--color-text-3)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
           }`}
         >
           ↑
@@ -66,10 +66,10 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
         <button
           onClick={() => handleRating("down")}
           disabled={saving}
-          className={`cursor-pointer w-7 h-7 rounded font-mono text-xs transition-colors duration-150 ${
+          className={`cursor-pointer w-7 h-7 rounded border font-[var(--font-ibm-plex-mono)] text-xs transition-colors duration-150 ${
             rating === "down"
-              ? "bg-red-500/10 text-red-400 border border-red-500/30"
-              : "border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-800/50 hover:text-zinc-200"
+              ? "bg-[var(--color-red-bg)] text-[var(--color-red)] border-[var(--color-red)]/50"
+              : "border-[var(--color-border)] text-[var(--color-text-3)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
           }`}
         >
           ↓
@@ -83,12 +83,12 @@ export default function FeedbackBar({ runId, stage, onSaved }: FeedbackBarProps)
             onChange={(e) => setNotes(e.target.value.slice(0, 200))}
             onKeyDown={(e) => e.key === "Enter" && save(rating)}
             placeholder="Notes (optional)"
-            className="flex-1 w-full bg-zinc-900 border border-zinc-800 focus:border-zinc-600 focus:ring-1 focus:ring-blue-500/10 rounded-lg px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors disabled:opacity-40"
+            className="flex-1 w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[9px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] placeholder:text-[var(--color-text-4)] disabled:opacity-40"
           />
           <button
             onClick={() => save(rating)}
             disabled={saving}
-            className="cursor-pointer px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white rounded-lg text-sm font-medium transition-colors"
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40"
           >
             {saving ? "…" : "Save"}
           </button>

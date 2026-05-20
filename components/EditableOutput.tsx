@@ -101,17 +101,17 @@ export default function EditableOutput({
   const displayValue = editedValue ?? originalValue;
   const isEdited = editedValue !== null;
   const textCls = monospace
-    ? "font-mono text-[11.5px] text-zinc-300 whitespace-pre-wrap break-words leading-relaxed"
-    : "text-[12.5px] text-zinc-300 whitespace-pre-wrap break-words leading-relaxed";
+    ? "font-[var(--font-ibm-plex-mono)] text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words"
+    : "text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words";
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+    <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{label}</span>
+          <span className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-text-3)]">{label}</span>
           {isEdited && !editing && (
-            <span className="text-[9px] font-mono bg-amber-900/40 text-amber-400 px-2 py-0.5 rounded-full border border-amber-900/30 uppercase tracking-wider">
+            <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
               Edited
             </span>
           )}
@@ -120,9 +120,10 @@ export default function EditableOutput({
           <button
             onClick={enterEdit}
             title="Edit"
-            className="cursor-pointer text-zinc-600 hover:text-zinc-300 transition-colors p-1 rounded hover:bg-zinc-800"
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)] whitespace-nowrap"
           >
             <PencilIcon />
+            Edit
           </button>
         )}
       </div>
@@ -135,18 +136,21 @@ export default function EditableOutput({
               ref={textareaRef}
               value={draft}
               onChange={(e) => { setDraft(e.target.value); autoResize(); }}
-              className={`w-full bg-zinc-800 border border-zinc-700 rounded p-3 text-zinc-100 resize-none min-h-[120px] focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/10 transition-colors overflow-hidden ${monospace ? "font-mono text-[11px]" : "text-[12px]"}`}
+              className={[
+                "w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-none min-h-[120px] overflow-hidden",
+                monospace ? "font-[var(--font-ibm-plex-mono)] text-[12px]" : "text-[13px]",
+              ].join(" ")}
               style={{ overflow: "hidden" }}
             />
 
             {saveError && (
-              <p className="text-[11px] font-mono text-red-400">{saveError}</p>
+              <p className="text-[11px] font-[var(--font-ibm-plex-mono)] text-[var(--color-error)]">{saveError}</p>
             )}
 
             <div className="flex items-center justify-between flex-wrap gap-2">
               <button
                 onClick={() => setShowOriginal((v) => !v)}
-                className="text-[11px] font-mono text-zinc-600 hover:text-zinc-400 underline cursor-pointer"
+                className="text-[11px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] underline cursor-pointer"
               >
                 {showOriginal ? "Hide original" : "Show original"}
               </button>
@@ -154,14 +158,14 @@ export default function EditableOutput({
                 <button
                   onClick={cancelEdit}
                   disabled={saving}
-                  className="cursor-pointer px-3 py-1.5 border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:border-zinc-600 rounded-md text-[11px] font-mono transition-colors active:scale-95 disabled:opacity-40"
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-40"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="cursor-pointer px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md text-[11px] font-mono transition-colors active:scale-95 disabled:opacity-60"
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
@@ -169,9 +173,9 @@ export default function EditableOutput({
             </div>
 
             {showOriginal && (
-              <div className="bg-zinc-950 border border-zinc-800 rounded p-3 mt-1">
-                <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Original AI output</p>
-                <pre className="font-mono text-[10.5px] text-zinc-500 whitespace-pre-wrap break-words leading-relaxed max-h-[280px] overflow-y-auto">
+              <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3 mt-1">
+                <p className="text-[9px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-3)] uppercase tracking-widest mb-2">Original AI output</p>
+                <pre className="font-[var(--font-ibm-plex-mono)] text-[10.5px] text-[var(--color-text-2)] whitespace-pre-wrap break-words leading-relaxed max-h-[280px] overflow-y-auto">
                   {originalValue}
                 </pre>
               </div>
@@ -183,7 +187,7 @@ export default function EditableOutput({
               {displayValue}
             </pre>
             {isEdited && editedAt && (
-              <p className="mt-2 text-[10px] font-mono text-zinc-600">
+              <p className="mt-2 text-[10px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-3)]">
                 Edited {relativeTime(editedAt)}
               </p>
             )}

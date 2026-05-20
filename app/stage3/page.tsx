@@ -10,10 +10,22 @@ import type { Run } from '@/lib/db'
 
 function VerdictBadge({ verdict }: { verdict: string }) {
   if (verdict === 'pass')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(90_158_117_/_0.12)] text-[var(--color-success)] border border-[color:rgb(90_158_117_/_0.28)]">✓ Pass</span>
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-green-bg)] text-[var(--color-green)] whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Pass
+      </span>
+    )
   if (verdict === 'minor_issue')
-    return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(184_144_74_/_0.12)] text-[var(--color-warn)] border border-[color:rgb(184_144_74_/_0.28)]">~ Minor</span>
-  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono bg-[color:rgb(184_96_96_/_0.12)] text-[var(--color-error)] border border-[color:rgb(184_96_96_/_0.28)]">✕ Fail</span>
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Minor
+      </span>
+    )
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Fail
+    </span>
+  )
 }
 
 interface ImageSlot {
@@ -40,9 +52,10 @@ function ImageCell({
   const catIndex = IMAGE_CATEGORIES.findIndex(c => c.id === prompt.category)
 
   return (
-    <div className="aspect-square rounded-xl border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface)] group">
+    <div className="aspect-square rounded-[11px] border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface)] group shadow-[0_1px_2px_rgba(20,20,18,.05)]">
       {image.status === 'done' && image.url ? (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image.url} alt={cat?.label ?? prompt.category} className="w-full h-full object-cover" />
           {auditResult && (
             <div className="absolute top-2 left-2">
@@ -52,34 +65,34 @@ function ImageCell({
           {auditResult?.requires_regeneration && regenCount < 3 && (
             <button
               onClick={onRegenerate}
-              className="absolute bottom-2 right-2 px-2 py-1 bg-[color:rgb(184_96_96_/_0.12)] border border-[color:rgb(184_96_96_/_0.30)] text-[var(--color-error)] text-[10px] font-mono rounded cursor-pointer hover:bg-[color:rgb(184_96_96_/_0.18)] transition-colors"
+              className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-red-bg)] border border-[var(--color-red)]/30 text-[var(--color-red)] text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer hover:brightness-95 transition-all"
             >
               Regenerate
             </button>
           )}
           {regenCount >= 3 && auditResult?.requires_regeneration && (
-            <div className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-surface)]/90 text-[var(--color-text-3)] text-[9px] font-mono rounded">
+            <div className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-surface)]/90 text-[var(--color-text-3)] text-[9px] font-[var(--font-ibm-plex-mono)] rounded">
               Max retries
             </div>
           )}
-          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-            <p className="font-mono text-[9px] text-white/80 truncate">{cat?.label}</p>
+          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/80 truncate">{cat?.label}</p>
           </div>
           {auditResult && auditResult.issues.length > 0 && (
             <button
               onClick={() => setShowDetails(v => !v)}
-              className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-[var(--color-text-2)] text-[9px] font-mono flex items-center justify-center cursor-pointer hover:bg-black/80"
+              className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-white text-[9px] font-[var(--font-ibm-plex-mono)] flex items-center justify-center cursor-pointer hover:bg-black/80"
             >
               i
             </button>
           )}
           {showDetails && auditResult && (
             <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
-              <p className="font-mono text-[9px] text-[var(--color-text-2)] uppercase tracking-wider mb-1">Issues</p>
+              <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider mb-1">Issues</p>
               {auditResult.issues.map((issue, i) => (
-                <p key={i} className="text-[10px] text-[var(--color-text-2)] font-mono leading-relaxed">• {issue}</p>
+                <p key={i} className="text-[10px] text-white/80 font-[var(--font-ibm-plex-mono)] leading-relaxed">• {issue}</p>
               ))}
-              <button onClick={() => setShowDetails(false)} className="mt-auto text-[9px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] font-mono cursor-pointer">close</button>
+              <button onClick={() => setShowDetails(false)} className="mt-auto text-[9px] text-white/40 hover:text-white/60 font-[var(--font-ibm-plex-mono)] cursor-pointer">close</button>
             </div>
           )}
         </>
@@ -89,13 +102,13 @@ function ImageCell({
         </div>
       ) : image.status === 'error' ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1">
-          <span className="text-[var(--color-error)] font-mono text-[10px]">Failed</span>
-          <span className="text-[var(--color-text-3)] text-[9px] text-center font-mono">{image.error?.slice(0, 60)}</span>
+          <span className="text-[var(--color-error)] font-[var(--font-ibm-plex-mono)] text-[10px]">Failed</span>
+          <span className="text-[var(--color-text-3)] text-[9px] text-center font-[var(--font-ibm-plex-mono)]">{image.error?.slice(0, 60)}</span>
         </div>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="font-mono text-[var(--color-text-4)] text-lg">{catIndex + 1}</span>
-          <span className="font-mono text-[var(--color-text-4)] text-[9px] text-center px-2">{cat?.label}</span>
+          <span className="font-[var(--font-ibm-plex-mono)] text-[var(--color-text-4)] text-lg">{catIndex + 1}</span>
+          <span className="font-[var(--font-ibm-plex-mono)] text-[var(--color-text-4)] text-[9px] text-center px-2">{cat?.label}</span>
         </div>
       )}
     </div>
@@ -116,15 +129,15 @@ function PhaseIndicator({ phase }: { phase: Stage3Phase }) {
   return (
     <div className="flex items-center gap-2 mb-8">
       {steps.map((step, i) => {
-        const stepOrder = i + 1 // A=1, B=2, C=3, D=4, E=5
+        const stepOrder = i + 1
         const isActive = phase === step.id
         const isDone = currentIdx > stepOrder
         return (
           <div key={step.id} className="flex items-center gap-2">
-            {i > 0 && <div className="w-6 h-px bg-[var(--color-surface-2)]" />}
+            {i > 0 && <div className="w-6 h-px bg-[var(--color-border-strong)]" />}
             <div className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-accent)]' : isDone ? 'bg-[var(--color-success)]' : 'bg-[var(--color-surface-3)]'}`} />
-              <span className={`font-mono text-[10px] uppercase tracking-widest ${isActive ? 'text-[var(--color-accent)]' : isDone ? 'text-[var(--color-success)]' : 'text-[var(--color-text-3)]'}`}>
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-accent)]' : isDone ? 'bg-[var(--color-green)]' : 'bg-[var(--color-border-strong)]'}`} />
+              <span className={`text-[11px] font-[550] ${isActive ? 'text-[var(--color-accent)]' : isDone ? 'text-[var(--color-green)]' : 'text-[var(--color-text-3)]'}`}>
                 {step.label}
               </span>
             </div>
@@ -139,8 +152,8 @@ function LoadingState({ message, subtitle }: { message: string; subtitle?: strin
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <div className="w-3 h-3 rounded-full bg-[var(--color-accent)] animate-pulse" />
-      <p className="font-mono text-sm text-[var(--color-text-2)]">{message}</p>
-      {subtitle && <p className="font-mono text-[11px] text-[var(--color-text-3)] max-w-sm text-center">{subtitle}</p>}
+      <p className="text-sm text-[var(--color-text-2)] font-[500]">{message}</p>
+      {subtitle && <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] max-w-sm text-center">{subtitle}</p>}
     </div>
   )
 }
@@ -148,8 +161,8 @@ function LoadingState({ message, subtitle }: { message: string; subtitle?: strin
 function ErrorState({ message }: { message: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
-      <p className="font-mono text-sm text-[var(--color-error)]">Error</p>
-      <p className="font-mono text-[11px] text-[var(--color-text-3)] max-w-md text-center">{message}</p>
+      <p className="text-sm text-[var(--color-error)] font-[600]">Error</p>
+      <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] max-w-md text-center">{message}</p>
     </div>
   )
 }
@@ -167,11 +180,13 @@ function QCGate({
   productImages: string[]
   onApprove: () => void
 }) {
+  const inputCls = "w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm font-[inherit] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Review Image Prompts</h2>
-        <p className="font-mono text-[11px] text-[var(--color-text-3)]">Review and edit the 11 prompts before generating. Changes are saved as learning data.</p>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">Review Image Prompts</h2>
+        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Review and edit the 11 prompts before generating. Changes are saved as learning data.</p>
       </div>
       <div className="space-y-4">
         {prompts.map((prompt, i) => {
@@ -181,21 +196,27 @@ function QCGate({
           const isInfographic = prompt.category === 'infographic_features' || prompt.category === 'infographic_benefits'
 
           return (
-            <div key={i} className="bg-[var(--color-surface)]/40 border border-[var(--color-border)] rounded-xl p-4 space-y-3">
+            <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] p-4 space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-[10px] text-[var(--color-text-2)] font-medium">{cat?.label ?? prompt.category}</span>
-                <span className="font-mono text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] px-2 py-0.5 rounded">{prompt.model}</span>
-                <span className="font-mono text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-3)] px-2 py-0.5 rounded">{prompt.aspect_ratio}</span>
+                <span className="text-[13px] font-[600] text-[var(--color-text)]">{cat?.label ?? prompt.category}</span>
+                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{prompt.model}</span>
+                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-3)] border border-[var(--color-border)] px-2 py-0.5 rounded">{prompt.aspect_ratio}</span>
                 {refImg && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={refImg}
                     alt="ref"
-                    className="w-6 h-6 object-cover rounded"
+                    className="w-6 h-6 object-cover rounded border border-[var(--color-border)]"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 )}
                 {cat && (
-                  <span className="font-mono text-[9px] text-[var(--color-text-3)]">{cat.description}</span>
+                  <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)]">{cat.description}</span>
+                )}
+                {isEdited && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
+                    Edited
+                  </span>
                 )}
               </div>
               <textarea
@@ -206,10 +227,10 @@ function QCGate({
                   updated[i] = { ...prompt, prompt: e.target.value }
                   onPromptsChange(updated)
                 }}
-                className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-border-hover)] focus:ring-1 focus:ring-[var(--color-accent)]/15 rounded-lg px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder-[var(--color-text-4)] focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
+                className={`${inputCls} font-[var(--font-ibm-plex-mono)] text-[11px] resize-y leading-relaxed`}
               />
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] text-[var(--color-text-4)]">{prompt.prompt.length} chars</span>
+                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-4)]">{prompt.prompt.length} chars</span>
                 {isEdited && (
                   <button
                     onClick={() => {
@@ -217,16 +238,16 @@ function QCGate({
                       updated[i] = { ...prompt, prompt: originalPrompts[i].prompt }
                       onPromptsChange(updated)
                     }}
-                    className="px-3 py-1 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-[10px] font-mono transition-colors cursor-pointer"
+                    className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
                   >
                     Reset to Original
                   </button>
                 )}
               </div>
               {isInfographic && prompt.german_text_used && (
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg p-3">
-                  <p className="font-mono text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">German text used</p>
-                  <p className="font-mono text-[10px] text-[var(--color-text-2)]">{prompt.german_text_used}</p>
+                <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3">
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">German text used</p>
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)]">{prompt.german_text_used}</p>
                 </div>
               )}
             </div>
@@ -235,9 +256,9 @@ function QCGate({
       </div>
       <button
         onClick={onApprove}
-        className="px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)] text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
       >
-        Approve All & Generate Images →
+        Approve All &amp; Generate Images →
       </button>
     </div>
   )
@@ -256,13 +277,13 @@ function GeneratingPhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Generating Images</h2>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">Generating Images</h2>
         {generatingIndex != null ? (
-          <p className="font-mono text-[11px] text-[var(--color-accent)] animate-pulse">
+          <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-accent)] animate-pulse">
             Generating image {generatingIndex + 1} of {prompts.length} — {cat?.label ?? prompts[generatingIndex]?.category}
           </p>
         ) : (
-          <p className="font-mono text-[11px] text-[var(--color-text-3)]">Starting generation…</p>
+          <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Starting generation…</p>
         )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -295,13 +316,13 @@ function AuditingPhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Auditing Images</h2>
+        <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">Auditing Images</h2>
         {auditingIndex != null ? (
-          <p className="font-mono text-[11px] text-[var(--color-accent)] animate-pulse">
+          <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-accent)] animate-pulse">
             Auditing image {auditingIndex + 1} of {prompts.length}…
           </p>
         ) : (
-          <p className="font-mono text-[11px] text-[var(--color-text-3)]">Completing audit…</p>
+          <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Completing audit…</p>
         )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -352,11 +373,21 @@ function CompletePhase({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-[var(--color-text)] text-lg font-medium mb-1">Image Generation Complete</h2>
-        <div className="flex items-center gap-4 font-mono text-[11px]">
-          <span className="text-[var(--color-success)]">{passed} passed</span>
-          {minor > 0 && <span className="text-[var(--color-warn)]">{minor} minor issues</span>}
-          {failed > 0 && <span className="text-[var(--color-error)]">{failed} failed</span>}
+        <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-2">Image Generation Complete</h2>
+        <div className="flex items-center gap-4 text-[13px]">
+          <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-green-bg)] text-[var(--color-green)] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{passed} passed
+          </span>
+          {minor > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{minor} minor
+            </span>
+          )}
+          {failed > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{failed} failed
+            </span>
+          )}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -375,7 +406,7 @@ function CompletePhase({
         {run?.id && (
           <Link
             href={`/history/${run.id}`}
-            className="px-4 py-2 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-sm transition-colors cursor-pointer"
+            className="inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
           >
             View Run History →
           </Link>
@@ -408,41 +439,41 @@ function RegenModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-6 max-w-2xl w-full space-y-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-2xl w-full space-y-4">
         <div>
-          <p className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image {index + 1}{cat ? ` — ${cat.label}` : ''}</p>
-          <p className="text-[var(--color-text)] text-sm font-medium mt-0.5">Attempt {regenCount + 1} of 3</p>
+          <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image {index + 1}{cat ? ` — ${cat.label}` : ''}</p>
+          <p className="text-[var(--color-text)] text-sm font-[600] mt-0.5">Attempt {regenCount + 1} of 3</p>
         </div>
         {auditResult && auditResult.issues.length > 0 && (
           <div className="space-y-1">
-            <p className="font-mono text-[9px] text-[var(--color-text-3)] uppercase tracking-widest">Issues</p>
+            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest">Issues</p>
             {auditResult.issues.map((issue, i) => (
-              <p key={i} className="text-[11px] text-[var(--color-error)] font-mono">• {issue}</p>
+              <p key={i} className="text-[11px] text-[var(--color-error)] font-[var(--font-ibm-plex-mono)]">• {issue}</p>
             ))}
           </div>
         )}
         <div>
-          <label className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest block mb-2">Edit Prompt</label>
+          <label className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest block mb-2">Edit Prompt</label>
           <textarea
             value={prompt}
             rows={8}
             onChange={e => onChange(e.target.value)}
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] focus:border-[var(--color-border-hover)] focus:ring-1 focus:ring-[var(--color-accent)]/15 rounded-lg px-3.5 py-2.5 text-sm text-[var(--color-text)] placeholder-[var(--color-text-4)] focus:outline-none transition-colors resize-y font-mono text-[11px] leading-relaxed"
+            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm font-[var(--font-ibm-plex-mono)] text-[11px] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y leading-relaxed"
           />
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="px-4 py-2 bg-[var(--color-accent)] hover:bg-[var(--color-accent)] disabled:bg-[var(--color-surface-2)] disabled:text-[var(--color-text-3)] text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? 'Regenerating…' : 'Regenerate Image'}
           </button>
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2 border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)]/50 text-[var(--color-text-2)] hover:text-[var(--color-text)] rounded-lg text-sm transition-colors cursor-pointer"
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-40"
           >
             Cancel
           </button>
@@ -538,7 +569,6 @@ function Stage3Page() {
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
 
-    // Save prompt edits as feedback
     const editsToSave = prompts.map((p, i) => ({
       category: p.category,
       original: originalPrompts[i]?.prompt ?? p.prompt,
@@ -587,7 +617,6 @@ function Stage3Page() {
     }
 
     setGeneratingIndex(null)
-    // Auto-trigger audit with the final images array
     await auditImagesInternal(updatedImages, prompts)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, prompts, originalPrompts])
@@ -643,7 +672,6 @@ function Stage3Page() {
 
     setAuditingIndex(null)
 
-    // Save to DB
     if (run.id) {
       const editCount = finalPrompts.filter((p, i) => p.prompt !== originalPrompts[i]?.prompt).length
       await fetch(`/api/runs/${run.id}`, {
@@ -732,83 +760,79 @@ function Stage3Page() {
   }, [run, prompts, regenCounts, auditResults])
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)]">
-      {/* Top bar */}
-      <div className="border-b border-[var(--color-border)] bg-[var(--color-bg)]">
-        <div className="max-w-5xl mx-auto px-6 h-11 flex items-center gap-4">
-          <Link href="/" className="font-mono text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors">← Pipeline</Link>
-          <div className="w-px h-3.5 bg-[var(--color-surface-2)]" />
-          <span className="font-mono text-[10px] text-[var(--color-accent)] uppercase tracking-widest">Stage 3</span>
-          <span className="text-[var(--color-text-4)]">·</span>
-          <span className="font-mono text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image Generation</span>
-          {run && (
-            <>
-              <div className="w-px h-3.5 bg-[var(--color-surface-2)]" />
-              <span className="font-mono text-[10px] text-[var(--color-text-3)]">{run.brand_name ?? run.product_name ?? `Run #${run.id}`}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <PhaseIndicator phase={phase} />
-
-        {phase === 'loading' && <LoadingState message="Loading run data…" />}
-        {phase === 'A_generating' && (
-          <LoadingState
-            message="Generating 11 image prompts…"
-            subtitle="Claude is analyzing your research and copy to craft targeted Higgsfield prompts."
-          />
-        )}
-        {phase === 'B_qc_gate' && (
-          <QCGate
-            prompts={prompts}
-            originalPrompts={originalPrompts}
-            onPromptsChange={setPrompts}
-            productImages={scraperImages}
-            onApprove={generateImages}
-          />
-        )}
-        {phase === 'C_generating' && (
-          <GeneratingPhase
-            images={images}
-            prompts={prompts}
-            generatingIndex={generatingIndex}
-          />
-        )}
-        {phase === 'D_auditing' && (
-          <AuditingPhase
-            images={images}
-            prompts={prompts}
-            auditResults={auditResults}
-            auditingIndex={auditingIndex}
-          />
-        )}
-        {phase === 'E_complete' && (
-          <CompletePhase
-            images={images}
-            prompts={prompts}
-            auditResults={auditResults}
-            regenCounts={regenCounts}
-            onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
-            run={run}
-          />
-        )}
-        {phase === 'error' && <ErrorState message={error ?? 'Unknown error'} />}
-
-        {regenModal && (
-          <RegenModal
-            index={regenModal.index}
-            prompt={regenModal.editedPrompt}
-            auditResult={auditResults[regenModal.index] ?? null}
-            regenCount={regenCounts[regenModal.index] ?? 0}
-            loading={regenLoading}
-            onChange={(p) => setRegenModal(prev => prev ? { ...prev, editedPrompt: p } : prev)}
-            onConfirm={() => regenerateImage(regenModal.index, regenModal.editedPrompt)}
-            onClose={() => setRegenModal(null)}
-          />
+    <main className="px-7 py-7 max-w-[1080px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link href="/" className="text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors">← Pipeline</Link>
+        <div className="w-px h-3.5 bg-[var(--color-border-strong)]" />
+        <span className="text-[11px] font-[650] uppercase tracking-[0.08em] text-[var(--color-accent)]">Stage 3</span>
+        <span className="text-[var(--color-text-4)]">·</span>
+        <span className="text-[11px] font-[550] text-[var(--color-text-3)]">Image Generation</span>
+        {run && (
+          <>
+            <div className="w-px h-3.5 bg-[var(--color-border-strong)]" />
+            <span className="text-[12px] text-[var(--color-text-2)]">{run.brand_name ?? run.product_name ?? `Run #${run.id}`}</span>
+          </>
         )}
       </div>
+
+      <PhaseIndicator phase={phase} />
+
+      {phase === 'loading' && <LoadingState message="Loading run data…" />}
+      {phase === 'A_generating' && (
+        <LoadingState
+          message="Generating 11 image prompts…"
+          subtitle="Claude is analyzing your research and copy to craft targeted Higgsfield prompts."
+        />
+      )}
+      {phase === 'B_qc_gate' && (
+        <QCGate
+          prompts={prompts}
+          originalPrompts={originalPrompts}
+          onPromptsChange={setPrompts}
+          productImages={scraperImages}
+          onApprove={generateImages}
+        />
+      )}
+      {phase === 'C_generating' && (
+        <GeneratingPhase
+          images={images}
+          prompts={prompts}
+          generatingIndex={generatingIndex}
+        />
+      )}
+      {phase === 'D_auditing' && (
+        <AuditingPhase
+          images={images}
+          prompts={prompts}
+          auditResults={auditResults}
+          auditingIndex={auditingIndex}
+        />
+      )}
+      {phase === 'E_complete' && (
+        <CompletePhase
+          images={images}
+          prompts={prompts}
+          auditResults={auditResults}
+          regenCounts={regenCounts}
+          onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
+          run={run}
+        />
+      )}
+      {phase === 'error' && <ErrorState message={error ?? 'Unknown error'} />}
+
+      {regenModal && (
+        <RegenModal
+          index={regenModal.index}
+          prompt={regenModal.editedPrompt}
+          auditResult={auditResults[regenModal.index] ?? null}
+          regenCount={regenCounts[regenModal.index] ?? 0}
+          loading={regenLoading}
+          onChange={(p) => setRegenModal(prev => prev ? { ...prev, editedPrompt: p } : prev)}
+          onConfirm={() => regenerateImage(regenModal.index, regenModal.editedPrompt)}
+          onClose={() => setRegenModal(null)}
+        />
+      )}
     </main>
   )
 }

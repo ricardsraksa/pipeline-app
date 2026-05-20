@@ -1,66 +1,120 @@
 @import "tailwindcss";
 
 /*
- * Design system — clean neutral light theme.
- * Off-white backgrounds, soft borders, muted text hierarchy.
+ * Design system — v4 light/dark theme
+ * Light mode default, dark mode via [data-theme="dark"] on <html>
  */
 
 @theme inline {
-  /* Surfaces — medium dark, not ultra black */
-  --color-bg:           #1c1c1f;        /* page bg — warm charcoal, like Claude chat */
-  --color-surface:      #242428;        /* card surface */
-  --color-surface-2:    #2c2c30;        /* elevated / hover surface */
-  --color-surface-3:    #353539;        /* deeper hover */
+  /* Surfaces */
+  --color-bg:           #f5f5f4;
+  --color-surface:      #ffffff;
+  --color-surface-2:    #f7f7f6;
+  --color-surface-3:    #efefed;
 
   /* Borders */
-  --color-border:       #38383d;
-  --color-border-hover: #48484e;
-  --color-border-strong:#5c5c63;
+  --color-border:       #e7e6e3;
+  --color-border-hover: #d7d6d2;
+  --color-border-strong:#d7d6d2;
 
   /* Text */
-  --color-text:         #ececee;        /* near-white */
-  --color-text-2:       #9d9da8;        /* secondary */
-  --color-text-3:       #6c6c76;        /* tertiary */
-  --color-text-4:       #48484f;        /* placeholder / disabled */
+  --color-text:         #1c1c1a;
+  --color-text-2:       #5d5c58;
+  --color-text-3:       #8c8b86;
+  --color-text-4:       #b8b7b2;
 
-  /* Accent + semantic — muted, no neon */
-  --color-accent:       #6b9ec8;        /* soft steel blue */
-  --color-accent-dim:   #5585ae;        /* deeper steel blue */
-  --color-success:      #5a9e75;        /* soft forest green */
-  --color-warn:         #b8904a;        /* soft amber */
-  --color-error:        #b86060;        /* soft muted red */
+  /* Accent + semantic */
+  --color-accent:       #3f6c9e;
+  --color-accent-dim:   #34597f;
+  --color-success:      #3f8f5f;
+  --color-warn:         #9a740f;
+  --color-error:        #b1554d;
+
+  /* New v4 tokens */
+  --color-primary:      #3f6c9e;
+  --color-on-primary:   #ffffff;
+  --color-accent-weak:  #e9eff6;
+  --color-accent-text:  #34597f;
+  --color-green:        #3f8f5f;
+  --color-green-bg:     #eaf2ec;
+  --color-amber:        #9a740f;
+  --color-amber-bg:     #f4eddc;
+  --color-red:          #b1554d;
+  --color-red-bg:       #f5e8e6;
+  --color-gray:         #7a796f;
+  --color-gray-bg:      #eeedea;
+  --color-soft:         #eef0f3;
+  --color-ring:         rgba(63,108,158,.22);
+  --radius:             11px;
+  --radius-sm:          8px;
 
   --font-mono: var(--font-ibm-plex-mono);
   --font-sans: var(--font-dm-sans);
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --color-bg:           #101113;
+  --color-surface:      #17181b;
+  --color-surface-2:    #1c1d21;
+  --color-surface-3:    #25272c;
+  --color-border:       #26282d;
+  --color-border-hover: #34373d;
+  --color-border-strong:#34373d;
+  --color-text:         #ececea;
+  --color-text-2:       #a3a39f;
+  --color-text-3:       #6f6f6b;
+  --color-text-4:       #4a4a4a;
+  --color-accent:       #7ba2d4;
+  --color-accent-dim:   #a8c6e8;
+  --color-success:      #5fae7f;
+  --color-warn:         #cda052;
+  --color-error:        #d4847c;
+  --color-primary:      #5b86b8;
+  --color-on-primary:   #ffffff;
+  --color-accent-weak:  #1a2535;
+  --color-accent-text:  #a8c6e8;
+  --color-green:        #5fae7f;
+  --color-green-bg:     #15271d;
+  --color-amber:        #cda052;
+  --color-amber-bg:     #2a2310;
+  --color-red:          #d4847c;
+  --color-red-bg:       #2a1816;
+  --color-gray:         #9a9a95;
+  --color-gray-bg:      #22242a;
+  --color-soft:         #232428;
+  --color-ring:         rgba(123,162,212,.28);
 }
 
 html, body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-dm-sans), "DM Sans", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Selection */
 ::selection {
-  background: rgba(107, 158, 200, 0.20);
+  background: var(--color-accent-weak);
   color: var(--color-text);
 }
 
-/* Scrollbar — subtle, light-mode */
+/* Scrollbar — light style */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #48484e;
+  background: #d7d6d2;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #5c5c63; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb:hover { background: #b8b7b2; background-clip: padding-box; border: 2px solid transparent; }
 
-/* Focus ring — visible for keyboard a11y but quiet */
+/* Focus ring */
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -93,7 +147,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   100% { background-position: 200% 0; }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.03) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -110,7 +164,7 @@ kbd.kbd {
   font-size: 10px;
   line-height: 1;
   color: var(--color-text-2);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-bottom-width: 2px;
   border-radius: 4px;

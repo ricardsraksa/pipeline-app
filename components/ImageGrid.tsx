@@ -22,15 +22,15 @@ export default function ImageGrid({ slots, currentIndex, onRetry }: ImageGridPro
   return (
     <div className="space-y-3">
       {currentIndex !== null && (
-        <p className="text-xs font-mono text-[#2563eb]">
-          <span className="pulse-dot inline-block w-1.5 h-1.5 rounded-full bg-[#2563eb] mr-2 align-middle" />
+        <p className="text-xs font-[var(--font-ibm-plex-mono)] text-[var(--color-accent)]">
+          <span className="pulse-dot inline-block w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] mr-2 align-middle" />
           Generating image {currentIndex} of {slots.length}...
         </p>
       )}
 
       {infographics.length > 0 && (
         <div>
-          <p className="text-xs font-mono text-[#404040] uppercase tracking-widest mb-2">
+          <p className="text-[11px] font-[650] uppercase tracking-[0.08em] text-[var(--color-text-3)] mb-2">
             Infographic
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -43,7 +43,7 @@ export default function ImageGrid({ slots, currentIndex, onRetry }: ImageGridPro
 
       {contextuals.length > 0 && (
         <div>
-          <p className="text-xs font-mono text-[#404040] uppercase tracking-widest mb-2">
+          <p className="text-[11px] font-[650] uppercase tracking-[0.08em] text-[var(--color-text-3)] mb-2">
             Contextual
           </p>
           <div className="grid grid-cols-4 gap-2">
@@ -67,8 +67,9 @@ function ImageSlotCell({
   const { prompt, imageUrl, status, error } = slot;
 
   return (
-    <div className="aspect-square rounded border border-[#2a2a2a] overflow-hidden relative bg-[#111]">
+    <div className="aspect-square rounded-[9px] border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface-2)]">
       {status === "done" && imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={imageUrl}
           alt={`Image ${prompt.index}`}
@@ -76,14 +77,14 @@ function ImageSlotCell({
         />
       ) : status === "error" ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-2">
-          <span className="text-[#dc2626] text-xs font-mono text-center">Failed</span>
+          <span className="text-[var(--color-error)] text-xs font-[var(--font-ibm-plex-mono)] text-center">Failed</span>
           {error && (
-            <span className="text-[#737373] text-xs text-center line-clamp-2">{error}</span>
+            <span className="text-[var(--color-text-3)] text-xs text-center line-clamp-2">{error}</span>
           )}
           {onRetry && (
             <button
               onClick={() => onRetry(prompt.index)}
-              className="text-xs text-[#2563eb] hover:underline font-mono mt-1"
+              className="cursor-pointer text-xs text-[var(--color-accent)] hover:underline font-[var(--font-ibm-plex-mono)] mt-1"
             >
               Retry
             </button>
@@ -91,16 +92,16 @@ function ImageSlotCell({
         </div>
       ) : status === "loading" ? (
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="pulse-dot w-3 h-3 rounded-full bg-[#2563eb]" />
+          <span className="pulse-dot w-3 h-3 rounded-full bg-[var(--color-accent)]" />
         </div>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-          <span className="text-[#2a2a2a] font-mono text-lg">{prompt.index}</span>
-          <span className="text-[#333] text-xs">{prompt.category}</span>
+          <span className="text-[var(--color-border-strong)] font-[var(--font-ibm-plex-mono)] text-lg">{prompt.index}</span>
+          <span className="text-[var(--color-text-4)] text-xs">{prompt.category}</span>
         </div>
       )}
 
-      <span className="absolute bottom-1 left-1 text-xs font-mono text-white/40 bg-black/50 px-1 rounded leading-none py-0.5">
+      <span className="absolute bottom-1 left-1 text-xs font-[var(--font-ibm-plex-mono)] text-white/50 bg-black/40 px-1 rounded leading-none py-0.5">
         {prompt.index}
       </span>
     </div>

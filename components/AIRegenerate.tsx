@@ -70,7 +70,7 @@ export default function AIRegenerate({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="cursor-pointer inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-2)] hover:border-[var(--color-border-hover)] text-[var(--color-text-2)] hover:text-[var(--color-text)] text-[11px] font-mono transition-colors duration-150"
+        className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] whitespace-nowrap"
       >
         <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
         {triggerLabel}
@@ -79,11 +79,11 @@ export default function AIRegenerate({
   }
 
   return (
-    <div className="rounded-xl border border-[color:rgb(107_158_200_/_0.30)] bg-[color:rgb(107_158_200_/_0.05)] px-4 py-3.5 fade-in space-y-2.5">
+    <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-accent-weak)] px-4 py-3.5 fade-in space-y-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+          <span className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-accent-text)]">
             Tell Claude what to change
           </span>
         </div>
@@ -104,7 +104,7 @@ export default function AIRegenerate({
         rows={3}
         autoFocus
         disabled={regenerating}
-        className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)]/60 focus:ring-2 focus:ring-[var(--color-accent)]/15 rounded-lg px-3 py-2 text-[12px] text-[var(--color-text)] placeholder-[var(--color-text-4)] focus:outline-none transition-colors resize-y disabled:opacity-50"
+        className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)] disabled:opacity-50"
       />
 
       {error && (
@@ -118,7 +118,7 @@ export default function AIRegenerate({
         <button
           onClick={handleRegenerate}
           disabled={regenerating || instructions.trim().length < 5}
-          className="cursor-pointer inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-[var(--color-accent)] hover:bg-[var(--color-accent-dim)] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-medium transition-colors duration-150"
+          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {regenerating ? (
             <>
@@ -135,11 +135,11 @@ export default function AIRegenerate({
         <button
           onClick={close}
           disabled={regenerating}
-          className="cursor-pointer h-8 px-3 rounded-md border border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-2)] text-[var(--color-text-3)] hover:text-[var(--color-text)] text-[12px] transition-colors duration-150 disabled:opacity-40"
+          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-40"
         >
           Cancel
         </button>
-        <p className="ml-auto font-mono text-[10px] text-[var(--color-text-3)] hidden sm:block">
+        <p className="ml-auto font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] hidden sm:block">
           Replaces current edits · inline editing still works after
         </p>
       </div>
