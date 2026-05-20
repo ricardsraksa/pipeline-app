@@ -81,7 +81,10 @@ export default function Home() {
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: { "image/*": [] },
+    accept: {
+      "image/*": [],
+      "image/avif": [".avif"],
+    },
     maxFiles: MAX_IMAGES,
     disabled: submitting || uploadingImages || sourceImages.length >= MAX_IMAGES,
     onDrop: uploadFiles,

@@ -34,6 +34,7 @@ function extFor(mimeType: string, fallback: string): string {
   if (mimeType.includes("png")) return "png";
   if (mimeType.includes("webp")) return "webp";
   if (mimeType.includes("gif")) return "gif";
+  if (mimeType.includes("avif")) return "avif";
   if (mimeType.includes("jpeg") || mimeType.includes("jpg")) return "jpg";
   return fallback;
 }
