@@ -23,12 +23,12 @@
   --color-text-3:       #7f7f8c;        /* tertiary */
   --color-text-4:       #adadb8;        /* placeholder / disabled */
 
-  /* Accent + semantic */
-  --color-accent:       #2563eb;        /* blue-600 — strong on white */
-  --color-accent-dim:   #1d4ed8;        /* blue-700 */
-  --color-success:      #16a34a;
-  --color-warn:         #d97706;
-  --color-error:        #dc2626;
+  /* Accent + semantic — muted, no neon */
+  --color-accent:       #3d6b96;        /* muted steel blue */
+  --color-accent-dim:   #2e5478;        /* deeper steel blue */
+  --color-success:      #3a7554;        /* muted forest green */
+  --color-warn:         #8a6530;        /* muted amber */
+  --color-error:        #8a3a3a;        /* muted burgundy */
 
   --font-mono: var(--font-ibm-plex-mono);
   --font-sans: var(--font-dm-sans);
@@ -45,7 +45,7 @@ html, body {
 
 /* Selection */
 ::selection {
-  background: rgba(79, 139, 255, 0.25);
+  background: rgba(61, 107, 150, 0.18);
   color: var(--color-text);
 }
 
