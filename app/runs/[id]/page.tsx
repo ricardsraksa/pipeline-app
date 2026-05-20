@@ -35,6 +35,8 @@ function getStageState(run: RunStatus, stage: Stage): StageState {
     case "stage2":
       if (run.outputs.stage2Output) return "complete";
       if (run.status === "stage2") return "running";
+      // Paused at the new Stage 1 → Stage 2 QC gate: Stage 2 hasn't started yet.
+      if (run.status === "awaiting_stage2_approval") return "waiting";
       return "pending";
     case "stage3":
       if (run.status === "completed") return "complete";
@@ -59,7 +61,7 @@ function isStuck(run: RunStatus): boolean {
   const ageMs = Date.now() - new Date(run.timestamps.lastUpdatedAt).getTime();
   return (
     ageMs > 10 * 60 * 1000 &&
-    !["completed", "failed", "awaiting_user", "awaiting_qc"].includes(run.status)
+    !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval"].includes(run.status)
   );
 }
 
@@ -68,6 +70,7 @@ function statusLabel(status: string): string {
     pending: "Starting…",
     scraping: "Stage 1 — Research",
     stage1: "Stage 1 — Research",
+    awaiting_stage2_approval: "Awaiting your review",
     stage2: "Stage 2 — Copy",
     awaiting_user: "Awaiting review",
     awaiting_qc: "Awaiting QC",
@@ -102,7 +105,7 @@ function StatusBadge({ status }: { status: string }) {
       <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Failed
     </span>
   );
-  if (status === "awaiting_user" || status === "awaiting_qc") return (
+  if (status === "awaiting_user" || status === "awaiting_qc" || status === "awaiting_stage2_approval") return (
     <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{statusLabel(status)}
     </span>
@@ -180,7 +183,7 @@ function PipelineProgress({ run }: { run: RunStatus }) {
         })}
       </div>
 
-      {run.currentStep && !["completed", "failed", "awaiting_user", "awaiting_qc"].includes(run.status) && (
+      {run.currentStep && !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval"].includes(run.status) && (
         <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--color-border)]">
           <Icon.Loader className="w-3.5 h-3.5 text-[var(--color-accent)]" />
           <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-2)] truncate">{run.currentStep}</span>
@@ -466,6 +469,7 @@ export default function RunPage() {
   const scrolledRef = useRef(false);
   const [resuming, setResuming] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [startingStage2, setStartingStage2] = useState(false);
 
   // Auto-scroll to last completed stage on initial load
   useEffect(() => {
@@ -498,6 +502,22 @@ export default function RunPage() {
       setTimeout(() => setResuming(false), 1200);
     } catch {
       setResuming(false);
+    }
+  }
+
+  async function handleStartStage2() {
+    if (!runId || startingStage2) return;
+    setStartingStage2(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}/start-stage2`, { method: "POST" });
+      const data = await res.json();
+      if (!data.success) {
+        alert(`Failed to start Stage 2: ${data.error ?? "unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Failed to start Stage 2: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTimeout(() => setStartingStage2(false), 1200);
     }
   }
 
@@ -776,6 +796,38 @@ export default function RunPage() {
                       stage="stage1"
                       onRegenerated={() => window.location.reload()}
                     />
+                  </div>
+                )}
+
+                {/* QC gate — paused between Stage 1 and Stage 2 */}
+                {run.status === "awaiting_stage2_approval" && (
+                  <div className="mt-5 border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] border-l-4 border-l-[var(--color-amber)] rounded-[11px] px-[18px] py-4 flex items-center gap-4 flex-wrap fade-in">
+                    <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-[var(--color-text)] font-[600]">
+                        Review the research summary above
+                      </p>
+                      <p className="text-[12px] text-[var(--color-text-2)] mt-0.5 leading-relaxed">
+                        Edit it if needed, then run Stage 2 to generate the German copy.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleStartStage2}
+                      disabled={startingStage2}
+                      className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
+                    >
+                      {startingStage2 ? (
+                        <>
+                          <Icon.Loader className="w-3.5 h-3.5" />
+                          Starting Stage 2&hellip;
+                        </>
+                      ) : (
+                        <>
+                          Looks good — run Stage 2
+                          <Icon.ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
               </>

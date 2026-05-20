@@ -14,6 +14,7 @@ async function getRuns(): Promise<RunSummary[]> {
 }
 
 const ACTIVE_STATUSES = new Set(["pending", "scraping", "stage1", "stage2"]);
+const WAITING_STATUSES = new Set(["awaiting_stage2_approval", "awaiting_user", "awaiting_qc"]);
 
 function isStuck(run: RunSummary): boolean {
   if (!run.last_updated_at) return false;
@@ -23,6 +24,7 @@ function isStuck(run: RunSummary): boolean {
     run.status !== "completed" &&
     run.status !== "awaiting_user" &&
     run.status !== "awaiting_qc" &&
+    run.status !== "awaiting_stage2_approval" &&
     run.status !== "failed"
   );
 }
@@ -38,16 +40,17 @@ function runAction(run: RunSummary): RunAction {
 type Tone = "active" | "success" | "warn" | "danger" | "muted";
 
 const STATUS_META: Record<string, { label: string; tone: Tone }> = {
-  pending:       { label: "Pending",       tone: "muted" },
-  scraping:      { label: "Scraping",      tone: "active" },
-  stage1:        { label: "Stage 1",       tone: "active" },
-  stage2:        { label: "Stage 2",       tone: "active" },
-  awaiting_user: { label: "Needs review",  tone: "warn"   },
-  awaiting_qc:   { label: "Awaiting QC",   tone: "warn"   },
-  complete:      { label: "Complete",      tone: "success"},
-  completed:     { label: "Complete",      tone: "success"},
-  partial:       { label: "Partial",       tone: "warn"   },
-  failed:        { label: "Failed",        tone: "danger" },
+  pending:                    { label: "Pending",          tone: "muted" },
+  scraping:                   { label: "Scraping",         tone: "active" },
+  stage1:                     { label: "Stage 1",          tone: "active" },
+  awaiting_stage2_approval:   { label: "Awaiting review",  tone: "warn"   },
+  stage2:                     { label: "Stage 2",          tone: "active" },
+  awaiting_user:              { label: "Needs review",     tone: "warn"   },
+  awaiting_qc:                { label: "Awaiting QC",      tone: "warn"   },
+  complete:                   { label: "Complete",         tone: "success"},
+  completed:                  { label: "Complete",         tone: "success"},
+  partial:                    { label: "Partial",          tone: "warn"   },
+  failed:                     { label: "Failed",           tone: "danger" },
 };
 
 function StatusBadge({ status, stuck }: { status: string | null; stuck?: boolean }) {
@@ -114,7 +117,7 @@ export default async function HistoryPage() {
       if (ACTIVE_STATUSES.has(s)) acc.active++;
       else if (s === "completed") acc.completed++;
       else if (s === "failed" || isStuck(r)) acc.failed++;
-      else if (s === "awaiting_user" || s === "awaiting_qc") acc.waiting++;
+      else if (WAITING_STATUSES.has(s)) acc.waiting++;
       return acc;
     },
     { active: 0, completed: 0, failed: 0, waiting: 0 }

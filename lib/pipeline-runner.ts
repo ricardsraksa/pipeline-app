@@ -513,7 +513,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   }
 }
 
-async function runStage2(runId: number, run: Run): Promise<void> {
+export async function runStage2(runId: number, run: Run): Promise<void> {
   await updateRun(runId, { status: "stage2", current_step: "Stage 2: Preparing prompt", last_updated_at: now() });
 
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
@@ -537,6 +537,50 @@ async function runStage2(runId: number, run: Run): Promise<void> {
     current_step: "Stage 2: Saving output",
     last_updated_at: now(),
   });
+}
+
+// ── Manual Stage 2 trigger (after the Stage 1 QC gate) ───────────────────────
+
+/**
+ * Run Stage 2 for a run that's paused at `awaiting_stage2_approval`, then
+ * move the run to `awaiting_user` so the existing image-approval / Stage 3
+ * flow can take over. Designed to be called from
+ * POST /api/runs/[id]/start-stage2.
+ */
+export async function runStage2Manually(runId: number): Promise<void> {
+  if (RUNNING_PIPELINES.has(runId)) {
+    console.warn(`Stage 2 manual trigger ${runId} skipped — pipeline already running.`);
+    return;
+  }
+  RUNNING_PIPELINES.add(runId);
+  try {
+    const run = await getRun(runId);
+    if (!run) throw new Error("Run not found");
+    if (!run.stage1_one_pager) {
+      throw new Error("Cannot start Stage 2 — Stage 1 one-pager is missing");
+    }
+
+    await updateRun(runId, { error_message: null, last_updated_at: now() });
+
+    await runStage2(runId, run);
+
+    await updateRun(runId, {
+      status: "awaiting_user",
+      current_step: "Awaiting image approval for Stage 3",
+      last_updated_at: now(),
+      completed_at: now(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Stage 2 manual trigger ${runId} failed:`, message);
+    await updateRun(runId, {
+      status: "failed",
+      error_message: message,
+      last_updated_at: now(),
+    }).catch(() => {});
+  } finally {
+    RUNNING_PIPELINES.delete(runId);
+  }
 }
 
 // ── Main pipeline entry point ─────────────────────────────────────────────────
@@ -575,15 +619,13 @@ export async function runPipeline(runId: number): Promise<void> {
     if (!runAfterScrape) throw new Error("Run not found after scrape");
     await runStage1(runId, runAfterScrape);
 
-    const runAfterStage1 = await getRun(runId);
-    if (!runAfterStage1) throw new Error("Run not found after stage 1");
-    await runStage2(runId, runAfterStage1);
-
+    // Pause at the new QC gate between Stage 1 and Stage 2. The user reviews
+    // the one-pager, optionally edits or AI-regenerates it, then triggers
+    // Stage 2 via POST /api/runs/[id]/start-stage2.
     await updateRun(runId, {
-      status: "awaiting_user",
-      current_step: "Awaiting image approval for Stage 3",
+      status: "awaiting_stage2_approval",
+      current_step: "Stage 1 complete — awaiting your review before Stage 2",
       last_updated_at: now(),
-      completed_at: now(),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -624,12 +666,10 @@ export async function resumePipeline(runId: number): Promise<void> {
       const freshRun = await getRun(runId);
       if (!freshRun) throw new Error("Run not found");
       await runStage1(runId, freshRun);
-      const afterStage1 = await getRun(runId);
-      if (!afterStage1) throw new Error("Run not found after stage 1");
-      await runStage2(runId, afterStage1);
+      // Pause at the Stage 1 → Stage 2 QC gate. User triggers Stage 2 manually.
       await updateRun(runId, {
-        status: "awaiting_user",
-        current_step: "Awaiting image approval for Stage 3",
+        status: "awaiting_stage2_approval",
+        current_step: "Stage 1 complete — awaiting your review before Stage 2",
         last_updated_at: now(),
       });
       return;
@@ -645,14 +685,11 @@ export async function resumePipeline(runId: number): Promise<void> {
         if (!freshRun) throw new Error("Run not found");
         await runStage1(runId, freshRun);
       }
-      const afterStage1 = await getRun(runId);
-      if (!afterStage1) throw new Error("Run not found");
-      await runStage2(runId, afterStage1);
+      // Pause at the Stage 1 → Stage 2 QC gate. User triggers Stage 2 manually.
       await updateRun(runId, {
-        status: "awaiting_user",
-        current_step: "Awaiting image approval for Stage 3",
+        status: "awaiting_stage2_approval",
+        current_step: "Stage 1 complete — awaiting your review before Stage 2",
         last_updated_at: now(),
-        completed_at: now(),
       });
       return;
     }

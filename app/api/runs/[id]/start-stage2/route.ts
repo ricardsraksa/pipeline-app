@@ -1,0 +1,43 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getRun } from "@/lib/db";
+import { runStage2Manually } from "@/lib/pipeline-runner";
+
+export const maxDuration = 10;
+
+export async function POST(
+  _req: NextRequest,
+  context: { params: Promise<unknown> }
+) {
+  const { id } = (await context.params) as { id: string };
+  const runId = parseInt(id, 10);
+
+  if (!Number.isFinite(runId)) {
+    return NextResponse.json({ error: "Invalid run id" }, { status: 400 });
+  }
+
+  const run = await getRun(runId);
+  if (!run) {
+    return NextResponse.json({ error: "Run not found" }, { status: 404 });
+  }
+
+  if (run.status !== "awaiting_stage2_approval") {
+    return NextResponse.json(
+      { error: "Run is not waiting for Stage 2 approval" },
+      { status: 400 }
+    );
+  }
+
+  if (!run.stage1_one_pager) {
+    return NextResponse.json(
+      { error: "Stage 1 must be complete before running Stage 2" },
+      { status: 400 }
+    );
+  }
+
+  // Fire-and-forget. Polling on the client will pick up the status change.
+  runStage2Manually(runId).catch((err) => {
+    console.error(`Manual Stage 2 trigger for run ${runId} failed:`, err);
+  });
+
+  return NextResponse.json({ success: true });
+}

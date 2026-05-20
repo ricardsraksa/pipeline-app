@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRun, updateRun, type Run } from "@/lib/db";
-import { resumePipeline } from "@/lib/pipeline-runner";
+import { resumePipeline, runStage2Manually } from "@/lib/pipeline-runner";
 
 export const maxDuration = 10;
 
@@ -81,12 +81,18 @@ export async function POST(
     error_message: null,
     current_step: null,
     completed_at: null,
+    // For a Stage 2 restart we need to flip to awaiting_stage2_approval so
+    // runStage2Manually's guard passes; for all other stages resumePipeline
+    // will overwrite status itself.
+    ...(stage === "stage2" ? { status: "awaiting_stage2_approval" as const } : {}),
     last_updated_at: new Date().toISOString(),
   });
 
-  // Fire-and-forget — resumePipeline will detect the cleared state via
-  // getLastCompletedStage() and run the appropriate stage from scratch.
-  resumePipeline(runId).catch((err) => {
+  // Stage 2 restart bypasses the QC gate (user already approved Stage 1 once).
+  // Everything else routes through resumePipeline which will pause at the gate
+  // again as appropriate.
+  const runner = stage === "stage2" ? runStage2Manually : resumePipeline;
+  runner(runId).catch((err) => {
     console.error(`Restart ${stage} for run ${runId} failed:`, err);
   });
 
