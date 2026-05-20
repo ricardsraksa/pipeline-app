@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       rawError = err instanceof Error ? err.message : String(err);
     }
-    return Response.json({ success: false, error: mapScraperError(rawError) });
+    return Response.json({ success: false, error: mapScraperError(rawError ?? "Scraper service returned failure") });
   }
 
   try {

@@ -36,6 +36,7 @@ export default function NavBar() {
             </Link>
           );
         })}
+        <span className="ml-auto font-mono text-[10px] text-zinc-700 select-none">v2.1</span>
       </div>
     </nav>
   );
