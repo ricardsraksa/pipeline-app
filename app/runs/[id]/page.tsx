@@ -460,6 +460,44 @@ function scrollToStage(stage: FailableStage | null) {
   });
 }
 
+// Short label for the Restart button (STAGE_DISPLAY_NAME is verbose for stage 3).
+const RESTART_LABEL: Record<FailableStage, string> = {
+  stage1: "Stage 1",
+  stage2: "Stage 2",
+  "stage3-prompts": "Stage 3",
+  "stage3-images": "Stage 3 Images",
+};
+
+// Per-stage "go back / restart" controls, shown under every stage section.
+function StageActions({
+  stage,
+  previousStage,
+  onRestart,
+  restarting,
+}: {
+  stage: FailableStage;
+  previousStage: FailableStage | null;
+  onRestart: (s: FailableStage) => void;
+  restarting: boolean;
+}) {
+  const btn =
+    "cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-60 whitespace-nowrap";
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {previousStage && (
+        <button onClick={() => scrollToStage(previousStage)} className={btn}>
+          <Icon.ArrowLeft className="w-3.5 h-3.5" />
+          Back to {STAGE_DISPLAY_NAME[previousStage]}
+        </button>
+      )}
+      <button onClick={() => onRestart(stage)} disabled={restarting} className={btn}>
+        {restarting ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />}
+        Restart {RESTART_LABEL[stage]}
+      </button>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RunPage() {
@@ -523,6 +561,13 @@ export default function RunPage() {
 
   async function handleRestartStage(stage: FailableStage) {
     if (!runId || restarting) return;
+    if (
+      !window.confirm(
+        `Restart ${RESTART_LABEL[stage]}? This clears that stage's output and re-runs it.`,
+      )
+    ) {
+      return;
+    }
     setRestarting(true);
     try {
       const res = await fetch(`/api/runs/${runId}/restart-stage`, {
@@ -790,7 +835,13 @@ export default function RunPage() {
                   <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
                 </div>
                 {runId !== null && (
-                  <div className="flex justify-end pt-1">
+                  <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+                    <StageActions
+                      stage="stage1"
+                      previousStage={null}
+                      onRestart={handleRestartStage}
+                      restarting={restarting}
+                    />
                     <AIRegenerate
                       runId={runId}
                       stage="stage1"
@@ -853,14 +904,22 @@ export default function RunPage() {
                   filename="STAGE2_GERMAN_COPY.txt"
                 />
                 {runId !== null && (
-                  <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
-                    <AIRegenerate
-                      runId={runId}
+                  <>
+                    <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
+                      <AIRegenerate
+                        runId={runId}
+                        stage="stage2"
+                        onRegenerated={() => window.location.reload()}
+                      />
+                      <FeedbackButtons runId={runId} stage="stage2" current={run.feedback?.stage2 ?? null} />
+                    </div>
+                    <StageActions
                       stage="stage2"
-                      onRegenerated={() => window.location.reload()}
+                      previousStage="stage1"
+                      onRestart={handleRestartStage}
+                      restarting={restarting}
                     />
-                    <FeedbackButtons runId={runId} stage="stage2" current={run.feedback?.stage2 ?? null} />
-                  </div>
+                  </>
                 )}
               </>
             ) : (
@@ -909,6 +968,12 @@ export default function RunPage() {
                 </span>
               </div>
             )}
+            <StageActions
+              stage="stage3-prompts"
+              previousStage="stage2"
+              onRestart={handleRestartStage}
+              restarting={restarting}
+            />
           </Section>
         )}
 
