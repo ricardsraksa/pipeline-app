@@ -17,11 +17,18 @@ import { REVISE_DOC_PROMPT } from "./prompts/revise_doc";
 import { ONE_PAGER_PROMPT } from "./prompts/one_pager";
 import { getPrompt } from "./prompts";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// timeout: a hung Anthropic request fails within 2 min instead of the SDK's
+// 10-min default, so a stalled Stage 1 call surfaces as a resumable failure
+// rather than an indefinitely "stuck" run.
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 // Faster, cheaper model for mechanical steps (doc revision, summarization)
 // that don't need Sonnet-level reasoning.
 const CLAUDE_HAIKU_MODEL = "claude-haiku-4-5-20251001";
+// Hard cap on each scrape HTTP call — a slow/unresponsive supplier site must
+// not hang the whole pipeline. Unbounded scrape fetches were the primary cause
+// of runs stuck at Stage 1.
+const SCRAPE_TIMEOUT_MS = 45_000;
 
 // In-memory lock to prevent a runId from being executed concurrently in the
 // same process (covers the common case of double-resume clicks). On a multi-
@@ -221,6 +228,7 @@ async function runScrape(runId: number, run: Run): Promise<void> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: run.product_url }),
+        signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
       });
       const scrapeData = await res.json();
       if (scrapeData.success) {
@@ -260,6 +268,7 @@ async function runScrape(runId: number, run: Run): Promise<void> {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: u }),
+          signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
         }).then((r) => r.json())
       )
     );

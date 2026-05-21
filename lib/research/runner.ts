@@ -5,7 +5,9 @@ import { COMPETITIVE_PROMPT } from "@/lib/prompts/research/competitive";
 import { PRODUCT_ANALYSIS_PROMPT } from "@/lib/prompts/research/product_analysis";
 import { VISUAL_PROMPT } from "@/lib/prompts/research/visual";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// timeout: a hung research call fails within 2 min instead of the SDK's
+// 10-min default, so a stalled Stage 1 step can't freeze the pipeline.
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
 
 export interface ResearchInputs {
   /** May be null in the description-first flow (user provided description + images instead). */
