@@ -786,3 +786,44 @@ export async function resumePipeline(runId: number): Promise<void> {
     RUNNING_PIPELINES.delete(runId);
   }
 }
+
+// ── Stuck-run watchdog ────────────────────────────────────────────────────────
+// Process-level safety net: every 2 min, find runs that have been in an active
+// status with no DB update for 8+ min — meaning the fire-and-forget pipeline
+// was killed (dev-server restart, crash) — and auto-resume them. Granular
+// resume means no work is lost. resumePipeline's own RUNNING_PIPELINES guard
+// makes this a no-op for runs still genuinely executing in this process.
+const WATCHDOG_STALE_MS = 8 * 60 * 1000;
+const WATCHDOG_INTERVAL_MS = 2 * 60 * 1000;
+
+async function watchdogSweep(): Promise<void> {
+  try {
+    const result = await db.execute(
+      `SELECT id, last_updated_at FROM runs
+       WHERE status IN ('pending', 'scraping', 'stage1', 'stage2')`,
+    );
+    const cutoff = Date.now() - WATCHDOG_STALE_MS;
+    const rows = result.rows as unknown as { id: number; last_updated_at: string | null }[];
+    for (const row of rows) {
+      if (!row.last_updated_at) continue;
+      if (new Date(row.last_updated_at).getTime() >= cutoff) continue;
+      if (RUNNING_PIPELINES.has(row.id)) continue; // still running here — leave it
+      console.warn(`[watchdog] run ${row.id} stale — auto-resuming`);
+      resumePipeline(row.id).catch((err) =>
+        console.error(`[watchdog] resume ${row.id} failed:`, err),
+      );
+    }
+  } catch (err) {
+    console.error("[watchdog] sweep failed:", err);
+  }
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __pipelineWatchdog: ReturnType<typeof setInterval> | undefined;
+}
+
+// Guarded so dev hot-reload doesn't stack multiple timers in one process.
+if (!globalThis.__pipelineWatchdog) {
+  globalThis.__pipelineWatchdog = setInterval(watchdogSweep, WATCHDOG_INTERVAL_MS);
+}
