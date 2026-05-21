@@ -172,6 +172,14 @@ function ErrorState({ message, runId }: { message: string; runId: string | null 
         </button>
         {runId && (
           <Link
+            href={`/runs/${runId}#stage-2-section`}
+            className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)]"
+          >
+            Back to Stage 2
+          </Link>
+        )}
+        {runId && (
+          <Link
             href={`/runs/${runId}`}
             className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)]"
           >
