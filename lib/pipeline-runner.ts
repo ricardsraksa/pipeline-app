@@ -711,6 +711,10 @@ export async function resumePipeline(runId: number): Promise<void> {
     const lastStage = getLastCompletedStage(run);
 
     if (lastStage === "none") {
+      // runPipeline manages the RUNNING_PIPELINES lock itself. Release the lock
+      // resumePipeline acquired first — otherwise runPipeline's duplicate-run
+      // guard sees it, skips, and the resume silently does nothing.
+      RUNNING_PIPELINES.delete(runId);
       await runPipeline(runId);
       return;
     }
