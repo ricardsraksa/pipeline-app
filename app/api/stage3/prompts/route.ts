@@ -25,6 +25,43 @@ interface RawPromptObj {
   source_image_references?: unknown
 }
 
+// Forced tool call. Claude reliably mis-escapes the German marketing copy
+// (full of quotation marks) when hand-writing a ~40 KB JSON array as text,
+// which broke JSON.parse. Routing the 9 prompts through a tool call hands the
+// structure to the API's own JSON serialisation, so the result is always
+// well-formed regardless of the copy's punctuation.
+const PROMPTS_TOOL: Anthropic.Tool = {
+  name: 'submit_image_prompts',
+  description: 'Submit the 9 generated image prompt briefs.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      prompts: {
+        type: 'array',
+        description: 'Exactly 9 image prompt objects, in order.',
+        items: {
+          type: 'object',
+          properties: {
+            index: { type: 'number' },
+            image_type: { type: 'string' },
+            category: { type: 'string' },
+            model: { type: 'string' },
+            aspect_ratio: { type: 'string' },
+            prompt: { type: 'string' },
+            german_text: { type: 'string' },
+            source_image_references: { type: 'array', items: { type: 'string' } },
+          },
+          required: [
+            'index', 'image_type', 'category', 'model',
+            'aspect_ratio', 'prompt', 'german_text', 'source_image_references',
+          ],
+        },
+      },
+    },
+    required: ['prompts'],
+  },
+}
+
 export async function POST(req: NextRequest) {
   const {
     research,
@@ -75,42 +112,39 @@ export async function POST(req: NextRequest) {
   ]
 
   try {
-    // Stream the response: the SDK rejects a non-streaming request whose
-    // max_tokens it estimates could take over 10 minutes. finalMessage()
-    // collects the stream into the same Message object.
+    // Forced tool call (see PROMPTS_TOOL): routes the 9 prompts through the
+    // API's JSON serialisation so German copy punctuation can't break parsing.
+    // Streaming is required by the SDK at this max_tokens budget;
+    // finalMessage() collects the stream.
     const message = await anthropic.messages
       .stream({
         model: 'claude-sonnet-4-5-20250929',
-        // 9 fully-expanded templates (each with an inline Fidelity Lock +
-        // Negative Constraint Block) run ~15-20k output tokens. 12k truncated
-        // the JSON array mid-object; 32k leaves comfortable headroom.
         max_tokens: 32000,
         system: systemPrompt,
         messages: [{ role: 'user', content: messageContent }],
+        tools: [PROMPTS_TOOL],
+        tool_choice: { type: 'tool', name: 'submit_image_prompts' },
       })
       .finalMessage()
 
-    const raw = message.content.find(b => b.type === 'text')?.text ?? ''
-
-    // A truncated response can't be valid JSON — surface a clear reason.
     if (message.stop_reason === 'max_tokens') {
       return Response.json(
-        { success: false, error: 'Prompt generation was cut off (output too long). Please retry.', raw },
+        { success: false, error: 'Prompt generation was cut off (output too long). Please retry.' },
         { status: 500 },
       )
     }
 
-    let parsed: RawPromptObj[]
-    try {
-      const jsonMatch = raw.match(/\[[\s\S]*\]/)
-      if (!jsonMatch) throw new Error('No JSON array found')
-      parsed = JSON.parse(jsonMatch[0])
-    } catch {
-      return Response.json({ success: false, error: 'Failed to parse prompts JSON', raw }, { status: 500 })
+    const toolUse = message.content.find(b => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      return Response.json(
+        { success: false, error: 'Model did not return structured prompts.' },
+        { status: 500 },
+      )
     }
+    const parsed = (toolUse.input as { prompts?: RawPromptObj[] }).prompts
 
     if (!Array.isArray(parsed) || parsed.length !== 9) {
-      return Response.json({ success: false, error: `Expected 9 prompts, got ${parsed?.length ?? 0}`, raw }, { status: 500 })
+      return Response.json({ success: false, error: `Expected 9 prompts, got ${parsed?.length ?? 0}` }, { status: 500 })
     }
 
     // Normalize: ensure required fields and a valid category slug for every prompt.
