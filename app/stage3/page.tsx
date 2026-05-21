@@ -450,6 +450,14 @@ function CompletePhase({
         </button>
         {run?.id && (
           <Link
+            href={`/runs/${run.id}#stage-2-section`}
+            className="inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
+          >
+            ← Back to Stage 2
+          </Link>
+        )}
+        {run?.id && (
+          <Link
             href={`/history/${run.id}`}
             className="inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
           >
