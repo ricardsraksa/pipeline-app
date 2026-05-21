@@ -9,8 +9,6 @@ import {
   runVisual,
   type ResearchInputs,
 } from "./research/runner";
-import { CHIEF_MID_PROMPT } from "./prompts/chief_mid";
-import { REVISE_RESEARCH_PROMPT } from "./prompts/revise_research";
 import { AVATAR_PROMPT } from "./prompts/avatar";
 import { OFFER_BRIEF_PROMPT } from "./prompts/offer_brief";
 import { NECESSARY_BELIEFS_PROMPT } from "./prompts/necessary_beliefs";
@@ -21,6 +19,9 @@ import { getPrompt } from "./prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+// Faster, cheaper model for mechanical steps (doc revision, summarization)
+// that don't need Sonnet-level reasoning.
+const CLAUDE_HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 // In-memory lock to prevent a runId from being executed concurrently in the
 // same process (covers the common case of double-resume clicks). On a multi-
@@ -76,11 +77,12 @@ async function anthropicMessage(args: {
   user: string;
   maxTokens: number;
   label: string;
+  model?: string;
 }): Promise<string> {
   const msg = await withRetry(
     () =>
       anthropic.messages.create({
-        model: CLAUDE_MODEL,
+        model: args.model ?? CLAUDE_MODEL,
         max_tokens: args.maxTokens,
         system: args.system,
         messages: [{ role: "user", content: args.user }],
@@ -172,6 +174,8 @@ async function reviseDoc(original: string, docType: string, changes: string): Pr
     user: `Document type: ${docType}\n\nOriginal document:\n\n${original}\n\n---\n\nRequired changes:\n\n${changes}`,
     maxTokens: 4000,
     label: `revise ${docType}`,
+    // Mechanical doc editing against an explicit changelist — Haiku is enough.
+    model: CLAUDE_HAIKU_MODEL,
   });
   return text || original;
 }
@@ -354,33 +358,15 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     });
   }
 
-  // ── Sub-step 6: Chief mid review (skip if already in DB) ──
-  let chiefMid = run.step_chief_mid ?? "";
-  if (!chiefMid) {
-    await updateRun(runId, { current_step: "Stage 1: Mid chief review (6/8)", last_updated_at: now() });
-    chiefMid = await anthropicMessage({
-      system: CHIEF_MID_PROMPT,
-      user: `RESEARCH.txt to review:\n\n${research}`,
-      maxTokens: 4000,
-      label: "chief mid review",
-    });
-    await updateRun(runId, { step_chief_mid: chiefMid, last_updated_at: now() });
-  }
-
-  // ── Sub-step 7: Research revised (skip if already in DB) ──
+  // ── Research is used downstream as-is ──
+  // The mid-review pass (chief mid review + research revision) was removed for
+  // speed — it was ~30% of Stage 1 wall-clock. step_chief_mid stays null;
+  // step_research_revised mirrors step_research so the resume check and every
+  // downstream reader (which read step_research_revised) keep working. Runs
+  // created before this change keep their genuinely-revised text.
   let researchRevised = run.step_research_revised ?? "";
   if (!researchRevised) {
-    await updateRun(runId, { current_step: "Stage 1: Revising research (7/8)", last_updated_at: now() });
     researchRevised = research;
-    if (chiefMid && !chiefMid.includes("NO REVISIONS REQUIRED")) {
-      const revised = await anthropicMessage({
-        system: REVISE_RESEARCH_PROMPT,
-        user: `RESEARCH.txt (original):\n\n${research}\n\n---\n\nCHIEF_MID.txt (review):\n\n${chiefMid}`,
-        maxTokens: 8000,
-        label: "revise research",
-      });
-      if (revised) researchRevised = revised;
-    }
     await updateRun(runId, { step_research_revised: researchRevised, last_updated_at: now() });
   }
 
@@ -563,6 +549,8 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       ].join("\n"),
       maxTokens: 2000,
       label: "one-pager synthesis",
+      // Pure summarization of finished docs — Haiku is enough.
+      model: CLAUDE_HAIKU_MODEL,
     });
     if (!onePager) throw new Error("Stage 1: one-pager synthesis returned empty");
     await updateRun(runId, { stage1_one_pager: onePager, last_updated_at: now() });
