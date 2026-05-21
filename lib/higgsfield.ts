@@ -1,10 +1,15 @@
-// Higgsfield v1 platform API connector.
+// Higgsfield platform API connector.
 //
-// Base URL is platform.higgsfield.ai (not api.higgsfield.ai, which is no longer
-// reachable). Auth is `Authorization: Key {KEY_ID}:{KEY_SECRET}`. Endpoints are
-// `/v1/text2image/{model}` (or `/v1/image2image/{model}` when a reference image
-// is provided). The request body must wrap inputs in a `params` object. Async
-// jobs return a `request_id` and are polled at `/requests/{id}/status`.
+// Verified against https://docs.higgsfield.ai (current):
+//   Base URL : https://platform.higgsfield.ai
+//   Submit   : POST /{model_id}                   body: { prompt, aspect_ratio, resolution }
+//   Poll     : GET  /requests/{request_id}/status
+//   Auth     : Authorization: Key {KEY_ID}:{KEY_SECRET}
+//
+// `model_id` is a path-style identifier such as "higgsfield-ai/soul/standard".
+// The platform routes POST /{model_id} directly — there is NO /v1/text2image/x
+// or /v1/image2image/x endpoint. Short names like "nano_banana_2" are not valid
+// model_ids; that mismatch is what produced HTTP 404 "Model not found".
 //
 // Credentials: set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET separately, OR
 // set HIGGSFIELD_CREDENTIALS in the format "KEY_ID:KEY_SECRET", OR set
@@ -14,29 +19,31 @@ const HIGGSFIELD_BASE = "https://platform.higgsfield.ai";
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 180_000;
 
-export type HiggsfieldModel =
-  | "marketing_studio_image"
-  | "flux_2"
-  | "flux_2_pro"
-  | "nano_banana_flash"
-  | "nano_banana_2"
-  | "nano_banana_pro"
-  | "gpt_image_2"
-  | "soul";
+// The verified-real flagship text-to-image model_id. Every generation routes
+// here until additional model_ids are confirmed against the Higgsfield Models
+// Gallery (cloud.higgsfield.ai).
+export const DEFAULT_MODEL_ID = "higgsfield-ai/soul/standard";
+
+// A "model" is just a Higgsfield model_id string. Kept as an exported alias so
+// existing imports keep typechecking.
+export type HiggsfieldModel = string;
 
 export interface GenerationRequest {
   prompt: string;
-  model?: HiggsfieldModel;
+  /** Higgsfield model_id (e.g. "higgsfield-ai/soul/standard"). Legacy short
+   *  names without a "/" are normalised to DEFAULT_MODEL_ID. */
+  model?: string;
+  /** Accepted for caller compatibility but not currently forwarded — see the
+   *  note in createGeneration(). */
   reference_image_url?: string;
   reference_image_base64?: string;
   aspect_ratio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
-  resolution?: "1k" | "2k";
-  model_variant?: string;
+  resolution?: "720p" | "1080p" | "1k" | "2k";
 }
 
 export interface GenerationResult {
   id: string;
-  status: "pending" | "processing" | "completed" | "failed" | "nsfw";
+  status: "queued" | "in_progress" | "completed" | "failed" | "nsfw";
   image_url?: string;
   error?: string;
 }
@@ -68,52 +75,61 @@ async function higgsfieldFetch(
     headers: {
       Authorization: `Key ${credentials}`,
       "Content-Type": "application/json",
+      Accept: "application/json",
       "User-Agent": "higgsfield-pipeline-app/1.0",
       ...(options.headers ?? {}),
     },
   });
 }
 
-function aspectToWidthHeight(aspect: GenerationRequest["aspect_ratio"], res: "1k" | "2k"): string {
-  const base = res === "2k" ? 2048 : 1024;
-  switch (aspect) {
-    case "16:9":
-      return `${base}x${Math.round((base * 9) / 16)}`;
-    case "9:16":
-      return `${Math.round((base * 9) / 16)}x${base}`;
-    case "4:3":
-      return `${base}x${Math.round((base * 3) / 4)}`;
-    case "3:4":
-      return `${Math.round((base * 3) / 4)}x${base}`;
-    case "1:1":
-    default:
-      return `${base}x${base}`;
-  }
+// A real model_id is a path like "org/model/tier". Anything without a slash is
+// a legacy short name the platform does not recognise — fall back to the
+// verified default rather than 404.
+function normalizeModelId(name?: string): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return DEFAULT_MODEL_ID;
+  return trimmed.includes("/") ? trimmed : DEFAULT_MODEL_ID;
+}
+
+// 720p is the only resolution confirmed working for the default model_id in
+// the Higgsfield docs, so it is the safe default. 1080p is emitted only when a
+// caller explicitly asks for it (and accepts the risk the model rejects it).
+function normalizeResolution(res?: string): "720p" | "1080p" {
+  return res === "1080p" ? "1080p" : "720p";
+}
+
+// Pull the result image URL out of the shapes Higgsfield returns it in.
+function extractImageUrl(data: Record<string, unknown>): string | undefined {
+  const images = data.images as Array<{ url?: string }> | undefined;
+  if (images?.[0]?.url) return images[0].url;
+  return (
+    (data.image_url as string | undefined) ??
+    (data.url as string | undefined) ??
+    ((data.result as { url?: string } | undefined)?.url)
+  );
 }
 
 export async function createGeneration(
   req: GenerationRequest,
 ): Promise<GenerationResult> {
-  const model = req.model ?? "marketing_studio_image";
-  const hasReference = !!(req.reference_image_url || req.reference_image_base64);
-  const endpoint = hasReference ? `/v1/image2image/${model}` : `/v1/text2image/${model}`;
-  const resolution = req.resolution ?? "2k";
+  const modelId = normalizeModelId(req.model);
   const aspect = req.aspect_ratio ?? "1:1";
+  const resolution = normalizeResolution(req.resolution);
 
-  const params: Record<string, unknown> = {
+  // NOTE: reference_image_url / reference_image_base64 are intentionally not
+  // forwarded. The documented text-to-image body is only { prompt, aspect_ratio,
+  // resolution }; the per-model input-image field is undocumented and sending
+  // an unknown field risks an HTTP 422. The Stage 3 prompts already describe
+  // the product in detail, so generation still works without it.
+  const body = {
     prompt: req.prompt,
     aspect_ratio: aspect,
-    width_and_height: aspectToWidthHeight(aspect, resolution),
-    quality: resolution === "2k" ? "high" : "standard",
+    resolution,
   };
 
-  if (req.model_variant) params.variant = req.model_variant;
-  if (req.reference_image_url) params.reference_image_url = req.reference_image_url;
-  if (req.reference_image_base64) params.reference_image = req.reference_image_base64;
-
-  const res = await higgsfieldFetch(endpoint, {
+  const res = await higgsfieldFetch(`/${modelId}`, {
     method: "POST",
-    body: JSON.stringify({ params }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -123,36 +139,32 @@ export async function createGeneration(
         ? "Higgsfield rejected the credentials. Verify HIGGSFIELD_API_KEY/HIGGSFIELD_API_SECRET in your environment (regenerate them at cloud.higgsfield.ai if needed)."
         : res.status === 403
           ? "Higgsfield credit balance is empty or your plan does not include this model."
-          : res.status === 422
-            ? `Higgsfield validation error: ${text.slice(0, 300)}`
-            : `Higgsfield API error ${res.status}: ${text.slice(0, 300)}`;
+          : res.status === 404
+            ? `Higgsfield model "${modelId}" not found. Verify the model_id against the Models Gallery at cloud.higgsfield.ai.`
+            : res.status === 422
+              ? `Higgsfield validation error: ${text.slice(0, 300)}`
+              : `Higgsfield API error ${res.status}: ${text.slice(0, 300)}`;
     throw new Error(friendly);
   }
 
   const data = (await res.json()) as Record<string, unknown>;
-
-  // Some models (e.g., flux fast variants) return the image inline.
-  const inlineUrl =
-    (data.image_url as string | undefined) ??
-    (data.url as string | undefined) ??
-    ((data.result as { url?: string } | undefined)?.url);
-
   const requestId =
-    (data.request_id as string | undefined) ??
-    (data.id as string | undefined) ??
-    (data.job_id as string | undefined);
+    (data.request_id as string | undefined) ?? (data.id as string | undefined);
+  const status = (data.status as GenerationResult["status"]) ?? "queued";
+  const inlineUrl = extractImageUrl(data);
 
-  if (inlineUrl) {
-    return { id: requestId ?? "sync", status: "completed", image_url: inlineUrl };
+  // Some responses may already be complete on submit.
+  if (status === "completed" && inlineUrl) {
+    return { id: requestId ?? "sync", status, image_url: inlineUrl };
   }
 
   if (!requestId) {
     throw new Error(
-      `Higgsfield returned no job id and no image url. Raw response: ${JSON.stringify(data).slice(0, 300)}`,
+      `Higgsfield returned no request_id. Raw response: ${JSON.stringify(data).slice(0, 300)}`,
     );
   }
 
-  return { id: requestId, status: (data.status as GenerationResult["status"]) ?? "pending" };
+  return { id: requestId, status };
 }
 
 export async function pollGeneration(id: string): Promise<GenerationResult> {
@@ -162,22 +174,12 @@ export async function pollGeneration(id: string): Promise<GenerationResult> {
     throw new Error(`Higgsfield poll error ${res.status}: ${text.slice(0, 200)}`);
   }
   const data = (await res.json()) as Record<string, unknown>;
-  const status = (data.status as GenerationResult["status"]) ?? "processing";
-
-  // Locate the resulting image URL across the shapes Higgsfield returns it.
-  const jobs = (data.jobs as Array<Record<string, unknown>> | undefined) ?? [];
-  const firstJob = jobs[0];
-  const firstJobResults = (firstJob?.results as { raw?: { url?: string } } | undefined);
-  const imageUrl =
-    (data.image_url as string | undefined) ??
-    (data.url as string | undefined) ??
-    ((data.result as { url?: string } | undefined)?.url) ??
-    firstJobResults?.raw?.url;
+  const status = (data.status as GenerationResult["status"]) ?? "in_progress";
 
   return {
     id,
     status,
-    image_url: imageUrl,
+    image_url: extractImageUrl(data),
     error: (data.error as string | undefined) ?? (data.detail as string | undefined),
   };
 }
@@ -190,7 +192,7 @@ export async function generateImage(req: GenerationRequest): Promise<string> {
   }
 
   if (!result.id || result.id === "sync") {
-    throw new Error("Higgsfield returned no job id; cannot poll for result.");
+    throw new Error("Higgsfield returned no request_id; cannot poll for result.");
   }
 
   const deadline = Date.now() + POLL_TIMEOUT_MS;
