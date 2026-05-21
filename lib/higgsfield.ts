@@ -1,49 +1,53 @@
 // Higgsfield platform API connector.
 //
-// Verified against https://docs.higgsfield.ai (current):
+// Verified live against platform.higgsfield.ai + the Models Gallery
+// (cloud.higgsfield.ai):
 //   Base URL : https://platform.higgsfield.ai
-//   Submit   : POST /{model_id}                   body: { prompt, aspect_ratio, resolution }
+//   Submit   : POST /{model_id}
 //   Poll     : GET  /requests/{request_id}/status
 //   Auth     : Authorization: Key {KEY_ID}:{KEY_SECRET}
 //
-// `model_id` is a path-style identifier such as "higgsfield-ai/soul/standard".
-// The platform routes POST /{model_id} directly — there is NO /v1/text2image/x
-// or /v1/image2image/x endpoint. Short names like "nano_banana_2" are not valid
-// model_ids; that mismatch is what produced HTTP 404 "Model not found".
+// Base model is Soul Reference — Higgsfield's flagship model that conditions
+// generation on a product photo (`image_reference_url`, required). When a run
+// has no reference image, generation falls back to Soul Standard (text-only).
 //
-// Credentials: set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET separately, OR
-// set HIGGSFIELD_CREDENTIALS in the format "KEY_ID:KEY_SECRET", OR set
-// HIGGSFIELD_API_KEY to the same "KEY_ID:KEY_SECRET" string.
+// NOTE: Nano Banana Pro is NOT exposed on the Higgsfield REST API — the REST
+// catalog is only the Soul family + DoP video models. It is reachable via the
+// Higgsfield consumer app / MCP, neither of which a deployed server can call.
+// If it ever lands on REST, swap BASE_MODEL below.
+//
+// Credentials: set HIGGSFIELD_API_KEY (key id) and HIGGSFIELD_API_SECRET, OR
+// set HIGGSFIELD_CREDENTIALS in the format "KEY_ID:KEY_SECRET".
 
 const HIGGSFIELD_BASE = "https://platform.higgsfield.ai";
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 180_000;
 
-// The verified-real flagship text-to-image model_id. Every generation routes
-// here until additional model_ids are confirmed against the Higgsfield Models
-// Gallery (cloud.higgsfield.ai).
-export const DEFAULT_MODEL_ID = "higgsfield-ai/soul/standard";
+// Verified-real model_ids (path segments for POST /{model_id}).
+export const BASE_MODEL = "higgsfield-ai/soul/reference"; // text + required reference image
+export const FALLBACK_MODEL = "higgsfield-ai/soul/standard"; // text-only, no reference image
 
-// A "model" is just a Higgsfield model_id string. Kept as an exported alias so
-// existing imports keep typechecking.
+// Kept as a loose alias so any lingering imports keep typechecking.
 export type HiggsfieldModel = string;
 
 export interface GenerationRequest {
   prompt: string;
-  /** Higgsfield model_id (e.g. "higgsfield-ai/soul/standard"). Legacy short
-   *  names without a "/" are normalised to DEFAULT_MODEL_ID. */
+  /** Accepted for caller compatibility; model routing is decided by whether a
+   *  reference image is present, not by this field. */
   model?: string;
-  /** Accepted for caller compatibility but not currently forwarded — see the
-   *  note in createGeneration(). */
+  /** Product photo URL. When set, generation uses Soul Reference and the image
+   *  conditions the result. Must be an https URL. */
   reference_image_url?: string;
+  /** Accepted for caller compatibility but unused — Soul Reference needs a URL,
+   *  not base64. Callers should pass an https URL via reference_image_url. */
   reference_image_base64?: string;
-  aspect_ratio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4";
+  aspect_ratio?: "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "2:3" | "3:2";
   resolution?: "720p" | "1080p" | "1k" | "2k";
 }
 
 export interface GenerationResult {
   id: string;
-  status: "queued" | "in_progress" | "completed" | "failed" | "nsfw";
+  status: "queued" | "in_progress" | "completed" | "failed" | "nsfw" | "canceled";
   image_url?: string;
   error?: string;
 }
@@ -58,10 +62,9 @@ function resolveCredentials(): string {
   if (key && key.includes(":")) return key;
 
   throw new Error(
-    "Higgsfield credentials not configured. Set HIGGSFIELD_API_KEY and " +
-      "HIGGSFIELD_API_SECRET (or HIGGSFIELD_CREDENTIALS=KEY_ID:KEY_SECRET) " +
-      "in your environment. Find these in your Higgsfield dashboard at " +
-      "cloud.higgsfield.ai.",
+    "Higgsfield credentials not configured. Set HIGGSFIELD_API_KEY (key id) and " +
+      "HIGGSFIELD_API_SECRET (or HIGGSFIELD_CREDENTIALS=KEY_ID:KEY_SECRET) in your " +
+      "environment. Create an API key at cloud.higgsfield.ai/api-keys.",
   );
 }
 
@@ -82,20 +85,16 @@ async function higgsfieldFetch(
   });
 }
 
-// A real model_id is a path like "org/model/tier". Anything without a slash is
-// a legacy short name the platform does not recognise — fall back to the
-// verified default rather than 404.
-function normalizeModelId(name?: string): string {
-  const trimmed = name?.trim();
-  if (!trimmed) return DEFAULT_MODEL_ID;
-  return trimmed.includes("/") ? trimmed : DEFAULT_MODEL_ID;
+// Soul models accept this fixed set of aspect ratios.
+const VALID_ASPECT_RATIOS = new Set(["9:16", "16:9", "4:3", "3:4", "1:1", "2:3", "3:2"]);
+function normalizeAspectRatio(a?: string): string {
+  return a && VALID_ASPECT_RATIOS.has(a) ? a : "1:1";
 }
 
-// 720p is the only resolution confirmed working for the default model_id in
-// the Higgsfield docs, so it is the safe default. 1080p is emitted only when a
-// caller explicitly asks for it (and accepts the risk the model rejects it).
+// Soul resolution enum is 720p | 1080p. Default to 1080p for best quality;
+// only drop to 720p when a caller explicitly asks for the lower tier.
 function normalizeResolution(res?: string): "720p" | "1080p" {
-  return res === "1080p" ? "1080p" : "720p";
+  return res === "720p" || res === "1k" ? "720p" : "1080p";
 }
 
 // Pull the result image URL out of the shapes Higgsfield returns it in.
@@ -112,20 +111,29 @@ function extractImageUrl(data: Record<string, unknown>): string | undefined {
 export async function createGeneration(
   req: GenerationRequest,
 ): Promise<GenerationResult> {
-  const modelId = normalizeModelId(req.model);
-  const aspect = req.aspect_ratio ?? "1:1";
+  const aspect = normalizeAspectRatio(req.aspect_ratio);
   const resolution = normalizeResolution(req.resolution);
+  const referenceUrl = req.reference_image_url?.trim();
 
-  // NOTE: reference_image_url / reference_image_base64 are intentionally not
-  // forwarded. The documented text-to-image body is only { prompt, aspect_ratio,
-  // resolution }; the per-model input-image field is undocumented and sending
-  // an unknown field risks an HTTP 422. The Stage 3 prompts already describe
-  // the product in detail, so generation still works without it.
-  const body = {
-    prompt: req.prompt,
-    aspect_ratio: aspect,
-    resolution,
-  };
+  // Soul Reference is the base model — it conditions on a product photo. With
+  // no reference image, fall back to Soul Standard (text-only).
+  const useReference = Boolean(referenceUrl);
+  const modelId = useReference ? BASE_MODEL : FALLBACK_MODEL;
+
+  const body: Record<string, unknown> = useReference
+    ? {
+        prompt: req.prompt,
+        image_reference_url: referenceUrl,
+        aspect_ratio: aspect,
+        resolution,
+        batch_size: 1,
+        enhance_prompt: true,
+      }
+    : {
+        prompt: req.prompt,
+        aspect_ratio: aspect,
+        resolution,
+      };
 
   const res = await higgsfieldFetch(`/${modelId}`, {
     method: "POST",
@@ -136,11 +144,11 @@ export async function createGeneration(
     const text = await res.text();
     const friendly =
       res.status === 401
-        ? "Higgsfield rejected the credentials. Verify HIGGSFIELD_API_KEY/HIGGSFIELD_API_SECRET in your environment (regenerate them at cloud.higgsfield.ai if needed)."
+        ? "Higgsfield rejected the credentials. Verify HIGGSFIELD_API_KEY/HIGGSFIELD_API_SECRET (create a fresh key at cloud.higgsfield.ai/api-keys)."
         : res.status === 403
-          ? "Higgsfield credit balance is empty or your plan does not include this model."
+          ? "Higgsfield account is out of credits. Add credits at cloud.higgsfield.ai/credits, then retry."
           : res.status === 404
-            ? `Higgsfield model "${modelId}" not found. Verify the model_id against the Models Gallery at cloud.higgsfield.ai.`
+            ? `Higgsfield model "${modelId}" not found.`
             : res.status === 422
               ? `Higgsfield validation error: ${text.slice(0, 300)}`
               : `Higgsfield API error ${res.status}: ${text.slice(0, 300)}`;
@@ -153,7 +161,6 @@ export async function createGeneration(
   const status = (data.status as GenerationResult["status"]) ?? "queued";
   const inlineUrl = extractImageUrl(data);
 
-  // Some responses may already be complete on submit.
   if (status === "completed" && inlineUrl) {
     return { id: requestId ?? "sync", status, image_url: inlineUrl };
   }
@@ -207,6 +214,9 @@ export async function generateImage(req: GenerationRequest): Promise<string> {
     }
     if (result.status === "nsfw") {
       throw new Error("Higgsfield flagged the prompt as NSFW and refused to generate.");
+    }
+    if (result.status === "canceled") {
+      throw new Error("Higgsfield generation was canceled.");
     }
   }
 
