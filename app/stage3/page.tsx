@@ -394,6 +394,7 @@ function CompletePhase({
   auditResults,
   regenCounts,
   onRegenerate,
+  onRerunAll,
   run,
 }: {
   images: ImageSlot[]
@@ -401,6 +402,7 @@ function CompletePhase({
   auditResults: (AuditResult | null)[]
   regenCounts: number[]
   onRegenerate: (i: number) => void
+  onRerunAll: () => void
   run: Run | null
 }) {
   const passed = auditResults.filter(r => r?.verdict === 'pass').length
@@ -439,7 +441,13 @@ function CompletePhase({
           />
         ))}
       </div>
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center gap-3 pt-2 flex-wrap">
+        <button
+          onClick={onRerunAll}
+          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
+        >
+          Regenerate all images
+        </button>
         {run?.id && (
           <Link
             href={`/history/${run.id}`}
@@ -864,6 +872,7 @@ function Stage3Page() {
           auditResults={auditResults}
           regenCounts={regenCounts}
           onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
+          onRerunAll={generateImages}
           run={run}
         />
       )}
