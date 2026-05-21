@@ -158,11 +158,27 @@ function LoadingState({ message, subtitle }: { message: string; subtitle?: strin
   )
 }
 
-function ErrorState({ message }: { message: string }) {
+function ErrorState({ message, runId }: { message: string; runId: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <p className="text-sm text-[var(--color-error)] font-[600]">Error</p>
       <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] max-w-md text-center">{message}</p>
+      <div className="flex items-center gap-2 mt-2">
+        <button
+          onClick={() => window.location.reload()}
+          className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105"
+        >
+          Retry Stage 3
+        </button>
+        {runId && (
+          <Link
+            href={`/runs/${runId}`}
+            className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)]"
+          >
+            Back to run
+          </Link>
+        )}
+      </div>
     </div>
   )
 }
@@ -843,7 +859,7 @@ function Stage3Page() {
           run={run}
         />
       )}
-      {phase === 'error' && <ErrorState message={error ?? 'Unknown error'} />}
+      {phase === 'error' && <ErrorState message={error ?? 'Unknown error'} runId={searchParams.get('runId')} />}
 
       {regenModal && (
         <RegenModal
