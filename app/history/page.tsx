@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { listRuns, type RunSummary } from "@/lib/db";
+import { HistoryRefresher } from "./HistoryRefresher";
 
 // Server components run in the same process as the API. Skip the HTTP roundtrip
 // and read from the DB directly — much faster, doesn't depend on INTERNAL_API_URL.
@@ -123,8 +124,11 @@ export default async function HistoryPage() {
     { active: 0, completed: 0, failed: 0, waiting: 0 }
   );
 
+  const hasActiveRuns = counts.active > 0;
+
   return (
     <main className="px-7 py-7 max-w-[1080px] mx-auto">
+      <HistoryRefresher hasActiveRuns={hasActiveRuns} />
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
