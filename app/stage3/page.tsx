@@ -34,6 +34,25 @@ interface ImageSlot {
   error?: string
 }
 
+// Download a generated image. Tries a blob download (forces a real "Save");
+// falls back to opening the image in a new tab if the CDN blocks cross-origin
+// fetches.
+async function downloadImage(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('fetch failed')
+    const blob = await res.blob()
+    const objUrl = URL.createObjectURL(blob)
+    const a = Object.assign(document.createElement('a'), { href: objUrl, download: filename })
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(objUrl)
+  } catch {
+    window.open(url, '_blank', 'noopener')
+  }
+}
+
 function ImageCell({
   image,
   prompt,
@@ -62,22 +81,6 @@ function ImageCell({
               <VerdictBadge verdict={auditResult.verdict} />
             </div>
           )}
-          {auditResult?.requires_regeneration && regenCount < 3 && (
-            <button
-              onClick={onRegenerate}
-              className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-red-bg)] border border-[var(--color-red)]/30 text-[var(--color-red)] text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer hover:brightness-95 transition-all"
-            >
-              Regenerate
-            </button>
-          )}
-          {regenCount >= 3 && auditResult?.requires_regeneration && (
-            <div className="absolute bottom-2 right-2 px-2 py-1 bg-[var(--color-surface)]/90 text-[var(--color-text-3)] text-[9px] font-[var(--font-ibm-plex-mono)] rounded">
-              Max retries
-            </div>
-          )}
-          <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/80 truncate">{cat?.label}</p>
-          </div>
           {auditResult && auditResult.issues.length > 0 && (
             <button
               onClick={() => setShowDetails(v => !v)}
@@ -86,6 +89,25 @@ function ImageCell({
               i
             </button>
           )}
+          {/* Action bar — Download + Regenerate, revealed on hover */}
+          <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => downloadImage(image.url as string, `${prompt.category || 'image'}_${catIndex + 1}.png`)}
+              className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer transition-colors"
+            >
+              Download
+            </button>
+            {regenCount < 3 ? (
+              <button
+                onClick={onRegenerate}
+                className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer transition-colors"
+              >
+                Regenerate
+              </button>
+            ) : (
+              <span className="px-2 py-1 text-white/50 text-[9px] font-[var(--font-ibm-plex-mono)]">Max retries</span>
+            )}
+          </div>
           {showDetails && auditResult && (
             <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
               <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider mb-1">Issues</p>
