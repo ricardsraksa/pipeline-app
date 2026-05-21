@@ -4,6 +4,7 @@ import { buildImagePromptsUserMessage } from '@/lib/prompts/image_prompts'
 import { getPrompt } from '@/lib/prompts'
 import { buildFeedbackSummary } from '@/lib/stage3/learning'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
+import { jsonrepair } from 'jsonrepair'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -141,10 +142,30 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       )
     }
-    const parsed = (toolUse.input as { prompts?: RawPromptObj[] }).prompts
+
+    // Claude usually returns `prompts` as a proper array, but for a payload
+    // this large it sometimes emits it as a stringified JSON array instead.
+    // Handle both — and run the string form through jsonrepair first, since
+    // the German marketing copy is prone to quote-escaping mistakes.
+    const rawPrompts = (toolUse.input as { prompts?: unknown }).prompts
+    let parsed: RawPromptObj[]
+    try {
+      if (Array.isArray(rawPrompts)) {
+        parsed = rawPrompts as RawPromptObj[]
+      } else if (typeof rawPrompts === 'string') {
+        parsed = JSON.parse(jsonrepair(rawPrompts)) as RawPromptObj[]
+      } else {
+        throw new Error('prompts field missing or not array/string')
+      }
+    } catch {
+      return Response.json({ success: false, error: 'Failed to parse generated prompts.' }, { status: 500 })
+    }
 
     if (!Array.isArray(parsed) || parsed.length !== 9) {
-      return Response.json({ success: false, error: `Expected 9 prompts, got ${parsed?.length ?? 0}` }, { status: 500 })
+      return Response.json(
+        { success: false, error: `Expected 9 prompts, got ${Array.isArray(parsed) ? parsed.length : 0}` },
+        { status: 500 },
+      )
     }
 
     // Normalize: ensure required fields and a valid category slug for every prompt.
