@@ -74,12 +74,23 @@ export async function POST(req: NextRequest) {
   try {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 12000,
+      // 9 fully-expanded templates (each with an inline Fidelity Lock +
+      // Negative Constraint Block) run ~15-20k output tokens. 12k truncated
+      // the JSON array mid-object; 32k leaves comfortable headroom.
+      max_tokens: 32000,
       system: systemPrompt,
       messages: [{ role: 'user', content: messageContent }],
     })
 
     const raw = message.content.find(b => b.type === 'text')?.text ?? ''
+
+    // A truncated response can't be valid JSON — surface a clear reason.
+    if (message.stop_reason === 'max_tokens') {
+      return Response.json(
+        { success: false, error: 'Prompt generation was cut off (output too long). Please retry.', raw },
+        { status: 500 },
+      )
+    }
 
     let parsed: RawPromptObj[]
     try {
