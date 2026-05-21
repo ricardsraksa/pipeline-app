@@ -46,6 +46,14 @@ export async function initDB() {
       prompt_edits_made INTEGER
     )
   `);
+  // Generic key/value store — used for the rotating Higgsfield MCP OAuth tokens.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS app_kv (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT
+    )
+  `);
 }
 
 async function migrateDB() {
@@ -181,6 +189,23 @@ export async function updateRun(id: number, fields: Partial<Run & { error_messag
   await db.execute({
     sql: `UPDATE runs SET ${setClauses} WHERE id = ?`,
     args: [...values, id],
+  });
+}
+
+// ── Key/value store (Higgsfield MCP OAuth tokens, etc.) ──────────────────────
+
+export async function getKV(key: string): Promise<string | null> {
+  const result = await db.execute({ sql: "SELECT value FROM app_kv WHERE key = ?", args: [key] });
+  if (!result.rows.length) return null;
+  const v = (result.rows[0] as unknown as { value: string | null }).value;
+  return v ?? null;
+}
+
+export async function setKV(key: string, value: string): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO app_kv (key, value, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    args: [key, value, new Date().toISOString()],
   });
 }
 

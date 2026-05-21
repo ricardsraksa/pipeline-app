@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 
+// Image generation goes through the Higgsfield MCP: submit + poll, ~10-40s.
+export const maxDuration = 300
+
 export async function POST(req: NextRequest) {
   const { prompt, model, reference_images, aspect_ratio } = await req.json()
 
