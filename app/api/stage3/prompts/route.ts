@@ -7,6 +7,9 @@ import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// Prompt generation streams ~15-20k output tokens — give the route room.
+export const maxDuration = 300
+
 // Index → slug, must match the order/categories used everywhere else.
 const SLUG_BY_INDEX = IMAGE_CATEGORIES.map(c => c.id)
 
@@ -72,15 +75,20 @@ export async function POST(req: NextRequest) {
   ]
 
   try {
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      // 9 fully-expanded templates (each with an inline Fidelity Lock +
-      // Negative Constraint Block) run ~15-20k output tokens. 12k truncated
-      // the JSON array mid-object; 32k leaves comfortable headroom.
-      max_tokens: 32000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: messageContent }],
-    })
+    // Stream the response: the SDK rejects a non-streaming request whose
+    // max_tokens it estimates could take over 10 minutes. finalMessage()
+    // collects the stream into the same Message object.
+    const message = await anthropic.messages
+      .stream({
+        model: 'claude-sonnet-4-5-20250929',
+        // 9 fully-expanded templates (each with an inline Fidelity Lock +
+        // Negative Constraint Block) run ~15-20k output tokens. 12k truncated
+        // the JSON array mid-object; 32k leaves comfortable headroom.
+        max_tokens: 32000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: messageContent }],
+      })
+      .finalMessage()
 
     const raw = message.content.find(b => b.type === 'text')?.text ?? ''
 
