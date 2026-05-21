@@ -332,11 +332,13 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
     const competitive = await runCompetitive(inputs, identify, market);
 
-    await updateRun(runId, { current_step: "Stage 1: Product analysis (4/5)", last_updated_at: now() });
-    const productAnalysis = await runProductAnalysis(inputs, identify, market, competitive);
-
-    await updateRun(runId, { current_step: "Stage 1: Visual strategy (5/5)", last_updated_at: now() });
-    const visual = await runVisual(inputs, identify, market, competitive);
+    // Product analysis and visual strategy both depend only on identify +
+    // market + competitive — neither consumes the other — so run them together.
+    await updateRun(runId, { current_step: "Stage 1: Product analysis + visual strategy (4/5)", last_updated_at: now() });
+    const [productAnalysis, visual] = await Promise.all([
+      runProductAnalysis(inputs, identify, market, competitive),
+      runVisual(inputs, identify, market, competitive),
+    ]);
 
     research = [identify, market, competitive, productAnalysis, visual].filter(Boolean).join("\n\n");
     if (!research) throw new Error("Stage 1 produced no output");
@@ -382,51 +384,98 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     await updateRun(runId, { step_research_revised: researchRevised, last_updated_at: now() });
   }
 
-  // ── Sub-step 4a: Avatar (skip if already in DB) ──
+  // ── Sub-step 4a-c: Avatar, offer brief & necessary beliefs (parallel) ──
+  // Each of these now works from RESEARCH.txt alone, so the three run
+  // concurrently instead of chaining avatar → offer brief → beliefs. Any
+  // doc already in the DB is skipped (granular resume); whatever succeeds is
+  // persisted even if a sibling fails, so a resume only redoes the failures.
   let avatar = run.step_avatar ?? "";
-  if (!avatar) {
-    await updateRun(runId, { current_step: "Stage 1: Building avatar (8/8)", last_updated_at: now() });
-    avatar = await anthropicMessage({
-      system: AVATAR_PROMPT,
-      user: `RESEARCH.txt:\n\n${researchRevised}`,
-      maxTokens: 3500,
-      label: "avatar",
-    });
-    if (!avatar) throw new Error("Stage 1: avatar generation returned empty");
-    await updateRun(runId, { step_avatar: avatar, last_updated_at: now() });
-  }
-
-  // ── Sub-step 4b: Offer brief (skip if already in DB) ──
   let offerBrief = run.step_offer_brief ?? "";
-  if (!offerBrief) {
-    await updateRun(runId, { current_step: "Stage 1: Writing offer brief", last_updated_at: now() });
-    offerBrief = await anthropicMessage({
-      system: OFFER_BRIEF_PROMPT,
-      user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}`,
-      maxTokens: 3500,
-      label: "offer brief",
-    });
-    if (!offerBrief) throw new Error("Stage 1: offer brief returned empty");
-    const brandName = extractBrandName(offerBrief);
+  let necessaryBeliefs = run.step_necessary_beliefs ?? "";
+
+  const needAvatar = !avatar;
+  const needOfferBrief = !offerBrief;
+  const needBeliefs = !necessaryBeliefs;
+
+  if (needAvatar || needOfferBrief || needBeliefs) {
     await updateRun(runId, {
-      step_offer_brief: offerBrief,
-      brand_name: brandName,
+      current_step: "Stage 1: Avatar, offer brief & necessary beliefs (parallel)",
       last_updated_at: now(),
     });
-  }
 
-  // ── Sub-step 4c: Necessary beliefs (skip if already in DB) ──
-  let necessaryBeliefs = run.step_necessary_beliefs ?? "";
-  if (!necessaryBeliefs) {
-    await updateRun(runId, { current_step: "Stage 1: Identifying necessary beliefs", last_updated_at: now() });
-    necessaryBeliefs = await anthropicMessage({
-      system: NECESSARY_BELIEFS_PROMPT,
-      user: `RESEARCH.txt:\n\n${researchRevised}\n\n---\n\nAVATAR.txt:\n\n${avatar}\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
-      maxTokens: 3500,
-      label: "necessary beliefs",
+    const tasks: { key: "avatar" | "offerBrief" | "beliefs"; run: () => Promise<string> }[] = [];
+    if (needAvatar) {
+      tasks.push({
+        key: "avatar",
+        run: () =>
+          anthropicMessage({
+            system: AVATAR_PROMPT,
+            user: `RESEARCH.txt:\n\n${researchRevised}`,
+            maxTokens: 3500,
+            label: "avatar",
+          }),
+      });
+    }
+    if (needOfferBrief) {
+      tasks.push({
+        key: "offerBrief",
+        run: () =>
+          anthropicMessage({
+            system: OFFER_BRIEF_PROMPT,
+            user: `RESEARCH.txt:\n\n${researchRevised}`,
+            maxTokens: 3500,
+            label: "offer brief",
+          }),
+      });
+    }
+    if (needBeliefs) {
+      tasks.push({
+        key: "beliefs",
+        run: () =>
+          anthropicMessage({
+            system: NECESSARY_BELIEFS_PROMPT,
+            user: `RESEARCH.txt:\n\n${researchRevised}`,
+            maxTokens: 3500,
+            label: "necessary beliefs",
+          }),
+      });
+    }
+
+    const settled = await Promise.allSettled(tasks.map((t) => t.run()));
+
+    const updates: Partial<Run> = { last_updated_at: now() };
+    const failures: string[] = [];
+    settled.forEach((res, i) => {
+      const { key } = tasks[i];
+      if (res.status === "fulfilled" && res.value) {
+        if (key === "avatar") {
+          avatar = res.value;
+          updates.step_avatar = avatar;
+        } else if (key === "offerBrief") {
+          offerBrief = res.value;
+          updates.step_offer_brief = offerBrief;
+          updates.brand_name = extractBrandName(offerBrief);
+        } else {
+          necessaryBeliefs = res.value;
+          updates.step_necessary_beliefs = necessaryBeliefs;
+        }
+      } else {
+        const reason =
+          res.status === "rejected"
+            ? res.reason instanceof Error
+              ? res.reason.message
+              : String(res.reason)
+            : "returned empty";
+        failures.push(`${key}: ${reason}`);
+      }
     });
-    if (!necessaryBeliefs) throw new Error("Stage 1: necessary beliefs returned empty");
-    await updateRun(runId, { step_necessary_beliefs: necessaryBeliefs, last_updated_at: now() });
+
+    // Persist successes first so a resume skips the completed docs.
+    await updateRun(runId, updates);
+
+    if (failures.length > 0) {
+      throw new Error(`Stage 1 parallel docs failed — ${failures.join("; ")}`);
+    }
   }
 
   // ── Sub-step 5: Chief final (skip if already in DB) ──
@@ -457,11 +506,18 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     let necessaryBeliefsRevised = necessaryBeliefs;
     if (chiefFinal && !chiefFinal.includes("NO REVISIONS REQUIRED")) {
       const revisions = parseRevisions(chiefFinal);
-      for (const rev of revisions) {
-        if (rev.docName === "AVATAR.txt") avatarRevised = await reviseDoc(avatar, "AVATAR.txt", rev.changes);
-        else if (rev.docName === "OFFER_BRIEF.txt") offerBriefRevised = await reviseDoc(offerBrief, "OFFER_BRIEF.txt", rev.changes);
-        else if (rev.docName === "NECESSARY_BELIEFS.txt") necessaryBeliefsRevised = await reviseDoc(necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
-      }
+      // Each revision targets a distinct document, so apply them concurrently.
+      await Promise.all(
+        revisions.map(async (rev) => {
+          if (rev.docName === "AVATAR.txt") {
+            avatarRevised = await reviseDoc(avatar, "AVATAR.txt", rev.changes);
+          } else if (rev.docName === "OFFER_BRIEF.txt") {
+            offerBriefRevised = await reviseDoc(offerBrief, "OFFER_BRIEF.txt", rev.changes);
+          } else if (rev.docName === "NECESSARY_BELIEFS.txt") {
+            necessaryBeliefsRevised = await reviseDoc(necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
+          }
+        })
+      );
     }
     await updateRun(runId, {
       step_avatar_revised: avatarRevised,
