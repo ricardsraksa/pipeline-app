@@ -711,11 +711,21 @@ export async function resumePipeline(runId: number): Promise<void> {
     const lastStage = getLastCompletedStage(run);
 
     if (lastStage === "none") {
-      // runPipeline manages the RUNNING_PIPELINES lock itself. Release the lock
-      // resumePipeline acquired first — otherwise runPipeline's duplicate-run
-      // guard sees it, skips, and the resume silently does nothing.
-      RUNNING_PIPELINES.delete(runId);
-      await runPipeline(runId);
+      // Run from the top — scrape, then Stage 1 — directly. Delegating to
+      // runPipeline does NOT work here: its anti-double-run guards (the
+      // RUNNING_PIPELINES lock and the "last_updated_at < 60s" recency check)
+      // both trip on resumePipeline's own lock and timestamp, so the call is
+      // silently skipped and the resume does nothing.
+      await updateRun(runId, { status: "stage1", last_updated_at: now() });
+      await runScrape(runId, run);
+      const freshRun = await getRun(runId);
+      if (!freshRun) throw new Error("Run not found");
+      await runStage1(runId, freshRun);
+      await updateRun(runId, {
+        status: "awaiting_stage2_approval",
+        current_step: "Stage 1 complete — awaiting your review before Stage 2",
+        last_updated_at: now(),
+      });
       return;
     }
 
