@@ -505,6 +505,7 @@ export default function RunPage() {
   const runId = typeof params.id === "string" ? parseInt(params.id, 10) : null;
   const run = useRunPolling(runId);
   const scrolledRef = useRef(false);
+  const autoResumedRef = useRef(false);
   const [resuming, setResuming] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
@@ -542,6 +543,26 @@ export default function RunPage() {
       setResuming(false);
     }
   }
+
+  // Auto-resume a stuck run. A run is "stuck" when it's still in an active
+  // status but its timestamp has been cold for 10+ min — almost always the
+  // fire-and-forget pipeline being killed mid-run (e.g. dev server restart).
+  // resumePipeline + granular Stage 1 resume picks up from the last completed
+  // sub-step, so no work is lost. Fires once per stuck episode and re-arms
+  // once the run is healthy again, so repeated deaths still self-heal without
+  // spamming (a stuck run is, by definition, ≥10 min between attempts).
+  useEffect(() => {
+    if (!run || !runId) return;
+    if (isStuck(run)) {
+      if (!autoResumedRef.current) {
+        autoResumedRef.current = true;
+        handleResume();
+      }
+    } else {
+      autoResumedRef.current = false;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, runId]);
 
   async function handleStartStage2() {
     if (!runId || startingStage2) return;
