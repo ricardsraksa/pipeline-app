@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { listRuns, type RunSummary } from "@/lib/db";
 import { HistoryRefresher } from "./HistoryRefresher";
+import { RunNameCell } from "./RunNameCell";
 
 // Server components run in the same process as the API. Skip the HTTP roundtrip
 // and read from the DB directly — much faster, doesn't depend on INTERNAL_API_URL.
@@ -203,11 +204,8 @@ export default async function HistoryPage() {
                     className="cursor-pointer transition-colors hover:bg-[var(--color-surface-2)]"
                   >
                     <td className="px-4 py-[13px] border-b border-[var(--color-border)] align-middle">
+                      <RunNameCell runId={run.id} initial={name} href={href} />
                       <Link href={href} className="block min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[13px] text-[var(--color-text)] font-[550] truncate">{name}</span>
-                          <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)] shrink-0">#{run.id}</span>
-                        </div>
                         <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] truncate">
                           {truncateUrl(run.product_url)}
                         </p>
