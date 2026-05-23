@@ -21,6 +21,19 @@ export async function GET(
   return Response.json({ run });
 }
 
+export async function DELETE(
+  _req: NextRequest,
+  context: { params: Promise<unknown> }
+) {
+  const { id } = (await context.params) as { id: string };
+  const runId = Number(id);
+  if (!Number.isFinite(runId)) {
+    return Response.json({ error: "Invalid id" }, { status: 400 });
+  }
+  await db.execute({ sql: "DELETE FROM runs WHERE id = ?", args: [runId] });
+  return Response.json({ success: true });
+}
+
 const EDITABLE_FIELDS = [
   "stage1_research",
   "stage1_chief_mid",
