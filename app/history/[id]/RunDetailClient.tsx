@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 import EditableOutput from "@/components/EditableOutput";
@@ -477,7 +478,14 @@ export default function RunDetailClient({ run }: Props) {
       {/* Generated Images */}
       {imageUrls.length > 0 && (
         <Section label={`Stage 3 — Generated Images · ${imageUrls.length}`}>
-          <div className="flex justify-end mb-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 mb-2">
+            <Link
+              href={`/stage3?runId=${run.id}&skipPrompts=1`}
+              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[13px] py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
+              title="Open Stage 3 with the saved prompts so you can re-run image generation"
+            >
+              ↺ Regenerate images
+            </Link>
             <button
               onClick={() => handleDownloadImages()}
               disabled={imagesZipping}

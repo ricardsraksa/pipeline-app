@@ -595,11 +595,31 @@ function Stage3Page() {
   useEffect(() => {
     const runId = searchParams.get('runId')
     if (!runId) { setError('No run ID provided'); setPhase('error'); return }
+    const skipPrompts = searchParams.get('skipPrompts') === '1'
     fetch(`/api/runs/${runId}`)
       .then(r => r.json())
       .then(data => {
         if (!data.run) throw new Error('Run not found')
         setRun(data.run)
+
+        // ?skipPrompts=1 — reuse the prompts saved on the last Stage 3 run
+        // and jump straight to the QC gate, so the user can re-run image
+        // generation without paying to regenerate the prompts.
+        if (skipPrompts && data.run.image_prompts) {
+          try {
+            const saved = JSON.parse(data.run.image_prompts) as ImagePrompt[]
+            if (Array.isArray(saved) && saved.length === 9) {
+              setPrompts(saved)
+              setOriginalPrompts(saved)
+              setImages(saved.map(() => ({ url: null, status: 'pending' as const })))
+              setAuditResults(saved.map(() => null))
+              setRegenCounts(saved.map(() => 0))
+              setPhase('B_qc_gate')
+              return
+            }
+          } catch { /* fall through to regenerating prompts */ }
+        }
+
         setPhase('A_generating')
       })
       .catch(err => { setError(err instanceof Error ? err.message : String(err)); setPhase('error') })
