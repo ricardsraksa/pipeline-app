@@ -602,19 +602,48 @@ function Stage3Page() {
         if (!data.run) throw new Error('Run not found')
         setRun(data.run)
 
-        // ?skipPrompts=1 — reuse the prompts saved on the last Stage 3 run
-        // and jump straight to the QC gate, so the user can re-run image
-        // generation without paying to regenerate the prompts.
+        // ?skipPrompts=1 — reuse the prompts saved on the last Stage 3 run.
+        // If saved images exist too, jump to the complete screen so the user
+        // can hover any image to regenerate / reprompt just that one. With
+        // only prompts, drop to the QC gate (regenerate-all flow).
         if (skipPrompts && data.run.image_prompts) {
           try {
             const saved = JSON.parse(data.run.image_prompts) as ImagePrompt[]
             if (Array.isArray(saved) && saved.length === 9) {
               setPrompts(saved)
               setOriginalPrompts(saved)
-              setImages(saved.map(() => ({ url: null, status: 'pending' as const })))
-              setAuditResults(saved.map(() => null))
+
+              let imageSlots: ImageSlot[] = saved.map(() => ({ url: null, status: 'pending' as const }))
+              let audits: (AuditResult | null)[] = saved.map(() => null)
+              let haveImages = false
+              if (data.run.generated_images) {
+                try {
+                  const savedImgs = JSON.parse(data.run.generated_images) as Array<{
+                    image_url?: string; status?: string
+                  }>
+                  if (Array.isArray(savedImgs)) {
+                    imageSlots = saved.map((_, i) => {
+                      const img = savedImgs[i]
+                      if (img?.image_url && img.status !== 'failed') {
+                        return { url: img.image_url, status: 'done' as const }
+                      }
+                      return { url: null, status: 'pending' as const }
+                    })
+                    haveImages = imageSlots.some(s => s.status === 'done')
+                  }
+                } catch { /* fall back to empty slots */ }
+              }
+              if (data.run.audit_results) {
+                try {
+                  const savedAudits = JSON.parse(data.run.audit_results) as (AuditResult | null)[]
+                  if (Array.isArray(savedAudits)) audits = savedAudits
+                } catch { /* keep nulls */ }
+              }
+
+              setImages(imageSlots)
+              setAuditResults(audits)
               setRegenCounts(saved.map(() => 0))
-              setPhase('B_qc_gate')
+              setPhase(haveImages ? 'E_complete' : 'B_qc_gate')
               return
             }
           } catch { /* fall through to regenerating prompts */ }
