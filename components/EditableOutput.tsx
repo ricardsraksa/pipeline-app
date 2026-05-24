@@ -30,6 +30,9 @@ export type EditableOutputProps = {
   editedAt?: string | null;
   label: string;
   monospace?: boolean;
+  /** If set, shows a Download button in the header that saves the displayed
+   *  value to this filename. */
+  downloadFilename?: string;
 };
 
 export default function EditableOutput({
@@ -41,6 +44,7 @@ export default function EditableOutput({
   editedAt: initialEditedAt = null,
   label,
   monospace = true,
+  downloadFilename,
 }: EditableOutputProps) {
   const [editing, setEditing] = useState(false);
   const [editedValue, setEditedValue] = useState<string | null>(initialEditedValue);
@@ -49,7 +53,26 @@ export default function EditableOutput({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [showOriginal, setShowOriginal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function copyValue() {
+    navigator.clipboard.writeText(editedValue ?? originalValue).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    }).catch(() => {});
+  }
+
+  function downloadValue() {
+    if (!downloadFilename) return;
+    const ext = downloadFilename.split(".").pop()?.toLowerCase();
+    const mime = ext === "md" ? "text/markdown" : "text/plain";
+    const text = editedValue ?? originalValue;
+    const url = URL.createObjectURL(new Blob([text], { type: mime }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: downloadFilename });
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function autoResize() {
     const el = textareaRef.current;
@@ -117,14 +140,37 @@ export default function EditableOutput({
           )}
         </div>
         {!editing && (
-          <button
-            onClick={enterEdit}
-            title="Edit"
-            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)] whitespace-nowrap"
-          >
-            <PencilIcon />
-            Edit
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={copyValue}
+              title="Copy to clipboard"
+              className={[
+                "cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent transition-all whitespace-nowrap",
+                copied
+                  ? "text-[var(--color-green)]"
+                  : "text-[var(--color-text-2)] hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)]",
+              ].join(" ")}
+            >
+              {copied ? "Copied ✓" : "Copy"}
+            </button>
+            {downloadFilename && (
+              <button
+                onClick={downloadValue}
+                title={`Download as ${downloadFilename}`}
+                className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)] whitespace-nowrap"
+              >
+                ↓ Download
+              </button>
+            )}
+            <button
+              onClick={enterEdit}
+              title="Edit"
+              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-3)] hover:text-[var(--color-text)] whitespace-nowrap"
+            >
+              <PencilIcon />
+              Edit
+            </button>
+          </div>
         )}
       </div>
 

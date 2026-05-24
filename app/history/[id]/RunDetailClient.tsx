@@ -229,6 +229,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 /* ─── main component ─── */
 export default function RunDetailClient({ run }: Props) {
   const slug = run.brand_name ?? run.product_name ?? `run_${run.id}`;
+  const [imagesZipping, setImagesZipping] = useState(false);
 
   const scraperData = (() => {
     try { return run.scraper_data ? JSON.parse(run.scraper_data) as { scraped_text?: string; images?: string[] } : null; }
@@ -272,6 +273,37 @@ export default function RunDetailClient({ run }: Props) {
     try { return run.approved_image_urls ? JSON.parse(run.approved_image_urls) : []; }
     catch { return []; }
   })();
+
+  async function handleDownloadImages() {
+    if (!imageUrls.length || imagesZipping) return;
+    setImagesZipping(true);
+    try {
+      const zip = new JSZip();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      // Fetch each image as a blob and add to the zip. If a CDN blocks the
+      // cross-origin fetch we just skip that one (rare; the per-image
+      // lightbox download uses the same fetch and works in practice).
+      for (let i = 0; i < imageUrls.length; i++) {
+        const url = imageUrls[i];
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const ext = (url.split(/[?#]/)[0].split(".").pop() || "png").slice(0, 4);
+          zip.file(`image_${pad(i + 1)}.${ext}`, blob);
+        } catch { /* skip */ }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = Object.assign(document.createElement("a"), {
+        href: URL.createObjectURL(blob),
+        download: `${slug}_images.zip`,
+      });
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setImagesZipping(false);
+    }
+  }
 
   async function handleDownloadAll() {
     const zip = new JSZip();
@@ -420,6 +452,7 @@ export default function RunDetailClient({ run }: Props) {
             editedAt={run.stage1_one_pager_edited_at}
             label="Research one-pager"
             monospace={false}
+            downloadFilename={`${slug}_STAGE1_ONE_PAGER.md`}
           />
         </Section>
       )}
@@ -436,6 +469,7 @@ export default function RunDetailClient({ run }: Props) {
             editedAt={run.stage2_edited_at}
             label="German Copy Kit"
             monospace={false}
+            downloadFilename={`${slug}_STAGE2_GERMAN_COPY.txt`}
           />
         </Section>
       )}
@@ -443,6 +477,15 @@ export default function RunDetailClient({ run }: Props) {
       {/* Generated Images */}
       {imageUrls.length > 0 && (
         <Section label={`Stage 3 — Generated Images · ${imageUrls.length}`}>
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={() => handleDownloadImages()}
+              disabled={imagesZipping}
+              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[13px] py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-60"
+            >
+              {imagesZipping ? "Zipping…" : "↓ Download all images (.zip)"}
+            </button>
+          </div>
           <ImageGrid urls={imageUrls} cols={4} />
         </Section>
       )}
