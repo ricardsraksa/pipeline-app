@@ -68,6 +68,9 @@ export async function GET(
       stage1: run.feedback_stage1,
       stage2: run.feedback_stage2,
       stage3: run.feedback_stage3,
+      stage1Note: run.feedback_stage1_note,
+      stage2Note: run.feedback_stage2_note,
+      stage3Note: run.feedback_stage3_note,
     },
     scrapeErrors: (() => {
       try { return run.notes ? JSON.parse(run.notes)?.scrapeErrors ?? [] : []; }

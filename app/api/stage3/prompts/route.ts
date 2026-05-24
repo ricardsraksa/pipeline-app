@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildImagePromptsUserMessage } from '@/lib/prompts/image_prompts'
 import { getPrompt } from '@/lib/prompts'
 import { buildFeedbackSummary } from '@/lib/stage3/learning'
+import { buildStage3FeedbackBlock } from '@/lib/feedback'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import { jsonrepair } from 'jsonrepair'
 
@@ -80,10 +81,14 @@ export async function POST(req: NextRequest) {
   }
 
   const feedbackSummary = buildFeedbackSummary()
+  const stage3UserFeedback = await buildStage3FeedbackBlock()
   // getPrompt("stage3") returns any Settings override saved to data/prompts.json,
   // falling back to IMAGE_PROMPTS_SYSTEM (the default template set).
   const basePrompt = getPrompt('stage3')
-  const systemPrompt = basePrompt + (feedbackSummary ? `\n\nFEEDBACK FROM PAST RUNS:\n${feedbackSummary}` : '\n\nNo feedback from past runs yet.')
+  const systemPrompt =
+    basePrompt
+    + (feedbackSummary ? `\n\nFEEDBACK FROM PAST RUNS:\n${feedbackSummary}` : '\n\nNo automatic feedback from past runs yet.')
+    + stage3UserFeedback
 
   const scraped: string[] = Array.isArray(product_images) ? product_images : []
   const uploaded: string[] = Array.isArray(uploaded_images) ? uploaded_images : []

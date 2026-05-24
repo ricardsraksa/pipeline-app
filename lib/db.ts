@@ -87,6 +87,10 @@ async function migrateDB() {
     "stage1_one_pager_edited_at TEXT",
     // Source images: user-uploaded reference photos that drive Stage 1 vision
     "uploaded_source_images TEXT",
+    // Free-text feedback notes alongside the thumbs vote per stage.
+    "feedback_stage1_note TEXT",
+    "feedback_stage2_note TEXT",
+    "feedback_stage3_note TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -276,4 +280,8 @@ export interface Run {
   stage1_one_pager_edited_at: string | null;
   // JSON array of R2 URLs uploaded by the user at run-start time
   uploaded_source_images: string | null;
+  // Free-text feedback notes — saved alongside the thumbs vote
+  feedback_stage1_note: string | null;
+  feedback_stage2_note: string | null;
+  feedback_stage3_note: string | null;
 }

@@ -46,6 +46,9 @@ export interface RunStatus {
     stage1: string | null;
     stage2: string | null;
     stage3: string | null;
+    stage1Note: string | null;
+    stage2Note: string | null;
+    stage3Note: string | null;
   };
   scrapeErrors: { url: string; error: string }[];
 }

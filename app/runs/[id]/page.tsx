@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
 import AIRegenerate from "@/components/AIRegenerate";
+import FeedbackButtons from "@/components/FeedbackButtons";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -352,69 +353,6 @@ function Section({
       </div>
       {children}
     </section>
-  );
-}
-
-function FeedbackButtons({
-  runId,
-  stage,
-  current,
-}: {
-  runId: number;
-  stage: "stage1" | "stage2" | "stage3";
-  current: string | null;
-}) {
-  const [value, setValue] = useState<string | null>(current);
-  const [saving, setSaving] = useState(false);
-
-  async function set(next: "up" | "down" | null) {
-    setSaving(true);
-    const prev = value;
-    setValue(next);
-    try {
-      const res = await fetch(`/api/runs/${runId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [`feedback_${stage}`]: next }),
-      });
-      if (!res.ok) setValue(prev);
-    } catch {
-      setValue(prev);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[12px] text-[var(--color-text-3)] mr-1">Was this useful?</span>
-      <button
-        onClick={() => set(value === "up" ? null : "up")}
-        disabled={saving}
-        aria-label="Mark useful"
-        className={[
-          "cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150",
-          value === "up"
-            ? "border-[var(--color-green)] bg-[var(--color-green-bg)] text-[var(--color-green)]"
-            : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)]",
-        ].join(" ")}
-      >
-        <Icon.ThumbsUp className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={() => set(value === "down" ? null : "down")}
-        disabled={saving}
-        aria-label="Mark not useful"
-        className={[
-          "cursor-pointer inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors duration-150",
-          value === "down"
-            ? "border-[var(--color-red)] bg-[var(--color-red-bg)] text-[var(--color-red)]"
-            : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)]",
-        ].join(" ")}
-      >
-        <Icon.ThumbsDown className="w-3.5 h-3.5" />
-      </button>
-    </div>
   );
 }
 
@@ -856,19 +794,29 @@ export default function RunPage() {
                   <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
                 </div>
                 {runId !== null && (
-                  <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-                    <StageActions
-                      stage="stage1"
-                      previousStage={null}
-                      onRestart={handleRestartStage}
-                      restarting={restarting}
-                    />
-                    <AIRegenerate
-                      runId={runId}
-                      stage="stage1"
-                      onRegenerated={() => window.location.reload()}
-                    />
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+                      <StageActions
+                        stage="stage1"
+                        previousStage={null}
+                        onRestart={handleRestartStage}
+                        restarting={restarting}
+                      />
+                      <AIRegenerate
+                        runId={runId}
+                        stage="stage1"
+                        onRegenerated={() => window.location.reload()}
+                      />
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <FeedbackButtons
+                        runId={runId}
+                        stage="stage1"
+                        initialVote={run.feedback?.stage1 ?? null}
+                        initialNote={run.feedback?.stage1Note ?? null}
+                      />
+                    </div>
+                  </>
                 )}
 
                 {/* QC gate — paused between Stage 1 and Stage 2 */}
@@ -932,7 +880,12 @@ export default function RunPage() {
                         stage="stage2"
                         onRegenerated={() => window.location.reload()}
                       />
-                      <FeedbackButtons runId={runId} stage="stage2" current={run.feedback?.stage2 ?? null} />
+                      <FeedbackButtons
+                        runId={runId}
+                        stage="stage2"
+                        initialVote={run.feedback?.stage2 ?? null}
+                        initialNote={run.feedback?.stage2Note ?? null}
+                      />
                     </div>
                     <StageActions
                       stage="stage2"

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import type { ImagePrompt, AuditResult, Stage3Phase } from '@/lib/stage3/types'
 import type { Run } from '@/lib/db'
+import FeedbackButtons from '@/components/FeedbackButtons'
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -463,6 +464,16 @@ function CompletePhase({
           />
         ))}
       </div>
+      {run?.id && (
+        <div className="flex justify-end pt-2">
+          <FeedbackButtons
+            runId={run.id}
+            stage="stage3"
+            initialVote={run.feedback_stage3 ?? null}
+            initialNote={run.feedback_stage3_note ?? null}
+          />
+        </div>
+      )}
       <div className="flex items-center gap-3 pt-2 flex-wrap">
         <button
           onClick={onRerunAll}

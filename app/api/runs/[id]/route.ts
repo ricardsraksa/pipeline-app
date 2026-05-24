@@ -58,6 +58,9 @@ export async function PATCH(
     feedback_stage1?: string | null;
     feedback_stage2?: string | null;
     feedback_stage3?: string | null;
+    feedback_stage1_note?: string | null;
+    feedback_stage2_note?: string | null;
+    feedback_stage3_note?: string | null;
     notes?: string | null;
     stage2_output?: string | null;
     stage3_prompts?: unknown;
@@ -125,6 +128,9 @@ export async function PATCH(
   if ("feedback_stage1" in body)  { fields.push("feedback_stage1 = ?");  values.push(body.feedback_stage1 ?? null); }
   if ("feedback_stage2" in body)  { fields.push("feedback_stage2 = ?");  values.push(body.feedback_stage2 ?? null); }
   if ("feedback_stage3" in body)  { fields.push("feedback_stage3 = ?");  values.push(body.feedback_stage3 ?? null); }
+  if ("feedback_stage1_note" in body) { fields.push("feedback_stage1_note = ?"); values.push(body.feedback_stage1_note ?? null); }
+  if ("feedback_stage2_note" in body) { fields.push("feedback_stage2_note = ?"); values.push(body.feedback_stage2_note ?? null); }
+  if ("feedback_stage3_note" in body) { fields.push("feedback_stage3_note = ?"); values.push(body.feedback_stage3_note ?? null); }
   if ("notes" in body)            { fields.push("notes = ?");            values.push(body.notes ?? null); }
   if ("stage2_output" in body)    { fields.push("stage2_output = ?");    values.push(body.stage2_output ?? null); }
   if ("stage3_prompts" in body)   { fields.push("stage3_prompts = ?");   values.push(body.stage3_prompts ? JSON.stringify(body.stage3_prompts) : null); }
