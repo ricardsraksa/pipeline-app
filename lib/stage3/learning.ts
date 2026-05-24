@@ -24,15 +24,31 @@ interface FeedbackStore {
     success: boolean
     timestamp: string
   }>
+  /** Per-image thumbs + free-text feedback the user attaches to specific
+   *  Stage 3 outputs. Keyed by `category` so it can steer the matching
+   *  template's prompt on the next run. */
+  image_feedback?: Array<{
+    category: string
+    vote: "up" | "down"
+    note?: string
+    prompt_used?: string
+    timestamp: string
+  }>
 }
 
 function loadFeedback(): FeedbackStore {
   try {
     if (fs.existsSync(FEEDBACK_PATH)) {
-      return JSON.parse(fs.readFileSync(FEEDBACK_PATH, 'utf-8'))
+      const raw = JSON.parse(fs.readFileSync(FEEDBACK_PATH, 'utf-8')) as Partial<FeedbackStore>
+      return {
+        prompt_edits: raw.prompt_edits ?? [],
+        audit_results: raw.audit_results ?? [],
+        regeneration_fixes: raw.regeneration_fixes ?? [],
+        image_feedback: raw.image_feedback ?? [],
+      }
     }
   } catch { /* ignore */ }
-  return { prompt_edits: [], audit_results: [], regeneration_fixes: [] }
+  return { prompt_edits: [], audit_results: [], regeneration_fixes: [], image_feedback: [] }
 }
 
 export function saveFeedback(update: Partial<FeedbackStore>): void {
@@ -41,6 +57,7 @@ export function saveFeedback(update: Partial<FeedbackStore>): void {
     prompt_edits: [...existing.prompt_edits, ...(update.prompt_edits ?? [])],
     audit_results: [...existing.audit_results, ...(update.audit_results ?? [])],
     regeneration_fixes: [...existing.regeneration_fixes, ...(update.regeneration_fixes ?? [])],
+    image_feedback: [...(existing.image_feedback ?? []), ...(update.image_feedback ?? [])],
   }
   fs.mkdirSync(path.dirname(FEEDBACK_PATH), { recursive: true })
   fs.writeFileSync(FEEDBACK_PATH, JSON.stringify(merged, null, 2))
@@ -94,6 +111,25 @@ export function buildFeedbackSummary(): string {
     lines.push('SUCCESSFUL REGENERATION FIXES:')
     for (const fix of successfulFixes.slice(-3)) {
       lines.push(`  Category ${fix.category}: "${fix.fix_applied}"`)
+    }
+  }
+
+  // Per-image user feedback (👍/👎 + note), keyed by category.
+  const imgFb = fb.image_feedback ?? []
+  if (imgFb.length) {
+    lines.push('PER-IMAGE USER FEEDBACK (apply to the matching template):')
+    const byCategory: Record<string, typeof imgFb> = {}
+    for (const f of imgFb) {
+      if (!byCategory[f.category]) byCategory[f.category] = []
+      byCategory[f.category].push(f)
+    }
+    for (const [cat, entries] of Object.entries(byCategory)) {
+      const recent = entries.slice(-3)
+      for (const e of recent) {
+        const v = e.vote === 'up' ? '👍' : '👎'
+        const n = e.note ? `: "${e.note}"` : ''
+        lines.push(`  ${cat} ${v}${n}`)
+      }
     }
   }
 

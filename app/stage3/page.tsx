@@ -6,6 +6,7 @@ import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import type { ImagePrompt, AuditResult, Stage3Phase } from '@/lib/stage3/types'
 import type { Run } from '@/lib/db'
 import FeedbackButtons from '@/components/FeedbackButtons'
+import FeedbackAppliedChip from '@/components/FeedbackAppliedChip'
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -68,8 +69,36 @@ function ImageCell({
   regenCount: number
 }) {
   const [showDetails, setShowDetails] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackVote, setFeedbackVote] = useState<'up' | 'down' | null>(null)
+  const [feedbackNote, setFeedbackNote] = useState('')
+  const [feedbackSaved, setFeedbackSaved] = useState(false)
   const cat = IMAGE_CATEGORIES.find(c => c.id === prompt.category)
   const catIndex = IMAGE_CATEGORIES.findIndex(c => c.id === prompt.category)
+
+  async function saveImageFeedback() {
+    if (!feedbackVote && !feedbackNote.trim()) {
+      setFeedbackOpen(false)
+      return
+    }
+    try {
+      await fetch('/api/stage3/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_feedback: [{
+            category: prompt.category,
+            vote: feedbackVote ?? 'down',
+            note: feedbackNote.trim() || undefined,
+            prompt_used: prompt.prompt.slice(0, 300),
+            timestamp: new Date().toISOString(),
+          }],
+        }),
+      })
+      setFeedbackSaved(true)
+      setTimeout(() => { setFeedbackOpen(false); setFeedbackSaved(false) }, 800)
+    } catch { /* informational only */ }
+  }
 
   return (
     <div className="aspect-square rounded-[11px] border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface)] group shadow-[0_1px_2px_rgba(20,20,18,.05)]">
@@ -90,13 +119,20 @@ function ImageCell({
               i
             </button>
           )}
-          {/* Action bar — Download + Regenerate, revealed on hover */}
-          <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action bar — Download + Rate + Regenerate, revealed on hover */}
+          <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => downloadImage(image.url as string, `${prompt.category || 'image'}_${catIndex + 1}.png`)}
               className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer transition-colors"
             >
               Download
+            </button>
+            <button
+              onClick={() => setFeedbackOpen(v => !v)}
+              title="Rate this image"
+              className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer transition-colors"
+            >
+              Rate
             </button>
             {regenCount < 3 ? (
               <button
@@ -109,6 +145,48 @@ function ImageCell({
               <span className="px-2 py-1 text-white/50 text-[9px] font-[var(--font-ibm-plex-mono)]">Max retries</span>
             )}
           </div>
+          {feedbackOpen && (
+            <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-2">
+              <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider">
+                Rate this image ({cat?.label})
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setFeedbackVote(v => v === 'up' ? null : 'up')}
+                  className={`px-2 py-1 rounded text-[11px] font-[var(--font-ibm-plex-mono)] cursor-pointer transition-colors ${feedbackVote === 'up' ? 'bg-[var(--color-green)] text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}
+                >
+                  👍
+                </button>
+                <button
+                  onClick={() => setFeedbackVote(v => v === 'down' ? null : 'down')}
+                  className={`px-2 py-1 rounded text-[11px] font-[var(--font-ibm-plex-mono)] cursor-pointer transition-colors ${feedbackVote === 'down' ? 'bg-[var(--color-red)] text-white' : 'bg-white/15 text-white hover:bg-white/25'}`}
+                >
+                  👎
+                </button>
+              </div>
+              <textarea
+                value={feedbackNote}
+                onChange={(e) => setFeedbackNote(e.target.value)}
+                placeholder="Optional: what to change/keep next time (steers future runs of this template)"
+                rows={3}
+                className="w-full text-[10px] text-white bg-white/10 border border-white/20 rounded p-1.5 placeholder:text-white/40 focus:outline-none focus:border-white/60 resize-none"
+              />
+              <div className="flex items-center justify-between gap-2 mt-auto">
+                <button
+                  onClick={() => { setFeedbackOpen(false); setFeedbackVote(null); setFeedbackNote('') }}
+                  className="text-[9px] text-white/40 hover:text-white/70 font-[var(--font-ibm-plex-mono)] cursor-pointer"
+                >
+                  cancel
+                </button>
+                <button
+                  onClick={saveImageFeedback}
+                  className="px-2 py-1 bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[10px] font-[620] rounded cursor-pointer hover:brightness-105"
+                >
+                  {feedbackSaved ? 'Saved ✓' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
           {showDetails && auditResult && (
             <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
               <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider mb-1">Issues</p>
@@ -465,7 +543,8 @@ function CompletePhase({
         ))}
       </div>
       {run?.id && (
-        <div className="flex justify-end pt-2">
+        <div className="flex items-start justify-between gap-3 pt-2 flex-wrap">
+          <FeedbackAppliedChip stage={3} />
           <FeedbackButtons
             runId={run.id}
             stage="stage3"

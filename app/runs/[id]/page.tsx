@@ -7,6 +7,7 @@ import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
+import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -806,9 +807,11 @@ export default function RunPage() {
                         runId={runId}
                         stage="stage1"
                         onRegenerated={() => window.location.reload()}
+                        initialFeedback={run.feedback?.stage1Note ?? null}
                       />
                     </div>
-                    <div className="flex justify-end pt-1">
+                    <div className="flex items-start justify-between gap-3 flex-wrap pt-1">
+                      <FeedbackAppliedChip stage={1} />
                       <FeedbackButtons
                         runId={runId}
                         stage="stage1"
@@ -879,13 +882,17 @@ export default function RunPage() {
                         runId={runId}
                         stage="stage2"
                         onRegenerated={() => window.location.reload()}
+                        initialFeedback={run.feedback?.stage2Note ?? null}
                       />
-                      <FeedbackButtons
-                        runId={runId}
-                        stage="stage2"
-                        initialVote={run.feedback?.stage2 ?? null}
-                        initialNote={run.feedback?.stage2Note ?? null}
-                      />
+                      <div className="flex items-start gap-3">
+                        <FeedbackAppliedChip stage={2} />
+                        <FeedbackButtons
+                          runId={runId}
+                          stage="stage2"
+                          initialVote={run.feedback?.stage2 ?? null}
+                          initialNote={run.feedback?.stage2Note ?? null}
+                        />
+                      </div>
                     </div>
                     <StageActions
                       stage="stage2"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 
 interface AIRegenerateProps {
@@ -10,6 +10,10 @@ interface AIRegenerateProps {
   onRegenerated: (newOutput: string) => void;
   /** Label override for the trigger button (defaults to "Edit with AI") */
   triggerLabel?: string;
+  /** If provided, pre-fills the instructions textarea — typically the user's
+   *  saved 👎/👍 note for this stage, so they don't have to retype what
+   *  they already told the feedback loop. */
+  initialFeedback?: string | null;
 }
 
 const STAGE_HINTS: Record<AIRegenerateProps["stage"], string> = {
@@ -26,9 +30,17 @@ export default function AIRegenerate({
   stage,
   onRegenerated,
   triggerLabel = "Edit with AI",
+  initialFeedback = null,
 }: AIRegenerateProps) {
   const [open, setOpen] = useState(false);
-  const [instructions, setInstructions] = useState("");
+  const [instructions, setInstructions] = useState(initialFeedback ?? "");
+
+  // Re-sync the textarea to the latest saved feedback every time the panel
+  // opens — so the user always sees their current note pre-filled.
+  useEffect(() => {
+    if (open) setInstructions(initialFeedback ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
