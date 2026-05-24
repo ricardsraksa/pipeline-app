@@ -106,6 +106,31 @@ function ImageGrid({ urls, cols = 4 }: { urls: string[]; cols?: number }) {
           >
             ✕
           </button>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              const url = lb;
+              try {
+                const res = await fetch(url);
+                const blob = await res.blob();
+                const objUrl = URL.createObjectURL(blob);
+                const ext = url.split(/[?#]/)[0].split(".").pop()?.slice(0, 4) || "png";
+                const a = Object.assign(document.createElement("a"), {
+                  href: objUrl,
+                  download: `image_${Date.now()}.${ext}`,
+                });
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(objUrl);
+              } catch {
+                window.open(url, "_blank", "noopener");
+              }
+            }}
+            className="cursor-pointer absolute top-5 left-5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-[550] bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-colors"
+          >
+            Download
+          </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={lb}
@@ -216,8 +241,24 @@ export default function RunDetailClient({ run }: Props) {
   })();
 
   const imageUrls: string[] = (() => {
-    try { return run.image_urls ? JSON.parse(run.image_urls) : []; }
-    catch { return []; }
+    try {
+      // Prefer the explicit image_urls column if it's populated.
+      if (run.image_urls) {
+        const parsed = JSON.parse(run.image_urls);
+        if (Array.isArray(parsed) && parsed.length) return parsed as string[];
+      }
+      // Otherwise pull from generated_images — the field Stage 3 actually
+      // writes. Each entry is { prompt_index, category, image_url, status }.
+      if (run.generated_images) {
+        const parsed = JSON.parse(run.generated_images);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((g: { image_url?: string; status?: string }) => g?.image_url && g.status !== "failed")
+            .map((g: { image_url: string }) => g.image_url);
+        }
+      }
+      return [];
+    } catch { return []; }
   })();
 
   const scrapedImageUrls: string[] = (() => {
