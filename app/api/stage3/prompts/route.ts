@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
   const stage3UserFeedback = await buildStage3FeedbackBlock()
   // getPrompt("stage3") returns any Settings override saved to data/prompts.json,
   // falling back to IMAGE_PROMPTS_SYSTEM (the default template set).
-  const basePrompt = getPrompt('stage3')
+  const basePrompt = await getPrompt('stage3')
   const systemPrompt =
     basePrompt
     + (feedbackSummary ? `\n\nFEEDBACK FROM PAST RUNS:\n${feedbackSummary}` : '\n\nNo automatic feedback from past runs yet.')

@@ -2,6 +2,10 @@
 // runs of the given stage and formats them as a "FEEDBACK FROM PAST RUNS" block
 // for injection into that stage's system prompt — so the user's 👍/👎 + free-
 // text comment actually steers the next generation.
+//
+// Source of truth is the `feedback_notes` table (durable; survives run delete).
+// On first read we also backfill from the legacy `runs.feedback_stage{N}*`
+// columns for any rows that haven't been mirrored yet — one-shot, idempotent.
 
 import { db } from "./db";
 
@@ -14,19 +18,45 @@ interface FeedbackRow {
   note: string | null;
 }
 
+let backfilled = false;
+
+async function backfillOnce(): Promise<void> {
+  if (backfilled) return;
+  backfilled = true;
+  try {
+    for (const stage of [1, 2, 3] as const) {
+      const voteCol = `feedback_stage${stage}`;
+      const noteCol = `feedback_stage${stage}_note`;
+      // Pick runs that have a vote OR note but no matching feedback_notes row.
+      await db.execute(`
+        INSERT OR IGNORE INTO feedback_notes
+          (source_run_id, stage, vote, note, product_name, brand_name, created_at, updated_at)
+        SELECT
+          r.id, ${stage}, r.${voteCol}, r.${noteCol},
+          r.product_name, r.brand_name,
+          COALESCE(r.last_updated_at, r.created_at),
+          COALESCE(r.last_updated_at, r.created_at)
+        FROM runs r
+        WHERE (r.${voteCol} IS NOT NULL AND r.${voteCol} != '')
+           OR (r.${noteCol} IS NOT NULL AND r.${noteCol} != '')
+      `);
+    }
+  } catch (err) {
+    console.error("[feedback] backfill failed:", err);
+  }
+}
+
 async function recent(stage: 1 | 2 | 3): Promise<FeedbackRow[]> {
-  const voteCol = `feedback_stage${stage}`;
-  const noteCol = `feedback_stage${stage}_note`;
-  // Pull the latest runs that have either a thumbs vote OR a note. Limit
-  // generously then trim — defensive against rows whose vote happens to be
-  // null but whose note is set.
+  await backfillOnce();
   const result = await db.execute(
-    `SELECT product_name, brand_name, ${voteCol} AS vote, ${noteCol} AS note
-       FROM runs
-      WHERE (${voteCol} IS NOT NULL AND ${voteCol} != '')
-         OR (${noteCol} IS NOT NULL AND ${noteCol} != '')
-      ORDER BY created_at DESC
+    `SELECT product_name, brand_name, vote, note
+       FROM feedback_notes
+      WHERE stage = ?
+        AND ( (vote IS NOT NULL AND vote != '')
+           OR (note IS NOT NULL AND note != '') )
+      ORDER BY updated_at DESC
       LIMIT ${RECENT_LIMIT}`,
+    [stage],
   );
   return result.rows as unknown as FeedbackRow[];
 }

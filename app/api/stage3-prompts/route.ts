@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: "stage2_output required" }, { status: 400 });
   }
 
-  const systemPrompt = getPrompt("stage3") + await buildFeedbackBlock();
+  const systemPrompt = (await getPrompt("stage3")) + (await buildFeedbackBlock());
 
   const imageContext =
     images?.length

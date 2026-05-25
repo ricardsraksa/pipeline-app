@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { db } from "@/lib/db";
+import { db, detachRunFeedback, upsertFeedbackNote, type FeedbackStage } from "@/lib/db";
 import type { Run } from "@/lib/db";
 
 export async function GET(
@@ -30,6 +30,9 @@ export async function DELETE(
   if (!Number.isFinite(runId)) {
     return Response.json({ error: "Invalid id" }, { status: 400 });
   }
+  // Preserve any feedback notes for this run before the row is gone.
+  // detachRunFeedback nulls source_run_id but keeps the row + product snapshot.
+  await detachRunFeedback(runId);
   await db.execute({ sql: "DELETE FROM runs WHERE id = ?", args: [runId] });
   return Response.json({ success: true });
 }
@@ -165,6 +168,29 @@ export async function PATCH(
     sql: `UPDATE runs SET ${fields.join(", ")} WHERE id = ?`,
     args: [...values, Number(id)],
   });
+
+  // Mirror feedback writes into the durable feedback_notes table so they
+  // outlive the run. Each stage's vote and note are tracked independently;
+  // pass `undefined` to upsertFeedbackNote to leave the unspecified field
+  // alone (i.e. don't clobber the note when only the vote changed).
+  const runId = Number(id);
+  const mirrors: Array<{ stage: FeedbackStage; voteKey: string; noteKey: string }> = [
+    { stage: 1, voteKey: "feedback_stage1", noteKey: "feedback_stage1_note" },
+    { stage: 2, voteKey: "feedback_stage2", noteKey: "feedback_stage2_note" },
+    { stage: 3, voteKey: "feedback_stage3", noteKey: "feedback_stage3_note" },
+  ];
+  for (const m of mirrors) {
+    const voteTouched = m.voteKey in body;
+    const noteTouched = m.noteKey in body;
+    if (!voteTouched && !noteTouched) continue;
+    await upsertFeedbackNote(runId, m.stage, {
+      vote: voteTouched ? ((body as Record<string, string | null | undefined>)[m.voteKey] ?? null) : undefined,
+      note: noteTouched ? ((body as Record<string, string | null | undefined>)[m.noteKey] ?? null) : undefined,
+    }).catch((err) => {
+      // Feedback mirroring must never break the user-facing PATCH.
+      console.error("[feedback_notes] mirror failed:", err);
+    });
+  }
 
   return Response.json({ success: true });
 }

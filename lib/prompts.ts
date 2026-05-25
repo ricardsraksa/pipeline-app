@@ -1,18 +1,14 @@
-import fs from "fs";
-import path from "path";
 import { IMAGE_PROMPTS_SYSTEM } from "@/lib/prompts/image_prompts";
-
-const PROMPTS_PATH = path.join(process.cwd(), "data", "prompts.json");
+import { ONE_PAGER_PROMPT } from "@/lib/prompts/one_pager";
+import { loadPromptsFile, getCurrentOverride, type PromptStage } from "@/lib/prompts-store";
 
 export type StageKey = "stage1" | "stage2" | "stage3";
 
-export function getPrompt(stage: StageKey): string {
+export async function getPrompt(stage: StageKey): Promise<string> {
   try {
-    if (fs.existsSync(PROMPTS_PATH)) {
-      const raw = fs.readFileSync(PROMPTS_PATH, "utf-8");
-      const json = JSON.parse(raw) as Record<string, string>;
-      if (json[stage]) return json[stage];
-    }
+    const data = await loadPromptsFile();
+    const override = getCurrentOverride(data, stage as PromptStage);
+    if (override?.prompt) return override.prompt;
   } catch {
     // fall through to defaults
   }
@@ -21,68 +17,12 @@ export function getPrompt(stage: StageKey): string {
   return STAGE3_PROMPT;
 }
 
-export const STAGE1_PROMPT = `You are a senior DTC product strategist and market researcher. Your task is to produce a comprehensive internal research brief for a product sourced from Alibaba or AliExpress that will be sold direct-to-consumer in Germany.
+// Settings exposes a single "Stage 1" prompt — it controls the one-pager
+// synthesis (the only Stage 1 output the user sees). Other Stage 1 calls
+// (identify, market, avatar, offer brief, beliefs) use their own purpose-built
+// prompts in lib/prompts/research/* and are intentionally not user-editable.
+export const STAGE1_PROMPT = ONE_PAGER_PROMPT;
 
-You will receive a product URL and any available scraped product text. Analyze the product and produce a full research brief structured exactly as follows. Write in English. Be specific, data-grounded, and honest — do not invent facts you cannot derive from the product information, German market knowledge, or reasonable inference.
-
-OUTPUT STRUCTURE:
-
-PRODUCT_NAME: [your single recommended German DTC brand name for this product — one word or compound word, e.g. WELLENFROH]
-
-PRODUCT IDENTIFICATION
-- Describe the product: what it is, key visible features, available variants/colors, target age or user group
-- Identify the core category it competes in (German consumer market)
-
-1. MARKET OVERVIEW — GERMANY
-- Category size and context: Who buys this? Why? What structural forces drive demand?
-- Statistics and context that create urgency (German-specific where possible: DLRG, Stiftung Warentest, GfK, industry bodies)
-- Seasonal patterns or purchase occasions
-- Primary buyer demographics (age, income, gender split, purchase context)
-- Platform landscape: where Germans buy this category (Amazon.de, brand sites, sporting goods, etc.)
-- Pricing landscape: budget / mid / premium / DTC tiers with EUR ranges
-- Recommended target price with rationale
-
-2. CUSTOMER PAIN POINTS — RANKED BY FREQUENCY
-- List 5-8 pain points in order of how frequently they appear in German consumer reviews, forum posts, and test reports
-- For each: name the pain, quote or paraphrase real German consumer language (translated if needed), describe the emotional consequence
-- Cite sources or context (Amazon.de reviews, test sites like Stiftung Warentest, Rochenkinder, kita.de, or German parenting forums)
-
-3. CUSTOMER DESIRES
-- Surface desire: what they say they want
-- Deeper emotional desire: the real outcome they are buying
-- Perfect solution description in parent/consumer language (in German, quoted)
-- Identity desire: who they want to be as a result of this purchase
-
-4. COMPETITIVE LANDSCAPE
-- 4-6 named competitors with: name, price range, positioning, key strengths, key weaknesses
-- Commoditized claims everyone makes (do not lead with these)
-- Market gaps that nobody fills well — specific, actionable opportunities
-
-5. PRODUCT ANALYSIS
-- Verified differentiators (only from observable product features — no invented claims)
-- For each differentiator: what it is, why it matters mechanically, how it solves a pain
-- Features NOT verified — list what should NOT be claimed without proof
-
-6. MARKET SOPHISTICATION
-- Awareness stage of the primary buyer segment
-- Ad exposure level in this category in Germany
-- German skepticism patterns: what triggers distrust, what builds it
-
-7. LEVELS OF CONSCIOUSNESS (Eugene Schwartz framework)
-- Break down the buyer population by awareness level (Unaware / Problem Aware / Solution Aware / Product Aware / Most Aware)
-- Estimate % in each segment
-- Which segment to target primarily and why
-
-WINNING BRAND IMAGE STRATEGY ANALYSIS
-- Competitor visual analysis: pick the strongest DTC competitor and analyze their image set (how many images, what categories, what visual patterns)
-- Visual patterns all winners use
-- What is unique to the best competitor vs. generic
-- Visual gaps no competitor addresses (these are your opportunities)
-- Must-have image types (list 7-10 with brief description of each)
-- Differentiated angles no competitor uses
-- Recommended image sequence (1 → n)
-
-End with no summary. The brief stands alone.`;
 
 export const STAGE2_PROMPT = `You are a senior DTC copywriter fluent in German consumer psychology. You specialize in writing conversion copy for German direct-to-consumer brands selling physical products to parents and families.
 

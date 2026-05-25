@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: "Invalid index" }, { status: 400 });
   }
 
-  const data = loadPromptsFile();
+  const data = await loadPromptsFile();
   const history = getHistory(data, stage as PromptStage);
   const entry = history[index];
   if (!entry) {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   data[stage] = entry.prompt;
   data[`${stage}_saved_at`] = saved_at;
 
-  writePromptsFile(data);
+  await writePromptsFile(data);
 
   return Response.json({ success: true, saved_at });
 }

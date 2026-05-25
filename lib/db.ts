@@ -54,6 +54,33 @@ export async function initDB() {
       updated_at TEXT
     )
   `);
+  // Durable feedback log. Rows are mirrored from the runs.feedback_stage{1,2,3}_*
+  // columns whenever a vote or note is saved. They outlive the source run (when
+  // a run is deleted, source_run_id is set to NULL, but product_name / brand_name
+  // snapshots stay so the prompt-builder can still attribute the note).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS feedback_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_run_id INTEGER,
+      stage INTEGER NOT NULL,
+      vote TEXT,
+      note TEXT,
+      product_name TEXT,
+      brand_name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  // SQLite allows multiple NULLs in a unique index, which is exactly what we
+  // want post-deletion: each delete-orphaned row keeps its own identity.
+  await db.execute(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_notes_run_stage
+       ON feedback_notes(source_run_id, stage)`,
+  );
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_feedback_notes_stage_updated
+       ON feedback_notes(stage, updated_at DESC)`,
+  );
 }
 
 async function migrateDB() {
@@ -210,6 +237,76 @@ export async function setKV(key: string, value: string): Promise<void> {
     sql: `INSERT INTO app_kv (key, value, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     args: [key, value, new Date().toISOString()],
+  });
+}
+
+// ── Durable feedback log ─────────────────────────────────────────────────────
+
+export type FeedbackStage = 1 | 2 | 3;
+
+/**
+ * Mirror the run row's feedback into the feedback_notes table.
+ * Idempotent — upserts on (source_run_id, stage). Pass undefined to leave a
+ * field alone; pass null to clear it. Reading product_name / brand_name from
+ * the runs table keeps the snapshot fresh on each write.
+ */
+export async function upsertFeedbackNote(
+  runId: number,
+  stage: FeedbackStage,
+  fields: { vote?: string | null; note?: string | null },
+): Promise<void> {
+  const row = await db.execute({
+    sql: "SELECT product_name, brand_name FROM runs WHERE id = ?",
+    args: [runId],
+  });
+  if (!row.rows.length) return;
+  const productName = (row.rows[0] as unknown as { product_name: string | null }).product_name ?? null;
+  const brandName = (row.rows[0] as unknown as { brand_name: string | null }).brand_name ?? null;
+
+  const now = new Date().toISOString();
+  // Look up existing row (if any) so we can leave unchanged fields alone.
+  const existing = await db.execute({
+    sql: "SELECT vote, note FROM feedback_notes WHERE source_run_id = ? AND stage = ?",
+    args: [runId, stage],
+  });
+  const prev = existing.rows[0] as unknown as { vote: string | null; note: string | null } | undefined;
+
+  const nextVote = fields.vote !== undefined ? fields.vote : (prev?.vote ?? null);
+  const nextNote = fields.note !== undefined ? fields.note : (prev?.note ?? null);
+
+  // If both are empty, no point persisting an empty row.
+  if ((nextVote === null || nextVote === "") && (nextNote === null || nextNote === "")) {
+    if (prev) {
+      await db.execute({
+        sql: "DELETE FROM feedback_notes WHERE source_run_id = ? AND stage = ?",
+        args: [runId, stage],
+      });
+    }
+    return;
+  }
+
+  await db.execute({
+    sql: `INSERT INTO feedback_notes (source_run_id, stage, vote, note, product_name, brand_name, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(source_run_id, stage) DO UPDATE SET
+            vote = excluded.vote,
+            note = excluded.note,
+            product_name = excluded.product_name,
+            brand_name = excluded.brand_name,
+            updated_at = excluded.updated_at`,
+    args: [runId, stage, nextVote, nextNote, productName, brandName, now, now],
+  });
+}
+
+/**
+ * Sever the link between a run and its feedback_notes rows so deleting the
+ * run doesn't drop them. The product_name/brand_name snapshot is enough for
+ * the prompt builder to keep attributing the note.
+ */
+export async function detachRunFeedback(runId: number): Promise<void> {
+  await db.execute({
+    sql: "UPDATE feedback_notes SET source_run_id = NULL WHERE source_run_id = ?",
+    args: [runId],
   });
 }
 

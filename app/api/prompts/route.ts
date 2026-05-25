@@ -12,11 +12,16 @@ import {
 const STAGES: PromptStage[] = ["stage1", "stage2", "stage3"];
 
 export async function GET() {
-  const data = loadPromptsFile();
+  const data = await loadPromptsFile();
+  const [stage1, stage2, stage3] = await Promise.all([
+    getPrompt("stage1"),
+    getPrompt("stage2"),
+    getPrompt("stage3"),
+  ]);
   return Response.json({
-    stage1: getPrompt("stage1"),
-    stage2: getPrompt("stage2"),
-    stage3: getPrompt("stage3"),
+    stage1,
+    stage2,
+    stage3,
     defaults: {
       stage1: STAGE1_PROMPT,
       stage2: STAGE2_PROMPT,
@@ -45,7 +50,7 @@ export async function PUT(req: NextRequest) {
     return Response.json({ success: false, error: "Prompt required" }, { status: 400 });
   }
 
-  const data = loadPromptsFile();
+  const data = await loadPromptsFile();
   const previous = getCurrentOverride(data, stage as PromptStage);
 
   // Stash the previous current onto history (only if it differs from the new value).
@@ -60,7 +65,7 @@ export async function PUT(req: NextRequest) {
   data[stage] = prompt;
   data[`${stage}_saved_at`] = saved_at;
 
-  writePromptsFile(data);
+  await writePromptsFile(data);
 
   return Response.json({ success: true, saved_at });
 }
@@ -72,7 +77,7 @@ export async function DELETE(req: NextRequest) {
     return Response.json({ success: false, error: "Invalid stage" }, { status: 400 });
   }
 
-  const data = loadPromptsFile();
+  const data = await loadPromptsFile();
   const current = getCurrentOverride(data, stage as PromptStage);
 
   // Reset means "stop using my override," but we never lose what was there:
@@ -84,7 +89,7 @@ export async function DELETE(req: NextRequest) {
   delete data[stage];
   delete data[`${stage}_saved_at`];
 
-  writePromptsFile(data);
+  await writePromptsFile(data);
 
   return Response.json({ success: true });
 }

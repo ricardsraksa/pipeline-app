@@ -14,7 +14,6 @@ import { OFFER_BRIEF_PROMPT } from "./prompts/offer_brief";
 import { NECESSARY_BELIEFS_PROMPT } from "./prompts/necessary_beliefs";
 import { CHIEF_FINAL_PROMPT } from "./prompts/chief_final";
 import { REVISE_DOC_PROMPT } from "./prompts/revise_doc";
-import { ONE_PAGER_PROMPT } from "./prompts/one_pager";
 import { getPrompt } from "./prompts";
 import {
   buildStage1FeedbackBlock,
@@ -541,8 +540,9 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     const beliefsForOnePager = fresh?.step_necessary_beliefs_revised ?? necessaryBeliefs;
 
     const stage1Feedback = await buildStage1FeedbackBlock();
+    const onePagerSystem = await getPrompt("stage1");
     const onePager = await anthropicMessage({
-      system: ONE_PAGER_PROMPT + stage1Feedback,
+      system: onePagerSystem + stage1Feedback,
       user: [
         "Here are the research documents for this product. Synthesize them into the one-pager.",
         "",
@@ -580,7 +580,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
   if (!stage1Output) throw new Error("No Stage 1 output to run Stage 2");
 
-  const systemPrompt = getPrompt("stage2") + await buildStage2FeedbackBlock();
+  const systemPrompt = (await getPrompt("stage2")) + (await buildStage2FeedbackBlock());
   const productName = run.brand_name ?? run.product_name ?? "";
 
   await updateRun(runId, { current_step: "Stage 2: Generating German copy (≈30–60s)", last_updated_at: now() });

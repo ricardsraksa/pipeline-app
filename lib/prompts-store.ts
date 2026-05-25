@@ -1,6 +1,11 @@
-// Disk-backed store for user-edited system prompts.
+// Durable store for user-edited system prompts.
 //
-// Shape on disk (data/prompts.json):
+// Backed by the Turso `app_kv` table under key "prompts_store" so overrides
+// survive Render redeploys (filesystem there is ephemeral). On first read we
+// transparently migrate any legacy `data/prompts.json` written by the old
+// fs-based store.
+//
+// Shape (single JSON blob under KV):
 //   {
 //     "stage1":              "<current override, or absent if reset>",
 //     "stage1_saved_at":     "<ISO timestamp>",
@@ -15,9 +20,10 @@
 
 import fs from "fs";
 import path from "path";
+import { getKV, setKV } from "./db";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const PROMPTS_PATH = path.join(DATA_DIR, "prompts.json");
+const KV_KEY = "prompts_store";
+const LEGACY_PATH = path.join(process.cwd(), "data", "prompts.json");
 const HISTORY_LIMIT = 20;
 
 export type PromptStage = "stage1" | "stage2" | "stage3";
@@ -29,18 +35,37 @@ export interface PromptHistoryEntry {
 
 export type PromptsFile = Record<string, unknown>;
 
-export function loadPromptsFile(): PromptsFile {
+let migrated = false;
+
+async function migrateLegacy(): Promise<void> {
+  if (migrated) return;
+  migrated = true;
+  // If KV already has data, never overwrite it from disk.
   try {
-    if (fs.existsSync(PROMPTS_PATH)) {
-      return JSON.parse(fs.readFileSync(PROMPTS_PATH, "utf-8")) as PromptsFile;
-    }
-  } catch { /* fall through */ }
+    const existing = await getKV(KV_KEY);
+    if (existing) return;
+    if (!fs.existsSync(LEGACY_PATH)) return;
+    const raw = fs.readFileSync(LEGACY_PATH, "utf-8");
+    JSON.parse(raw); // validate
+    await setKV(KV_KEY, raw);
+  } catch {
+    // Migration is best-effort.
+  }
+}
+
+export async function loadPromptsFile(): Promise<PromptsFile> {
+  await migrateLegacy();
+  try {
+    const raw = await getKV(KV_KEY);
+    if (raw) return JSON.parse(raw) as PromptsFile;
+  } catch {
+    /* fall through to empty */
+  }
   return {};
 }
 
-export function writePromptsFile(data: PromptsFile): void {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(PROMPTS_PATH, JSON.stringify(data, null, 2), "utf-8");
+export async function writePromptsFile(data: PromptsFile): Promise<void> {
+  await setKV(KV_KEY, JSON.stringify(data));
 }
 
 export function getHistory(data: PromptsFile, stage: PromptStage): PromptHistoryEntry[] {
