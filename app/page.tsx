@@ -82,8 +82,16 @@ export default function Home() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
-      "image/*": [],
+      // JPEG/PNG/WebP/GIF pass straight through. AVIF/HEIC/HEIF are transcoded
+      // to JPEG on the server (see /api/upload-source-images) so the research
+      // model only ever sees formats it supports.
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/webp": [".webp"],
+      "image/gif": [".gif"],
       "image/avif": [".avif"],
+      "image/heic": [".heic"],
+      "image/heif": [".heif"],
     },
     maxFiles: MAX_IMAGES,
     disabled: submitting || uploadingImages || sourceImages.length >= MAX_IMAGES,
@@ -218,7 +226,7 @@ export default function Home() {
                     : "Drag images here or click to upload"}
             </p>
             <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)] mt-1">
-              Up to {MAX_IMAGES} · jpg, png, webp · 8MB each
+              Up to {MAX_IMAGES} · jpg, png, webp, gif, avif, heic · 8MB each
             </p>
           </div>
 

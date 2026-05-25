@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createRun } from "@/lib/db";
 import { runPipeline } from "@/lib/pipeline-runner";
 
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
     uploaded_source_images: sourceImages,
     status: "pending",
   });
+
+  // Invalidate any cached /history payload so the new run shows immediately
+  // when the user navigates there.
+  revalidatePath("/history");
 
   // Fire-and-forget: pipeline runs in background
   runPipeline(runId).catch((err) => {

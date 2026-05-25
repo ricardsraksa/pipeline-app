@@ -17,6 +17,11 @@ const STAGE_NUMS: Record<Stage, string> = {
   stage3: "03",
 };
 
+interface HistoryEntry {
+  prompt: string;
+  saved_at: string;
+}
+
 interface PromptState {
   current: string;
   default: string;
@@ -25,31 +30,42 @@ interface PromptState {
   saving: boolean;
   saved: boolean;
   resetting: boolean;
+  history: HistoryEntry[];
+  historyOpen: boolean;
+  restoringIndex: number | null;
+  previewIndex: number | null;
 }
 
 export default function SettingsPage() {
   const [prompts, setPrompts] = useState<Record<Stage, PromptState> | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function refresh(preserveEdits = false) {
+    const data = await fetch("/api/prompts").then((r) => r.json());
+    setPrompts((prev) => {
+      const state: Record<Stage, PromptState> = {} as Record<Stage, PromptState>;
+      for (const stage of ["stage1", "stage2", "stage3"] as Stage[]) {
+        const prevS = prev?.[stage];
+        state[stage] = {
+          current: data[stage],
+          default: data.defaults[stage],
+          savedAt: data.saved_at?.[stage] ?? null,
+          editing: preserveEdits && prevS ? prevS.editing : data[stage],
+          saving: false,
+          saved: false,
+          resetting: false,
+          history: (data.history?.[stage] ?? []) as HistoryEntry[],
+          historyOpen: prevS?.historyOpen ?? false,
+          restoringIndex: null,
+          previewIndex: prevS?.previewIndex ?? null,
+        };
+      }
+      return state;
+    });
+  }
+
   useEffect(() => {
-    fetch("/api/prompts")
-      .then((r) => r.json())
-      .then((data) => {
-        const state: Record<Stage, PromptState> = {} as Record<Stage, PromptState>;
-        for (const stage of ["stage1", "stage2", "stage3"] as Stage[]) {
-          state[stage] = {
-            current: data[stage],
-            default: data.defaults[stage],
-            savedAt: null,
-            editing: data[stage],
-            saving: false,
-            saved: false,
-            resetting: false,
-          };
-        }
-        setPrompts(state);
-      })
-      .finally(() => setLoading(false));
+    refresh().finally(() => setLoading(false));
   }, []);
 
   function update(stage: Stage, patch: Partial<PromptState>) {
@@ -70,7 +86,8 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        update(stage, { current: prompts[stage].editing, savedAt: data.saved_at, saved: true });
+        update(stage, { saved: true });
+        await refresh(true);
       }
     } finally {
       update(stage, { saving: false });
@@ -87,9 +104,27 @@ export default function SettingsPage() {
         body: JSON.stringify({ stage }),
       });
       const defaultText = prompts[stage].default;
-      update(stage, { editing: defaultText, current: defaultText, savedAt: null, saved: false });
+      update(stage, { editing: defaultText, saved: false });
+      await refresh(true);
     } finally {
       update(stage, { resetting: false });
+    }
+  }
+
+  async function restore(stage: Stage, index: number) {
+    update(stage, { restoringIndex: index });
+    try {
+      const res = await fetch("/api/prompts/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, index }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await refresh(false);
+      }
+    } finally {
+      update(stage, { restoringIndex: null });
     }
   }
 
@@ -121,7 +156,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
-          Edit the system prompts for each stage. Changes take effect on the next pipeline run.
+          Edit the system prompts for each stage. Changes take effect on the next pipeline run. Old versions are kept in history — nothing is lost on reset.
         </p>
       </div>
 
@@ -198,7 +233,69 @@ export default function SettingsPage() {
                     {s.resetting ? "Resetting…" : "Reset to default"}
                   </button>
                 )}
+
+                {s.history.length > 0 && (
+                  <button
+                    onClick={() => update(stage, { historyOpen: !s.historyOpen })}
+                    className="cursor-pointer ml-auto inline-flex items-center gap-[6px] rounded-lg px-[12px] py-[8px] text-[12px] font-[600] text-[var(--color-text-2)] border border-transparent transition-all hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] whitespace-nowrap"
+                    aria-expanded={s.historyOpen}
+                  >
+                    {s.historyOpen ? "▼" : "▶"} History ({s.history.length})
+                  </button>
+                )}
               </div>
+
+              {/* History list */}
+              {s.historyOpen && s.history.length > 0 && (
+                <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-2)]">
+                  <ul className="divide-y divide-[var(--color-border)]">
+                    {s.history.map((h, i) => {
+                      const expanded = s.previewIndex === i;
+                      const preview = h.prompt.replace(/\s+/g, " ").slice(0, 120);
+                      return (
+                        <li key={`${h.saved_at}-${i}`} className="px-5 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)]">
+                                  {formatDate(h.saved_at)}
+                                </span>
+                                <span className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)]">
+                                  · {h.prompt.length.toLocaleString()} chars
+                                </span>
+                              </div>
+                              {expanded ? (
+                                <pre className="whitespace-pre-wrap text-[11px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-2)] max-h-[280px] overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded p-3">
+                                  {h.prompt}
+                                </pre>
+                              ) : (
+                                <p className="text-[12px] text-[var(--color-text-3)] truncate">
+                                  {preview}{h.prompt.length > 120 ? "…" : ""}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() => update(stage, { previewIndex: expanded ? null : i })}
+                                className="cursor-pointer text-[11px] font-[600] text-[var(--color-text-3)] hover:text-[var(--color-text)] transition-colors px-2 py-1"
+                              >
+                                {expanded ? "Hide" : "View"}
+                              </button>
+                              <button
+                                onClick={() => restore(stage, i)}
+                                disabled={s.restoringIndex !== null}
+                                className="cursor-pointer inline-flex items-center gap-[5px] rounded-md px-[10px] py-[6px] text-[11.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                {s.restoringIndex === i ? "Restoring…" : "Restore"}
+                              </button>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </section>
           );
         })}

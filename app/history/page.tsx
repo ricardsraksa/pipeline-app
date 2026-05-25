@@ -4,6 +4,11 @@ import { listRuns, type RunSummary } from "@/lib/db";
 import { HistoryRefresher } from "./HistoryRefresher";
 import { RunNameCell } from "./RunNameCell";
 
+// History is live data — must never be statically cached. Force dynamic
+// rendering so every navigation / router.refresh() hits the DB.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Server components run in the same process as the API. Skip the HTTP roundtrip
 // and read from the DB directly — much faster, doesn't depend on INTERNAL_API_URL.
 async function getRuns(): Promise<RunSummary[]> {

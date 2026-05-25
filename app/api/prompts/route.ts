@@ -1,12 +1,18 @@
 import { NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
 import { STAGE1_PROMPT, STAGE2_PROMPT, STAGE3_PROMPT, getPrompt } from "@/lib/prompts";
+import {
+  loadPromptsFile,
+  writePromptsFile,
+  getHistory,
+  pushHistory,
+  getCurrentOverride,
+  type PromptStage,
+} from "@/lib/prompts-store";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const PROMPTS_PATH = path.join(DATA_DIR, "prompts.json");
+const STAGES: PromptStage[] = ["stage1", "stage2", "stage3"];
 
 export async function GET() {
+  const data = loadPromptsFile();
   return Response.json({
     stage1: getPrompt("stage1"),
     stage2: getPrompt("stage2"),
@@ -16,57 +22,69 @@ export async function GET() {
       stage2: STAGE2_PROMPT,
       stage3: STAGE3_PROMPT,
     },
+    saved_at: {
+      stage1: getCurrentOverride(data, "stage1")?.saved_at ?? null,
+      stage2: getCurrentOverride(data, "stage2")?.saved_at ?? null,
+      stage3: getCurrentOverride(data, "stage3")?.saved_at ?? null,
+    },
+    history: {
+      stage1: getHistory(data, "stage1"),
+      stage2: getHistory(data, "stage2"),
+      stage3: getHistory(data, "stage3"),
+    },
   });
 }
 
 export async function PUT(req: NextRequest) {
-  const { stage, prompt } = await req.json() as { stage: string; prompt: string };
+  const { stage, prompt } = (await req.json()) as { stage: string; prompt: string };
 
-  if (!["stage1", "stage2", "stage3"].includes(stage)) {
+  if (!STAGES.includes(stage as PromptStage)) {
     return Response.json({ success: false, error: "Invalid stage" }, { status: 400 });
   }
   if (typeof prompt !== "string" || !prompt.trim()) {
     return Response.json({ success: false, error: "Prompt required" }, { status: 400 });
   }
 
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const data = loadPromptsFile();
+  const previous = getCurrentOverride(data, stage as PromptStage);
+
+  // Stash the previous current onto history (only if it differs from the new value).
+  if (previous && previous.prompt !== prompt) {
+    pushHistory(data, stage as PromptStage, {
+      prompt: previous.prompt,
+      saved_at: previous.saved_at,
+    });
   }
 
-  let current: Record<string, string> = {};
-  try {
-    if (fs.existsSync(PROMPTS_PATH)) {
-      current = JSON.parse(fs.readFileSync(PROMPTS_PATH, "utf-8"));
-    }
-  } catch {
-    current = {};
-  }
+  const saved_at = new Date().toISOString();
+  data[stage] = prompt;
+  data[`${stage}_saved_at`] = saved_at;
 
-  current[stage] = prompt;
-  current[`${stage}_saved_at`] = new Date().toISOString();
+  writePromptsFile(data);
 
-  fs.writeFileSync(PROMPTS_PATH, JSON.stringify(current, null, 2), "utf-8");
-
-  return Response.json({ success: true, saved_at: current[`${stage}_saved_at`] });
+  return Response.json({ success: true, saved_at });
 }
 
 export async function DELETE(req: NextRequest) {
-  const { stage } = await req.json() as { stage: string };
+  const { stage } = (await req.json()) as { stage: string };
 
-  if (!["stage1", "stage2", "stage3"].includes(stage)) {
+  if (!STAGES.includes(stage as PromptStage)) {
     return Response.json({ success: false, error: "Invalid stage" }, { status: 400 });
   }
 
-  try {
-    if (fs.existsSync(PROMPTS_PATH)) {
-      const current = JSON.parse(fs.readFileSync(PROMPTS_PATH, "utf-8")) as Record<string, string>;
-      delete current[stage];
-      delete current[`${stage}_saved_at`];
-      fs.writeFileSync(PROMPTS_PATH, JSON.stringify(current, null, 2), "utf-8");
-    }
-  } catch {
-    // ignore
+  const data = loadPromptsFile();
+  const current = getCurrentOverride(data, stage as PromptStage);
+
+  // Reset means "stop using my override," but we never lose what was there:
+  // push the current onto history before unsetting.
+  if (current) {
+    pushHistory(data, stage as PromptStage, current);
   }
+
+  delete data[stage];
+  delete data[`${stage}_saved_at`];
+
+  writePromptsFile(data);
 
   return Response.json({ success: true });
 }
