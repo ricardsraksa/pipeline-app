@@ -96,6 +96,7 @@ function ImageCell({
   auditResult,
   onRegenerate,
   onOverrideVerdict,
+  onSaveNote,
   regenCount,
 }: {
   image: ImageSlot
@@ -103,21 +104,29 @@ function ImageCell({
   auditResult: AuditResult | null
   onRegenerate: () => void
   onOverrideVerdict?: () => void
+  /** Persist the operator's note onto auditResult.user_note (drives the next
+   *  regen's prompt rewrite). Distinct from the stage3 learning store. */
+  onSaveNote?: (note: string) => void
   regenCount: number
 }) {
   const [showDetails, setShowDetails] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feedbackVote, setFeedbackVote] = useState<'up' | 'down' | null>(null)
-  const [feedbackNote, setFeedbackNote] = useState('')
+  const [feedbackNote, setFeedbackNote] = useState(auditResult?.user_note ?? '')
   const [feedbackSaved, setFeedbackSaved] = useState(false)
   const cat = IMAGE_CATEGORIES.find(c => c.id === prompt.category)
   const catIndex = IMAGE_CATEGORIES.findIndex(c => c.id === prompt.category)
+  const hasNote = (auditResult?.user_note ?? '').trim().length > 0
 
   async function saveImageFeedback() {
     if (!feedbackVote && !feedbackNote.trim()) {
       setFeedbackOpen(false)
       return
     }
+    // Persist the note to auditResult.user_note so the next regen of THIS
+    // image picks it up as additional rewrite instructions. (The vote+note
+    // also still go to the stage3 learning store below for future runs.)
+    if (onSaveNote) onSaveNote(feedbackNote.trim())
     try {
       await fetch('/api/stage3/feedback', {
         method: 'POST',
@@ -163,6 +172,16 @@ function ImageCell({
               className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/60 text-white text-[9px] font-[var(--font-ibm-plex-mono)] flex items-center justify-center cursor-pointer hover:bg-black/80"
             >
               i
+            </button>
+          )}
+          {hasNote && (
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              title={`Your note: "${auditResult?.user_note ?? ''}". Click to edit. Applied on next regenerate.`}
+              className={`absolute top-2 ${auditResult && auditResult.issues.length > 0 ? 'right-9' : 'right-2'} w-5 h-5 rounded-full bg-[var(--color-accent)] text-white text-[10px] flex items-center justify-center cursor-pointer hover:brightness-110`}
+              aria-label="Your note (applied on next regenerate)"
+            >
+              💬
             </button>
           )}
           {/* Action bar — Download + Rate + Regenerate, revealed on hover */}
@@ -213,7 +232,7 @@ function ImageCell({
               <textarea
                 value={feedbackNote}
                 onChange={(e) => setFeedbackNote(e.target.value)}
-                placeholder="Optional: what to change/keep next time (steers future runs of this template)"
+                placeholder="What to change (e.g. warmer lighting, brushed steel more visible). Applied to THIS image's prompt on the next regenerate, and saved as feedback for future runs."
                 rows={3}
                 className="w-full text-[10px] text-white bg-white/10 border border-white/20 rounded p-1.5 placeholder:text-white/40 focus:outline-none focus:border-white/60 resize-none"
               />
@@ -544,6 +563,7 @@ function CompletePhase({
   onRerunAll,
   onRegenerateFailed,
   onOverrideVerdict,
+  onSaveNote,
   run,
 }: {
   images: ImageSlot[]
@@ -554,6 +574,7 @@ function CompletePhase({
   onRerunAll: () => void
   onRegenerateFailed: () => void
   onOverrideVerdict: (i: number) => void
+  onSaveNote: (i: number, note: string) => void
   run: Run | null
 }) {
   // Count slots that need a redo: either nothing generated, or effective
@@ -596,6 +617,7 @@ function CompletePhase({
             auditResult={auditResults[i]}
             onRegenerate={() => onRegenerate(i)}
             onOverrideVerdict={() => onOverrideVerdict(i)}
+            onSaveNote={(note) => onSaveNote(i, note)}
             regenCount={regenCounts[i] ?? 0}
           />
         ))}
@@ -679,13 +701,18 @@ function RegenModal({
   const auditCategory = (auditResult as AuditResult & { category?: string } | null)?.category
   const cat = IMAGE_CATEGORIES.find(c => c.id === (auditCategory ?? category ?? ''))
 
-  // If the slot has audit issues, pre-populate the AI-edit panel with them so
-  // a single click rewrites the prompt to address what went wrong. The
-  // operator can still edit or replace the text before clicking Rewrite.
+  // Pre-populate the AI-edit panel with (a) the operator's saved note for
+  // this image, if any, and (b) the auditor's issues. One click on Rewrite
+  // applies both. Operator can edit before clicking.
   const presetIssues = useMemo(() => {
     const issues = auditResult?.issues?.filter(Boolean) ?? []
-    if (issues.length === 0 || effectiveVerdict(auditResult) === 'pass') return ''
-    return 'Fix the audit issues:\n- ' + issues.join('\n- ')
+    const note = (auditResult?.user_note ?? '').trim()
+    const skipIssues = issues.length === 0 || effectiveVerdict(auditResult) === 'pass'
+    if (!note && skipIssues) return ''
+    const parts: string[] = []
+    if (note) parts.push('My note: ' + note)
+    if (!skipIssues) parts.push('Fix the audit issues:\n- ' + issues.join('\n- '))
+    return parts.join('\n\n')
   }, [auditResult])
 
   const [aiOpen, setAiOpen] = useState(presetIssues.length > 0)
@@ -1191,8 +1218,22 @@ function Stage3Page() {
     for (const i of indices) {
       const audit = auditResults[i]
       const issues = audit?.issues?.filter(Boolean) ?? []
+      const userNote = (audit?.user_note ?? '').trim()
       let nextPrompt = prompts[i].prompt
-      if (issues.length > 0) {
+      // Rewrite when we have either auditor issues OR a user note. Combine
+      // both so the user's note takes priority but the auditor's findings
+      // still inform the rewrite.
+      if (issues.length > 0 || userNote) {
+        const parts: string[] = []
+        if (userNote) {
+          parts.push('Operator note (highest priority — follow this):\n' + userNote)
+        }
+        if (issues.length > 0) {
+          parts.push(
+            'Auditor flagged these problems with the previous render — avoid them while keeping the product itself unchanged:\n- ' +
+              issues.join('\n- '),
+          )
+        }
         try {
           const res = await fetch('/api/stage3/edit-prompt', {
             method: 'POST',
@@ -1200,9 +1241,7 @@ function Stage3Page() {
             body: JSON.stringify({
               prompt: nextPrompt,
               category: prompts[i].category,
-              instructions:
-                'The auditor flagged the previous render with these problems. Rewrite the prompt so the next render avoids them while keeping the product itself unchanged:\n- ' +
-                issues.join('\n- '),
+              instructions: parts.join('\n\n'),
             }),
           })
           const data = await res.json()
@@ -1218,6 +1257,34 @@ function Stage3Page() {
       await regenerateImage(i, nextPrompt)
     }
   }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
+
+  // Persist the operator's per-image note onto auditResult.user_note so the
+  // next regen of this image picks it up as additional rewrite instructions.
+  // PATCHes the run so the note survives a refresh.
+  const saveImageNote = useCallback((index: number, note: string) => {
+    if (!run) return
+    setAuditResults((prev) => {
+      // Make sure there's an audit row to attach the note to — synthesize one
+      // if the image never went through auditing (e.g. brand-new failed slot).
+      const base = prev[index] ?? {
+        image_index: index,
+        verdict: 'minor_issue' as const,
+        issues: [],
+        requires_regeneration: false,
+      }
+      const updated = prev.map((r, i) =>
+        i === index ? { ...base, user_note: note || null } : r,
+      )
+      // Bump even if prev[index] was null:
+      if (!prev[index]) updated[index] = { ...base, user_note: note || null }
+      fetch(`/api/runs/${run.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audit_results: JSON.stringify(updated) }),
+      }).catch(() => { /* informational; ignore network blips */ })
+      return updated
+    })
+  }, [run])
 
   // Phase E: Operator override of an audit verdict. Cycles
   // pass → minor → fail → (clear back to auditor's verdict) → ...
@@ -1298,6 +1365,7 @@ function Stage3Page() {
           onRerunAll={generateImages}
           onRegenerateFailed={regenerateFailedImages}
           onOverrideVerdict={overrideVerdict}
+          onSaveNote={saveImageNote}
           run={run}
         />
       )}

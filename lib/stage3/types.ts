@@ -39,6 +39,9 @@ export interface AuditResult {
   /** Operator override. If set, takes precedence over `verdict` everywhere
    *  (counts, "regenerate failed only", badge color). null = no override. */
   user_override?: Verdict | null
+  /** Operator-written note. Used as additional instructions when the prompt
+   *  is rewritten before the next regen. Persisted with the run. */
+  user_note?: string | null
   issues: string[]
   requires_regeneration: boolean
 }
