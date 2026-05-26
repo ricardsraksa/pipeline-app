@@ -33,17 +33,16 @@ AUDIT CRITERIA:
 
 OUTPUT FORMAT (JSON only, no preamble):
 {
-  "verdict": "pass" | "minor_issue" | "fail",
+  "verdict": "pass" | "fail",
   "issues": ["issue 1", "issue 2"],
   "requires_regeneration": true | false
 }
 
-VERDICT DEFINITIONS:
-- "pass": Image is ready for use. Minor imperfections acceptable.
-- "minor_issue": Usable but has notable issues worth noting. Does NOT require regeneration.
-- "fail": Image has critical problems that make it unusable. REQUIRES regeneration.
+VERDICT DEFINITIONS — binary, no middle ground:
+- "pass": Image is ready to ship. Minor cosmetic imperfections (slight crop, mild colour cast, subtle lighting quirks) are acceptable.
+- "fail": Anything you'd want to redo — wrong product, drifted product details, garbled text, bad anatomy, off-brand composition, prompt not followed. If you'd hesitate to ship it, fail it.
 
-REQUIRES_REGENERATION: Set to true only for "fail" verdict. Minor issues do not require regeneration.
+REQUIRES_REGENERATION: Mirrors verdict — true for "fail", false for "pass".
 
 Output only the JSON object. Do not include any explanation outside the JSON.`
 

@@ -30,14 +30,17 @@ export interface GeneratedImage {
   status: 'generating' | 'complete' | 'failed'
 }
 
-export type Verdict = 'pass' | 'minor_issue' | 'fail'
+export type Verdict = 'pass' | 'fail'
 
 export interface AuditResult {
   image_index: number
-  /** Auto verdict from the audit pass — never mutated after the audit returns. */
+  /** Auto verdict from the audit pass — never mutated after the audit returns.
+   *  Legacy runs may still hold `'minor_issue'` in storage; readers should
+   *  treat anything that isn't a clean `'pass'` as `'fail'` (see
+   *  effectiveVerdict / coerceVerdict). */
   verdict: Verdict
   /** Operator override. If set, takes precedence over `verdict` everywhere
-   *  (counts, "regenerate failed only", badge color). null = no override. */
+   *  (counts, "regenerate flagged", badge color). null = no override. */
   user_override?: Verdict | null
   /** Operator-written note. Used as additional instructions when the prompt
    *  is rewritten before the next regen. Persisted with the run. */
@@ -46,10 +49,16 @@ export interface AuditResult {
   requires_regeneration: boolean
 }
 
+/** Coerce any stored verdict (incl. legacy `'minor_issue'`) into the binary
+ *  pass/fail world. Anything that isn't `'pass'` becomes `'fail'`. */
+export function coerceVerdict(v: string | null | undefined): Verdict {
+  return v === 'pass' ? 'pass' : 'fail'
+}
+
 /** Single source of truth: prefer the user's override when it's set. */
 export function effectiveVerdict(a: AuditResult | null | undefined): Verdict | null {
   if (!a) return null
-  return a.user_override ?? a.verdict
+  return coerceVerdict(a.user_override ?? a.verdict)
 }
 
 export interface PromptFeedback {

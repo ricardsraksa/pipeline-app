@@ -52,15 +52,15 @@ function buildReferenceImages(
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 // Cycle order when the user clicks the badge to override:
-//   pass → minor_issue → fail → (clear override, revert to audit) → ...
+//   pass → fail → (clear override, revert to audit) → ...
 function nextOverride(current: Verdict | null, autoVerdict: Verdict): Verdict | null {
-  // If we're already on a manual override, advance through pass→minor→fail.
-  // Once we'd cycle back to whatever the auditor said, clear instead so the
-  // user can also "untoggle" their override.
-  const order: Verdict[] = ['pass', 'minor_issue', 'fail']
-  const idx = current === null ? order.indexOf(autoVerdict) : order.indexOf(current)
-  const next = order[(idx + 1) % order.length]
-  return next === autoVerdict ? null : next
+  // Three logical states for the click cycle: pass, fail, no-override.
+  // If we're on no-override, flip to the OPPOSITE of the auditor's verdict.
+  // If we're already overriding, flip to the auditor's verdict — but if that
+  // would just match what they said anyway, clear the override instead.
+  if (current === null) return autoVerdict === 'pass' ? 'fail' : 'pass'
+  const flipped: Verdict = current === 'pass' ? 'fail' : 'pass'
+  return flipped === autoVerdict ? null : flipped
 }
 
 function VerdictBadge({
@@ -75,9 +75,9 @@ function VerdictBadge({
   title?: string
 }) {
   const tone =
-    verdict === 'pass' ? { bg: 'var(--color-green-bg)', fg: 'var(--color-green)', label: 'Pass' }
-    : verdict === 'minor_issue' ? { bg: 'var(--color-amber-bg)', fg: 'var(--color-amber)', label: 'Minor' }
-    : { bg: 'var(--color-red-bg)', fg: 'var(--color-red)', label: 'Fail' }
+    verdict === 'pass'
+      ? { bg: 'var(--color-green-bg)', fg: 'var(--color-green)', label: 'Pass' }
+      : { bg: 'var(--color-red-bg)', fg: 'var(--color-red)', label: 'Fail' }
 
   // Append the manual-override hint to the label so it's visible even on small chips.
   const labelText = overridden ? `${tone.label} (manual)` : tone.label
@@ -95,7 +95,7 @@ function VerdictBadge({
     <button
       type="button"
       onClick={onClick}
-      title={title ?? 'Click to override — cycles pass → minor → fail → auto'}
+      title={title ?? 'Click to flip pass ↔ fail. Click again to clear override.'}
       className={`${baseCls} cursor-pointer transition-all hover:brightness-95`}
       style={{ background: tone.bg, color: tone.fg }}
     >
@@ -622,12 +622,10 @@ function CompletePhase({
   // when there's an actual issue worth flagging.
   const failedCount = images.reduce((n, img, i) => {
     const generationFailed = img.status === 'error' || img.status === 'failed'
-    const v = effectiveVerdict(auditResults[i])
-    const auditFlagged = v === 'fail' || v === 'minor_issue'
+    const auditFlagged = effectiveVerdict(auditResults[i]) === 'fail'
     return (generationFailed || auditFlagged) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
   }, 0)
   const passed = auditResults.filter(r => effectiveVerdict(r) === 'pass').length
-  const minor = auditResults.filter(r => effectiveVerdict(r) === 'minor_issue').length
   const failed = auditResults.filter(r => effectiveVerdict(r) === 'fail').length
 
   return (
@@ -638,11 +636,6 @@ function CompletePhase({
           <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-green-bg)] text-[var(--color-green)] whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{passed} passed
           </span>
-          {minor > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{minor} minor
-            </span>
-          )}
           {failed > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
               <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{failed} failed
@@ -1268,8 +1261,7 @@ function Stage3Page() {
     const indices: number[] = []
     images.forEach((img, i) => {
       const generationFailed = img.status === 'error' || img.status === 'failed'
-      const v = effectiveVerdict(auditResults[i])
-      const auditFlagged = v === 'fail' || v === 'minor_issue'
+      const auditFlagged = effectiveVerdict(auditResults[i]) === 'fail'
       const underCap = (regenCounts[i] ?? 0) < 3
       if ((generationFailed || auditFlagged) && underCap) indices.push(i)
     })
@@ -1325,11 +1317,13 @@ function Stage3Page() {
     setAuditResults((prev) => {
       // Make sure there's an audit row to attach the note to — synthesize one
       // if the image never went through auditing (e.g. brand-new failed slot).
+      // Default to 'fail' so an un-audited image with a note still surfaces
+      // in "Regenerate flagged (N)" — operator-noted = worth redoing.
       const base = prev[index] ?? {
         image_index: index,
-        verdict: 'minor_issue' as const,
+        verdict: 'fail' as const,
         issues: [],
-        requires_regeneration: false,
+        requires_regeneration: true,
       }
       const updated = prev.map((r, i) =>
         i === index ? { ...base, user_note: note || null } : r,
