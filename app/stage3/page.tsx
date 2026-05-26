@@ -496,6 +496,7 @@ function CompletePhase({
   regenCounts,
   onRegenerate,
   onRerunAll,
+  onRegenerateFailed,
   run,
 }: {
   images: ImageSlot[]
@@ -504,8 +505,15 @@ function CompletePhase({
   regenCounts: number[]
   onRegenerate: (i: number) => void
   onRerunAll: () => void
+  onRegenerateFailed: () => void
   run: Run | null
 }) {
+  // Count slots that need a redo: either nothing generated, or audit said fail.
+  const failedCount = images.reduce((n, img, i) => {
+    const generationFailed = img.status === 'error' || img.status === 'failed'
+    const auditFailed = auditResults[i]?.verdict === 'fail'
+    return (generationFailed || auditFailed) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
+  }, 0)
   const passed = auditResults.filter(r => r?.verdict === 'pass').length
   const minor = auditResults.filter(r => r?.verdict === 'minor_issue').length
   const failed = auditResults.filter(r => r?.verdict === 'fail').length
@@ -554,9 +562,23 @@ function CompletePhase({
         </div>
       )}
       <div className="flex items-center gap-3 pt-2 flex-wrap">
+        {failedCount > 0 && (
+          <button
+            onClick={onRegenerateFailed}
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
+            title="Re-runs just the slots that errored out or failed audit. Sequential to stay under Higgsfield rate limits."
+          >
+            Regenerate failed only ({failedCount})
+          </button>
+        )}
         <button
           onClick={onRerunAll}
-          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
+          className={[
+            "cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-transparent transition-all whitespace-nowrap",
+            failedCount > 0
+              ? "bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border-strong)] hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)]"
+              : "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:brightness-105",
+          ].join(" ")}
         >
           Regenerate all images
         </button>
@@ -984,6 +1006,27 @@ function Stage3Page() {
     setRegenModal(null)
   }, [run, prompts, regenCounts, auditResults])
 
+  // Phase E: Regenerate every image that's either failed to generate at all
+  // (status === 'error' / 'failed') or generated but failed the audit
+  // (verdict === 'fail'). Runs sequentially so we don't blow the Higgsfield
+  // rate limit. Each retry uses the existing prompt — for edited prompts,
+  // use the per-image Regenerate button.
+  const regenerateFailedImages = useCallback(async () => {
+    if (!run) return
+    const indices: number[] = []
+    images.forEach((img, i) => {
+      const generationFailed = img.status === 'error' || img.status === 'failed'
+      const auditFailed = auditResults[i]?.verdict === 'fail'
+      const underCap = (regenCounts[i] ?? 0) < 3
+      if ((generationFailed || auditFailed) && underCap) indices.push(i)
+    })
+    if (indices.length === 0) return
+    for (const i of indices) {
+      // Use the latest prompt for this slot (it may have been edited earlier).
+      await regenerateImage(i, prompts[i].prompt)
+    }
+  }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
+
   return (
     <main className="px-7 py-7 max-w-[1080px] mx-auto">
       {/* Header */}
@@ -1042,6 +1085,7 @@ function Stage3Page() {
           regenCounts={regenCounts}
           onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
           onRerunAll={generateImages}
+          onRegenerateFailed={regenerateFailedImages}
           run={run}
         />
       )}
