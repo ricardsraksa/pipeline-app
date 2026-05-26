@@ -4,30 +4,64 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import { Icon } from '@/components/ui/Icon'
-import type { ImagePrompt, AuditResult, Stage3Phase } from '@/lib/stage3/types'
+import type { ImagePrompt, AuditResult, Stage3Phase, Verdict } from '@/lib/stage3/types'
+import { effectiveVerdict } from '@/lib/stage3/types'
 import type { Run } from '@/lib/db'
 import FeedbackButtons from '@/components/FeedbackButtons'
 import FeedbackAppliedChip from '@/components/FeedbackAppliedChip'
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function VerdictBadge({ verdict }: { verdict: string }) {
-  if (verdict === 'pass')
+// Cycle order when the user clicks the badge to override:
+//   pass → minor_issue → fail → (clear override, revert to audit) → ...
+function nextOverride(current: Verdict | null, autoVerdict: Verdict): Verdict | null {
+  // If we're already on a manual override, advance through pass→minor→fail.
+  // Once we'd cycle back to whatever the auditor said, clear instead so the
+  // user can also "untoggle" their override.
+  const order: Verdict[] = ['pass', 'minor_issue', 'fail']
+  const idx = current === null ? order.indexOf(autoVerdict) : order.indexOf(current)
+  const next = order[(idx + 1) % order.length]
+  return next === autoVerdict ? null : next
+}
+
+function VerdictBadge({
+  verdict,
+  overridden = false,
+  onClick,
+  title,
+}: {
+  verdict: Verdict
+  overridden?: boolean
+  onClick?: () => void
+  title?: string
+}) {
+  const tone =
+    verdict === 'pass' ? { bg: 'var(--color-green-bg)', fg: 'var(--color-green)', label: 'Pass' }
+    : verdict === 'minor_issue' ? { bg: 'var(--color-amber-bg)', fg: 'var(--color-amber)', label: 'Minor' }
+    : { bg: 'var(--color-red-bg)', fg: 'var(--color-red)', label: 'Fail' }
+
+  // Append the manual-override hint to the label so it's visible even on small chips.
+  const labelText = overridden ? `${tone.label} (manual)` : tone.label
+
+  const baseCls = `inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full whitespace-nowrap ${overridden ? 'ring-1 ring-[var(--color-text)]/30 ring-offset-1 ring-offset-[var(--color-surface)]' : ''}`
+
+  if (!onClick) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-green-bg)] text-[var(--color-green)] whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Pass
+      <span className={baseCls} style={{ background: tone.bg, color: tone.fg }} title={title}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{labelText}
       </span>
     )
-  if (verdict === 'minor_issue')
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Minor
-      </span>
-    )
+  }
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Fail
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      title={title ?? 'Click to override — cycles pass → minor → fail → auto'}
+      className={`${baseCls} cursor-pointer transition-all hover:brightness-95`}
+      style={{ background: tone.bg, color: tone.fg }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{labelText}
+    </button>
   )
 }
 
@@ -61,12 +95,14 @@ function ImageCell({
   prompt,
   auditResult,
   onRegenerate,
+  onOverrideVerdict,
   regenCount,
 }: {
   image: ImageSlot
   prompt: ImagePrompt
   auditResult: AuditResult | null
   onRegenerate: () => void
+  onOverrideVerdict?: () => void
   regenCount: number
 }) {
   const [showDetails, setShowDetails] = useState(false)
@@ -109,7 +145,16 @@ function ImageCell({
           <img src={image.url} alt={cat?.label ?? prompt.category} className="w-full h-full object-cover" />
           {auditResult && (
             <div className="absolute top-2 left-2">
-              <VerdictBadge verdict={auditResult.verdict} />
+              <VerdictBadge
+                verdict={effectiveVerdict(auditResult) ?? auditResult.verdict}
+                overridden={auditResult.user_override != null}
+                onClick={onOverrideVerdict}
+                title={
+                  auditResult.user_override != null
+                    ? `Overridden — auditor said ${auditResult.verdict}. Click to cycle.`
+                    : `Auditor: ${auditResult.verdict}. Click to override.`
+                }
+              />
             </div>
           )}
           {auditResult && auditResult.issues.length > 0 && (
@@ -498,6 +543,7 @@ function CompletePhase({
   onRegenerate,
   onRerunAll,
   onRegenerateFailed,
+  onOverrideVerdict,
   run,
 }: {
   images: ImageSlot[]
@@ -507,17 +553,19 @@ function CompletePhase({
   onRegenerate: (i: number) => void
   onRerunAll: () => void
   onRegenerateFailed: () => void
+  onOverrideVerdict: (i: number) => void
   run: Run | null
 }) {
-  // Count slots that need a redo: either nothing generated, or audit said fail.
+  // Count slots that need a redo: either nothing generated, or effective
+  // verdict (after override) is fail.
   const failedCount = images.reduce((n, img, i) => {
     const generationFailed = img.status === 'error' || img.status === 'failed'
-    const auditFailed = auditResults[i]?.verdict === 'fail'
+    const auditFailed = effectiveVerdict(auditResults[i]) === 'fail'
     return (generationFailed || auditFailed) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
   }, 0)
-  const passed = auditResults.filter(r => r?.verdict === 'pass').length
-  const minor = auditResults.filter(r => r?.verdict === 'minor_issue').length
-  const failed = auditResults.filter(r => r?.verdict === 'fail').length
+  const passed = auditResults.filter(r => effectiveVerdict(r) === 'pass').length
+  const minor = auditResults.filter(r => effectiveVerdict(r) === 'minor_issue').length
+  const failed = auditResults.filter(r => effectiveVerdict(r) === 'fail').length
 
   return (
     <div className="space-y-6">
@@ -547,6 +595,7 @@ function CompletePhase({
             prompt={prompt}
             auditResult={auditResults[i]}
             onRegenerate={() => onRegenerate(i)}
+            onOverrideVerdict={() => onOverrideVerdict(i)}
             regenCount={regenCounts[i] ?? 0}
           />
         ))}
@@ -1121,7 +1170,7 @@ function Stage3Page() {
     const indices: number[] = []
     images.forEach((img, i) => {
       const generationFailed = img.status === 'error' || img.status === 'failed'
-      const auditFailed = auditResults[i]?.verdict === 'fail'
+      const auditFailed = effectiveVerdict(auditResults[i]) === 'fail'
       const underCap = (regenCounts[i] ?? 0) < 3
       if ((generationFailed || auditFailed) && underCap) indices.push(i)
     })
@@ -1131,6 +1180,25 @@ function Stage3Page() {
       await regenerateImage(i, prompts[i].prompt)
     }
   }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
+
+  // Phase E: Operator override of an audit verdict. Cycles
+  // pass → minor → fail → (clear back to auditor's verdict) → ...
+  // Persists by PATCHing audit_results on the run so it survives refresh.
+  const overrideVerdict = useCallback((index: number) => {
+    if (!run) return
+    const current = auditResults[index]
+    if (!current) return
+    const nextVal = nextOverride(current.user_override ?? null, current.verdict)
+    const updated = auditResults.map((r, i) =>
+      i === index && r ? { ...r, user_override: nextVal } : r,
+    )
+    setAuditResults(updated)
+    fetch(`/api/runs/${run.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audit_results: JSON.stringify(updated) }),
+    }).catch(() => { /* override is informational; ignore network blips */ })
+  }, [run, auditResults])
 
   return (
     <main className="px-7 py-7 max-w-[1080px] mx-auto">
@@ -1191,6 +1259,7 @@ function Stage3Page() {
           onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
           onRerunAll={generateImages}
           onRegenerateFailed={regenerateFailedImages}
+          onOverrideVerdict={overrideVerdict}
           run={run}
         />
       )}

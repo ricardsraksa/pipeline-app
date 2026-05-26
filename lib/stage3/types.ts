@@ -30,11 +30,23 @@ export interface GeneratedImage {
   status: 'generating' | 'complete' | 'failed'
 }
 
+export type Verdict = 'pass' | 'minor_issue' | 'fail'
+
 export interface AuditResult {
   image_index: number
-  verdict: 'pass' | 'minor_issue' | 'fail'
+  /** Auto verdict from the audit pass — never mutated after the audit returns. */
+  verdict: Verdict
+  /** Operator override. If set, takes precedence over `verdict` everywhere
+   *  (counts, "regenerate failed only", badge color). null = no override. */
+  user_override?: Verdict | null
   issues: string[]
   requires_regeneration: boolean
+}
+
+/** Single source of truth: prefer the user's override when it's set. */
+export function effectiveVerdict(a: AuditResult | null | undefined): Verdict | null {
+  if (!a) return null
+  return a.user_override ?? a.verdict
 }
 
 export interface PromptFeedback {
