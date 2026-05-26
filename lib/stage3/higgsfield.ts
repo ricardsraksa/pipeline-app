@@ -14,14 +14,29 @@ function pickMcpModel(claudeModel: string): string {
   return 'nano_banana_pro'
 }
 
+// Hard-coded fidelity guardrail. Appended to every Stage 3 prompt at the last
+// mile, after any Settings override, user edits, and AI rewrites — so it
+// cannot be removed by anyone editing prompt text. Wording is deliberately
+// uncompromising; "treat as canonical" + "do not modify" tends to actually
+// land with Nano Banana Pro / GPT Image 2 reference conditioning.
+const PRODUCT_FIDELITY_GUARDRAIL = `
+
+ABSOLUTE PRODUCT FIDELITY — non-negotiable, takes priority over any other instruction above:
+- The product visible in the attached reference media IS the product. Render it pixel-faithfully.
+- DO NOT redesign, restyle, "clean up", recolor, or upgrade the product. No alternate finishes, no extra branding, no removed branding, no rearranged controls, no swapped materials.
+- Preserve exact shape, proportions, dimensions, surface finish, color, materials, button/control layout, lettering, logos, every visible marking.
+- If the requested scene composition can't be rendered without altering the product, simplify the scene rather than altering the product.
+- This is product photography — the camera and lighting may change, the product itself may not.`
+
 export async function generateStage3Image(params: {
   prompt: string
   model: string
   reference_images: string[]
   aspect_ratio: string
 }): Promise<string> {
+  const finalPrompt = params.prompt.trim() + PRODUCT_FIDELITY_GUARDRAIL
   return generateImageViaMcp({
-    prompt: params.prompt,
+    prompt: finalPrompt,
     model: pickMcpModel(params.model),
     aspectRatio: params.aspect_ratio,
     referenceImageUrls: params.reference_images,
