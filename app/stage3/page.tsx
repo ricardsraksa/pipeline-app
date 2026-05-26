@@ -10,6 +10,45 @@ import type { Run } from '@/lib/db'
 import FeedbackButtons from '@/components/FeedbackButtons'
 import FeedbackAppliedChip from '@/components/FeedbackAppliedChip'
 
+// Cap total reference images per generation. Higgsfield accepts multiple refs;
+// pushing beyond ~4 doesn't materially improve fidelity and slows submission.
+const MAX_REFS = 4
+
+/**
+ * Build the reference-image set for ONE Stage 3 generation.
+ *
+ * Order matters — most image models weight the first refs more heavily.
+ * Operator-uploaded source photos go first (they are the ground truth for
+ * "what does the product actually look like"), then any prompt-specific refs
+ * Claude picked out of the scraped product images. Duplicates are removed.
+ *
+ * If the operator never uploaded sources, we fall back to the prompt-specific
+ * refs / scraped image at the chosen index, matching legacy behaviour.
+ */
+function buildReferenceImages(
+  uploadedSources: string[],
+  promptRefs: string[],
+  scrapedImages: string[],
+  promptRefIndex: number | undefined,
+): string[] {
+  const fallback = promptRefIndex != null
+    ? [scrapedImages[promptRefIndex]].filter(Boolean)
+    : scrapedImages.slice(0, 1)
+  const ordered: string[] = []
+  for (const u of uploadedSources) if (u) ordered.push(u)
+  for (const r of promptRefs ?? []) if (r) ordered.push(r)
+  if (ordered.length === 0) for (const f of fallback) if (f) ordered.push(f)
+  const seen = new Set<string>()
+  const deduped: string[] = []
+  for (const u of ordered) {
+    if (seen.has(u)) continue
+    seen.add(u)
+    deduped.push(u)
+    if (deduped.length >= MAX_REFS) break
+  }
+  return deduped
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 // Cycle order when the user clicks the badge to override:
@@ -1004,6 +1043,13 @@ function Stage3Page() {
     setPhase('C_generating')
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
+    let uploadedSources: string[] = []
+    try {
+      if (run.uploaded_source_images) {
+        const parsed = JSON.parse(run.uploaded_source_images)
+        if (Array.isArray(parsed)) uploadedSources = parsed.filter((u): u is string => typeof u === 'string')
+      }
+    } catch { /* missing or malformed JSON — fall back to no uploaded refs */ }
 
     const editsToSave = prompts.map((p, i) => ({
       category: p.category,
@@ -1026,11 +1072,12 @@ function Stage3Page() {
       updatedImages[i] = { url: null, status: 'generating' }
       setImages([...updatedImages])
 
-      const refImages = (p.source_image_references && p.source_image_references.length > 0)
-        ? p.source_image_references
-        : (p.reference_image_index != null
-            ? [productImages[p.reference_image_index]].filter(Boolean)
-            : productImages.slice(0, 1))
+      const refImages = buildReferenceImages(
+        uploadedSources,
+        p.source_image_references ?? [],
+        productImages,
+        p.reference_image_index,
+      )
 
       try {
         const res = await fetch('/api/stage3/generate', {
@@ -1139,12 +1186,20 @@ function Stage3Page() {
 
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
+    let uploadedSources: string[] = []
+    try {
+      if (run.uploaded_source_images) {
+        const parsed = JSON.parse(run.uploaded_source_images)
+        if (Array.isArray(parsed)) uploadedSources = parsed.filter((u): u is string => typeof u === 'string')
+      }
+    } catch { /* fall back to no uploaded refs */ }
     const p = prompts[index]
-    const refImages = (p.source_image_references && p.source_image_references.length > 0)
-      ? p.source_image_references
-      : (p.reference_image_index != null
-          ? [productImages[p.reference_image_index]].filter(Boolean)
-          : productImages.slice(0, 1))
+    const refImages = buildReferenceImages(
+      uploadedSources,
+      p.source_image_references ?? [],
+      productImages,
+      p.reference_image_index,
+    )
 
     const originalIssue = auditResults[index]?.issues?.join(', ') ?? ''
 
