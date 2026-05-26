@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
@@ -680,6 +680,7 @@ function CompletePhase({
         )}
         <button
           onClick={onRerunAll}
+          title="Re-runs prompt generation (picking up your 👍/👎 + notes), then generates a fresh image batch. Discards the current prompts."
           className={[
             "cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-transparent transition-all whitespace-nowrap",
             failedCount > 0
@@ -687,7 +688,7 @@ function CompletePhase({
               : "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:brightness-105",
           ].join(" ")}
         >
-          Regenerate all images
+          Re-prompt &amp; regenerate
         </button>
         {run?.id && (
           <Link
@@ -915,6 +916,11 @@ function Stage3Page() {
   const [regenModal, setRegenModal] = useState<{ index: number; editedPrompt: string } | null>(null)
   const [regenCounts, setRegenCounts] = useState<number[]>([])
   const [regenLoading, setRegenLoading] = useState(false)
+  // When the operator hits "Regenerate all" from the complete screen, we set
+  // this ref so Phase A's effect knows to skip the QC gate and chain directly
+  // into image generation with the fresh prompts. Ref (not state) so the
+  // effect reads the latest value without re-running on flip.
+  const autoAdvanceAfterPromptsRef = useRef(false)
 
   const scraperImages = useMemo(() => {
     if (!run?.scraper_data) return []
@@ -1025,14 +1031,30 @@ function Stage3Page() {
         setImages(data.prompts.map(() => ({ url: null, status: 'pending' as const })))
         setAuditResults(data.prompts.map(() => null))
         setRegenCounts(data.prompts.map(() => 0))
-        setPhase('B_qc_gate')
+        if (autoAdvanceAfterPromptsRef.current) {
+          // "Regenerate all images" path: skip the QC gate and chain straight
+          // into image generation with the fresh prompts. Pass them explicitly
+          // because the closure inside generateImages still holds the stale
+          // `prompts` state.
+          autoAdvanceAfterPromptsRef.current = false
+          generateImages(data.prompts as ImagePrompt[])
+        } else {
+          setPhase('B_qc_gate')
+        }
       })
       .catch(err => { setError(err instanceof Error ? err.message : String(err)); setPhase('error') })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, run])
 
-  // Phase C: Generate images sequentially
-  const generateImages = useCallback(async () => {
+  // Phase C: Generate images sequentially.
+  //
+  // Accepts an optional `promptsArg` override so callers that JUST set fresh
+  // prompts can pass them in without waiting for React to flush — the
+  // useCallback closure would otherwise hold the stale `prompts` value.
+  const generateImages = useCallback(async (promptsArg?: ImagePrompt[]) => {
     if (!run) return
+    const ps = promptsArg ?? prompts
+    if (!ps.length) return
     setPhase('C_generating')
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
     const productImages: string[] = scraperData?.images ?? []
@@ -1044,7 +1066,7 @@ function Stage3Page() {
       }
     } catch { /* missing or malformed JSON — fall back to no uploaded refs */ }
 
-    const editsToSave = prompts.map((p, i) => ({
+    const editsToSave = ps.map((p, i) => ({
       category: p.category,
       original: originalPrompts[i]?.prompt ?? p.prompt,
       edited: p.prompt,
@@ -1057,10 +1079,10 @@ function Stage3Page() {
       body: JSON.stringify({ prompt_edits: editsToSave }),
     }).catch(() => {})
 
-    const updatedImages: ImageSlot[] = prompts.map(() => ({ url: null, status: 'pending' as const }))
+    const updatedImages: ImageSlot[] = ps.map(() => ({ url: null, status: 'pending' as const }))
 
-    for (let i = 0; i < prompts.length; i++) {
-      const p = prompts[i]
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i]
       setGeneratingIndex(i)
       updatedImages[i] = { url: null, status: 'generating' }
       setImages([...updatedImages])
@@ -1095,7 +1117,7 @@ function Stage3Page() {
     }
 
     setGeneratingIndex(null)
-    await auditImagesInternal(updatedImages, prompts)
+    await auditImagesInternal(updatedImages, ps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, prompts, originalPrompts])
 
@@ -1309,6 +1331,16 @@ function Stage3Page() {
     }
   }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
 
+  // "Regenerate all" from the complete screen — re-runs Stage 3 prompt
+  // generation (which picks up the operator's accumulated 👍/👎 notes and the
+  // stage3 learning store), then auto-chains into a fresh image batch. The
+  // existing per-image notes / overrides reset because we're starting over.
+  const regenerateAll = useCallback(() => {
+    if (!run) return
+    autoAdvanceAfterPromptsRef.current = true
+    setPhase('A_generating')
+  }, [run])
+
   // Persist the operator's per-image note onto auditResult.user_note so the
   // next regen of this image picks it up as additional rewrite instructions.
   // PATCHes the run so the note survives a refresh.
@@ -1415,7 +1447,7 @@ function Stage3Page() {
           auditResults={auditResults}
           regenCounts={regenCounts}
           onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
-          onRerunAll={generateImages}
+          onRerunAll={regenerateAll}
           onRegenerateFailed={regenerateFailedImages}
           onOverrideVerdict={overrideVerdict}
           onSaveNote={saveImageNote}
