@@ -679,8 +679,17 @@ function RegenModal({
   const auditCategory = (auditResult as AuditResult & { category?: string } | null)?.category
   const cat = IMAGE_CATEGORIES.find(c => c.id === (auditCategory ?? category ?? ''))
 
-  const [aiOpen, setAiOpen] = useState(false)
-  const [aiInstructions, setAiInstructions] = useState('')
+  // If the slot has audit issues, pre-populate the AI-edit panel with them so
+  // a single click rewrites the prompt to address what went wrong. The
+  // operator can still edit or replace the text before clicking Rewrite.
+  const presetIssues = useMemo(() => {
+    const issues = auditResult?.issues?.filter(Boolean) ?? []
+    if (issues.length === 0 || effectiveVerdict(auditResult) === 'pass') return ''
+    return 'Fix the audit issues:\n- ' + issues.join('\n- ')
+  }, [auditResult])
+
+  const [aiOpen, setAiOpen] = useState(presetIssues.length > 0)
+  const [aiInstructions, setAiInstructions] = useState(presetIssues)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
@@ -1163,8 +1172,12 @@ function Stage3Page() {
   // Phase E: Regenerate every image that's either failed to generate at all
   // (status === 'error' / 'failed') or generated but failed the audit
   // (verdict === 'fail'). Runs sequentially so we don't blow the Higgsfield
-  // rate limit. Each retry uses the existing prompt — for edited prompts,
-  // use the per-image Regenerate button.
+  // rate limit.
+  //
+  // Before retrying, we ask Claude to rewrite the prompt using the audit's
+  // own issues as instructions — so we don't waste a generation re-running
+  // the same prompt that already failed. If the rewrite fails (network etc.),
+  // we fall back to the existing prompt so the user still gets a retry.
   const regenerateFailedImages = useCallback(async () => {
     if (!run) return
     const indices: number[] = []
@@ -1176,8 +1189,33 @@ function Stage3Page() {
     })
     if (indices.length === 0) return
     for (const i of indices) {
-      // Use the latest prompt for this slot (it may have been edited earlier).
-      await regenerateImage(i, prompts[i].prompt)
+      const audit = auditResults[i]
+      const issues = audit?.issues?.filter(Boolean) ?? []
+      let nextPrompt = prompts[i].prompt
+      if (issues.length > 0) {
+        try {
+          const res = await fetch('/api/stage3/edit-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: nextPrompt,
+              category: prompts[i].category,
+              instructions:
+                'The auditor flagged the previous render with these problems. Rewrite the prompt so the next render avoids them while keeping the product itself unchanged:\n- ' +
+                issues.join('\n- '),
+            }),
+          })
+          const data = await res.json()
+          if (data.success && typeof data.prompt === 'string' && data.prompt.trim().length > 20) {
+            nextPrompt = data.prompt.trim()
+            // Show the user the new prompt in state right away.
+            setPrompts((prev) => prev.map((p, j) => (j === i ? { ...p, prompt: nextPrompt } : p)))
+          }
+        } catch {
+          // Fall through: regen with the existing prompt rather than failing the loop.
+        }
+      }
+      await regenerateImage(i, nextPrompt)
     }
   }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
 
