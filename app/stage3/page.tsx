@@ -707,18 +707,22 @@ function Stage3Page() {
   useEffect(() => {
     const runId = searchParams.get('runId')
     if (!runId) { setError('No run ID provided'); setPhase('error'); return }
-    const skipPrompts = searchParams.get('skipPrompts') === '1'
+    // ?fresh=1 is an escape hatch that forces a clean Stage 3 run, ignoring
+    // any saved prompts/images. Default behavior: ALWAYS restore saved state
+    // so refreshing the page never throws work away. (The legacy ?skipPrompts=1
+    // is kept as a synonym for the default — no-op since restore is default now.)
+    const forceFresh = searchParams.get('fresh') === '1'
     fetch(`/api/runs/${runId}`)
       .then(r => r.json())
       .then(data => {
         if (!data.run) throw new Error('Run not found')
         setRun(data.run)
 
-        // ?skipPrompts=1 — reuse the prompts saved on the last Stage 3 run.
-        // If saved images exist too, jump to the complete screen so the user
-        // can hover any image to regenerate / reprompt just that one. With
-        // only prompts, drop to the QC gate (regenerate-all flow).
-        if (skipPrompts && data.run.image_prompts) {
+        // If the run already has saved prompts (and optionally images), restore
+        // them. Images → E_complete (per-image regenerate/rate flow). Prompts
+        // only → B_qc_gate (regenerate-all flow). No saved prompts → fall
+        // through to A_generating below.
+        if (!forceFresh && data.run.image_prompts) {
           try {
             const saved = JSON.parse(data.run.image_prompts) as ImagePrompt[]
             if (Array.isArray(saved) && saved.length === 9) {
