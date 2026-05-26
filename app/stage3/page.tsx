@@ -577,12 +577,15 @@ function CompletePhase({
   onSaveNote: (i: number, note: string) => void
   run: Run | null
 }) {
-  // Count slots that need a redo: either nothing generated, or effective
-  // verdict (after override) is fail.
+  // Count slots that need a redo: nothing generated, OR effective verdict
+  // (after override) is fail OR minor. We include minor so a single click
+  // catches every non-clean-pass image; the auditor only marks fail/minor
+  // when there's an actual issue worth flagging.
   const failedCount = images.reduce((n, img, i) => {
     const generationFailed = img.status === 'error' || img.status === 'failed'
-    const auditFailed = effectiveVerdict(auditResults[i]) === 'fail'
-    return (generationFailed || auditFailed) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
+    const v = effectiveVerdict(auditResults[i])
+    const auditFlagged = v === 'fail' || v === 'minor_issue'
+    return (generationFailed || auditFlagged) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
   }, 0)
   const passed = auditResults.filter(r => effectiveVerdict(r) === 'pass').length
   const minor = auditResults.filter(r => effectiveVerdict(r) === 'minor_issue').length
@@ -638,9 +641,9 @@ function CompletePhase({
           <button
             onClick={onRegenerateFailed}
             className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
-            title="Re-runs just the slots that errored out or failed audit. Sequential to stay under Higgsfield rate limits."
+            title="Re-runs every slot that errored or didn't get a clean pass (fail + minor). Sequential to stay under Higgsfield rate limits."
           >
-            Regenerate failed only ({failedCount})
+            Regenerate flagged ({failedCount})
           </button>
         )}
         <button
@@ -1210,9 +1213,10 @@ function Stage3Page() {
     const indices: number[] = []
     images.forEach((img, i) => {
       const generationFailed = img.status === 'error' || img.status === 'failed'
-      const auditFailed = effectiveVerdict(auditResults[i]) === 'fail'
+      const v = effectiveVerdict(auditResults[i])
+      const auditFlagged = v === 'fail' || v === 'minor_issue'
       const underCap = (regenCounts[i] ?? 0) < 3
-      if ((generationFailed || auditFailed) && underCap) indices.push(i)
+      if ((generationFailed || auditFlagged) && underCap) indices.push(i)
     })
     if (indices.length === 0) return
     for (const i of indices) {
