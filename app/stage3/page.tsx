@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
+import { Icon } from '@/components/ui/Icon'
 import type { ImagePrompt, AuditResult, Stage3Phase } from '@/lib/stage3/types'
 import type { Run } from '@/lib/db'
 import FeedbackButtons from '@/components/FeedbackButtons'
@@ -607,6 +608,7 @@ function RegenModal({
   index,
   prompt,
   auditResult,
+  category,
   regenCount,
   loading,
   onChange,
@@ -616,13 +618,51 @@ function RegenModal({
   index: number
   prompt: string
   auditResult: AuditResult | null
+  category: string | null
   regenCount: number
   loading: boolean
   onChange: (p: string) => void
   onConfirm: () => void
   onClose: () => void
 }) {
-  const cat = IMAGE_CATEGORIES.find(c => c.id === (auditResult as AuditResult & { category?: string })?.category)
+  // Prefer the audit's category (when present) for the title; fall back to the
+  // prompt's own category so we always show something useful.
+  const auditCategory = (auditResult as AuditResult & { category?: string } | null)?.category
+  const cat = IMAGE_CATEGORIES.find(c => c.id === (auditCategory ?? category ?? ''))
+
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiInstructions, setAiInstructions] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  async function runAiEdit() {
+    const trimmed = aiInstructions.trim()
+    if (trimmed.length < 5) {
+      setAiError('Tell Claude what to change (at least 5 characters)')
+      return
+    }
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await fetch('/api/stage3/edit-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, instructions: trimmed, category: category ?? null }),
+      })
+      const data = await res.json()
+      if (!data.success || !data.prompt) {
+        setAiError(data.error ?? `HTTP ${res.status}`)
+        return
+      }
+      onChange(data.prompt as string)
+      setAiInstructions('')
+      setAiOpen(false)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -641,7 +681,68 @@ function RegenModal({
           </div>
         )}
         <div>
-          <label className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest block mb-2">Edit Prompt</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Edit Prompt</label>
+            {!aiOpen && (
+              <button
+                onClick={() => setAiOpen(true)}
+                disabled={loading}
+                className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-2 py-1 text-[11px] font-[620] text-[var(--color-accent-text)] bg-[var(--color-accent-weak)] border border-transparent transition-all hover:brightness-95 whitespace-nowrap disabled:opacity-40"
+              >
+                <Icon.Spark className="w-3 h-3 text-[var(--color-accent)]" />
+                Edit with AI
+              </button>
+            )}
+          </div>
+          {aiOpen && (
+            <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 mb-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-[650] uppercase tracking-[0.1em] text-[var(--color-accent-text)] flex items-center gap-1.5">
+                  <Icon.Spark className="w-3 h-3 text-[var(--color-accent)]" />
+                  Tell Claude what to change
+                </span>
+                <button
+                  onClick={() => { setAiOpen(false); setAiInstructions(''); setAiError(null) }}
+                  disabled={aiLoading}
+                  className="cursor-pointer text-[var(--color-text-3)] hover:text-[var(--color-text)] transition-colors disabled:opacity-40"
+                  aria-label="Close AI edit"
+                >
+                  <Icon.X className="w-3 h-3" />
+                </button>
+              </div>
+              <textarea
+                value={aiInstructions}
+                onChange={(e) => setAiInstructions(e.target.value)}
+                placeholder="e.g. Warmer lighting, brushed-steel finish more visible, remove the second hand"
+                rows={2}
+                autoFocus
+                disabled={aiLoading}
+                className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-[11px] py-[8px] text-[12px] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)] disabled:opacity-50"
+              />
+              {aiError && (
+                <div className="text-[11px] text-[var(--color-error)] flex items-start gap-1.5">
+                  <Icon.Alert className="w-3 h-3 flex-shrink-0 mt-px" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={runAiEdit}
+                  disabled={aiLoading || aiInstructions.trim().length < 5}
+                  className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {aiLoading ? (
+                    <><Icon.Loader className="w-3 h-3" />Rewriting…</>
+                  ) : (
+                    <><Icon.Spark className="w-3 h-3" />Rewrite prompt</>
+                  )}
+                </button>
+                <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)]">
+                  Replaces the textarea below
+                </p>
+              </div>
+            </div>
+          )}
           <textarea
             value={prompt}
             rows={8}
@@ -652,14 +753,14 @@ function RegenModal({
         <div className="flex items-center gap-3">
           <button
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || aiLoading}
             className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? 'Regenerating…' : 'Regenerate Image'}
           </button>
           <button
             onClick={onClose}
-            disabled={loading}
+            disabled={loading || aiLoading}
             className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-40"
           >
             Cancel
@@ -1100,6 +1201,7 @@ function Stage3Page() {
           index={regenModal.index}
           prompt={regenModal.editedPrompt}
           auditResult={auditResults[regenModal.index] ?? null}
+          category={prompts[regenModal.index]?.category ?? null}
           regenCount={regenCounts[regenModal.index] ?? 0}
           loading={regenLoading}
           onChange={(p) => setRegenModal(prev => prev ? { ...prev, editedPrompt: p } : prev)}
