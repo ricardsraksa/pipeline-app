@@ -40,7 +40,15 @@ type RunAction = "view-live" | "continue" | "view";
 
 function runAction(run: RunSummary): RunAction {
   if (ACTIVE_STATUSES.has(run.status ?? "")) return "view-live";
-  if (run.status === "failed" || isStuck(run)) return "continue";
+  // "Waiting" runs (awaiting_stage2_approval, awaiting_user, awaiting_qc)
+  // need a user action to move forward — Stage 2 approval, image approval,
+  // QC verdict — and that action lives on the live run page, not the
+  // static history view. Same for failed/stuck.
+  if (
+    run.status === "failed" ||
+    isStuck(run) ||
+    WAITING_STATUSES.has(run.status ?? "")
+  ) return "continue";
   return "view";
 }
 

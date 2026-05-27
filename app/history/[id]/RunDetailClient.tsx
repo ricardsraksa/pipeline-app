@@ -343,8 +343,48 @@ export default function RunDetailClient({ run }: Props) {
     URL.revokeObjectURL(a.href);
   }
 
+  // Runs that finished a stage but are stalled waiting for the operator's next
+  // action (Stage 2 approval, image approval, QC verdict) need to land on the
+  // live run page to move forward — the static history detail can't drive them.
+  const waitingStatuses = new Set([
+    "awaiting_stage2_approval",
+    "awaiting_user",
+    "awaiting_qc",
+  ]);
+  const isWaiting = waitingStatuses.has(run.status ?? "");
+  const isFailed = run.status === "failed";
+  const canContinue = isWaiting || isFailed;
+
   return (
     <div className="space-y-10">
+
+      {canContinue && (
+        <div className="flex items-start gap-3 rounded-[11px] border border-[var(--color-amber)] bg-[var(--color-amber-bg)] px-4 py-3 text-[13px] text-[var(--color-text)]">
+          <span className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-amber)] mt-0.5">
+            {isFailed ? "Failed" : "Waiting"}
+          </span>
+          <div className="flex-1">
+            <p className="font-[600]">
+              {isFailed
+                ? "This run failed mid-pipeline."
+                : run.status === "awaiting_stage2_approval"
+                  ? "Stage 1 finished. Stage 2 hasn't started yet — your approval is needed to continue."
+                  : run.status === "awaiting_user"
+                    ? "Stage 3 is waiting for image approval."
+                    : "QC review is required before the pipeline continues."}
+            </p>
+            <p className="text-[var(--color-text-2)] text-[12px] mt-0.5">
+              Use the live run page to pick up where this left off.
+            </p>
+          </div>
+          <Link
+            href={`/runs/${run.id}`}
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[13px] py-[7px] text-[12.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
+          >
+            {isFailed ? "Open & retry →" : "Continue run →"}
+          </Link>
+        </div>
+      )}
 
       {/* Download All */}
       <div className="flex justify-end">
