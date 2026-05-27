@@ -396,6 +396,113 @@ function ErrorState({ message, runId }: { message: string; runId: string | null 
   )
 }
 
+/**
+ * "Edit with AI" affordance for a single prompt — shared between the QC gate
+ * and the per-image regen modal. Collapsed by default; opens an inline textarea
+ * for instructions, calls /api/stage3/edit-prompt, then hands the rewrite back
+ * to the parent via onResult.
+ */
+function PromptAiEditor({
+  prompt,
+  category,
+  initialInstructions = '',
+  onResult,
+  disabled = false,
+}: {
+  prompt: string
+  category: string | null
+  initialInstructions?: string
+  onResult: (newPrompt: string) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [instructions, setInstructions] = useState(initialInstructions)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function run() {
+    const trimmed = instructions.trim()
+    if (trimmed.length < 5) {
+      setErr('Tell Claude what to change (at least 5 characters)')
+      return
+    }
+    setLoading(true)
+    setErr(null)
+    try {
+      const res = await fetch('/api/stage3/edit-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, instructions: trimmed, category }),
+      })
+      const data = await res.json()
+      if (!data.success || !data.prompt) {
+        setErr(data.error ?? `HTTP ${res.status}`)
+        return
+      }
+      onResult(data.prompt as string)
+      setInstructions('')
+      setOpen(false)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[10px] py-[6px] text-[12px] font-[620] text-[var(--color-accent-text)] bg-[var(--color-accent-weak)] border border-transparent transition-all hover:brightness-95 whitespace-nowrap disabled:opacity-40"
+      >
+        <Icon.Spark className="w-3 h-3 text-[var(--color-accent)]" />
+        Edit with AI
+      </button>
+    )
+  }
+  return (
+    <div className="w-full border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-[650] uppercase tracking-[0.1em] text-[var(--color-accent-text)] flex items-center gap-1.5">
+          <Icon.Spark className="w-3 h-3 text-[var(--color-accent)]" />
+          Tell Claude what to change
+        </span>
+        <button
+          onClick={() => { setOpen(false); setInstructions(''); setErr(null) }}
+          disabled={loading}
+          className="cursor-pointer text-[var(--color-text-3)] hover:text-[var(--color-text)] transition-colors disabled:opacity-40"
+          aria-label="Close"
+        >
+          <Icon.X className="w-3 h-3" />
+        </button>
+      </div>
+      <textarea
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+        placeholder="e.g. warmer lighting, remove the second person, brushed steel more visible"
+        rows={2}
+        autoFocus
+        disabled={loading}
+        className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-[11px] py-[8px] text-[12px] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)] disabled:opacity-50"
+      />
+      {err && (
+        <div className="text-[11px] text-[var(--color-error)] flex items-start gap-1.5">
+          <Icon.Alert className="w-3 h-3 flex-shrink-0 mt-px" />
+          <span>{err}</span>
+        </div>
+      )}
+      <button
+        onClick={run}
+        disabled={loading || instructions.trim().length < 5}
+        className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? (<><Icon.Loader className="w-3 h-3" />Rewriting…</>) : (<><Icon.Spark className="w-3 h-3" />Rewrite prompt</>)}
+      </button>
+    </div>
+  )
+}
+
 function QCGate({
   prompts,
   originalPrompts,
@@ -460,20 +567,31 @@ function QCGate({
                 }}
                 className={`${inputCls} font-[var(--font-ibm-plex-mono)] text-[11px] resize-y leading-relaxed`}
               />
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-4)]">{prompt.prompt.length} chars</span>
-                {isEdited && (
-                  <button
-                    onClick={() => {
+                <div className="flex items-center gap-2 ml-auto">
+                  <PromptAiEditor
+                    prompt={prompt.prompt}
+                    category={prompt.category}
+                    onResult={(newPrompt) => {
                       const updated = [...prompts]
-                      updated[i] = { ...prompt, prompt: originalPrompts[i].prompt }
+                      updated[i] = { ...prompt, prompt: newPrompt }
                       onPromptsChange(updated)
                     }}
-                    className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
-                  >
-                    Reset to Original
-                  </button>
-                )}
+                  />
+                  {isEdited && (
+                    <button
+                      onClick={() => {
+                        const updated = [...prompts]
+                        updated[i] = { ...prompt, prompt: originalPrompts[i].prompt }
+                        onPromptsChange(updated)
+                      }}
+                      className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
+                    >
+                      Reset to Original
+                    </button>
+                  )}
+                </div>
               </div>
               {germanText && (
                 <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3">
