@@ -518,12 +518,123 @@ function QCGate({
 }) {
   const inputCls = "w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm font-[inherit] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
 
+  // Bulk "Edit all with AI" — applies one instruction across every prompt in
+  // parallel. Partial failures are tolerated: prompts whose rewrite fails keep
+  // their current text. Progress counter shows X/9 as they land.
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkInstr, setBulkInstr] = useState('')
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, failed: 0 })
+  const [bulkErr, setBulkErr] = useState<string | null>(null)
+
+  async function runBulkEdit() {
+    const trimmed = bulkInstr.trim()
+    if (trimmed.length < 5) {
+      setBulkErr('At least 5 characters of instructions')
+      return
+    }
+    setBulkLoading(true)
+    setBulkErr(null)
+    setBulkProgress({ done: 0, failed: 0 })
+
+    let done = 0
+    let failed = 0
+    const next: ImagePrompt[] = [...prompts]
+    await Promise.all(
+      prompts.map(async (p, i) => {
+        try {
+          const res = await fetch('/api/stage3/edit-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: p.prompt, instructions: trimmed, category: p.category }),
+          })
+          const data = await res.json()
+          if (data.success && typeof data.prompt === 'string' && data.prompt.trim().length > 20) {
+            next[i] = { ...p, prompt: data.prompt.trim() }
+            done++
+          } else {
+            failed++
+          }
+        } catch {
+          failed++
+        }
+        setBulkProgress({ done, failed })
+      })
+    )
+    onPromptsChange(next)
+    setBulkLoading(false)
+    if (failed === 0) {
+      setBulkInstr('')
+      setBulkOpen(false)
+      setBulkProgress({ done: 0, failed: 0 })
+    } else {
+      setBulkErr(`${failed} of ${prompts.length} prompts didn't rewrite — kept their previous text.`)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">Review Image Prompts</h2>
         <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Review and edit the 9 prompts before generating. Changes are saved as learning data.</p>
       </div>
+
+      {/* Bulk AI edit */}
+      {!bulkOpen ? (
+        <button
+          onClick={() => setBulkOpen(true)}
+          className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[13px] py-[7px] text-[12.5px] font-[620] text-[var(--color-accent-text)] bg-[var(--color-accent-weak)] border border-transparent transition-all hover:brightness-95 whitespace-nowrap"
+        >
+          <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+          Edit all {prompts.length} prompts with AI
+        </button>
+      ) : (
+        <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-accent-weak)] p-4 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-accent-text)] flex items-center gap-1.5">
+              <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
+              Apply one change to ALL prompts
+            </span>
+            <button
+              onClick={() => { setBulkOpen(false); setBulkInstr(''); setBulkErr(null); setBulkProgress({ done: 0, failed: 0 }) }}
+              disabled={bulkLoading}
+              className="cursor-pointer text-[var(--color-text-3)] hover:text-[var(--color-text)] transition-colors disabled:opacity-40"
+              aria-label="Close"
+            >
+              <Icon.X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <textarea
+            value={bulkInstr}
+            onChange={(e) => setBulkInstr(e.target.value)}
+            placeholder="e.g. Make the German overlay text shorter and bolder. Shift all backgrounds to a warmer palette. Add more lifestyle context to product shots."
+            rows={3}
+            autoFocus
+            disabled={bulkLoading}
+            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-[13px] py-[11px] text-[13px] transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)] disabled:opacity-50"
+          />
+          {bulkErr && (
+            <div className="text-[11px] text-[var(--color-error)] flex items-start gap-1.5">
+              <Icon.Alert className="w-3 h-3 flex-shrink-0 mt-px" />
+              <span>{bulkErr}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={runBulkEdit}
+              disabled={bulkLoading || bulkInstr.trim().length < 5}
+              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {bulkLoading
+                ? (<><Icon.Loader className="w-3.5 h-3.5" />Rewriting {bulkProgress.done + bulkProgress.failed}/{prompts.length}…</>)
+                : (<><Icon.Spark className="w-3.5 h-3.5" />Rewrite all {prompts.length}</>)}
+            </button>
+            <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)]">
+              Runs in parallel · per-prompt facts (product, refs, German text) are preserved
+            </p>
+          </div>
+        </div>
+      )}
       <div className="space-y-4">
         {prompts.map((prompt, i) => {
           const cat = IMAGE_CATEGORIES.find(c => c.id === prompt.category)
