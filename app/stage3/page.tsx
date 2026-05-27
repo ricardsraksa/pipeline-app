@@ -1053,7 +1053,9 @@ function Stage3Page() {
   // useCallback closure would otherwise hold the stale `prompts` value.
   const generateImages = useCallback(async (promptsArg?: ImagePrompt[]) => {
     if (!run) return
-    const ps = promptsArg ?? prompts
+    // Guard against React's synthetic event sneaking in when this is wired
+    // directly as an onClick handler — only accept an actual array override.
+    const ps = Array.isArray(promptsArg) ? promptsArg : prompts
     if (!ps.length) return
     setPhase('C_generating')
     const scraperData = run.scraper_data ? JSON.parse(run.scraper_data) : null
