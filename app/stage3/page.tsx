@@ -503,6 +503,77 @@ function PromptAiEditor({
   )
 }
 
+/**
+ * Floating Stage 2 copy panel — a small button anchored to the right edge of
+ * the viewport that toggles a slide-in panel containing the Stage 2 German
+ * copy. The text is plain (not a textarea) so the user can select arbitrary
+ * spans and copy them into their Google Doc while images are generating.
+ *
+ * Hidden entirely if the run has no Stage 2 output yet (description-only
+ * runs, or before Stage 2 completes).
+ */
+function Stage2CopyPanel({ run }: { run: Run | null }) {
+  const [open, setOpen] = useState(false)
+  // Prefer the edited copy if the operator tweaked it on the run page.
+  const copy = run?.stage2_copy_edited ?? run?.stage2_output ?? ''
+  if (!copy.trim()) return null
+
+  return (
+    <>
+      {/* Toggle button — right edge, vertically centered */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Show Stage 2 German copy — select + copy into your Google Doc"
+        aria-label="Toggle Stage 2 copy panel"
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer flex items-center gap-1.5 px-2.5 py-3 rounded-l-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-[var(--color-border-strong)] border-r-0 shadow-[0_2px_6px_rgba(20,20,18,.10)] hover:brightness-105 transition-all"
+      >
+        <span className="font-[var(--font-ibm-plex-mono)] text-[11px] font-[700] [writing-mode:vertical-rl] rotate-180">
+          {open ? 'Close copy' : 'Stage 2 copy'}
+        </span>
+      </button>
+
+      {/* Slide-in panel */}
+      <div
+        aria-hidden={!open}
+        className={[
+          'fixed top-0 right-0 h-screen w-[440px] max-w-[90vw] z-50 bg-[var(--color-surface)] border-l border-[var(--color-border-strong)] shadow-[-4px_0_16px_rgba(20,20,18,.08)] transition-transform duration-200 ease-out flex flex-col',
+          open ? 'translate-x-0' : 'translate-x-full pointer-events-none',
+        ].join(' ')}
+      >
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+          <div className="min-w-0">
+            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-3)]">Stage 2</p>
+            <h3 className="text-[13px] font-[600] text-[var(--color-text)] truncate">
+              German copy {run?.brand_name ? `— ${run.brand_name}` : run?.product_name ? `— ${run.product_name}` : ''}
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => navigator.clipboard?.writeText(copy).catch(() => {})}
+              title="Copy entire Stage 2 output"
+              className="cursor-pointer text-[11px] font-[var(--font-ibm-plex-mono)] px-2 py-1 rounded border border-[var(--color-border-strong)] text-[var(--color-text-2)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
+            >
+              Copy all
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close panel"
+              className="cursor-pointer text-[var(--color-text-3)] hover:text-[var(--color-text)] p-1"
+            >
+              <Icon.X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed font-[var(--font-ibm-plex-mono)] text-[var(--color-text)] selection:bg-[var(--color-accent-weak)]">
+            {copy}
+          </pre>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function QCGate({
   prompts,
   originalPrompts,
@@ -1700,6 +1771,10 @@ function Stage3Page() {
           onClose={() => setRegenModal(null)}
         />
       )}
+
+      {/* Always-available Stage 2 copy reference (hidden on description-only
+          runs or before Stage 2 completes). */}
+      <Stage2CopyPanel run={run} />
     </main>
   )
 }
