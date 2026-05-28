@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     one_pager,
     product_images,
     uploaded_images,
+    operator_note,
   } = await req.json()
 
   if (!research || !copy) {
@@ -85,10 +86,18 @@ export async function POST(req: NextRequest) {
   // getPrompt("stage3") returns any Settings override saved to data/prompts.json,
   // falling back to IMAGE_PROMPTS_SYSTEM (the default template set).
   const basePrompt = await getPrompt('stage3')
+  // Per-call note from the operator — typed into the "Re-prompt & regenerate"
+  // dialog. Highest-priority guidance, so it sits at the end of the system
+  // prompt where the model weights tend to land hardest.
+  const opNote = typeof operator_note === 'string' ? operator_note.trim() : ''
+  const operatorBlock = opNote
+    ? `\n\n--- OPERATOR NOTE (highest priority — follow this in every prompt) ---\n${opNote}\n---`
+    : ''
   const systemPrompt =
     basePrompt
     + (feedbackSummary ? `\n\nFEEDBACK FROM PAST RUNS:\n${feedbackSummary}` : '\n\nNo automatic feedback from past runs yet.')
     + stage3UserFeedback
+    + operatorBlock
 
   const scraped: string[] = Array.isArray(product_images) ? product_images : []
   const uploaded: string[] = Array.isArray(uploaded_images) ? uploaded_images : []

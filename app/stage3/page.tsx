@@ -1270,6 +1270,9 @@ function Stage3Page() {
   // into image generation with the fresh prompts. Ref (not state) so the
   // effect reads the latest value without re-running on flip.
   const autoAdvanceAfterPromptsRef = useRef(false)
+  // Optional operator note from the "Re-prompt & regenerate" dialog. Sent
+  // alongside the /api/stage3/prompts POST so the next 9 prompts respect it.
+  const reprmptNoteRef = useRef<string>('')
 
   const scraperImages = useMemo(() => {
     if (!run?.scraper_data) return []
@@ -1370,6 +1373,7 @@ function Stage3Page() {
         one_pager: onePager,
         product_images: productImages,
         uploaded_images: uploadedImages,
+        operator_note: reprmptNoteRef.current || undefined,
       }),
     })
       .then(r => r.json())
@@ -1684,13 +1688,25 @@ function Stage3Page() {
 
   // "Regenerate all" from the complete screen — re-runs Stage 3 prompt
   // generation (which picks up the operator's accumulated 👍/👎 notes and the
-  // stage3 learning store), then auto-chains into a fresh image batch. The
-  // existing per-image notes / overrides reset because we're starting over.
-  const regenerateAll = useCallback(() => {
+  // stage3 learning store), then auto-chains into a fresh image batch.
+  //
+  // `note` is the optional operator instruction from the "Re-prompt &
+  // regenerate" dialog. It's stashed in a ref so Phase A's effect can pick
+  // it up when it fires (state would race the setPhase below).
+  const executeRegenerateAll = useCallback((note: string) => {
     if (!run) return
+    reprmptNoteRef.current = note.trim()
     autoAdvanceAfterPromptsRef.current = true
     setPhase('A_generating')
   }, [run])
+  // Modal toggle: clicking "Re-prompt & regenerate" opens a small note input
+  // first, then commits via executeRegenerateAll on submit.
+  const [reprmptModalOpen, setReprmptModalOpen] = useState(false)
+  const [reprmptDraft, setReprmptDraft] = useState('')
+  const openReprmptModal = useCallback(() => {
+    setReprmptDraft('')
+    setReprmptModalOpen(true)
+  }, [])
 
   // Persist the operator's per-image note onto auditResult.user_note so the
   // next regen of this image picks it up as additional rewrite instructions.
@@ -1798,7 +1814,7 @@ function Stage3Page() {
           auditResults={auditResults}
           regenCounts={regenCounts}
           onRegenerate={(i) => setRegenModal({ index: i, editedPrompt: prompts[i].prompt })}
-          onRerunAll={regenerateAll}
+          onRerunAll={openReprmptModal}
           onRegenerateFailed={regenerateFailedImages}
           onOverrideVerdict={overrideVerdict}
           onSaveNote={saveImageNote}
@@ -1824,6 +1840,50 @@ function Stage3Page() {
       {/* Always-available Stage 2 copy reference (hidden on description-only
           runs or before Stage 2 completes). */}
       <Stage2CopyPanel run={run} />
+
+      {reprmptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setReprmptModalOpen(false)}
+          />
+          <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-xl w-full space-y-4">
+            <div>
+              <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Re-prompt &amp; regenerate</p>
+              <h3 className="text-[15px] font-[600] text-[var(--color-text)] mt-0.5">
+                Anything specific Claude should do differently this time?
+              </h3>
+              <p className="text-[12px] text-[var(--color-text-3)] mt-1 leading-relaxed">
+                Optional. Whatever you put here gets injected as the highest-priority instruction
+                across all 9 fresh prompts. Leave blank to just re-run with the accumulated
+                feedback from past rounds.
+              </p>
+            </div>
+            <textarea
+              value={reprmptDraft}
+              onChange={(e) => setReprmptDraft(e.target.value)}
+              placeholder="e.g. Use warmer lighting throughout. Move all German overlay text higher in frame. Drop the studio backgrounds — show product in real apartments instead."
+              rows={4}
+              autoFocus
+              className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)]"
+            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => { setReprmptModalOpen(false); executeRegenerateAll(reprmptDraft) }}
+                className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
+              >
+                {reprmptDraft.trim() ? 'Regenerate with this note' : 'Regenerate (no note)'}
+              </button>
+              <button
+                onClick={() => setReprmptModalOpen(false)}
+                className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
