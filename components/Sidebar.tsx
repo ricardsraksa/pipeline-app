@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { version as APP_VERSION } from "../package.json";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -77,18 +78,26 @@ export default function Sidebar() {
       <div className="flex-1" />
 
       {/* Footer */}
-      <div className="border-t border-[var(--color-border)] pt-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs text-[var(--color-text-2)] min-w-0">
-          <span className="w-[7px] h-[7px] rounded-full bg-[var(--color-green)] shrink-0" />
-          <span className="truncate">Higgsfield connected</span>
-        </div>
-        <button
-          onClick={toggleTheme}
-          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-2)] grid place-items-center text-sm transition-colors hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] shrink-0 cursor-pointer"
-          title="Toggle theme"
+      <div className="border-t border-[var(--color-border)] pt-3">
+        <p
+          className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)] mb-1.5 select-none"
+          title={`Pipeline app v${APP_VERSION}`}
         >
-          {theme === "light" ? "☾" : "☀"}
-        </button>
+          v{APP_VERSION}
+        </p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-[var(--color-text-2)] min-w-0">
+            <span className="w-[7px] h-[7px] rounded-full bg-[var(--color-green)] shrink-0" />
+            <span className="truncate">Higgsfield connected</span>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-2)] grid place-items-center text-sm transition-colors hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] shrink-0 cursor-pointer"
+            title="Toggle theme"
+          >
+            {theme === "light" ? "☾" : "☀"}
+          </button>
+        </div>
       </div>
     </aside>
   );
