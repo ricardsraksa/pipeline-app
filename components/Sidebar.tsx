@@ -79,12 +79,21 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-[var(--color-border)] pt-3">
-        <p
-          className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)] mb-1.5 select-none"
-          title={`Pipeline app v${APP_VERSION}`}
-        >
-          v{APP_VERSION}
-        </p>
+        {(() => {
+          // Build label = package.json version + the build's git short SHA.
+          // SHA is injected at build time via next.config.ts → NEXT_PUBLIC_COMMIT_SHA,
+          // so it changes on every Render deploy (every commit gets a unique label).
+          const sha = process.env.NEXT_PUBLIC_COMMIT_SHA ?? "dev";
+          const label = `v${APP_VERSION} · ${sha}`;
+          return (
+            <p
+              className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)] mb-1.5 select-text"
+              title={`Pipeline app ${label}`}
+            >
+              {label}
+            </p>
+          );
+        })()}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-xs text-[var(--color-text-2)] min-w-0">
             <span className="w-[7px] h-[7px] rounded-full bg-[var(--color-green)] shrink-0" />
