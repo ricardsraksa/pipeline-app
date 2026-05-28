@@ -564,8 +564,14 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed font-[var(--font-ibm-plex-mono)] text-[var(--color-text)] selection:bg-[var(--color-accent-weak)]">
+        <div className="flex-1 overflow-y-auto px-5 py-4 bg-white">
+          {/* Rendered in 11pt black Arial so what you see matches what the
+              copy looks like in the Google Doc you're pasting into. White
+              background is forced so dark mode doesn't invert the look. */}
+          <pre
+            className="whitespace-pre-wrap leading-relaxed selection:bg-[var(--color-accent-weak)]"
+            style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 11, color: '#000' }}
+          >
             {copy}
           </pre>
         </div>
