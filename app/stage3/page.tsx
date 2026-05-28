@@ -9,6 +9,7 @@ import { effectiveVerdict } from '@/lib/stage3/types'
 import type { Run } from '@/lib/db'
 import FeedbackButtons from '@/components/FeedbackButtons'
 import FeedbackAppliedChip from '@/components/FeedbackAppliedChip'
+import JSZip from 'jszip'
 
 // Cap total reference images per generation. Higgsfield accepts multiple refs;
 // pushing beyond ~4 doesn't materially improve fidelity and slows submission.
@@ -934,6 +935,44 @@ function CompletePhase({
   const passed = auditResults.filter(r => effectiveVerdict(r) === 'pass').length
   const failed = auditResults.filter(r => effectiveVerdict(r) === 'fail').length
 
+  const [zipping, setZipping] = useState(false)
+  // Download every generated image as a single .zip. Filenames include the
+  // category for context. Images that errored or never finished are skipped.
+  async function downloadAll() {
+    if (zipping) return
+    const items = images
+      .map((img, i) => ({ img, i, prompt: prompts[i] }))
+      .filter((x) => x.img.url && x.img.status !== 'error' && x.img.status !== 'failed')
+    if (items.length === 0) return
+    setZipping(true)
+    try {
+      const zip = new JSZip()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      for (const { img, i, prompt } of items) {
+        try {
+          const res = await fetch(img.url as string)
+          if (!res.ok) continue
+          const blob = await res.blob()
+          const ext = ((img.url as string).split(/[?#]/)[0].split('.').pop() || 'png').slice(0, 4)
+          const cat = (prompt?.category || 'image').replace(/[^a-z0-9_-]+/gi, '_')
+          zip.file(`${pad(i + 1)}_${cat}.${ext}`, blob)
+        } catch { /* skip a single broken URL rather than aborting the whole zip */ }
+      }
+      const blob = await zip.generateAsync({ type: 'blob' })
+      const slug = run?.brand_name ?? run?.product_name ?? `run_${run?.id ?? 'export'}`
+      const safeSlug = slug.replace(/[^a-z0-9_-]+/gi, '_').slice(0, 60) || 'images'
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob),
+        download: `${safeSlug}_images.zip`,
+      })
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } finally {
+      setZipping(false)
+    }
+  }
+  const downloadableCount = images.filter((img) => img.url && img.status !== 'error' && img.status !== 'failed').length
+
   return (
     <div className="space-y-6">
       <div>
@@ -975,6 +1014,16 @@ function CompletePhase({
         </div>
       )}
       <div className="flex items-center gap-3 pt-2 flex-wrap">
+        {downloadableCount > 0 && (
+          <button
+            onClick={downloadAll}
+            disabled={zipping}
+            title="Download every successful image as a single .zip"
+            className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap disabled:opacity-60"
+          >
+            {zipping ? 'Zipping…' : `↓ Download all (${downloadableCount}).zip`}
+          </button>
+        )}
         {failedCount > 0 && (
           <button
             onClick={onRegenerateFailed}
