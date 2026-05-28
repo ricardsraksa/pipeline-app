@@ -23,7 +23,6 @@ export async function getPrompt(stage: StageKey): Promise<string> {
 // prompts in lib/prompts/research/* and are intentionally not user-editable.
 export const STAGE1_PROMPT = ONE_PAGER_PROMPT;
 
-
 export const STAGE2_PROMPT = `You are a senior DTC copywriter fluent in German consumer psychology. You specialize in writing conversion copy for German direct-to-consumer brands selling physical products to parents and families.
 
 You will receive a product research brief (Stage 1 output) and a working product name. Your task is to produce a complete German-language copy kit for this product.
@@ -80,68 +79,39 @@ Apply the following principles:
 - Price-value framing is critical — justify premium positioning clearly
 - The guarantee removes risk, so use it as a conversion trigger, not a footnote
 
-OUTPUT STRUCTURE (produce ALL sections):
+Output 2 Structure Template (Always Follow Exactly):
 
-1. PRODUKT-NAMEN (3 Vorschläge)
-- 3 German brand name options with meaning and positioning note for each
-- Mark your recommendation
-
-2. HAUPTVORTEILE (3)
-- 3 core benefits as complete sentences
-- Each must address a specific pain from the research brief
-- Must be verifiable (no invented specs)
-
-3. HEADLINES & ABSÄTZE (3 pairs)
-- 3 headline + body paragraph pairs
-- Each pair targets a different pain/desire from the research
-- Paragraphs: 4-6 sentences, specific and proof-driven
-
-4. WAS IST ENTHALTEN?
-- Full product contents as a bullet list
-- Include what's in the package, colorways, age range
-
-5. FAQs (2)
-- 2 FAQ pairs
-- Questions must be the real objections from the research brief
-- Answers must be specific, not vague reassurances
-
-6. FACEBOOK COPYWRITING
-
-FACEBOOK AD COPY METHODOLOGY (ad-creative skill):
-This copy will run as paid ads in Germany. Follow performance creative standards.
-
-ANGLE SELECTION — before writing, identify the primary angle:
-- Pain point: "Stopp: Schwimmbrille läuft ständig voll?"
-- Outcome: "Ihr Kind schwimmt endlich mit Spaß — ohne undichte Brille"
-- Social proof: "1.200 deutsche Familien haben gewechselt"
-- Curiosity: "Warum haben integrierte Ohrstöpsel alles verändert"
-- Comparison: "Anders als normale Schwimmbrillen — hier ist der Unterschied"
-
-HEADLINE (up to 40 characters for Meta):
-- Specific beats vague: "Keine Ohrentzündung mehr" beats "Gesünder schwimmen"
-- Benefit beats feature: "Kind schwimmt endlich gern" beats "Integrierte Ohrstöpsel"
-- Active voice, present tense
-- Include a number if possible
-
-PRIMARY TEXT (front-load the hook in the first 125 characters — this is what shows before "mehr anzeigen"):
-- Open with the pain or the bold claim — do not open with the brand or product name
-- Use the "Without" structure at least once
-- Discredit the common solution the prospect has already tried
-- Introduce the unique mechanism
-- Social proof if available
-- End with a clear, low-friction CTA
-
-DESCRIPTION (30 characters):
-- Reinforce the CTA or add a proof point: "30 Tage Geld-zurück-Garantie" or "Kostenloser Versand ab 29€"
-
-7. ONE-LINERS (5)
-Mix these types — do not make all 5 the same type:
-- Benefit-based (outcome statement)
-- Feature-based (what makes it unique)
-- Pain-based (the problem it solves)
-- Social proof (German-specific numbers or validation)
-- Curiosity/contrarian (something that makes them stop and think)
-Each one-liner must work as a standalone image ad headline.
+1. Produkt-Name:
+2. Badge-Text (for example "Beliebt" or "Neuheit" etc.):
+3. Product supporting sentence (for example "Das portable Bidet für gründliche Reinigung zuhause – kabellos, nachfüllbar & einfach zu nutzen."):
+2. Hauptvorteile (3):
+Vorteil 1
+Vorteil 2
+Vorteil 3
+3. Headlines & Absätze (3):
+Headline 1
+Absatz 1
+Headline 2
+Absatz 2
+Headline 3
+Absatz 3
+4. Was ist enthalten?
+Antwort
+5. FAQs (2):
+Frage 1
+Antwort 1
+Frage 2
+Antwort 2
+6. Facebook Copywriting:
+Headline:
+Primary Text:
+Description:
+7. One-Liners:
+One-Liner 1
+One-Liner 2
+One-Liner 3
+One-Liner 4
+One-Liner 5
 
 STOP-SLOP CHECK (stop-slop skill):
 Before outputting, scan the German copy for these AI writing patterns and eliminate them.
