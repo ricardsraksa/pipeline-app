@@ -28,6 +28,13 @@ const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 // Faster, cheaper model for mechanical steps (doc revision, summarization)
 // that don't need Sonnet-level reasoning.
 const CLAUDE_HAIKU_MODEL = "claude-haiku-4-5-20251001";
+// Stage 2 (German copy) uses the top-tier model — it has the heaviest,
+// most rule-laden system prompt (forbidden phrases, structural rules,
+// marketing-psychology + customer-language blocks, seven-sweep review),
+// which is exactly where Opus's stronger multi-constraint adherence pays
+// off. Override with STAGE2_MODEL env var to A/B against Sonnet without a
+// code change.
+const STAGE2_MODEL = process.env.STAGE2_MODEL?.trim() || "claude-opus-4-8";
 // Hard cap on each scrape HTTP call — a slow/unresponsive supplier site must
 // not hang the whole pipeline. Unbounded scrape fetches were the primary cause
 // of runs stuck at Stage 1.
@@ -88,15 +95,21 @@ async function anthropicMessage(args: {
   maxTokens: number;
   label: string;
   model?: string;
+  /** Per-request timeout override (ms). Defaults to the client's 120s.
+   *  Opus is slower than Sonnet, so the Stage 2 call passes a larger value. */
+  timeoutMs?: number;
 }): Promise<string> {
   const msg = await withRetry(
     () =>
-      anthropic.messages.create({
-        model: args.model ?? CLAUDE_MODEL,
-        max_tokens: args.maxTokens,
-        system: args.system,
-        messages: [{ role: "user", content: args.user }],
-      }),
+      anthropic.messages.create(
+        {
+          model: args.model ?? CLAUDE_MODEL,
+          max_tokens: args.maxTokens,
+          system: args.system,
+          messages: [{ role: "user", content: args.user }],
+        },
+        args.timeoutMs ? { timeout: args.timeoutMs } : undefined,
+      ),
     { label: args.label },
   );
   return msg.content.find((b) => b.type === "text")?.text ?? "";
@@ -583,13 +596,17 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const systemPrompt = (await getPrompt("stage2")) + (await buildStage2FeedbackBlock());
   const productName = run.brand_name ?? run.product_name ?? "";
 
-  await updateRun(runId, { current_step: "Stage 2: Generating German copy (≈30–60s)", last_updated_at: now() });
+  await updateRun(runId, { current_step: "Stage 2: Generating German copy with Opus (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
     system: systemPrompt,
     user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete German copy kit now.`,
     maxTokens: 8192,
     label: "stage 2 German copy",
+    model: STAGE2_MODEL,
+    // Opus + an 8k-token German copy kit can run well past Sonnet's pace;
+    // give it 4 minutes before the client aborts.
+    timeoutMs: 240_000,
   });
   if (!output) throw new Error("Stage 2 produced no output");
 
