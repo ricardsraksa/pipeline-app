@@ -10,15 +10,16 @@ import { VISUAL_PROMPT } from "@/lib/prompts/research/visual";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
 
 // Server-side web search tool. Anthropic runs the searches itself and feeds
-// the results back to the model within a single create() call, so the final
-// message already contains text + citations — no manual agentic loop needed.
-// Localised to Germany so results are German-market relevant. Disable per-run
-// by setting RESEARCH_WEB_SEARCH=off.
-const WEB_SEARCH_ENABLED = (process.env.RESEARCH_WEB_SEARCH ?? "on").toLowerCase() !== "off";
+// the results back to the model within a single create() call.
+//
+// OFF by default — the searches added too much latency to Stage 1. Re-enable
+// by setting RESEARCH_WEB_SEARCH=on (env). When on, max_uses is capped low to
+// keep it from ballooning the runtime.
+const WEB_SEARCH_ENABLED = (process.env.RESEARCH_WEB_SEARCH ?? "off").toLowerCase() === "on";
 const WEB_SEARCH_TOOL = {
   type: "web_search_20250305" as const,
   name: "web_search" as const,
-  max_uses: 5,
+  max_uses: 3,
   user_location: { type: "approximate" as const, country: "DE" },
 };
 
