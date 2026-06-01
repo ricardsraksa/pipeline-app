@@ -51,6 +51,9 @@ FORBIDDEN PHRASES — NEVER USE:
 - Any sentence containing "wahre/echte Freude bereiten"
 - Any AI-typical em-dash usage pattern like "klar — verständlich — und direkt"
 
+PRICING IS OUT OF SCOPE — NEVER mention it:
+- No price, no EUR figure, no "€", no "ab X €", no discount/Rabatt/Angebot percentages, no price comparisons or anchors. Pricing lives outside this pipeline and is added later by a human. Even if the product description contains a price, do NOT put it in the copy. Sell on outcome, mechanism, and trust — never on price.
+
 FORBIDDEN STRUCTURAL PATTERNS:
 - "Nicht X, sondern Y" — state Y directly without the negation setup
 - Rhetorical question + obvious answer — cut the question, state the answer
@@ -136,9 +139,6 @@ Name the specific painful moment customers know — the morning the brille leake
 
 SOCIAL PROOF — GERMAN STYLE:
 Germans trust specific numbers more than vague enthusiasm. "1.247 deutsche Familien" beats "Tausende zufriedene Kunden". If you don't have a real number from the research, don't fake one — use a different trust signal (material certification, testing process, money-back terms).
-
-ANCHORING WITH PRICE-VALUE:
-Premium price points need a concrete reference frame. "29€ — etwa der Preis von zwei undichten Plastikbrillen, die nach 3 Monaten kaputt gehen" gives the buyer a comparison they understand.
 
 EARNED CONFIDENCE:
 German buyers are skeptical of confident claims. Earn confidence through specifics, not enthusiasm. "Dichtet ab bei einer Drucktiefe von 2 Metern" earns trust. "Die beste Schwimmbrille überhaupt!" loses it.

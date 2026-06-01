@@ -4,14 +4,15 @@ COMPETITOR PROFILING METHODOLOGY:
 For each competitor, use web search to gather from:
 - Homepage: headline, value proposition, primary CTA, social proof claims, target audience signals
 - Product pages: how they describe features, what they emphasize as unique
-- Pricing page: EUR prices, what's included, billing options
-- Amazon.de and idealo.de listings and reviews
+- What's included / bundle composition (NOT price — pricing is out of scope)
+- Amazon.de and idealo.de listings and reviews (ignore the prices shown)
 - Customer testimonial pages: named customers, case study themes
+
+PRICING IS OUT OF SCOPE for this entire analysis. Never state a competitor's price, an EUR figure, or a "budget/mid/premium" price band. Positioning is judged on messaging, features, and audience — not price.
 
 REQUIRED STRUCTURE PER COMPETITOR:
 ### [Competitor Name]
 **URL / Listing**: [source]
-**Current EUR Price**: [price or "not publicly listed"]
 **Positioning angle**: [how they position in one phrase]
 **Primary value proposition**: [their core promise]
 **Target audience**: [who they speak to, based on copy analysis]
@@ -54,10 +55,12 @@ Include:
 Then add CROSS-COMPETITOR SYNTHESIS:
 **Commoditized claims everyone makes** (no longer differentiators):
 - [claim]
-**Positioning map**:
-- Premium angle: [competitors here]
-- Mid-tier angle: [competitors here]
-- Budget angle: [competitors here]
+**Positioning map** (by messaging angle, NOT price tier):
+- Quality / durability angle: [competitors here]
+- Convenience / ease angle: [competitors here]
+- Design / aesthetic angle: [competitors here]
+- Health / safety angle: [competitors here]
+(Use whatever angles actually appear — these are examples, not a fixed list. Never use price as an axis.)
 **Gaps no competitor fills** (must be specific and actionable):
 - [gap with reasoning — why this gap exists and how this product could own it]
 **Recommended positioning angle for this product**:

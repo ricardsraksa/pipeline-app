@@ -28,7 +28,7 @@ WHERE TO SEARCH:
    Always note in the research whether each quote came from German or English Reddit, and link the subreddit name.
 
 3. gutefrage.net — search: site:gutefrage.net [product category keywords]
-4. idealo.de product reviews and price comparison comments
+4. idealo.de product reviews (ignore price-comparison figures — pricing is out of scope)
 5. Trustpilot.de for brand-level trust signals
 6. German YouTube video comments on product reviews in this category
 
@@ -67,8 +67,8 @@ OUTPUT — write only these sections:
 - Why they buy (purchase context, trigger occasions)
 - Seasonality and purchase timing
 - Platform landscape: where Germans buy this category (Amazon.de market share, retail chains, DTC, specialty)
-- Pricing tiers in EUR: budget / mid / premium / DTC opportunity with actual price ranges
-- Recommended target price with reasoning grounded in the data
+
+PRICING IS OUT OF SCOPE. Do NOT mention prices, price tiers, EUR figures, "budget/mid/premium" price bands, or a recommended/target price anywhere. Pricing is decided outside this pipeline. Describe positioning in non-price terms only (e.g. "value", "premium-feel", "mass-market") if relevant.
 
 3. CUSTOMER PAIN POINTS (ranked by frequency)
 - Minimum 5 pain points in descending order of frequency

@@ -29,9 +29,10 @@ const SEARCH_DIRECTIVE = `
 --- LIVE WEB SEARCH AVAILABLE ---
 You have a web_search tool. Use it to ground this analysis in current reality, not memory:
 - Search the GERMAN web (Amazon.de reviews, Idealo, German forums/Reddit, Stiftung Warentest, retailer pages) for this product category.
-- Verify market figures, price ranges, and named competitors against real listings — do not invent numbers.
+- Verify named competitors and their messaging/features against real listings — do not invent them.
 - Pull real customer pain-point language from actual reviews; quote it where useful.
 - If a search returns nothing solid for a claim, say so or drop the claim rather than fabricating.
+PRICING IS OUT OF SCOPE — never report a price, EUR figure, or price tier, even if search results show them. Ignore pricing entirely.
 Prefer 2–4 targeted searches over many shallow ones. Write the final analysis in the required structure; do not include raw search dumps.`;
 
 function withSearchDirective(system: string): string {

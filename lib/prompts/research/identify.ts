@@ -9,10 +9,12 @@ HALLUCINATION PREVENTION — ABSOLUTE RULES:
 SOURCES:
 You receive three sources:
 1. The product URL
-2. Scraped listing data (pricing, images, listing copy, market context)
+2. Scraped listing data (images, listing copy, market context)
 3. An optional user description
 
-Use all three together. If sources conflict, user description takes priority for product identity; scraped data takes priority for pricing/market signals.
+Use all three together. If sources conflict, user description takes priority for product identity.
+
+PRICING IS OUT OF SCOPE. Never mention price, cost, or EUR figures anywhere in your output.
 
 OUTPUT — write only this section:
 

@@ -43,4 +43,5 @@ RULES:
 - Use cases must be concrete scenarios, not categories. "Owner is at work all day and worries about hydration" not "Daily use"
 - USPs must be things actually unique to this product vs competitors named in the research — not generic claims
 - Maximum 1-2 USPs unless the research clearly identifies 3 strong differentiators
+- PRICING IS OUT OF SCOPE: never mention a price, EUR figure, cost, or price tier anywhere in the one-pager.
 - No emoji. No bold within bullets. No nested bullets. Just clean markdown.`;

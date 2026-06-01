@@ -1,4 +1,6 @@
-export const OFFER_BRIEF_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is Germany and the customer speaks German, so you will reference German customer behaviour, German platforms, and EUR pricing — but the document itself is an English internal working document. Do NOT write any section, header, or summary in German. The only exception is direct German customer quotes (which must be followed by an English translation in parentheses).
+export const OFFER_BRIEF_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is Germany and the customer speaks German, so you will reference German customer behaviour and German platforms — but the document itself is an English internal working document. Do NOT write any section, header, or summary in German. The only exception is direct German customer quotes (which must be followed by an English translation in parentheses).
+
+PRICING IS OUT OF SCOPE. Pricing is decided outside this pipeline. Do NOT recommend, estimate, or mention any price, EUR figure, price tier, charm pricing, or "value/premium/budget" price band anywhere. Positioning is expressed through messaging and audience, never price.
 
 NO INVENTION RULE: Use only what the research document supports. If a fact, demographic, pain point, or differentiator is not in the research, do not include it. If you feel something is missing from the research, flag it at the end of your output under a "MISSING FROM RESEARCH" section rather than inventing it.
 
@@ -13,34 +15,9 @@ Cover these sections:
 1. Product Name & Hook — 3 brand name suggestions if no name exists, plus a one-sentence hook capturing the core promise
 2. The Problem — the specific problem this product solves, and why existing solutions fail this avatar
 3. The Unique Mechanism — the verified differentiator that makes this product work when others don't. This must be grounded in the research. Frame it as a proprietary angle the avatar cannot get from competitors. If no real differentiator exists, say so honestly — do not invent one.
-4. The Offer — what is included, plus the full pricing analysis below:
-
-PRICING METHODOLOGY (pricing-strategy skill):
-The recommended EUR price must be based on value-based pricing principles, not cost-plus guessing.
-
-PRICING FRAMEWORK:
-1. Value ceiling — what is the maximum a German customer would pay based on the outcome they get? Pull from the research: what is the cost of the problem NOT being solved (time, money, frustration)?
-2. Next best alternative floor — what does the cheapest credible alternative cost? This sets the minimum to be taken seriously.
-3. Perceived value positioning:
-   - Budget tier signals low quality to German buyers who have been burned before
-   - Premium tier requires proof that this product can command that price
-   - Mid-tier with clear differentiation is typically the strongest DTC entry point
-4. German market pricing psychology:
-   - Germans are value-conscious but not necessarily price-sensitive — they pay for quality they can verify
-   - Charm pricing (€24,99 vs €25) works but should not undermine premium positioning
-   - Round prices (€25, €30) signal confidence and premium quality
-   - "Made in Germany" or German-certified products can command 20-30% premium
-
-REQUIRED PRICING OUTPUT:
-**Recommended EUR Price**: [price]
-**Pricing rationale**:
-- Value ceiling estimate: [EUR X — based on what?]
-- Next best alternative: [EUR Y from which competitor]
-- Positioning: [value/mid/premium — and why this tier fits]
-- Psychological framing: [how to present the price to reduce resistance]
-**Bundle/offer angles to test**:
-- [angle 1: e.g. multi-pack discount]
-- [angle 2: e.g. subscription model]
+4. The Offer — what is included in the package, the bundle composition, and any guarantee that removes risk. Do NOT mention price. Non-price offer angles to test:
+- [angle 1: e.g. multi-pack / bundle]
+- [angle 2: e.g. subscription / refill model]
 - [angle 3: e.g. guarantee that removes risk]
 
 5. Proof Elements — most convincing proof types for this avatar, German trust signals to use (Trusted Shops, Käuferschutz, TÜV, Stiftung Warentest where relevant)
@@ -61,7 +38,7 @@ ANGLE TYPES TO CONSIDER (pick the 2-3 most relevant):
 - **Gift/occasion angle** — product as a gift for someone else (parent buying for child, partner buying for partner)
 - **Preventive angle** — buying before the problem gets worse, not after
 - **Expert/enthusiast angle** — targeting buyers who already know this category and want the best version
-- **Value/savings angle** — targeting price-sensitive buyers who need to justify the spend
+- **Justification angle** — targeting cautious buyers who need a concrete reason the product is worth it (durability, longevity, "buy once" — never framed in price terms)
 - **Identity angle** — buying as a statement of who you are as a parent/person/professional
 - **Social proof angle** — targeting buyers who follow the crowd and need permission from others
 
