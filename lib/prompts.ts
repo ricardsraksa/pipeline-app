@@ -51,9 +51,6 @@ FORBIDDEN PHRASES — NEVER USE:
 - Any sentence containing "wahre/echte Freude bereiten"
 - Any AI-typical em-dash usage pattern like "klar — verständlich — und direkt"
 
-PRICING IS OUT OF SCOPE — NEVER mention it:
-- No price, no EUR figure, no "€", no "ab X €", no discount/Rabatt/Angebot percentages, no price comparisons or anchors. Pricing lives outside this pipeline and is added later by a human. Even if the product description contains a price, do NOT put it in the copy. Sell on outcome, mechanism, and trust — never on price.
-
 FORBIDDEN STRUCTURAL PATTERNS:
 - "Nicht X, sondern Y" — state Y directly without the negation setup
 - Rhetorical question + obvious answer — cut the question, state the answer
@@ -72,6 +69,9 @@ FORBIDDEN AI TELLS:
 - Closing sections with "Denn das verdient Ihre Familie." or similar emotional capstones
 - Listing benefits in groups of three with parallel grammar
 - Starting consecutive sentences with the same word
+
+PRICING IS OUT OF SCOPE — NEVER mention it:
+- No price, no EUR figure, no "€", no "ab X €", no discount/Rabatt/Angebot percentages, no price comparisons or anchors. Pricing lives outside this pipeline and is added later by a human. Even if the product description contains a price, do NOT put it in the copy. Sell on outcome, mechanism, and trust — never on price.
 
 SPECIFICITY ENFORCEMENT:
 Every adjective must be replaceable with a specific number, material, or outcome. If you write "bequem" you must replace with "keine Druckstellen auch nach 30 Minuten". If you write "hochwertig" you must replace with a specific material or certification. If the spec isn't in the research brief, do not invent one — find a different angle.
@@ -176,7 +176,13 @@ OUTPUT STRUCTURE (Always Follow Exactly)
 
 1. Produkt-Name:
 2. Badge-Text (for example "Beliebt" or "Neuheit" etc.):
-3. Product supporting sentence (for example "Das portable Bidet für gründliche Reinigung zuhause – kabellos, nachfüllbar & einfach zu nutzen."):
+3. Product supporting sentence — ONE short tagline-style sentence. NOT a feature dump. NOT multiple specs strung together. Pattern: "Der/Die/Das [Adjective] [Category] für [Outcome/User]" or similar. Maximum 15 words. Examples of correct format:
+   - "Der faltbare Sitz für Festivals, Reisen & Outdoor-Momente."
+   - "Die stilvolle Kosmetiktasche mit cleverem Klappdesign."
+   - "Das portable Bidet für gründliche Reinigung zuhause – kabellos, nachfüllbar & einfach zu nutzen."
+   - "Entfernt Tierhaare schnell und mühelos von Möbeln, Kleidung und anderen Oberflächen."
+
+   Do NOT write things like: "Trinkbrunnen aus 304-Edelstahl mit drei Trinkstellen, USB-C-Anschluss und leiser Pumpe (30 dB) – damit Ihre Katze mehr trinkt..." — that is a feature dump, not a tagline.
 4. Hauptvorteile (3) — each benefit MUST be ONE sentence (two maximum if absolutely necessary). Tight, specific, no filler. If you write three sentences for a benefit, you are wrong:
    Vorteil 1
    Vorteil 2
@@ -212,6 +218,7 @@ PER-SECTION SLOP CHECK
 
 After writing each section, before moving to the next, scan for:
 - Any forbidden phrase from the hard constraints list above
+- Any price or EUR figure (pricing is out of scope)
 - Any vague adjective (bequem, hochwertig, premium, innovativ) without a specific anchor
 - Passive voice
 - Rhetorical question + obvious answer
