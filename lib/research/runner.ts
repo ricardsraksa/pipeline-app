@@ -9,6 +9,46 @@ import { VISUAL_PROMPT } from "@/lib/prompts/research/visual";
 // 10-min default, so a stalled Stage 1 step can't freeze the pipeline.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
 
+// Server-side web search tool. Anthropic runs the searches itself and feeds
+// the results back to the model within a single create() call, so the final
+// message already contains text + citations — no manual agentic loop needed.
+// Localised to Germany so results are German-market relevant. Disable per-run
+// by setting RESEARCH_WEB_SEARCH=off.
+const WEB_SEARCH_ENABLED = (process.env.RESEARCH_WEB_SEARCH ?? "on").toLowerCase() !== "off";
+const WEB_SEARCH_TOOL = {
+  type: "web_search_20250305" as const,
+  name: "web_search" as const,
+  max_uses: 5,
+  user_location: { type: "approximate" as const, country: "DE" },
+};
+
+// Appended to the market + competitive system prompts when search is on, so
+// the model actually uses the tool instead of falling back on training memory.
+const SEARCH_DIRECTIVE = `
+
+--- LIVE WEB SEARCH AVAILABLE ---
+You have a web_search tool. Use it to ground this analysis in current reality, not memory:
+- Search the GERMAN web (Amazon.de reviews, Idealo, German forums/Reddit, Stiftung Warentest, retailer pages) for this product category.
+- Verify market figures, price ranges, and named competitors against real listings — do not invent numbers.
+- Pull real customer pain-point language from actual reviews; quote it where useful.
+- If a search returns nothing solid for a claim, say so or drop the claim rather than fabricating.
+Prefer 2–4 targeted searches over many shallow ones. Write the final analysis in the required structure; do not include raw search dumps.`;
+
+function withSearchDirective(system: string): string {
+  return WEB_SEARCH_ENABLED ? system + SEARCH_DIRECTIVE : system;
+}
+
+// With tools enabled the response interleaves text blocks with tool_use /
+// web_search_tool_result blocks. Concatenate every text block so we don't
+// drop the model's prose that lands after a search result.
+function collectText(content: Anthropic.ContentBlock[]): string {
+  return content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
 export interface ResearchInputs {
   /** May be null in the description-first flow (user provided description + images instead). */
   product_url: string | null;
@@ -95,13 +135,18 @@ export async function runMarket(inputs: ResearchInputs, identifyOutput: string):
     `\n\n--- PRODUCT IDENTIFICATION (from previous analysis) ---\n${identifyOutput}`,
   ].join("");
 
-  const msg = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 3000,
-    system: MARKET_PROMPT,
-    messages: [{ role: "user", content: userMessage }],
-  });
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  const msg = await anthropic.messages.create(
+    {
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 4000,
+      system: withSearchDirective(MARKET_PROMPT),
+      messages: [{ role: "user", content: userMessage }],
+      ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
+    },
+    // Web search adds round trips; give it more headroom than a plain call.
+    WEB_SEARCH_ENABLED ? { timeout: 180_000 } : undefined,
+  );
+  return collectText(msg.content);
 }
 
 // ── Call 3: Competitive Landscape ────────────────────────────────────────────
@@ -118,13 +163,17 @@ export async function runCompetitive(
     `\n\n--- MARKET OVERVIEW SUMMARY ---\n${marketOutput.slice(0, 1500)}`,
   ].join("");
 
-  const msg = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 3000,
-    system: COMPETITIVE_PROMPT,
-    messages: [{ role: "user", content: userMessage }],
-  });
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  const msg = await anthropic.messages.create(
+    {
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 4000,
+      system: withSearchDirective(COMPETITIVE_PROMPT),
+      messages: [{ role: "user", content: userMessage }],
+      ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
+    },
+    WEB_SEARCH_ENABLED ? { timeout: 180_000 } : undefined,
+  );
+  return collectText(msg.content);
 }
 
 // ── Call 4: Product Analysis + Market Sophistication + Levels ────────────────

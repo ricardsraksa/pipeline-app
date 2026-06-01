@@ -927,7 +927,7 @@ function CompletePhase({
   // catches every non-clean-pass image; the auditor only marks fail/minor
   // when there's an actual issue worth flagging.
   const failedCount = images.reduce((n, img, i) => {
-    const generationFailed = img.status === 'error' || img.status === 'failed'
+    const generationFailed = img.status === 'error'
     const auditFlagged = effectiveVerdict(auditResults[i]) === 'fail'
     return (generationFailed || auditFlagged) && (regenCounts[i] ?? 0) < 3 ? n + 1 : n
   }, 0)
@@ -947,7 +947,7 @@ function CompletePhase({
     if (downloading) return
     const items = images
       .map((img, i) => ({ img, i, prompt: prompts[i] }))
-      .filter((x) => x.img.url && x.img.status !== 'error' && x.img.status !== 'failed')
+      .filter((x) => x.img.url && x.img.status !== 'error')
     if (items.length === 0) return
     setDownloading(true)
     try {
@@ -965,7 +965,7 @@ function CompletePhase({
       setDownloading(false)
     }
   }
-  const downloadableCount = images.filter((img) => img.url && img.status !== 'error' && img.status !== 'failed').length
+  const downloadableCount = images.filter((img) => img.url && img.status !== 'error').length
 
   return (
     <div className="space-y-6">
@@ -1637,7 +1637,7 @@ function Stage3Page() {
     if (!run) return
     const indices: number[] = []
     images.forEach((img, i) => {
-      const generationFailed = img.status === 'error' || img.status === 'failed'
+      const generationFailed = img.status === 'error'
       const auditFlagged = effectiveVerdict(auditResults[i]) === 'fail'
       const underCap = (regenCounts[i] ?? 0) < 3
       if ((generationFailed || auditFlagged) && underCap) indices.push(i)
