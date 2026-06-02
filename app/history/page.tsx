@@ -20,8 +20,8 @@ async function getRuns(): Promise<RunSummary[]> {
   }
 }
 
-const ACTIVE_STATUSES = new Set(["pending", "scraping", "stage1", "stage2"]);
-const WAITING_STATUSES = new Set(["awaiting_stage2_approval", "awaiting_user", "awaiting_qc"]);
+const ACTIVE_STATUSES = new Set(["pending", "scraping", "stage1", "stage2", "generating_hero", "generating_remaining"]);
+const WAITING_STATUSES = new Set(["awaiting_stage2_approval", "awaiting_user", "awaiting_qc", "awaiting_hero_qc"]);
 
 function isStuck(run: RunSummary): boolean {
   if (!run.last_updated_at) return false;
@@ -32,6 +32,7 @@ function isStuck(run: RunSummary): boolean {
     run.status !== "awaiting_user" &&
     run.status !== "awaiting_qc" &&
     run.status !== "awaiting_stage2_approval" &&
+    run.status !== "awaiting_hero_qc" &&
     run.status !== "failed"
   );
 }
@@ -61,7 +62,10 @@ const STATUS_META: Record<string, { label: string; tone: Tone }> = {
   awaiting_stage2_approval:   { label: "Awaiting review",  tone: "warn"   },
   stage2:                     { label: "Stage 2",          tone: "active" },
   awaiting_user:              { label: "Needs review",     tone: "warn"   },
-  awaiting_qc:                { label: "Awaiting QC",      tone: "warn"   },
+  awaiting_qc:                { label: "Review prompts",   tone: "warn"   },
+  generating_hero:            { label: "Hero…",            tone: "active" },
+  awaiting_hero_qc:           { label: "Review hero",      tone: "warn"   },
+  generating_remaining:       { label: "Stage 3 prompts…", tone: "active" },
   complete:                   { label: "Complete",         tone: "success"},
   completed:                  { label: "Complete",         tone: "success"},
   partial:                    { label: "Partial",          tone: "warn"   },

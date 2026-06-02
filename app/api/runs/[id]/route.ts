@@ -89,6 +89,11 @@ export async function PATCH(
     step_necessary_beliefs_revised?: string | null;
     scraped_image_urls?: string[] | null;
     approved_image_urls?: string[] | null;
+    // Hero-first Stage 3
+    stage3_hero_prompt_edited?: string | null;
+    stage3_remaining_prompts?: string | null;
+    stage3_remaining_prompts_edited?: string | null;
+    stage3_remaining_images?: string | null;
   };
 
   const existing = await db.execute({
@@ -159,6 +164,10 @@ export async function PATCH(
   if ("step_avatar_revised" in body)          { fields.push("step_avatar_revised = ?");          values.push(body.step_avatar_revised ?? null); }
   if ("step_offer_brief_revised" in body)     { fields.push("step_offer_brief_revised = ?");     values.push(body.step_offer_brief_revised ?? null); }
   if ("step_necessary_beliefs_revised" in body){ fields.push("step_necessary_beliefs_revised = ?");values.push(body.step_necessary_beliefs_revised ?? null); }
+  if ("stage3_hero_prompt_edited" in body)        { fields.push("stage3_hero_prompt_edited = ?");        values.push(body.stage3_hero_prompt_edited ?? null); }
+  if ("stage3_remaining_prompts" in body)         { fields.push("stage3_remaining_prompts = ?");         values.push(body.stage3_remaining_prompts ?? null); }
+  if ("stage3_remaining_prompts_edited" in body)  { fields.push("stage3_remaining_prompts_edited = ?");  values.push(body.stage3_remaining_prompts_edited ?? null); }
+  if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
 
   if (fields.length === 0) {
     return Response.json({ success: true });

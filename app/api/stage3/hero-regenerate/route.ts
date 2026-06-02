@@ -1,0 +1,56 @@
+import { NextRequest } from 'next/server'
+import { getRun, updateRun } from '@/lib/db'
+import { generateStage3Image } from '@/lib/stage3/higgsfield'
+import type { HeroPrompt } from '@/lib/stage3/hero'
+
+// Regenerate the hero image at the QC gate. Optionally accepts an edited
+// prompt (the operator tweaked it). Stays at awaiting_hero_qc.
+export const maxDuration = 300
+
+function safeArr(json: string | null): string[] {
+  if (!json) return []
+  try { const v = JSON.parse(json); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [] } catch { return [] }
+}
+
+export async function POST(req: NextRequest) {
+  const { runId, editedPrompt } = (await req.json()) as { runId?: number; editedPrompt?: string }
+  if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
+
+  const run = await getRun(runId)
+  if (!run) return Response.json({ success: false, error: 'Run not found' }, { status: 404 })
+
+  let hero: HeroPrompt | null = null
+  try { hero = run.stage3_hero_prompt ? JSON.parse(run.stage3_hero_prompt) : null } catch { hero = null }
+  if (!hero) return Response.json({ success: false, error: 'No hero prompt to regenerate' }, { status: 400 })
+
+  const promptText = (editedPrompt && editedPrompt.trim()) || hero.prompt
+  const uploaded = safeArr(run.uploaded_source_images)
+  const scraperData = run.scraper_data ? (() => { try { return JSON.parse(run.scraper_data!) } catch { return null } })() : null
+  const scraped: string[] = Array.isArray(scraperData?.images) ? scraperData.images : []
+  const sourceImageUrls = [...uploaded, ...scraped].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 5)
+
+  try {
+    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 3: Regenerating hero shot', last_updated_at: new Date().toISOString() })
+
+    const imageUrl = await generateStage3Image({
+      prompt: promptText,
+      model: hero.model || 'nano_banana_2',
+      reference_images: sourceImageUrls,
+      aspect_ratio: hero.aspect_ratio || '1:1',
+    })
+
+    await updateRun(runId, {
+      ...(editedPrompt && editedPrompt.trim() ? { stage3_hero_prompt_edited: editedPrompt.trim() } : {}),
+      stage3_hero_image_url: imageUrl,
+      status: 'awaiting_hero_qc',
+      current_step: 'Stage 3: Review the hero shot',
+      last_updated_at: new Date().toISOString(),
+    })
+
+    return Response.json({ success: true, hero_image_url: imageUrl })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await updateRun(runId, { status: 'awaiting_hero_qc', error_message: message, last_updated_at: new Date().toISOString() }).catch(() => {})
+    return Response.json({ success: false, error: message }, { status: 500 })
+  }
+}

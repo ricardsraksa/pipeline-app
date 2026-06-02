@@ -118,6 +118,16 @@ async function migrateDB() {
     "feedback_stage1_note TEXT",
     "feedback_stage2_note TEXT",
     "feedback_stage3_note TEXT",
+    // ── Hero-first Stage 3 (two-phase) ────────────────────────────────────
+    // Phase 1: one hero studio shot generated from the SOURCE product photos.
+    "stage3_hero_prompt TEXT",
+    "stage3_hero_prompt_edited TEXT",
+    "stage3_hero_image_url TEXT",
+    "stage3_hero_approved INTEGER DEFAULT 0",
+    // Phase 2: the 8 derivative prompts/images, all referencing the approved hero.
+    "stage3_remaining_prompts TEXT",
+    "stage3_remaining_prompts_edited TEXT",
+    "stage3_remaining_images TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -381,4 +391,12 @@ export interface Run {
   feedback_stage1_note: string | null;
   feedback_stage2_note: string | null;
   feedback_stage3_note: string | null;
+  // Hero-first Stage 3 (two-phase)
+  stage3_hero_prompt: string | null;
+  stage3_hero_prompt_edited: string | null;
+  stage3_hero_image_url: string | null;
+  stage3_hero_approved: number | null;
+  stage3_remaining_prompts: string | null;
+  stage3_remaining_prompts_edited: string | null;
+  stage3_remaining_images: string | null;
 }

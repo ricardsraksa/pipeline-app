@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
+import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ function isStuck(run: RunStatus): boolean {
   const ageMs = Date.now() - new Date(run.timestamps.lastUpdatedAt).getTime();
   return (
     ageMs > 10 * 60 * 1000 &&
-    !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval"].includes(run.status)
+    !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status)
   );
 }
 
@@ -76,6 +77,9 @@ function statusLabel(status: string): string {
     stage2: "Stage 2 — Copy",
     awaiting_user: "Awaiting review",
     awaiting_qc: "Awaiting QC",
+    generating_hero: "Stage 3 — Generating hero",
+    awaiting_hero_qc: "Stage 3 — Review hero",
+    generating_remaining: "Stage 3 — Writing prompts",
     completed: "Complete",
     failed: "Failed",
   };
@@ -107,7 +111,7 @@ function StatusBadge({ status }: { status: string }) {
       <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Failed
     </span>
   );
-  if (status === "awaiting_user" || status === "awaiting_qc" || status === "awaiting_stage2_approval") return (
+  if (status === "awaiting_user" || status === "awaiting_qc" || status === "awaiting_stage2_approval" || status === "awaiting_hero_qc") return (
     <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{statusLabel(status)}
     </span>
@@ -912,43 +916,14 @@ export default function RunPage() {
           </Section>
         )}
 
-        {/* Stage 3 gate */}
-        {(run.status === "awaiting_user" || run.status === "awaiting_qc" || run.status === "completed") && (
+        {/* Stage 3 — hero-first two-phase flow. Shows once Stage 2 has output,
+            or any time a hero-flow status is active. The component drives all
+            of its own states (entry → hero QC → prompt QC → grid) off the run
+            status it polls directly. */}
+        {(Boolean(outputs.stage2Output) ||
+          ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status)) && (
           <Section id="stage-3-section" label="Stage 3 — Images">
-            {run.status === "awaiting_user" ? (
-              <div className="border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] border-l-4 border-l-[var(--color-primary)] rounded-[11px] px-[18px] py-4 flex items-center gap-4 flex-wrap">
-                <span className="grid place-items-center w-8 h-8 rounded-lg bg-[var(--color-accent-weak)] flex-shrink-0">
-                  <Icon.Image className="w-4 h-4 text-[var(--color-accent)]" />
-                </span>
-                <div className="flex-1">
-                  <p className="text-[13px] text-[var(--color-text)] font-[600] mb-1">
-                    Ready for Stage 3
-                  </p>
-                  <p className="text-[12px] text-[var(--color-text-2)] leading-relaxed">
-                    Approve product images and (optionally) add reference photos, then launch image generation.
-                  </p>
-                </div>
-                <Link
-                  href={`/stage3?runId=${runId}`}
-                  className="inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap"
-                >
-                  Open Stage 3
-                  <Icon.ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            ) : run.status === "awaiting_qc" ? (
-              <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] px-5 py-4 flex items-center gap-3 text-[var(--color-text-2)]">
-                <Icon.Loader className="w-4 h-4 text-[var(--color-warn)]" />
-                <span className="text-[12px]">Awaiting prompt review &amp; QC&hellip;</span>
-              </div>
-            ) : (
-              <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] px-5 py-4 flex items-center gap-3">
-                <Icon.Check className="w-4 h-4 text-[var(--color-green)]" />
-                <span className="text-[12px] text-[var(--color-green)]">
-                  Stage 3 complete. View images on the Stage 3 page.
-                </span>
-              </div>
-            )}
+            <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
             <StageActions
               stage="stage3-prompts"
               previousStage="stage2"
