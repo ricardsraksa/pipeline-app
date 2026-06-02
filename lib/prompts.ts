@@ -176,13 +176,22 @@ OUTPUT STRUCTURE (Always Follow Exactly)
 
 1. Produkt-Name:
 2. Badge-Text (for example "Beliebt" or "Neuheit" etc.):
-3. Product supporting sentence — ONE short tagline-style sentence. NOT a feature dump. NOT multiple specs strung together. Pattern: "Der/Die/Das [Adjective] [Category] für [Outcome/User]" or similar. Maximum 15 words. Examples of correct format:
+3. Product supporting sentence — ONE short positioning tagline that appears in light grey directly under the product name on the product page. It says what the product IS plus its single key differentiator. It is NOT a benefit claim, NOT a pain point, NOT a spec dump, NOT a sentence with a relative clause explaining a problem.
+
+   Format pattern: "Die/Der/Das [Category] mit/für [single key differentiator]."
+   Maximum 12 words. Positioning only. No negatives. No "der/die/das ... nicht ..." constructions.
+
+   Examples of CORRECT format:
+   - "Die Kinderschwimmbrille mit fest verbundenen Ohrstöpseln."
    - "Der faltbare Sitz für Festivals, Reisen & Outdoor-Momente."
    - "Die stilvolle Kosmetiktasche mit cleverem Klappdesign."
-   - "Das portable Bidet für gründliche Reinigung zuhause – kabellos, nachfüllbar & einfach zu nutzen."
-   - "Entfernt Tierhaare schnell und mühelos von Möbeln, Kleidung und anderen Oberflächen."
+   - "Das portable Bidet für gründliche Reinigung zuhause."
 
-   Do NOT write things like: "Trinkbrunnen aus 304-Edelstahl mit drei Trinkstellen, USB-C-Anschluss und leiser Pumpe (30 dB) – damit Ihre Katze mehr trinkt..." — that is a feature dump, not a tagline.
+   Examples of WRONG format (do NOT do this):
+   - "Der Trinkbrunnen aus 304-Edelstahl, der nach zwei Wochen nicht schleimig wird." (leads with a negative, crams in a pain point)
+   - "Trinkbrunnen aus 304-Edelstahl mit drei Trinkstellen, USB-C-Anschluss und leiser Pumpe (30 dB) – damit Ihre Katze mehr trinkt..." (spec dump)
+
+   The pain point and benefits belong in the headlines and Hauptvorteile — NOT here. This line is clean positioning only.
 4. Hauptvorteile (3) — each benefit MUST be ONE sentence (two maximum if absolutely necessary). Tight, specific, no filler. If you write three sentences for a benefit, you are wrong:
    Vorteil 1
    Vorteil 2
