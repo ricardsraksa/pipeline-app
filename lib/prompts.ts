@@ -176,22 +176,24 @@ OUTPUT STRUCTURE (Always Follow Exactly)
 
 1. Produkt-Name:
 2. Badge-Text (for example "Beliebt" or "Neuheit" etc.):
-3. Product supporting sentence — ONE short positioning tagline that appears in light grey directly under the product name on the product page. It says what the product IS plus its single key differentiator. It is NOT a benefit claim, NOT a pain point, NOT a spec dump, NOT a sentence with a relative clause explaining a problem.
+3. Product supporting sentence — ONE short positioning tagline in light grey under the product name. It names the category and the SINGLE most important thing about the product: usually its core purpose or the one defining feature the whole product is built around. ONE idea only. NOT a list of specs. NOT materials unless the material IS the core story. NOT a pain point. NOT a benefit claim with numbers.
 
-   Format pattern: "Die/Der/Das [Category] mit/für [single key differentiator]."
-   Maximum 12 words. Positioning only. No negatives. No "der/die/das ... nicht ..." constructions.
+   How to choose the one idea: ask "what is the single most important thing this product does or has?" For the swim goggles, the whole product is built around fixed earplugs, so: "Die Kinderschwimmbrille mit fest verbundenen Ohrstöpseln." For the cat fountain, the core purpose is making cats drink more, so the line should lead with that, e.g. "Der Trinkbrunnen, der Ihre Katze zum Trinken animiert." NOT a spec list like "aus 304-Edelstahl mit drei Trinkstellen und 30-dB-Pumpe."
+
+   Format pattern: "Die/Der/Das [Category] mit/für/der [single core purpose or defining feature]."
+   Maximum 12 words. One idea. No spec lists. No negatives. No relative clauses explaining a problem.
 
    Examples of CORRECT format:
    - "Die Kinderschwimmbrille mit fest verbundenen Ohrstöpseln."
    - "Der faltbare Sitz für Festivals, Reisen & Outdoor-Momente."
    - "Die stilvolle Kosmetiktasche mit cleverem Klappdesign."
-   - "Das portable Bidet für gründliche Reinigung zuhause."
+   - "Der Trinkbrunnen, der Ihre Katze zum Trinken animiert."
 
    Examples of WRONG format (do NOT do this):
+   - "Der Katzen-Trinkbrunnen aus 304-Edelstahl mit drei Trinkstellen und 30-dB-Pumpe." (spec list, three ideas, no core purpose)
    - "Der Trinkbrunnen aus 304-Edelstahl, der nach zwei Wochen nicht schleimig wird." (leads with a negative, crams in a pain point)
-   - "Trinkbrunnen aus 304-Edelstahl mit drei Trinkstellen, USB-C-Anschluss und leiser Pumpe (30 dB) – damit Ihre Katze mehr trinkt..." (spec dump)
 
-   The pain point and benefits belong in the headlines and Hauptvorteile — NOT here. This line is clean positioning only.
+   The specs, pain points, and benefits belong in the headlines and Hauptvorteile — NOT here. This line is one clean idea: what the product is and the single most important thing about it.
 4. Hauptvorteile (3) — each benefit MUST be ONE sentence (two maximum if absolutely necessary). Tight, specific, no filler. If you write three sentences for a benefit, you are wrong:
    Vorteil 1
    Vorteil 2
