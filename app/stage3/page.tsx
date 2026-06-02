@@ -157,6 +157,16 @@ function ImageCell({
   const catIndex = IMAGE_CATEGORIES.findIndex(c => c.id === prompt.category)
   const hasNote = (auditResult?.user_note ?? '').trim().length > 0
 
+  // A slot has "failed" when generation errored OR the (effective) audit
+  // verdict is fail. failReason is a short human summary of WHY, shown
+  // directly on the card. Clicking a failed card opens the rewrite modal.
+  const generationFailed = image.status === 'error'
+  const auditFailed = image.status === 'done' && effectiveVerdict(auditResult) === 'fail'
+  const isFailed = generationFailed || auditFailed
+  const failReason = generationFailed
+    ? (image.error?.trim() || 'Image generation failed')
+    : (auditResult?.issues?.filter(Boolean)[0] || 'Did not pass the quality check')
+
   async function saveImageFeedback() {
     if (!feedbackVote && !feedbackNote.trim()) {
       setFeedbackOpen(false)
@@ -186,11 +196,25 @@ function ImageCell({
   }
 
   return (
-    <div className="aspect-square rounded-[11px] border border-[var(--color-border)] overflow-hidden relative bg-[var(--color-surface)] group shadow-[0_1px_2px_rgba(20,20,18,.05)]">
+    <div className={`aspect-square rounded-[11px] border overflow-hidden relative bg-[var(--color-surface)] group shadow-[0_1px_2px_rgba(20,20,18,.05)] ${isFailed ? 'border-[var(--color-red)]/60' : 'border-[var(--color-border)]'}`}>
       {image.status === 'done' && image.url ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.url} alt={cat?.label ?? prompt.category} className="w-full h-full object-cover" />
+          <img src={image.url} alt={cat?.label ?? prompt.category} className={`w-full h-full object-cover ${auditFailed ? 'opacity-75' : ''}`} />
+          {/* Persistent failure banner — visible at rest, says WHY it failed,
+              click anywhere on it to open the rewrite modal (which pre-fills
+              the AI editor with these exact issues). Hover action bar sits
+              above it (later in DOM) for Download/Rate/Regenerate. */}
+          {auditFailed && (
+            <button
+              onClick={onRegenerate}
+              title="Click to rewrite the prompt and regenerate this image"
+              className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)] transition-colors"
+            >
+              <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to rewrite</span>
+              <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
+            </button>
+          )}
           {auditResult && (
             <div className="absolute top-2 left-2">
               <VerdictBadge
@@ -223,8 +247,9 @@ function ImageCell({
               💬
             </button>
           )}
-          {/* Action bar — Download + Rate + Regenerate, revealed on hover */}
-          <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action bar — Download + Rate + Regenerate, revealed on hover.
+              z-20 so it sits above the persistent failure banner (z-10). */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-between gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => downloadImage(image.url as string, `${prompt.category || 'image'}_${catIndex + 1}.png`)}
               className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer transition-colors"
@@ -250,7 +275,7 @@ function ImageCell({
             )}
           </div>
           {feedbackOpen && (
-            <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-2">
+            <div className="absolute inset-0 z-30 bg-black/85 p-3 flex flex-col gap-2">
               <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider">
                 Rate this image ({cat?.label})
               </p>
@@ -292,7 +317,7 @@ function ImageCell({
             </div>
           )}
           {showDetails && auditResult && (
-            <div className="absolute inset-0 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
+            <div className="absolute inset-0 z-30 bg-black/85 p-3 flex flex-col gap-1 overflow-y-auto">
               <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-white/60 uppercase tracking-wider mb-1">Issues</p>
               {auditResult.issues.map((issue, i) => (
                 <p key={i} className="text-[10px] text-white/80 font-[var(--font-ibm-plex-mono)] leading-relaxed">• {issue}</p>
@@ -306,10 +331,17 @@ function ImageCell({
           <div className="w-2 h-2 rounded-full bg-[var(--color-accent)] animate-pulse" />
         </div>
       ) : image.status === 'error' ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1">
-          <span className="text-[var(--color-error)] font-[var(--font-ibm-plex-mono)] text-[10px]">Failed</span>
-          <span className="text-[var(--color-text-3)] text-[9px] text-center font-[var(--font-ibm-plex-mono)]">{image.error?.slice(0, 60)}</span>
-        </div>
+        <button
+          onClick={onRegenerate}
+          title="Click to rewrite the prompt and try again"
+          className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 cursor-pointer bg-[var(--color-red-bg)] hover:brightness-95 transition-all text-center"
+        >
+          <span className="text-[var(--color-red)] font-[700] text-[11px]">Failed</span>
+          <span className="text-[var(--color-text-2)] text-[10px] leading-snug line-clamp-3">{failReason}</span>
+          <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">
+            <Icon.Spark className="w-3 h-3" /> Tap to rewrite
+          </span>
+        </button>
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
           <span className="font-[var(--font-ibm-plex-mono)] text-[var(--color-text-4)] text-lg">{catIndex + 1}</span>
@@ -320,8 +352,18 @@ function ImageCell({
   )
 }
 
-function PhaseIndicator({ phase }: { phase: Stage3Phase }) {
-  const steps = [
+function PhaseIndicator({
+  phase,
+  navigable,
+  onJump,
+}: {
+  phase: Stage3Phase
+  /** Phases the operator can click to jump to (review prompts / view images).
+   *  The transient process phases (generate, audit) are never navigable. */
+  navigable?: Set<Stage3Phase>
+  onJump?: (p: Stage3Phase) => void
+}) {
+  const steps: { id: Stage3Phase; label: string }[] = [
     { id: 'A_generating', label: 'Prompts' },
     { id: 'B_qc_gate', label: 'QC Gate' },
     { id: 'C_generating', label: 'Generate' },
@@ -332,20 +374,28 @@ function PhaseIndicator({ phase }: { phase: Stage3Phase }) {
   const currentIdx = phaseOrder.indexOf(phase)
 
   return (
-    <div className="flex items-center gap-2 mb-8">
+    <div className="flex items-center gap-2 mb-8 flex-wrap">
       {steps.map((step, i) => {
         const stepOrder = i + 1
         const isActive = phase === step.id
         const isDone = currentIdx > stepOrder
+        const canJump = !!navigable?.has(step.id) && !isActive
+        const inner = (
+          <div className="flex items-center gap-1.5">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-accent)]' : isDone ? 'bg-[var(--color-green)]' : 'bg-[var(--color-border-strong)]'}`} />
+            <span className={`text-[11px] font-[550] ${isActive ? 'text-[var(--color-accent)]' : isDone ? 'text-[var(--color-green)]' : 'text-[var(--color-text-3)]'} ${canJump ? 'underline decoration-dotted underline-offset-2' : ''}`}>
+              {step.label}
+            </span>
+          </div>
+        )
         return (
           <div key={step.id} className="flex items-center gap-2">
             {i > 0 && <div className="w-6 h-px bg-[var(--color-border-strong)]" />}
-            <div className="flex items-center gap-1.5">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-accent)]' : isDone ? 'bg-[var(--color-green)]' : 'bg-[var(--color-border-strong)]'}`} />
-              <span className={`text-[11px] font-[550] ${isActive ? 'text-[var(--color-accent)]' : isDone ? 'text-[var(--color-green)]' : 'text-[var(--color-text-3)]'}`}>
-                {step.label}
-              </span>
-            </div>
+            {canJump ? (
+              <button onClick={() => onJump?.(step.id)} title={`Go to ${step.label}`} className="cursor-pointer hover:opacity-80 transition-opacity">
+                {inner}
+              </button>
+            ) : inner}
           </div>
         )
       })}
@@ -1774,7 +1824,26 @@ function Stage3Page() {
         )}
       </div>
 
-      <PhaseIndicator phase={phase} />
+      <PhaseIndicator
+        phase={phase}
+        navigable={(() => {
+          // You can hop between the two real "destinations" once their data
+          // exists: QC Gate (review/edit the 9 prompts) and Complete (the
+          // generated images). The in-between process phases aren't targets.
+          const set = new Set<Stage3Phase>()
+          const hasImages = images.some((im) => im.status === 'done' || im.status === 'error')
+          // Don't allow jumping away mid-generation/mid-audit.
+          if (phase === 'B_qc_gate' || phase === 'E_complete') {
+            if (prompts.length > 0) set.add('B_qc_gate')
+            if (hasImages) set.add('E_complete')
+          }
+          return set
+        })()}
+        onJump={(target) => {
+          if (target === 'B_qc_gate' && prompts.length > 0) setPhase('B_qc_gate')
+          else if (target === 'E_complete') setPhase('E_complete')
+        }}
+      />
 
       {phase === 'loading' && <LoadingState message="Loading run data…" />}
       {phase === 'A_generating' && (
