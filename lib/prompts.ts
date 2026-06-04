@@ -194,7 +194,7 @@ OUTPUT STRUCTURE (Always Follow Exactly)
    - "Der Trinkbrunnen aus 304-Edelstahl, der nach zwei Wochen nicht schleimig wird." (leads with a negative, crams in a pain point)
 
    The specs, pain points, and benefits belong in the headlines and Hauptvorteile — NOT here. This line is one clean idea: what the product is and the single most important thing about it.
-4. Hauptvorteile (3) — each benefit MUST be ONE sentence (two maximum if absolutely necessary). Tight, specific, no filler. If you write three sentences for a benefit, you are wrong:
+4. Hauptvorteile (3) — each benefit MUST be exactly ONE sentence. Not two. Tight, specific, no filler. If a benefit runs longer than one sentence, cut it down until it is one:
    Vorteil 1
    Vorteil 2
    Vorteil 3
@@ -205,7 +205,7 @@ OUTPUT STRUCTURE (Always Follow Exactly)
    Absatz 2
    Headline 3
    Absatz 3
-6. Was ist enthalten?
+6. Was ist enthalten? — the answer MUST be exactly ONE sentence. Tight, specific, no list, no filler:
    Antwort
 7. FAQs (2):
    Frage 1
