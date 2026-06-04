@@ -559,93 +559,125 @@ function CompletedReview({
   const passed = images.filter((im) => effVerdict(im) === "pass").length;
   const failed = images.filter((im) => effVerdict(im) === "fail").length;
 
+  // Placement: an image that carries a German copy line belongs inline with
+  // that copy block (one image per section). Images with no copy line are
+  // product shots for the top of the page. This is a labeling-only split —
+  // generation is unchanged.
+  const entries = images.map((im, i) => ({ im, i, copy: (promptFor(im)?.german_text || "").trim() }));
+  const sectionEntries = entries.filter((e) => e.copy);
+  const productEntries = entries.filter((e) => !e.copy);
+
+  // Render one interactive image tile (verdict badge, regenerate, fail banner,
+  // generating overlay). Index `i` is the position in the `images` array so
+  // toggleVerdict/regenerate stay correct after regrouping.
+  const renderTile = (im: RemImage, i: number) => {
+    const v = effVerdict(im);
+    const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
+    const overridden = im.user_override != null;
+    const regenerating = busyIdx === i;
+    return (
+      <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
+        {regenerating && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
+            <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
+            <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">Generating…</span>
+          </div>
+        )}
+        {im.image_url ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={im.image_url} alt={im.category} className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
+            {v && (
+              <button
+                onClick={() => toggleVerdict(i)}
+                title={overridden ? `Overridden — auditor said ${im.verdict}. Click to cycle.` : `Auditor: ${im.verdict}. Click to override.`}
+                className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"} ${overridden ? "ring-1 ring-white/60" : ""}`}
+              >
+                {v}{overridden ? "•" : ""}
+              </button>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
+              <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
+            </div>
+            {v === "fail" && failReason && (
+              <button onClick={() => setRegenIdx(i)} title="Click to regenerate this image" className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
+                <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to fix</span>
+                <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
+              </button>
+            )}
+          </>
+        ) : (
+          <button onClick={() => setRegenIdx(i)} className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 cursor-pointer bg-[var(--color-red-bg)] text-center">
+            <span className="text-[var(--color-red)] font-[700] text-[11px]">Failed</span>
+            <span className="text-[var(--color-text-2)] text-[10px] line-clamp-3">{failReason}</span>
+            <span className="mt-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">Tap to regenerate</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 3 complete · hero + 8" : "Stage 3 images"}</h3>
         <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
       </div>
-      <p className="text-[11px] text-[var(--color-text-3)] -mt-1">Each image is captioned with its copy section and the exact German line it pairs with — match that line in your doc to place the image.</p>
+      <p className="text-[11px] text-[var(--color-text-3)] -mt-2">Images are grouped by where they go on the page: product shots up top, then one image per copy section (matched by the German line it carries — search that line in your doc to place it).</p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {heroUrl && (
-          <div className="flex flex-col gap-1.5">
-            <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
-              <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
-              <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+      {/* ── Product shots — top of the page ────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
+          Top of page · product shots <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {productEntries.length + (heroUrl ? 1 : 0)} images</span>
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {heroUrl && (
+            <div className="flex flex-col gap-1.5">
+              <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
+                <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
+                <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+              </div>
+              <div className="px-0.5">
+                <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">Hero shot</p>
+                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Main product image</p>
+              </div>
             </div>
-            <div className="px-0.5">
-              <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">1 · Hero shot</p>
-              <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Main product image — top of the page</p>
-            </div>
-          </div>
-        )}
-        {images.map((im, i) => {
-          const v = effVerdict(im);
-          const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
-          const overridden = im.user_override != null;
-          const regenerating = busyIdx === i;
-          const copy = (promptFor(im)?.german_text || "").trim();
-          return (
+          )}
+          {productEntries.map(({ im, i }) => (
             <div key={i} className="flex flex-col gap-1.5">
-            <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
-              {regenerating && (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
-                  <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
-                  <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">Generating…</span>
-                </div>
-              )}
-              {im.image_url ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={im.image_url} alt={im.category} className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
-                  {/* clickable verdict badge */}
-                  {v && (
-                    <button
-                      onClick={() => toggleVerdict(i)}
-                      title={overridden ? `Overridden — auditor said ${im.verdict}. Click to cycle.` : `Auditor: ${im.verdict}. Click to override.`}
-                      className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"} ${overridden ? "ring-1 ring-white/60" : ""}`}
-                    >
-                      {v}{overridden ? "•" : ""}
-                    </button>
-                  )}
-                  {/* hover actions */}
-                  <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
-                    <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
-                  </div>
-                  {/* persistent fail banner (auditor or override) */}
-                  {v === "fail" && failReason && (
-                    <button onClick={() => setRegenIdx(i)} title="Click to regenerate this image" className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
-                      <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to fix</span>
-                      <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button onClick={() => setRegenIdx(i)} className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 cursor-pointer bg-[var(--color-red-bg)] text-center">
-                  <span className="text-[var(--color-red)] font-[700] text-[11px]">Failed</span>
-                  <span className="text-[var(--color-text-2)] text-[10px] line-clamp-3">{failReason}</span>
-                  <span className="mt-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">Tap to regenerate</span>
-                </button>
-              )}
+              {renderTile(im, i)}
+              <div className="px-0.5">
+                <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{catLabel(im.category)}</p>
+                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Product shot — no copy overlay</p>
+              </div>
             </div>
-            {/* Placement caption: which copy section this image pairs with */}
-            <div className="px-0.5">
-              <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{im.index} · {catLabel(im.category)}</p>
-              {copy ? (
-                <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-3" title={copy}>“{copy}”</p>
-              ) : (
-                <p className="text-[10px] text-[var(--color-text-4)] italic leading-snug">No copy overlay — standalone visual</p>
-              )}
-            </div>
-            </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
+
+      {/* ── Body sections — one image each ─────────────────────────────── */}
+      {sectionEntries.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
+            Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {sectionEntries.length} sections</span>
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {sectionEntries.map(({ im, i, copy }, n) => (
+              <div key={i} className="flex flex-col gap-1.5">
+                {renderTile(im, i)}
+                <div className="px-0.5">
+                  <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-accent-text)]">Section {n + 1} · {catLabel(im.category)}</p>
+                  <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-3" title={copy}>Goes with: “{copy}”</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {regenIdx != null && images[regenIdx] && (
         <RegenImageModal
