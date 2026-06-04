@@ -472,13 +472,23 @@ function CompletedReview({
     [prompts],
   );
 
-  // Persist current images array to the run.
-  const persist = useCallback(async (next: RemImage[]) => {
-    await fetch(`/api/runs/${runId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage3_remaining_images: JSON.stringify(next) }),
-    }).catch(() => {});
+  // Persist current images array to the run. Serialized through a promise
+  // chain so concurrent regenerations commit in call order — otherwise two
+  // in-flight PATCHes could land out of order and an earlier (staler) write
+  // would clobber a later one.
+  const persistChain = useRef<Promise<unknown>>(Promise.resolve());
+  const persist = useCallback((next: RemImage[]) => {
+    persistChain.current = persistChain.current
+      .catch(() => {})
+      .then(() =>
+        fetch(`/api/runs/${runId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage3_remaining_images: JSON.stringify(next) }),
+        }),
+      )
+      .catch(() => {});
+    return persistChain.current;
   }, [runId]);
 
   // Toggle the operator override pass ↔ fail ↔ (clear).
@@ -524,14 +534,23 @@ function CompletedReview({
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
       } catch { /* audit optional */ }
 
-      const updated: RemImage = { index: im.index, category: im.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null };
-      const next = images.map((x, j) => (j === i ? updated : x));
-      setImages(next);
-      await persist(next);
+      // Functional update + persist the freshly-merged array, so a concurrent
+      // regeneration of another tile can't overwrite this one with a stale
+      // snapshot captured when this handler was created.
+      setImages((prev) => {
+        const cur = prev[i];
+        const updated: RemImage = { index: cur.index, category: cur.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null };
+        const next = prev.map((x, j) => (j === i ? updated : x));
+        persist(next);
+        return next;
+      });
     } catch (e) {
-      const next = images.map((x, j) => (j === i ? { ...x, status: "failed" as const, error: e instanceof Error ? e.message : String(e) } : x));
-      setImages(next);
-      await persist(next);
+      const msg = e instanceof Error ? e.message : String(e);
+      setImages((prev) => {
+        const next = prev.map((x, j) => (j === i ? { ...x, status: "failed" as const, error: msg } : x));
+        persist(next);
+        return next;
+      });
     } finally {
       setBusyIdx(null);
     }
