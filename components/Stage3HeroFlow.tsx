@@ -188,13 +188,25 @@ export default function Stage3HeroFlow({
           Stage 3 generates a <strong>hero shot first</strong> from your source product photos. You approve it, then the other 8 images are built using the approved hero as the reference — so the product stays consistent.
         </p>
         {err && <ErrBox msg={err} />}
-        <button
-          disabled={!stage2Ready || busy !== null}
-          onClick={() => trigger("/api/stage3-hero-prompt", { runId }, "hero")}
-          className={btnPrimary}
-        >
-          {busy === "hero" ? "Generating hero…" : "Generate Stage 3 — Hero first →"}
-        </button>
+        <div className="flex gap-3 flex-wrap items-center">
+          <button
+            disabled={!stage2Ready || busy !== null}
+            onClick={() => trigger("/api/stage3-hero-prompt", { runId }, "hero")}
+            className={btnPrimary}
+          >
+            {busy === "hero" ? "Generating hero…" : "Generate Stage 3 — Hero first →"}
+          </button>
+          <button
+            disabled={!stage2Ready || busy !== null}
+            onClick={() => trigger("/api/stage3/skip-hero", { runId }, "skip")}
+            className={btnSecondary}
+          >
+            {busy === "skip" ? "Writing prompts…" : "Skip hero — use source images"}
+          </button>
+        </div>
+        <p className="text-[11px] text-[var(--color-text-3)] max-w-md">
+          “Skip hero” builds the 8 images straight from your source product photos as the reference, instead of generating and approving a hero shot first.
+        </p>
         {!stage2Ready && <p className="text-[11px] text-[var(--color-text-3)]">Finish Stage 2 first.</p>}
       </div>
     );
@@ -289,7 +301,6 @@ export default function Stage3HeroFlow({
     };
 
     const generateAll = async () => {
-      if (!heroUrl) return;
       setErr(null);
       setBusy("generate-8");
       const results: (RemImage | null)[] = saved.map(() => null);
@@ -307,9 +318,12 @@ export default function Stage3HeroFlow({
         const p = saved[i];
         setGenIndex(i);
         try {
+          // Reference the image(s) this prompt was built around: the approved
+          // hero, or the source product photos when the hero step was skipped.
+          const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
           const gen = await fetch("/api/stage3/generate", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: p.prompt, model: p.model, reference_images: [heroUrl], aspect_ratio: p.aspect_ratio }),
+            body: JSON.stringify({ prompt: p.prompt, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
           }).then((r) => r.json());
           if (!gen.success) throw new Error(gen.error || "generation failed");
 
@@ -355,7 +369,7 @@ export default function Stage3HeroFlow({
             </button>
           </div>
           <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
-            {genIndex != null ? `Image ${genIndex + 2} of 9` : "Finishing…"} · all referencing the approved hero
+            {genIndex != null ? `Image ${genIndex + 2} of 9` : "Finishing…"} · {heroUrl ? "all referencing the approved hero" : "all referencing your source product photos"}
           </p>
           <GenGrid heroUrl={heroUrl} images={genImages} />
         </div>
@@ -477,6 +491,8 @@ function CompletedReview({
   const [images, setImages] = useState<RemImage[]>(initialImages);
   const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
   const [placement, setPlacement] = useState<Placement | null>(initialPlacement);
   const [placing, setPlacing] = useState(false);
   const [placeErr, setPlaceErr] = useState<string | null>(null);
@@ -549,7 +565,6 @@ function CompletedReview({
 
   // Regenerate a single image with an (optionally AI-rewritten) prompt.
   const regenerate = async (i: number, newPromptText: string, productDesc: string) => {
-    if (!heroUrl) return;
     const im = images[i];
     const p = promptFor(im);
     if (!p) return;
@@ -558,9 +573,10 @@ function CompletedReview({
     setRegenIdx(null);
     setBusyIdx(i);
     try {
+      const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
       const gen = await fetch("/api/stage3/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: newPromptText, model: p.model, reference_images: [heroUrl], aspect_ratio: p.aspect_ratio }),
+        body: JSON.stringify({ prompt: newPromptText, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
       }).then((r) => r.json());
       if (!gen.success) throw new Error(gen.error || "generation failed");
 
@@ -596,8 +612,34 @@ function CompletedReview({
     }
   };
 
+  // Regenerate every failed/flagged image in one go, each with its (possibly
+  // bulk-edited) prompt. Sequential so tiles light up one at a time and we
+  // don't hammer Higgsfield; each call reuses the single-image regenerate path
+  // (functional state merge + serialized persist).
+  const regenerateAllFailed = async (drafts: Record<number, string>) => {
+    setBulkOpen(false);
+    setBulkRunning(true);
+    try {
+      const targets = images
+        .map((im, i) => ({ im, i }))
+        .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail");
+      for (const { im, i } of targets) {
+        const text = drafts[i] ?? promptFor(im)?.prompt ?? "";
+        if (!text) continue;
+        await regenerate(i, text, im.category);
+      }
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   const passed = images.filter((im) => effVerdict(im) === "pass").length;
   const failed = images.filter((im) => effVerdict(im) === "fail").length;
+  // Images that need fixing: a hard generation failure (Higgsfield rejected /
+  // errored — often a content-guideline block) or an auditor "fail".
+  const fixable = images
+    .map((im, i) => ({ im, i }))
+    .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail");
 
   // Placement: the AI looked at the images and chose one to anchor each of the
   // 3 body sections; everything else is a top-of-page product shot. We map the
@@ -675,6 +717,15 @@ function CompletedReview({
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 3 complete · hero + 8" : "Stage 3 images"}</h3>
         <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
+        {fixable.length > 0 && (
+          <button
+            onClick={() => setBulkOpen(true)}
+            disabled={bulkRunning || busyIdx !== null}
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95 disabled:opacity-50 whitespace-nowrap"
+          >
+            {bulkRunning ? "Regenerating failed…" : `Fix all ${fixable.length} failed →`}
+          </button>
+        )}
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
         <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
@@ -760,6 +811,121 @@ function CompletedReview({
           onRegenerate={(promptText) => regenerate(regenIdx, promptText, images[regenIdx].category)}
         />
       )}
+
+      {bulkOpen && fixable.length > 0 && (
+        <BulkFixModal
+          failed={fixable}
+          promptFor={promptFor}
+          onClose={() => setBulkOpen(false)}
+          onRegenerateAll={regenerateAllFailed}
+        />
+      )}
+    </div>
+  );
+}
+
+// Bulk-fix the failed/flagged images: apply one AI rewrite instruction to every
+// failed prompt at once (handy when Higgsfield rejected several for the same
+// content-guideline reason), tweak any individually, then regenerate them all.
+function BulkFixModal({
+  failed,
+  promptFor,
+  onClose,
+  onRegenerateAll,
+}: {
+  failed: Array<{ im: RemImage; i: number }>;
+  promptFor: (im: RemImage) => RemainingPrompt | null;
+  onClose: () => void;
+  onRegenerateAll: (drafts: Record<number, string>) => void;
+}) {
+  const [drafts, setDrafts] = useState<Record<number, string>>(() => {
+    const d: Record<number, string> = {};
+    for (const { im, i } of failed) d[i] = promptFor(im)?.prompt ?? "";
+    return d;
+  });
+  const [instr, setInstr] = useState(
+    "Reword to pass image-generation content guidelines: remove anything that could be flagged (injury, blood, medical claims, weapons, explicit or unsafe content, real brand names/logos). Keep the product, scene, and German text overlay intact.",
+  );
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiErr, setAiErr] = useState<string | null>(null);
+
+  async function rewriteAll() {
+    const text = instr.trim();
+    if (text.length < 5) { setAiErr("Add an instruction first."); return; }
+    setAiBusy(true); setAiErr(null);
+    try {
+      const results = await Promise.all(
+        failed.map(async ({ im, i }) => {
+          try {
+            const res = await fetch("/api/stage3/edit-prompt", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: drafts[i], instructions: text, category: im.category }),
+            });
+            const data = await res.json();
+            return { i, prompt: data.success && data.prompt ? (data.prompt as string) : null };
+          } catch { return { i, prompt: null }; }
+        }),
+      );
+      const failedCount = results.filter((r) => !r.prompt).length;
+      setDrafts((prev) => {
+        const next = { ...prev };
+        for (const r of results) if (r.prompt) next[r.i] = r.prompt;
+        return next;
+      });
+      if (failedCount) setAiErr(`${failedCount} prompt(s) couldn't be rewritten — edit those manually below.`);
+    } catch (e) {
+      setAiErr(e instanceof Error ? e.message : "Rewrite failed");
+    } finally { setAiBusy(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-3xl w-full space-y-4 max-h-[90vh] overflow-y-auto">
+        <div>
+          <h3 className="text-[15px] font-[640] text-[var(--color-text)]">Fix {failed.length} failed image{failed.length > 1 ? "s" : ""}</h3>
+          <p className="text-[11px] text-[var(--color-text-3)] mt-0.5">Apply one instruction to every failed prompt, edit any individually, then regenerate them all.</p>
+        </div>
+
+        {/* Shared AI instruction */}
+        <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
+          <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-accent-text)]">Rewrite all with AI</label>
+          <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3} disabled={aiBusy}
+            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+          {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
+          <button onClick={rewriteAll} disabled={aiBusy}
+            className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
+            {aiBusy ? "Rewriting all…" : `Rewrite all ${failed.length} prompts`}
+          </button>
+        </div>
+
+        {/* Per-image prompts */}
+        <div className="space-y-3">
+          {failed.map(({ im, i }) => (
+            <div key={i} className="space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">#{im.index} · {im.category}</span>
+                {im.status === "failed" && im.error && (
+                  <span className="text-[10px] text-[var(--color-red)] truncate max-w-[60%]" title={im.error}>{im.error}</span>
+                )}
+              </div>
+              <textarea
+                value={drafts[i] ?? ""}
+                onChange={(e) => setDrafts((prev) => ({ ...prev, [i]: e.target.value }))}
+                rows={4}
+                className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button onClick={() => onRegenerateAll(drafts)} disabled={aiBusy} className={btnPrimary}>
+            Regenerate all {failed.length}
+          </button>
+          <button onClick={onClose} disabled={aiBusy} className={btnSecondary}>Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }

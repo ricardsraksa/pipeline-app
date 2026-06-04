@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
     const visual = run.step_research_revised ?? run.step_research ?? ''
 
-    const prompts = await generateRemainingPrompts({ onePager, copy, avatar, visual, heroImageUrl: heroUrl })
+    const prompts = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl] })
     if (!prompts.length) throw new Error('Phase 2 produced no prompts')
 
     await updateRun(runId, {

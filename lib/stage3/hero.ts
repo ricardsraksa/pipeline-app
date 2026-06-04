@@ -159,8 +159,19 @@ export async function generateRemainingPrompts(params: {
   copy: string
   avatar: string
   visual: string
-  heroImageUrl: string
+  /** The image(s) every derivative prompt references for product appearance:
+   *  the approved hero (1), or the source product photos when the hero step is
+   *  skipped. */
+  referenceImageUrls: string[]
+  fromSource?: boolean
 }): Promise<RemainingPrompt[]> {
+  const refs = params.referenceImageUrls.filter(Boolean)
+  const refLine = params.fromSource
+    ? `SOURCE PRODUCT IMAGE URLS (${refs.length}) — these are the reference for all 8; render the product exactly as shown: ${refs.join(', ')}`
+    : `APPROVED HERO IMAGE URL (reference for all 8): ${refs[0] ?? ''}`
+  const tail = params.fromSource
+    ? 'Generate the 8 prompts JSON array now. The source product photos are attached below — every prompt references them so the real product stays consistent (there is no separate hero shot).'
+    : 'Generate the 8 prompts JSON array now. The approved hero image is attached below — every prompt references it.'
   const userText = [
     'STAGE 1 ONE-PAGER:',
     params.onePager || '(none)',
@@ -171,23 +182,23 @@ export async function generateRemainingPrompts(params: {
     'STAGE 1 AVATAR + VISUAL STRATEGY:',
     [params.avatar, params.visual].filter(Boolean).join('\n\n') || '(none)',
     '',
-    `APPROVED HERO IMAGE URL (reference for all 8): ${params.heroImageUrl}`,
+    refLine,
     '',
-    'Generate the 8 prompts JSON array now. The approved hero image is attached below — every prompt references it.',
+    tail,
   ].join('\n')
 
   const msg = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 8000,
     system: REMAINING_SYSTEM,
-    messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks([params.heroImageUrl])] }],
+    messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],
   })
   const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
   let arr: RemainingPrompt[]
   try { arr = JSON.parse(raw) } catch { arr = JSON.parse(jsonrepair(raw)) }
   if (!Array.isArray(arr)) throw new Error('Remaining prompts did not parse to an array')
 
-  // Normalize + always pin the hero as the single reference.
+  // Normalize + always pin the reference image(s) every prompt was built around.
   return arr.slice(0, 8).map((p, i) => ({
     index: typeof p.index === 'number' ? p.index : i + 2,
     image_type: p.image_type || '',
@@ -196,6 +207,6 @@ export async function generateRemainingPrompts(params: {
     aspect_ratio: p.aspect_ratio || '1:1',
     prompt: p.prompt || '',
     german_text: p.german_text || '',
-    source_image_references: [params.heroImageUrl],
+    source_image_references: refs,
   }))
 }
