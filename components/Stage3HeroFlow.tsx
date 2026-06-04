@@ -29,6 +29,14 @@ interface RemImage {
   error?: string;
   verdict?: "pass" | "fail";
   issues?: string[];
+  /** Operator override of the auditor's verdict. Wins over `verdict`. */
+  user_override?: "pass" | "fail" | null;
+}
+
+function effVerdict(im: RemImage | null | undefined): "pass" | "fail" | null {
+  if (!im) return null;
+  const v = im.user_override ?? im.verdict;
+  return v === "pass" ? "pass" : v === "fail" ? "fail" : null;
 }
 
 const btnPrimary =
@@ -371,13 +379,17 @@ export default function Stage3HeroFlow({
         .filter((g) => g?.image_url && g.status !== "failed")
         .map((g, i) => ({ index: i + 1, category: g.category || "", image_url: g.image_url as string, status: "done" as const }));
     }
+    const prompts = safeParse<RemainingPrompt[]>(
+      run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts,
+      [],
+    );
     return (
-      <div className="space-y-3">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">
-          {heroUrl ? "Stage 3 complete · hero + 8 derivatives" : "Stage 3 images"}
-        </h3>
-        <GenGrid heroUrl={heroUrl} images={imgs} />
-      </div>
+      <CompletedReview
+        runId={runId}
+        heroUrl={heroUrl}
+        initialImages={imgs}
+        prompts={prompts}
+      />
     );
   }
 
@@ -395,6 +407,247 @@ export default function Stage3HeroFlow({
       <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
     </div>
   );
+}
+
+/* ── Completed review: per-image verdict override, fail reason, regenerate ── */
+function CompletedReview({
+  runId,
+  heroUrl,
+  initialImages,
+  prompts,
+}: {
+  runId: number;
+  heroUrl: string | null;
+  initialImages: RemImage[];
+  prompts: RemainingPrompt[];
+}) {
+  const [images, setImages] = useState<RemImage[]>(initialImages);
+  const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
+  const [busyIdx, setBusyIdx] = useState<number | null>(null);
+
+  const promptFor = useCallback(
+    (im: RemImage) => prompts.find((p) => p.index === im.index) ?? null,
+    [prompts],
+  );
+
+  // Persist current images array to the run.
+  const persist = useCallback(async (next: RemImage[]) => {
+    await fetch(`/api/runs/${runId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage3_remaining_images: JSON.stringify(next) }),
+    }).catch(() => {});
+  }, [runId]);
+
+  // Toggle the operator override pass ↔ fail ↔ (clear).
+  const toggleVerdict = (i: number) => {
+    setImages((prev) => {
+      const im = prev[i];
+      const cur = im.user_override ?? null;
+      const auto = im.verdict ?? "pass";
+      // null → opposite of auto ; then flip ; flipping back to auto clears.
+      let nextOverride: "pass" | "fail" | null;
+      if (cur === null) nextOverride = auto === "pass" ? "fail" : "pass";
+      else { const flip = cur === "pass" ? "fail" : "pass"; nextOverride = flip === auto ? null : flip; }
+      const next = prev.map((x, j) => (j === i ? { ...x, user_override: nextOverride } : x));
+      persist(next);
+      return next;
+    });
+  };
+
+  // Regenerate a single image with an (optionally AI-rewritten) prompt.
+  const regenerate = async (i: number, newPromptText: string, productDesc: string) => {
+    if (!heroUrl) return;
+    const im = images[i];
+    const p = promptFor(im);
+    if (!p) return;
+    setBusyIdx(i);
+    try {
+      const gen = await fetch("/api/stage3/generate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: newPromptText, model: p.model, reference_images: [heroUrl], aspect_ratio: p.aspect_ratio }),
+      }).then((r) => r.json());
+      if (!gen.success) throw new Error(gen.error || "generation failed");
+
+      let verdict: "pass" | "fail" = "pass";
+      let issues: string[] = [];
+      try {
+        const audit = await fetch("/api/stage3/audit", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, german_text_used: p.german_text || null }),
+        }).then((r) => r.json());
+        if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
+      } catch { /* audit optional */ }
+
+      const updated: RemImage = { index: im.index, category: im.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null };
+      const next = images.map((x, j) => (j === i ? updated : x));
+      setImages(next);
+      await persist(next);
+      setRegenIdx(null);
+    } catch (e) {
+      const next = images.map((x, j) => (j === i ? { ...x, status: "failed" as const, error: e instanceof Error ? e.message : String(e) } : x));
+      setImages(next);
+      await persist(next);
+    } finally {
+      setBusyIdx(null);
+    }
+  };
+
+  const passed = images.filter((im) => effVerdict(im) === "pass").length;
+  const failed = images.filter((im) => effVerdict(im) === "fail").length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 3 complete · hero + 8" : "Stage 3 images"}</h3>
+        <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
+        {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {heroUrl && (
+          <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
+            <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
+            <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+          </div>
+        )}
+        {images.map((im, i) => {
+          const v = effVerdict(im);
+          const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
+          const overridden = im.user_override != null;
+          return (
+            <div key={i} className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
+              {im.image_url ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={im.image_url} alt={im.category} className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
+                  {/* clickable verdict badge */}
+                  {v && (
+                    <button
+                      onClick={() => toggleVerdict(i)}
+                      title={overridden ? `Overridden — auditor said ${im.verdict}. Click to cycle.` : `Auditor: ${im.verdict}. Click to override.`}
+                      className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"} ${overridden ? "ring-1 ring-white/60" : ""}`}
+                    >
+                      {v}{overridden ? "•" : ""}
+                    </button>
+                  )}
+                  {/* hover actions */}
+                  <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
+                    <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
+                  </div>
+                  {/* persistent fail banner (auditor or override) */}
+                  {v === "fail" && failReason && (
+                    <button onClick={() => setRegenIdx(i)} title="Click to regenerate this image" className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
+                      <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to fix</span>
+                      <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button onClick={() => setRegenIdx(i)} className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 cursor-pointer bg-[var(--color-red-bg)] text-center">
+                  <span className="text-[var(--color-red)] font-[700] text-[11px]">Failed</span>
+                  <span className="text-[var(--color-text-2)] text-[10px] line-clamp-3">{failReason}</span>
+                  <span className="mt-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">Tap to regenerate</span>
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {regenIdx != null && images[regenIdx] && (
+        <RegenImageModal
+          image={images[regenIdx]}
+          prompt={promptFor(images[regenIdx])}
+          busy={busyIdx === regenIdx}
+          onClose={() => setRegenIdx(null)}
+          onRegenerate={(promptText) => regenerate(regenIdx, promptText, images[regenIdx].category)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RegenImageModal({
+  image,
+  prompt,
+  busy,
+  onClose,
+  onRegenerate,
+}: {
+  image: RemImage;
+  prompt: RemainingPrompt | null;
+  busy: boolean;
+  onClose: () => void;
+  onRegenerate: (promptText: string) => void;
+}) {
+  const issues = image.issues?.filter(Boolean) ?? [];
+  const [draft, setDraft] = useState(prompt?.prompt ?? "");
+  const [aiInstr, setAiInstr] = useState(issues.length ? "Fix the audit issues:\n- " + issues.join("\n- ") : "");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiErr, setAiErr] = useState<string | null>(null);
+
+  async function runAi() {
+    const instr = aiInstr.trim();
+    if (instr.length < 5) { setAiErr("Tell Claude what to change (5+ chars)"); return; }
+    setAiLoading(true); setAiErr(null);
+    try {
+      const res = await fetch("/api/stage3/edit-prompt", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: draft, instructions: instr, category: image.category }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.prompt) { setAiErr(data.error ?? `HTTP ${res.status}`); return; }
+      setDraft(data.prompt as string);
+    } catch (e) { setAiErr(e instanceof Error ? e.message : "Network error"); }
+    finally { setAiLoading(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-2xl w-full space-y-4 max-h-[90vh] overflow-y-auto">
+        <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">Image #{image.index} — {image.category}</p>
+        {issues.length > 0 && (
+          <div className="space-y-1">
+            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest">Audit issues</p>
+            {issues.map((iss, k) => <p key={k} className="text-[11px] text-[var(--color-red)]">• {iss}</p>)}
+          </div>
+        )}
+        {/* AI edit */}
+        <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
+          <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-accent-text)]">Edit with AI</label>
+          <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} rows={2} disabled={aiLoading}
+            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+          {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
+          <button onClick={runAi} disabled={aiLoading || aiInstr.trim().length < 5}
+            className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
+            {aiLoading ? "Rewriting…" : "Rewrite prompt"}
+          </button>
+        </div>
+        {/* manual prompt */}
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={8}
+          className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+        <div className="flex items-center gap-3">
+          <button onClick={() => onRegenerate(draft)} disabled={busy} className={btnPrimary}>
+            {busy ? "Regenerating…" : "Regenerate this image"}
+          </button>
+          <button onClick={onClose} disabled={busy} className={btnSecondary}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function dlImg(url: string, name: string) {
+  try {
+    const res = await fetch(url); const blob = await res.blob();
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: name });
+    a.click(); URL.revokeObjectURL(a.href);
+  } catch { window.open(url, "_blank", "noopener"); }
 }
 
 /* ── small presentational helpers ──────────────────────────────────────── */
