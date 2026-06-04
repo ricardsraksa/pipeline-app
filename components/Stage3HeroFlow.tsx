@@ -57,6 +57,32 @@ export default function Stage3HeroFlow({
   // Hero QC local edit state
   const [heroEditing, setHeroEditing] = useState(false);
   const [heroDraft, setHeroDraft] = useState("");
+  // AI-assisted hero-prompt edit ("tell Claude what to change")
+  const [heroAiInstr, setHeroAiInstr] = useState("");
+  const [heroAiLoading, setHeroAiLoading] = useState(false);
+  const [heroAiErr, setHeroAiErr] = useState<string | null>(null);
+
+  async function rewriteHeroWithAi() {
+    const instr = heroAiInstr.trim();
+    if (instr.length < 5) { setHeroAiErr("Tell Claude what to change (5+ characters)"); return; }
+    setHeroAiLoading(true);
+    setHeroAiErr(null);
+    try {
+      const res = await fetch("/api/stage3/edit-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: heroDraft, instructions: instr, category: "hero_studio" }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.prompt) { setHeroAiErr(data.error ?? `HTTP ${res.status}`); return; }
+      setHeroDraft(data.prompt as string);
+      setHeroAiInstr("");
+    } catch (e) {
+      setHeroAiErr(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setHeroAiLoading(false);
+    }
+  }
 
   // Prompt QC local edit state (8 derivative prompts)
   const [promptDrafts, setPromptDrafts] = useState<RemainingPrompt[] | null>(null);
@@ -171,7 +197,28 @@ export default function Stage3HeroFlow({
         </div>
 
         {heroEditing && (
-          <div className="space-y-2 max-w-2xl">
+          <div className="space-y-3 max-w-2xl">
+            {/* AI-assisted edit: describe a change, Claude rewrites the prompt. */}
+            <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
+              <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-accent-text)]">Edit with AI</label>
+              <textarea
+                value={heroAiInstr}
+                onChange={(e) => setHeroAiInstr(e.target.value)}
+                placeholder="e.g. warmer lighting, darker background, slight three-quarter angle"
+                rows={2}
+                disabled={heroAiLoading}
+                className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+              />
+              {heroAiErr && <p className="text-[11px] text-[var(--color-red)]">{heroAiErr}</p>}
+              <button
+                onClick={rewriteHeroWithAi}
+                disabled={heroAiLoading || heroAiInstr.trim().length < 5}
+                className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {heroAiLoading ? "Rewriting…" : "Rewrite prompt"}
+              </button>
+            </div>
+
             <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Hero prompt (scene / lighting only — appearance comes from the photos)</label>
             <textarea
               value={heroDraft}
