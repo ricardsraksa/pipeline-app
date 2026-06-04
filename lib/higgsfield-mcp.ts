@@ -131,38 +131,67 @@ function parseSse(body: string): JsonRpcResponse {
 
 let rpcId = 1;
 
+// Higgsfield's MCP sits behind Cloudflare and intermittently returns 502/503/
+// 504 (origin bad gateway) or 429. These are transient — retry a few times
+// with exponential backoff before surfacing the failure to the user.
+const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function mcpRequest(
   method: string,
   params: unknown,
   allowRetry = true,
 ): Promise<unknown> {
-  const token = await getAccessToken();
-  const res = await fetch(MCP_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),
-  });
+  const maxAttempts = 4;
+  let lastTransient: string | null = null;
 
-  if (res.status === 401 && allowRetry) {
-    // Access token rejected — force a refresh and retry once.
-    memAccess = null;
-    await setKV(KV_ACCESS_EXP, "0");
-    return mcpRequest(method, params, false);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const token = await getAccessToken();
+    let res: Response;
+    try {
+      res = await fetch(MCP_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),
+      });
+    } catch (err) {
+      // Network-level failure (DNS, reset, timeout) — treat as transient.
+      lastTransient = err instanceof Error ? err.message : String(err);
+      if (attempt < maxAttempts - 1) { await sleep(700 * 2 ** attempt); continue; }
+      throw new Error(`Higgsfield MCP ${method} network error after ${maxAttempts} attempts: ${lastTransient}`);
+    }
+
+    if (res.status === 401 && allowRetry) {
+      // Access token rejected — force a refresh and retry once.
+      memAccess = null;
+      await setKV(KV_ACCESS_EXP, "0");
+      return mcpRequest(method, params, false);
+    }
+
+    // Transient upstream error — back off and retry without consuming the
+    // 401 retry budget.
+    if (TRANSIENT_STATUS.has(res.status) && attempt < maxAttempts - 1) {
+      lastTransient = `${res.status}`;
+      await sleep(700 * 2 ** attempt);
+      continue;
+    }
+
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`Higgsfield MCP ${method} failed (${res.status}): ${text.slice(0, 200)}`);
+    }
+    const parsed = parseSse(text);
+    if (parsed.error) {
+      throw new Error(`Higgsfield MCP ${method} error: ${parsed.error.message}`);
+    }
+    return parsed.result;
   }
 
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Higgsfield MCP ${method} failed (${res.status}): ${text.slice(0, 200)}`);
-  }
-  const parsed = parseSse(text);
-  if (parsed.error) {
-    throw new Error(`Higgsfield MCP ${method} error: ${parsed.error.message}`);
-  }
-  return parsed.result;
+  throw new Error(`Higgsfield MCP ${method} failed after ${maxAttempts} attempts (last: ${lastTransient}).`);
 }
 
 async function callTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
