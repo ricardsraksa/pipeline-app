@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
@@ -633,6 +634,37 @@ function CompletedReview({
     }
   };
 
+  // Download every image — the hero AND all generated derivatives — as one zip.
+  const [zipping, setZipping] = useState(false);
+  const downloadAll = async () => {
+    if (zipping) return;
+    setZipping(true);
+    try {
+      const zip = new JSZip();
+      const targets: Array<{ url: string; name: string }> = [];
+      if (heroUrl) targets.push({ url: heroUrl, name: "01_hero.png" });
+      for (const im of images) {
+        if (im.image_url && im.status !== "failed") {
+          targets.push({ url: im.image_url, name: `${String(im.index).padStart(2, "0")}_${im.category || "image"}.png` });
+        }
+      }
+      await Promise.all(
+        targets.map(async (t) => {
+          try {
+            const blob = await fetch(t.url).then((r) => r.blob());
+            zip.file(t.name, blob);
+          } catch { /* skip any that fail to fetch */ }
+        }),
+      );
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "stage3_images.zip" });
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      setZipping(false);
+    }
+  };
+
   const passed = images.filter((im) => effVerdict(im) === "pass").length;
   const failed = images.filter((im) => effVerdict(im) === "fail").length;
   // Images that need fixing: a hard generation failure (Higgsfield rejected /
@@ -726,6 +758,13 @@ function CompletedReview({
             {bulkRunning ? "Regenerating failed…" : `Fix all ${fixable.length} failed →`}
           </button>
         )}
+        <button
+          onClick={downloadAll}
+          disabled={zipping}
+          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
+        >
+          {zipping ? "Zipping…" : "↓ Download all (.zip)"}
+        </button>
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
         <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
