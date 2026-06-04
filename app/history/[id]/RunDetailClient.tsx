@@ -244,13 +244,28 @@ export default function RunDetailClient({ run }: Props) {
 
   const imageUrls: string[] = (() => {
     try {
-      // Prefer the explicit image_urls column if it's populated.
+      // New hero-first flow: hero image + the 8 derivatives in
+      // stage3_remaining_images. This is where completed runs now store
+      // their images, so check it first.
+      const heroFlow: string[] = [];
+      if (run.stage3_hero_image_url) heroFlow.push(run.stage3_hero_image_url);
+      if (run.stage3_remaining_images) {
+        const parsed = JSON.parse(run.stage3_remaining_images);
+        if (Array.isArray(parsed)) {
+          for (const g of parsed as Array<{ image_url?: string; status?: string }>) {
+            if (g?.image_url && g.status !== "failed") heroFlow.push(g.image_url);
+          }
+        }
+      }
+      if (heroFlow.length) return heroFlow;
+
+      // Explicit image_urls column, if populated.
       if (run.image_urls) {
         const parsed = JSON.parse(run.image_urls);
         if (Array.isArray(parsed) && parsed.length) return parsed as string[];
       }
-      // Otherwise pull from generated_images — the field Stage 3 actually
-      // writes. Each entry is { prompt_index, category, image_url, status }.
+      // Legacy /stage3 path: generated_images. Each entry is
+      // { prompt_index, category, image_url, status }.
       if (run.generated_images) {
         const parsed = JSON.parse(run.generated_images);
         if (Array.isArray(parsed)) {

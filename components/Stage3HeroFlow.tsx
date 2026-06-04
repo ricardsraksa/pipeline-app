@@ -393,6 +393,30 @@ export default function Stage3HeroFlow({
     );
   }
 
+  // Old-flow runs (generated via the previous /stage3 page) store their images
+  // in generated_images and sit at status 'awaiting_user' — none of the hero
+  // branches match, so render those images read-only here instead of a dead
+  // "status / Refresh" fallback.
+  if (hasOldImages) {
+    const old = safeParse<Array<{ image_url?: string; category?: string; status?: string }>>(run.generated_images, []);
+    const imgs: RemImage[] = old
+      .filter((g) => g?.image_url && g.status !== "failed")
+      .map((g, i) => ({ index: i + 1, category: g.category || "", image_url: g.image_url as string, status: "done" as const }));
+    return (
+      <div className="space-y-3">
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Stage 3 images ({imgs.length})</h3>
+        <p className="text-[11px] text-[var(--color-text-3)]">Generated on the previous Stage 3 flow.</p>
+        <GenGrid heroUrl={null} images={imgs} />
+        <a
+          href={`/stage3?runId=${runId}`}
+          className={btnSecondary + " no-underline"}
+        >
+          Open in Stage 3 editor →
+        </a>
+      </div>
+    );
+  }
+
   // Fallback (e.g. failed during hero flow): show whatever we have.
   return (
     <div className="space-y-3">
