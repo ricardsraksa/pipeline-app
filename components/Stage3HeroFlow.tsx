@@ -677,7 +677,7 @@ function CompletedReview({
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
-        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one into each of the 3 body sections (problem → solution → proof). Everything else is a product shot for the top of the page.</p>
+        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
         <button
           onClick={runPlacement}
           disabled={placing}

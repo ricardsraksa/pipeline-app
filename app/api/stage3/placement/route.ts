@@ -8,13 +8,14 @@ export const maxDuration = 120;
 
 type RemImage = { index: number; category: string; image_url: string; status?: string };
 
-const SYSTEM = `You are an art director laying out a German DTC product landing page.
+const SYSTEM = `You are an art director laying out a German DTC product landing page. The page always follows this fixed template:
+- TOP (product gallery): the hero plus clean product shots — the product on its own, studio/contextless, or simple feature/spec callouts. This is the buy box area.
+- 3 BODY SECTIONS: each is one headline + a short paragraph + ONE supporting image. The three run as a story in order: Section 1 = the hook / problem moment (an emotional, real-life in-use scene), Section 2 = the solution / main benefit / how it works (product in use delivering the benefit), Section 3 = reassurance / comfort / everyday payoff.
+- A separate REVIEWS section lower down handles social proof with its own customer photos.
 
-The page has this structure:
-- TOP: a set of clean product shots (the gallery at the top of the page).
-- BODY: exactly 3 content sections that tell a story in order — Section 1 (hook / problem), Section 2 (solution / how it works / main benefit), Section 3 (proof / lifestyle / reassurance).
+So the 3 body-section images should be clean, PHOTOGRAPHIC, in-context lifestyle/benefit shots that show the product being used by real people — the kind that pair naturally with a headline. AVOID putting graphic-heavy assets in the body sections when a cleaner lifestyle/benefit photo exists: comparison tables/charts, before/after split graphics, and review-screenshot/testimonial graphics are NOT body-section images (charts belong up top with the product shots; testimonial graphics belong in the reviews section). Only fall back to a graphic asset for a body section if there genuinely is no suitable lifestyle/benefit photo.
 
-You are given a numbered set of candidate images. LOOK AT THE IMAGES and choose the single best image to anchor each of the 3 body sections, so the three together read as a problem -> solution -> proof flow. You do NOT need the images to match any copy — judge purely by what each image shows and how well it fits that section's role. Every section MUST get a distinct image (never reuse one image for two sections). Images you do not pick are the top-of-page product shots.
+You are given a numbered set of candidate images. LOOK AT THE IMAGES and choose the single best image to anchor each of the 3 body sections so they read as hook -> solution -> reassurance. Judge purely by what each image shows. Every section MUST get a distinct image (never reuse one). Images you do not pick are the top-of-page product shots.
 
 Return ONLY this JSON, no prose, no markdown:
 {"section_1": <image index>, "section_2": <image index>, "section_3": <image index>, "reasons": {"1": "<short why>", "2": "<short why>", "3": "<short why>"}}`;
