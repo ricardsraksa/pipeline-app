@@ -249,9 +249,24 @@ export default function EditableOutput({
           </div>
         ) : (
           <div>
-            <pre className={`${textCls} max-h-[520px] overflow-y-auto`}>
-              {displayValue}
-            </pre>
+            {stage === "stage2" ? (
+              // Stage 2 is customer copy bound for a Google Doc. Render it in a
+              // white "document" box with black 11pt Arial so a manual
+              // select-and-copy (Cmd+C) carries that formatting and lands at
+              // size 11 Arial in the Doc — while staying readable in dark mode.
+              <div className="bg-white rounded-lg p-4 max-h-[520px] overflow-y-auto">
+                <div
+                  className="whitespace-pre-wrap break-words selection:bg-[var(--color-accent-weak)]"
+                  style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "11pt", color: "#000", lineHeight: 1.5 }}
+                >
+                  {displayValue}
+                </div>
+              </div>
+            ) : (
+              <pre className={`${textCls} max-h-[520px] overflow-y-auto`}>
+                {displayValue}
+              </pre>
+            )}
             {isEdited && editedAt && (
               <p className="mt-2 text-[10px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-3)]">
                 Edited {relativeTime(editedAt)}
