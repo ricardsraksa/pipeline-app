@@ -212,7 +212,11 @@ export default async function HistoryPage() {
                 const name = run.brand_name ?? run.product_name ?? "(unnamed)";
                 const stuck = isStuck(run);
                 const action = runAction(run);
-                const href = action === "view" ? `/history/${run.id}` : `/runs/${run.id}`;
+                // Always open the live run page — it's status-driven and renders
+                // every stage including the interactive Stage 3 review (pass/fail
+                // override, fail reasons, per-image regenerate). The static
+                // /history/[id] archive lacks those controls.
+                const href = `/runs/${run.id}`;
                 const actionLabel =
                   action === "view-live" ? "View live" : action === "continue" ? "Continue" : "View";
                 const isActive = ACTIVE_STATUSES.has(run.status ?? "");
