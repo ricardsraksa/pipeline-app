@@ -37,18 +37,27 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage2_copy_edited: null,
         stage2_edited_at: null,
       };
+    // Both Stage 3 restart variants do a FULL reset: wipe the entire hero-first
+    // flow (hero prompt/image/approval, the 8 derivative prompts/images, and the
+    // AI section placement) plus any legacy /stage3 columns, so the run drops
+    // back to the Stage 3 entry point and the whole stage runs again from scratch.
     case "stage3-prompts":
+    case "stage3-images":
       return {
+        stage3_hero_prompt: null,
+        stage3_hero_prompt_edited: null,
+        stage3_hero_image_url: null,
+        stage3_hero_approved: 0,
+        stage3_remaining_prompts: null,
+        stage3_remaining_prompts_edited: null,
+        stage3_remaining_images: null,
+        stage3_placement: null,
+        // Legacy /stage3 flow columns.
         image_prompts: null,
         stage3_image_prompts_edited: null,
         generated_images: null,
         audit_results: null,
         stage3_edited_at: null,
-      };
-    case "stage3-images":
-      return {
-        generated_images: null,
-        audit_results: null,
       };
   }
 }
@@ -76,17 +85,28 @@ export async function POST(
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
+  const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
+
   await updateRun(runId, {
     ...fieldsToClear(stage),
     error_message: null,
     current_step: null,
     completed_at: null,
     // For a Stage 2 restart we need to flip to awaiting_stage2_approval so
-    // runStage2Manually's guard passes; for all other stages resumePipeline
-    // will overwrite status itself.
+    // runStage2Manually's guard passes. For a Stage 3 restart we drop to
+    // 'awaiting_user' — the Stage 3 entry gate — so the hero flow shows its
+    // start button. For other stages resumePipeline overwrites status itself.
     ...(stage === "stage2" ? { status: "awaiting_stage2_approval" as const } : {}),
+    ...(isStage3 ? { status: "awaiting_user" as const } : {}),
     last_updated_at: new Date().toISOString(),
   });
+
+  // Stage 3 is the hero-first flow, driven from the UI (the user clicks
+  // "Generate hero" to start) — no pipeline resume needed. The status reset
+  // above puts the run back at the Stage 3 entry point.
+  if (isStage3) {
+    return NextResponse.json({ success: true });
+  }
 
   // Stage 2 restart bypasses the QC gate (user already approved Stage 1 once).
   // Everything else routes through resumePipeline which will pause at the gate

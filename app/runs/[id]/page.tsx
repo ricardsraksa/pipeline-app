@@ -472,9 +472,12 @@ export default function RunPage() {
 
   async function handleRestartStage(stage: FailableStage) {
     if (!runId || restarting) return;
+    const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
     if (
       !window.confirm(
-        `Restart ${RESTART_LABEL[stage]}? This clears that stage's output and re-runs it.`,
+        isStage3
+          ? "Restart Stage 3 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 3 start."
+          : `Restart ${RESTART_LABEL[stage]}? This clears that stage's output and re-runs it.`,
       )
     ) {
       return;
@@ -489,11 +492,15 @@ export default function RunPage() {
       const data = await res.json();
       if (!data.success) {
         alert(`Restart failed: ${data.error ?? "unknown error"}`);
+        setRestarting(false);
+        return;
       }
+      // Stage 3 lives in a self-contained component with its own fetched state;
+      // reload so it picks up the wiped columns and shows the entry screen.
+      window.location.reload();
     } catch (err) {
       alert(`Restart failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setTimeout(() => setRestarting(false), 1200);
+      setRestarting(false);
     }
   }
 
