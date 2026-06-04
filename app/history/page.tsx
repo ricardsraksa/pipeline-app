@@ -47,6 +47,7 @@ function runAction(run: RunSummary): RunAction {
   // static history view. Same for failed/stuck.
   if (
     run.status === "failed" ||
+    run.status === "cancelled" ||
     isStuck(run) ||
     WAITING_STATUSES.has(run.status ?? "")
   ) return "continue";
@@ -68,6 +69,7 @@ const STATUS_META: Record<string, { label: string; tone: Tone }> = {
   generating_remaining:       { label: "Stage 3 prompts…", tone: "active" },
   complete:                   { label: "Complete",         tone: "success"},
   completed:                  { label: "Complete",         tone: "success"},
+  cancelled:                  { label: "Cancelled",        tone: "muted"  },
   partial:                    { label: "Partial",          tone: "warn"   },
   failed:                     { label: "Failed",           tone: "danger" },
 };

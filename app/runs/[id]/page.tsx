@@ -64,7 +64,7 @@ function isStuck(run: RunStatus): boolean {
   const ageMs = Date.now() - new Date(run.timestamps.lastUpdatedAt).getTime();
   return (
     ageMs > 10 * 60 * 1000 &&
-    !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status)
+    !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status)
   );
 }
 
@@ -82,6 +82,7 @@ function statusLabel(status: string): string {
     generating_remaining: "Stage 3 — Writing prompts",
     completed: "Complete",
     failed: "Failed",
+    cancelled: "Cancelled",
   };
   return map[status] ?? status;
 }
@@ -109,6 +110,11 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "failed") return (
     <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Failed
+    </span>
+  );
+  if (status === "cancelled") return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-gray-bg)] text-[var(--color-gray)] whitespace-nowrap">
+      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Cancelled
     </span>
   );
   if (status === "awaiting_user" || status === "awaiting_qc" || status === "awaiting_stage2_approval" || status === "awaiting_hero_qc") return (
@@ -451,6 +457,17 @@ export default function RunPage() {
   const autoResumedRef = useRef(false);
   const [resuming, setResuming] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [killing, setKilling] = useState(false);
+
+  async function handleKill() {
+    if (!runId || killing) return;
+    if (!window.confirm("Kill this run? It stops at the next stage boundary. You can Resume it later.")) return;
+    setKilling(true);
+    try {
+      await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+    } catch { /* ignore */ }
+    finally { setTimeout(() => setKilling(false), 1200); }
+  }
   const [startingStage2, setStartingStage2] = useState(false);
 
   // Auto-scroll to last completed stage on initial load
@@ -600,8 +617,11 @@ export default function RunPage() {
   const { outputs } = run;
   const hasAnyOutput = Object.values(outputs).some(Boolean);
   const isFailed = run.status === "failed";
+  const isCancelled = run.status === "cancelled";
   const isStuckRun = isStuck(run);
-  const showResumeBanner = isFailed || isStuckRun;
+  // Non-terminal = something is (or should be) running → can be killed.
+  const isTerminal = ["completed", "failed", "cancelled"].includes(run.status);
+  const showResumeBanner = isFailed || isCancelled || isStuckRun;
   const displayName = run.meta.brandName ?? run.meta.productName ?? `Run #${runId}`;
   const elapsed = elapsedTime(run.timestamps.startedAt, run.timestamps.completedAt);
 
@@ -647,6 +667,16 @@ export default function RunPage() {
               <StatusBadge status={run.status} />
               {elapsed && (
                 <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-4)]">{elapsed}</span>
+              )}
+              {!isTerminal && (
+                <button
+                  onClick={handleKill}
+                  disabled={killing}
+                  title="Stop this run at the next stage boundary"
+                  className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95 whitespace-nowrap disabled:opacity-50"
+                >
+                  {killing ? "Killing…" : "■ Kill run"}
+                </button>
               )}
             </div>
           </div>
@@ -698,7 +728,7 @@ export default function RunPage() {
             <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-[13px] text-[var(--color-text)] font-[600]">
-                {isFailed ? "Run failed" : "Run appears stuck"}
+                {isFailed ? "Run failed" : isCancelled ? "Run cancelled" : "Run appears stuck"}
               </p>
               {run.currentStep && (
                 <p className="text-[11px] text-[var(--color-text-3)] font-[var(--font-ibm-plex-mono)] mt-0.5">

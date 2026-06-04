@@ -46,6 +46,38 @@ const SCRAPE_TIMEOUT_MS = 45_000;
 // check below it's good enough.
 const RUNNING_PIPELINES = new Set<number>();
 
+// Cooperative cancellation. The background pipeline has no built-in abort, so
+// "kill run" sets the run's status to 'cancelled' AND flags it here. The
+// runner calls guardCancel() at every stage boundary and bails (throwing
+// PipelineCancelled) rather than continuing into the next expensive call.
+const CANCELLED = new Set<number>();
+export class PipelineCancelled extends Error {
+  constructor() { super("Run cancelled by user"); this.name = "PipelineCancelled"; }
+}
+/** Flag a run for cancellation. The next guardCancel() in its pipeline throws. */
+export function requestCancel(runId: number): void {
+  CANCELLED.add(runId);
+}
+function guardCancel(runId: number): void {
+  if (CANCELLED.has(runId)) throw new PipelineCancelled();
+}
+/** Catch-block helper: a cancelled run lands on 'cancelled', everything else
+ *  on 'failed' with the error message. Always clears the cancel flag. */
+async function markStopped(runId: number, err: unknown): Promise<void> {
+  if (err instanceof PipelineCancelled) {
+    await updateRun(runId, {
+      status: "cancelled",
+      current_step: "Cancelled by user",
+      error_message: null,
+      last_updated_at: now(),
+    }).catch(() => {});
+  } else {
+    const message = err instanceof Error ? err.message : String(err);
+    await updateRun(runId, { status: "failed", error_message: message, last_updated_at: now() }).catch(() => {});
+  }
+  CANCELLED.delete(runId);
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -355,17 +387,21 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   // ── Sub-step 1-5: Research modules (skip if already in DB) ──
   let research = run.step_research ?? "";
   if (!research) {
+    guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
     const identify = await runIdentify(inputs);
 
+    guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Market overview (2/5)", last_updated_at: now() });
     const market = await runMarket(inputs, identify);
 
+    guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
     const competitive = await runCompetitive(inputs, identify, market);
 
     // Product analysis and visual strategy both depend only on identify +
     // market + competitive — neither consumes the other — so run them together.
+    guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Product analysis + visual strategy (4/5)", last_updated_at: now() });
     const [productAnalysis, visual] = await Promise.all([
       runProductAnalysis(inputs, identify, market, competitive),
@@ -495,6 +531,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   // ── Sub-step 5: Chief final (skip if already in DB) ──
   let chiefFinal = run.step_chief_final ?? "";
   if (!chiefFinal) {
+    guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Final chief review", last_updated_at: now() });
     chiefFinal = await anthropicMessage({
       system: CHIEF_FINAL_PROMPT,
@@ -588,6 +625,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
 }
 
 export async function runStage2(runId: number, run: Run): Promise<void> {
+  guardCancel(runId);
   await updateRun(runId, { status: "stage2", current_step: "Stage 2: Preparing prompt", last_updated_at: now() });
 
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
@@ -596,6 +634,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const systemPrompt = (await getPrompt("stage2")) + (await buildStage2FeedbackBlock());
   const productName = run.brand_name ?? run.product_name ?? "";
 
+  guardCancel(runId);
   await updateRun(runId, { current_step: "Stage 2: Generating German copy with Opus (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
@@ -649,15 +688,11 @@ export async function runStage2Manually(runId: number): Promise<void> {
       completed_at: now(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`Stage 2 manual trigger ${runId} failed:`, message);
-    await updateRun(runId, {
-      status: "failed",
-      error_message: message,
-      last_updated_at: now(),
-    }).catch(() => {});
+    console.error(`Stage 2 manual trigger ${runId} stopped:`, err instanceof Error ? err.message : String(err));
+    await markStopped(runId, err);
   } finally {
     RUNNING_PIPELINES.delete(runId);
+    CANCELLED.delete(runId);
   }
 }
 
@@ -706,15 +741,11 @@ export async function runPipeline(runId: number): Promise<void> {
       last_updated_at: now(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`Pipeline ${runId} failed:`, message);
-    await updateRun(runId, {
-      status: "failed",
-      error_message: message,
-      last_updated_at: now(),
-    }).catch(() => {});
+    console.error(`Pipeline ${runId} stopped:`, err instanceof Error ? err.message : String(err));
+    await markStopped(runId, err);
   } finally {
     RUNNING_PIPELINES.delete(runId);
+    CANCELLED.delete(runId);
   }
 }
 
@@ -814,15 +845,11 @@ export async function resumePipeline(runId: number): Promise<void> {
       return;
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error(`Resume ${runId} failed:`, message);
-    await updateRun(runId, {
-      status: "failed",
-      error_message: message,
-      last_updated_at: now(),
-    }).catch(() => {});
+    console.error(`Resume ${runId} stopped:`, err instanceof Error ? err.message : String(err));
+    await markStopped(runId, err);
   } finally {
     RUNNING_PIPELINES.delete(runId);
+    CANCELLED.delete(runId);
   }
 }
 

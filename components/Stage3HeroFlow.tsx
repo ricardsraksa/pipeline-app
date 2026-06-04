@@ -63,6 +63,9 @@ export default function Stage3HeroFlow({
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
   const [genIndex, setGenIndex] = useState<number | null>(null);
+  // Stop flag for the client-side 8-image loop (the run-page "Kill run" only
+  // reaches server stages; this loop runs in the browser).
+  const stopRef = useRef(false);
 
   const fetchRun = useCallback(async () => {
     try {
@@ -218,7 +221,9 @@ export default function Stage3HeroFlow({
       }).catch(() => {});
 
       const productDesc = run.product_description ?? run.product_name ?? "";
+      stopRef.current = false;
       for (let i = 0; i < saved.length; i++) {
+        if (stopRef.current) break;
         const p = saved[i];
         setGenIndex(i);
         try {
@@ -260,7 +265,15 @@ export default function Stage3HeroFlow({
     if (busy === "generate-8") {
       return (
         <div className="space-y-3">
-          <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Generating the 8 images…</h3>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Generating the 8 images…</h3>
+            <button
+              onClick={() => { stopRef.current = true; }}
+              className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95"
+            >
+              ■ Stop after current
+            </button>
+          </div>
           <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
             {genIndex != null ? `Image ${genIndex + 2} of 9` : "Finishing…"} · all referencing the approved hero
           </p>
