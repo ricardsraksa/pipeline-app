@@ -562,6 +562,30 @@ function PromptAiEditor({
  * Hidden entirely if the run has no Stage 2 output yet (description-only
  * runs, or before Stage 2 completes).
  */
+// Copy text to the clipboard with an HTML flavor that forces 11pt Arial, so
+// pasting into Google Docs lands as 11pt Arial (Docs measures in points; the
+// browser's default plain-text paste would inherit the doc's current size).
+// Falls back to plain text where the rich clipboard API isn't available.
+async function copyRich(text: string) {
+  const esc = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#000;white-space:pre-wrap">${esc}</div>`
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        }),
+      ])
+      return
+    }
+  } catch { /* fall through to plain text */ }
+  try { await navigator.clipboard?.writeText(text) } catch { /* no-op */ }
+}
+
 function Stage2CopyPanel({ run }: { run: Run | null }) {
   const [open, setOpen] = useState(false)
   // Prefer the edited copy if the operator tweaked it on the run page.
@@ -599,8 +623,8 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button
-              onClick={() => navigator.clipboard?.writeText(copy).catch(() => {})}
-              title="Copy entire Stage 2 output"
+              onClick={() => copyRich(copy)}
+              title="Copy entire Stage 2 output as 11pt Arial"
               className="cursor-pointer text-[11px] font-[var(--font-ibm-plex-mono)] px-2 py-1 rounded border border-[var(--color-border-strong)] text-[var(--color-text-2)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
             >
               Copy all
@@ -615,15 +639,16 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 bg-white">
-          {/* Rendered in 11pt black Arial so what you see matches what the
-              copy looks like in the Google Doc you're pasting into. White
-              background is forced so dark mode doesn't invert the look. */}
-          <pre
+          {/* Rendered in 11pt (point, not px) black Arial so a manual
+              select-and-copy lands as 11pt in the Google Doc, which measures
+              type in points. A plain <div> (not <pre>) avoids Docs treating
+              it as a monospace code block on paste. */}
+          <div
             className="whitespace-pre-wrap leading-relaxed selection:bg-[var(--color-accent-weak)]"
-            style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: 11, color: '#000' }}
+            style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', color: '#000' }}
           >
             {copy}
-          </pre>
+          </div>
         </div>
       </div>
     </>
