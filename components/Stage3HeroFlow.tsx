@@ -33,6 +33,13 @@ interface RemImage {
   user_override?: "pass" | "fail" | null;
 }
 
+interface Placement {
+  section_1: number;
+  section_2: number;
+  section_3: number;
+  reasons?: Record<string, string>;
+}
+
 function effVerdict(im: RemImage | null | undefined): "pass" | "fail" | null {
   if (!im) return null;
   const v = im.user_override ?? im.verdict;
@@ -401,12 +408,14 @@ export default function Stage3HeroFlow({
       run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts,
       [],
     );
+    const placement = safeParse<Placement | null>(run.stage3_placement, null);
     return (
       <CompletedReview
         runId={runId}
         heroUrl={heroUrl}
         initialImages={imgs}
         prompts={prompts}
+        initialPlacement={placement}
       />
     );
   }
@@ -457,20 +466,51 @@ function CompletedReview({
   heroUrl,
   initialImages,
   prompts,
+  initialPlacement,
 }: {
   runId: number;
   heroUrl: string | null;
   initialImages: RemImage[];
   prompts: RemainingPrompt[];
+  initialPlacement: Placement | null;
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
   const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
   const [busyIdx, setBusyIdx] = useState<number | null>(null);
+  const [placement, setPlacement] = useState<Placement | null>(initialPlacement);
+  const [placing, setPlacing] = useState(false);
+  const [placeErr, setPlaceErr] = useState<string | null>(null);
 
   const promptFor = useCallback(
     (im: RemImage) => prompts.find((p) => p.index === im.index) ?? null,
     [prompts],
   );
+
+  // Ask the AI to look at the images and assign one to each of the 3 body
+  // sections; the rest become top-of-page product shots. Persists server-side.
+  const runPlacement = useCallback(async () => {
+    setPlacing(true); setPlaceErr(null);
+    try {
+      const res = await fetch("/api/stage3/placement", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      });
+      const data = await res.json();
+      if (!data.success) { setPlaceErr(data.error || "Placement failed"); return; }
+      setPlacement(data.placement as Placement);
+    } catch (e) {
+      setPlaceErr(e instanceof Error ? e.message : "Network error");
+    } finally { setPlacing(false); }
+  }, [runId]);
+
+  // Auto-run placement once when a completed run has enough images but no
+  // saved placement yet (covers runs finished before this feature existed).
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (autoTried.current) return;
+    const usable = images.filter((im) => im.image_url && im.status !== "failed");
+    if (!placement && usable.length >= 3) { autoTried.current = true; runPlacement(); }
+  }, [placement, images, runPlacement]);
 
   // Persist current images array to the run. Serialized through a promise
   // chain so concurrent regenerations commit in call order — otherwise two
@@ -559,13 +599,24 @@ function CompletedReview({
   const passed = images.filter((im) => effVerdict(im) === "pass").length;
   const failed = images.filter((im) => effVerdict(im) === "fail").length;
 
-  // Placement: an image that carries a German copy line belongs inline with
-  // that copy block (one image per section). Images with no copy line are
-  // product shots for the top of the page. This is a labeling-only split —
-  // generation is unchanged.
-  const entries = images.map((im, i) => ({ im, i, copy: (promptFor(im)?.german_text || "").trim() }));
-  const sectionEntries = entries.filter((e) => e.copy);
-  const productEntries = entries.filter((e) => !e.copy);
+  // Placement: the AI looked at the images and chose one to anchor each of the
+  // 3 body sections; everything else is a top-of-page product shot. We map the
+  // chosen image `index` values to array positions for rendering. Until a
+  // placement exists, everything shows as product shots (the auto-run fills it
+  // in). This is a labeling-only split — generation is unchanged.
+  const entries = images.map((im, i) => ({ im, i }));
+  const sectionPicks: Array<{ section: number; index: number }> = placement
+    ? [
+        { section: 1, index: placement.section_1 },
+        { section: 2, index: placement.section_2 },
+        { section: 3, index: placement.section_3 },
+      ]
+    : [];
+  const pickedIndexes = new Set(sectionPicks.map((s) => s.index));
+  const sectionEntries = sectionPicks
+    .map((s) => ({ ...s, entry: entries.find((e) => e.im.index === s.index) }))
+    .filter((s): s is { section: number; index: number; entry: { im: RemImage; i: number } } => !!s.entry);
+  const productEntries = entries.filter((e) => !pickedIndexes.has(e.im.index));
 
   // Render one interactive image tile (verdict badge, regenerate, fail banner,
   // generating overlay). Index `i` is the position in the `images` array so
@@ -625,7 +676,17 @@ function CompletedReview({
         <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
       </div>
-      <p className="text-[11px] text-[var(--color-text-3)] -mt-2">Images are grouped by where they go on the page: product shots up top, then one image per copy section (matched by the German line it carries — search that line in your doc to place it).</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
+        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one into each of the 3 body sections (problem → solution → proof). Everything else is a product shot for the top of the page.</p>
+        <button
+          onClick={runPlacement}
+          disabled={placing}
+          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
+        >
+          {placing ? "Placing…" : placement ? "↺ Re-run auto-placement" : "Auto-place images"}
+        </button>
+      </div>
+      {placeErr && <ErrBox msg={placeErr} />}
 
       {/* ── Product shots — top of the page ────────────────────────────── */}
       <div className="space-y-2">
@@ -652,32 +713,43 @@ function CompletedReview({
               {renderTile(im, i)}
               <div className="px-0.5">
                 <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{catLabel(im.category)}</p>
-                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Product shot — no copy overlay</p>
+                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Product shot</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Body sections — one image each ─────────────────────────────── */}
-      {sectionEntries.length > 0 && (
+      {/* ── Body sections — AI-placed, one image each ──────────────────── */}
+      {placing && !placement ? (
+        <Spinner label="Looking at the images and assigning sections…" />
+      ) : sectionEntries.length > 0 ? (
         <div className="space-y-2">
           <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
-            Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {sectionEntries.length} sections</span>
+            Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— problem → solution → proof</span>
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {sectionEntries.map(({ im, i, copy }, n) => (
-              <div key={i} className="flex flex-col gap-1.5">
-                {renderTile(im, i)}
-                <div className="px-0.5">
-                  <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-accent-text)]">Section {n + 1} · {catLabel(im.category)}</p>
-                  <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-3" title={copy}>Goes with: “{copy}”</p>
+            {sectionEntries.map(({ section, entry }) => {
+              const { im, i } = entry;
+              const copy = (promptFor(im)?.german_text || "").trim();
+              const reason = placement?.reasons?.[String(section)] || "";
+              return (
+                <div key={i} className="flex flex-col gap-1.5">
+                  {renderTile(im, i)}
+                  <div className="px-0.5">
+                    <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-accent-text)]">Section {section} · {catLabel(im.category)}</p>
+                    {copy
+                      ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={copy}>Goes with: “{copy}”</p>
+                      : reason
+                        ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={reason}>{reason}</p>
+                        : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
-      )}
+      ) : null}
 
       {regenIdx != null && images[regenIdx] && (
         <RegenImageModal

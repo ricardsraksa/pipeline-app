@@ -128,6 +128,9 @@ async function migrateDB() {
     "stage3_remaining_prompts TEXT",
     "stage3_remaining_prompts_edited TEXT",
     "stage3_remaining_images TEXT",
+    // AI placement: which image anchors each of the 3 body sections; the rest
+    // are top-of-page product shots. JSON { section_1, section_2, section_3, reasons }.
+    "stage3_placement TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -399,4 +402,5 @@ export interface Run {
   stage3_remaining_prompts: string | null;
   stage3_remaining_prompts_edited: string | null;
   stage3_remaining_images: string | null;
+  stage3_placement: string | null;
 }
