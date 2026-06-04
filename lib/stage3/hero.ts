@@ -187,16 +187,35 @@ export async function generateRemainingPrompts(params: {
     tail,
   ].join('\n')
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    system: REMAINING_SYSTEM,
-    messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],
-  })
-  const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
-  let arr: RemainingPrompt[]
-  try { arr = JSON.parse(raw) } catch { arr = JSON.parse(jsonrepair(raw)) }
-  if (!Array.isArray(arr)) throw new Error('Remaining prompts did not parse to an array')
+  // The model occasionally emits slightly malformed JSON (a stray token, an
+  // unescaped quote, or prose around the array). Extract the array, try a
+  // strict parse then a repair, and retry the whole call a couple of times
+  // before giving up — much more robust than a single parse attempt.
+  let arr: RemainingPrompt[] | null = null
+  let lastErr: unknown = null
+  for (let attempt = 0; attempt < 3 && !arr; attempt++) {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      system: REMAINING_SYSTEM,
+      messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],
+    })
+    const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
+    // Isolate the JSON array even if the model wrapped it in prose.
+    const start = raw.indexOf('[')
+    const end = raw.lastIndexOf(']')
+    const slice = start !== -1 && end > start ? raw.slice(start, end + 1) : raw
+    try {
+      const parsed = JSON.parse(slice)
+      if (Array.isArray(parsed)) arr = parsed
+    } catch {
+      try {
+        const repaired = JSON.parse(jsonrepair(slice))
+        if (Array.isArray(repaired)) arr = repaired
+      } catch (e) { lastErr = e }
+    }
+  }
+  if (!arr) throw new Error(`Remaining prompts did not parse to an array${lastErr ? `: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}` : ''}`)
 
   // Normalize + always pin the reference image(s) every prompt was built around.
   return arr.slice(0, 8).map((p, i) => ({
