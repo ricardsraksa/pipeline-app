@@ -115,10 +115,42 @@ function buildCompetitorContext(inputs: ResearchInputs): string {
   return `\nCOMPETITOR URLS:\n${urls}\n\nCOMPETITOR DATA:\n${data}`;
 }
 
+// Anthropic occasionally fails to download an attached image URL within its
+// own fetch window, returning a 400 "The request timed out while trying to
+// download the file. Please try again later." — transient, not a bad image.
+// Retry these (and 429 / 5xx / overloaded) a few times before giving up so a
+// single hiccup doesn't fail the whole run.
+async function createWithRetry(
+  body: Anthropic.MessageCreateParamsNonStreaming,
+  opts?: { timeout?: number },
+): Promise<Anthropic.Message> {
+  const maxAttempts = 4
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await anthropic.messages.create(body, opts)
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number })?.status
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      const transient =
+        status === 429 ||
+        (typeof status === 'number' && status >= 500) ||
+        msg.includes('timed out while trying to download') ||
+        msg.includes('please try again later') ||
+        msg.includes('overloaded') ||
+        msg.includes('timeout')
+      if (!transient || attempt === maxAttempts) throw err
+      await new Promise((r) => setTimeout(r, attempt * 2500))
+    }
+  }
+  throw lastErr
+}
+
 // ── Call 1: Product Identification ───────────────────────────────────────────
 
 export async function runIdentify(inputs: ResearchInputs): Promise<string> {
-  const msg = await anthropic.messages.create({
+  const msg = await createWithRetry({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 1500,
     system: IDENTIFY_PROMPT,
@@ -137,7 +169,7 @@ export async function runMarket(inputs: ResearchInputs, identifyOutput: string):
     `\n\n--- PRODUCT IDENTIFICATION (from previous analysis) ---\n${identifyOutput}`,
   ].join("");
 
-  const msg = await anthropic.messages.create(
+  const msg = await createWithRetry(
     {
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 4000,
@@ -165,7 +197,7 @@ export async function runCompetitive(
     `\n\n--- MARKET OVERVIEW SUMMARY ---\n${marketOutput.slice(0, 1500)}`,
   ].join("");
 
-  const msg = await anthropic.messages.create(
+  const msg = await createWithRetry(
     {
       model: "claude-sonnet-4-5-20250929",
       max_tokens: 4000,
@@ -197,7 +229,7 @@ export async function runProductAnalysis(
     `\n\n--- COMPETITIVE LANDSCAPE SUMMARY ---\n${competitiveOutput.slice(0, 1500)}`,
   ].join("");
 
-  const msg = await anthropic.messages.create({
+  const msg = await createWithRetry({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 2000,
     system: PRODUCT_ANALYSIS_PROMPT,
@@ -229,7 +261,7 @@ export async function runVisual(
       : "",
   ].join("");
 
-  const msg = await anthropic.messages.create({
+  const msg = await createWithRetry({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 2000,
     system: VISUAL_PROMPT,
