@@ -56,8 +56,28 @@ export default function EditableOutput({
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  function copyValue() {
-    navigator.clipboard.writeText(editedValue ?? originalValue).then(() => {
+  async function copyValue() {
+    const text = editedValue ?? originalValue;
+    // Stage 2 is customer copy that gets pasted into a Google Doc — write an
+    // HTML clipboard flavor forcing black 11pt Arial so it lands at the right
+    // size (Docs measures in points; px or plain text would inherit the doc's
+    // current size). Other stages keep a plain-text copy.
+    try {
+      if (stage === "stage2" && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#000;white-space:pre-wrap">${esc}</div>`;
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([text], { type: "text/plain" }),
+          }),
+        ]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+        return;
+      }
+    } catch { /* fall through to plain text */ }
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     }).catch(() => {});
