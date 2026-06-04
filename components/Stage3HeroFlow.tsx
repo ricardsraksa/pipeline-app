@@ -485,6 +485,9 @@ function CompletedReview({
     const im = images[i];
     const p = promptFor(im);
     if (!p) return;
+    // Close the modal right away and flip the tile into a generating state so
+    // the operator gets immediate feedback while the (slow) gen+audit runs.
+    setRegenIdx(null);
     setBusyIdx(i);
     try {
       const gen = await fetch("/api/stage3/generate", {
@@ -507,7 +510,6 @@ function CompletedReview({
       const next = images.map((x, j) => (j === i ? updated : x));
       setImages(next);
       await persist(next);
-      setRegenIdx(null);
     } catch (e) {
       const next = images.map((x, j) => (j === i ? { ...x, status: "failed" as const, error: e instanceof Error ? e.message : String(e) } : x));
       setImages(next);
@@ -541,8 +543,15 @@ function CompletedReview({
           const v = effVerdict(im);
           const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
           const overridden = im.user_override != null;
+          const regenerating = busyIdx === i;
           return (
             <div key={i} className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
+              {regenerating && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
+                  <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
+                  <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">Generating…</span>
+                </div>
+              )}
               {im.image_url ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -609,10 +618,12 @@ function RegenImageModal({
   onRegenerate: (promptText: string) => void;
 }) {
   const issues = image.issues?.filter(Boolean) ?? [];
-  const [draft, setDraft] = useState(prompt?.prompt ?? "");
+  const originalPrompt = prompt?.prompt ?? "";
+  const [draft, setDraft] = useState(originalPrompt);
   const [aiInstr, setAiInstr] = useState(issues.length ? "Fix the audit issues:\n- " + issues.join("\n- ") : "");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
+  const [updated, setUpdated] = useState(false); // prompt was changed since open
 
   async function runAi() {
     const instr = aiInstr.trim();
@@ -626,6 +637,7 @@ function RegenImageModal({
       const data = await res.json();
       if (!data.success || !data.prompt) { setAiErr(data.error ?? `HTTP ${res.status}`); return; }
       setDraft(data.prompt as string);
+      setUpdated(true);
     } catch (e) { setAiErr(e instanceof Error ? e.message : "Network error"); }
     finally { setAiLoading(false); }
   }
@@ -647,17 +659,33 @@ function RegenImageModal({
           <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} rows={2} disabled={aiLoading}
             className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
           {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
-          <button onClick={runAi} disabled={aiLoading || aiInstr.trim().length < 5}
-            className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
-            {aiLoading ? "Rewriting…" : "Rewrite prompt"}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={runAi} disabled={aiLoading || aiInstr.trim().length < 5}
+              className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
+              {aiLoading ? "Rewriting…" : "Rewrite prompt"}
+            </button>
+            {updated && !aiLoading && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-[620] text-[var(--color-green)]">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                Prompt updated by AI
+              </span>
+            )}
+          </div>
         </div>
         {/* manual prompt */}
-        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={8}
-          className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt {updated && <span className="text-[var(--color-green)] normal-case tracking-normal">· edited</span>}</label>
+            {updated && (
+              <button onClick={() => { setDraft(originalPrompt); setUpdated(false); }} className="text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer">Revert</button>
+            )}
+          </div>
+          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setUpdated(e.target.value !== originalPrompt); }} rows={8}
+            className={`w-full border bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] ${updated ? "border-[var(--color-green)]" : "border-[var(--color-border-strong)]"}`} />
+        </div>
         <div className="flex items-center gap-3">
           <button onClick={() => onRegenerate(draft)} disabled={busy} className={btnPrimary}>
-            {busy ? "Regenerating…" : "Regenerate this image"}
+            {busy ? "Starting…" : updated ? "Regenerate with new prompt" : "Regenerate this image"}
           </button>
           <button onClick={onClose} disabled={busy} className={btnSecondary}>Cancel</button>
         </div>
