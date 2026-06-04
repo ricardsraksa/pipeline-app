@@ -39,6 +39,24 @@ function effVerdict(im: RemImage | null | undefined): "pass" | "fail" | null {
   return v === "pass" ? "pass" : v === "fail" ? "fail" : null;
 }
 
+// Human-readable label for each Stage 3 image template, so the operator knows
+// which part of the copy each image pairs with.
+const CATEGORY_LABELS: Record<string, string> = {
+  hero: "Hero shot",
+  lifestyle: "Lifestyle",
+  problem_solution: "Problem → Solution",
+  feature_callout: "Feature callout",
+  benefit_visualization: "Benefit",
+  before_after: "Before / After",
+  comparison: "Comparison",
+  ugc_native: "UGC / Native",
+  review_social_proof: "Review / Social proof",
+};
+function catLabel(slug: string | undefined): string {
+  if (!slug) return "Image";
+  return CATEGORY_LABELS[slug] ?? slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const btnPrimary =
   "cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondary =
@@ -529,14 +547,21 @@ function CompletedReview({
         <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
       </div>
+      <p className="text-[11px] text-[var(--color-text-3)] -mt-1">Each image is captioned with its copy section and the exact German line it pairs with — match that line in your doc to place the image.</p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {heroUrl && (
-          <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
-            <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
-            <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+          <div className="flex flex-col gap-1.5">
+            <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
+              <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
+              <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+            </div>
+            <div className="px-0.5">
+              <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">1 · Hero shot</p>
+              <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Main product image — top of the page</p>
+            </div>
           </div>
         )}
         {images.map((im, i) => {
@@ -544,8 +569,10 @@ function CompletedReview({
           const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
           const overridden = im.user_override != null;
           const regenerating = busyIdx === i;
+          const copy = (promptFor(im)?.german_text || "").trim();
           return (
-            <div key={i} className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
+            <div key={i} className="flex flex-col gap-1.5">
+            <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
               {regenerating && (
                 <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
                   <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
@@ -586,6 +613,16 @@ function CompletedReview({
                   <span className="mt-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">Tap to regenerate</span>
                 </button>
               )}
+            </div>
+            {/* Placement caption: which copy section this image pairs with */}
+            <div className="px-0.5">
+              <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{im.index} · {catLabel(im.category)}</p>
+              {copy ? (
+                <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-3" title={copy}>“{copy}”</p>
+              ) : (
+                <p className="text-[10px] text-[var(--color-text-4)] italic leading-snug">No copy overlay — standalone visual</p>
+              )}
+            </div>
             </div>
           );
         })}
