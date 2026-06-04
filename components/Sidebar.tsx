@@ -80,7 +80,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="border-t border-[var(--color-border)] pt-3">
         <p
-          className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-4)] opacity-55 mb-1.5 select-text"
+          className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)] mb-1.5 select-text"
           title={`Pipeline app v${APP_VERSION}`}
         >
           v{APP_VERSION}
