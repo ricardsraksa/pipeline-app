@@ -9,6 +9,7 @@ import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
+import EditableOutput from "@/components/EditableOutput";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -205,77 +206,6 @@ function PipelineProgress({ run }: { run: RunStatus }) {
   );
 }
 
-// ── Output block ──────────────────────────────────────────────────────────────
-
-function OutputBlock({ label, text, filename }: { label: string; text: string; filename: string }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  function download() {
-    const a = Object.assign(document.createElement("a"), {
-      href: URL.createObjectURL(new Blob([text], { type: "text/plain" })),
-      download: filename,
-    });
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  async function copy(e: React.MouseEvent) {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
-  }
-
-  return (
-    <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 h-10 hover:bg-[var(--color-surface-2)] transition-colors duration-150">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="cursor-pointer flex items-center gap-2 flex-1 text-left min-w-0"
-          aria-expanded={open}
-        >
-          <Icon.ChevronRight
-            className={`w-3.5 h-3.5 text-[var(--color-text-3)] transition-transform duration-150 ${open ? "rotate-90" : ""}`}
-          />
-          <Icon.Doc className="w-3.5 h-3.5 text-[var(--color-text-3)] flex-shrink-0" />
-          <span className="text-[13px] text-[var(--color-text)] truncate font-[500]">{label}</span>
-          <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-4)] flex-shrink-0">
-            {text.length.toLocaleString()} chars
-          </span>
-        </button>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={copy}
-            className={[
-              "cursor-pointer inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-[var(--font-ibm-plex-mono)] border transition-colors duration-150",
-              copied
-                ? "border-[var(--color-green)] text-[var(--color-green)] bg-[var(--color-green-bg)]"
-                : "border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)]",
-            ].join(" ")}
-            aria-label="Copy to clipboard"
-          >
-            {copied ? <Icon.Check className="w-3 h-3" /> : <Icon.Copy className="w-3 h-3" />}
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <button
-            onClick={download}
-            className="cursor-pointer inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-[var(--font-ibm-plex-mono)] border border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] transition-colors duration-150"
-            aria-label="Download as .txt"
-          >
-            <Icon.Download className="w-3 h-3" />
-            .txt
-          </button>
-        </div>
-      </div>
-      {open && (
-        <div className="max-h-80 overflow-y-auto bg-[var(--color-surface-2)] px-4 py-3 border-t border-[var(--color-border)] fade-in">
-          <pre className="whitespace-pre-wrap break-words font-[var(--font-ibm-plex-mono)] text-[11.5px] text-[var(--color-text)] leading-relaxed">{text}</pre>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Minimal markdown renderer for the Stage 1 one-pager.
 function OnePagerMarkdown({ text }: { text: string }) {
@@ -904,10 +834,16 @@ export default function RunPage() {
           <Section id="stage-2-section" label="Stage 2 — German Copy">
             {outputs.stage2Output ? (
               <>
-                <OutputBlock
-                  label={outputs.stage2OutputEdited ? "German Copy Kit (edited)" : "German Copy Kit"}
-                  text={outputs.stage2OutputEdited ?? outputs.stage2Output}
-                  filename="STAGE2_GERMAN_COPY.txt"
+                <EditableOutput
+                  runId={Number(runId)}
+                  field="stage2_copy"
+                  stage="stage2"
+                  originalValue={outputs.stage2Output}
+                  editedValue={outputs.stage2OutputEdited}
+                  editedAt={outputs.stage2EditedAt}
+                  label="German Copy Kit"
+                  monospace={false}
+                  downloadFilename="STAGE2_GERMAN_COPY.txt"
                 />
                 {runId !== null && (
                   <>
