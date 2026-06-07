@@ -43,6 +43,17 @@ function isStuck(r: RunSummary): boolean {
   return ageMs > 10 * 60 * 1000 && !["completed", "failed", "cancelled", ...WAITING].includes(r.status ?? "");
 }
 
+// Thumbnail source: the generated Stage 3 hero if there is one, else the first
+// uploaded source photo, else null (→ gradient mesh placeholder).
+function thumbUrl(r: RunSummary): string | null {
+  if (r.stage3_hero_image_url) return r.stage3_hero_image_url;
+  try {
+    const arr = r.uploaded_source_images ? JSON.parse(r.uploaded_source_images) : null;
+    if (Array.isArray(arr) && typeof arr[0] === "string") return arr[0];
+  } catch { /* ignore */ }
+  return null;
+}
+
 function MeshThumb({ id, className }: { id: number; className?: string }) {
   const [m1, m2] = MESH[id % MESH.length];
   return <div className={`imgmesh ${className ?? ""}`} style={{ "--m1": m1, "--m2": m2 } as React.CSSProperties} />;
@@ -228,8 +239,11 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
               className="group grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-4 py-[13px] border-b border-[var(--color-border)] last:border-0 cursor-pointer tr hover:bg-[var(--color-surface-2)] fade-in"
               style={{ animationDelay: `${i * 22}ms`, opacity: deleting === r.id ? 0.4 : undefined }}>
               <div className="min-w-0 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-[var(--radius-sm)] overflow-hidden shrink-0 border border-[var(--color-border)]">
-                  <MeshThumb id={r.id} className="w-full h-full" />
+                <div className="w-9 h-9 rounded-[var(--radius-sm)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
+                  {thumbUrl(r)
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={thumbUrl(r) as string} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    : <MeshThumb id={r.id} className="w-full h-full" />}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">

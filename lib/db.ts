@@ -153,6 +153,10 @@ export interface RunSummary {
   current_step: string | null;
   last_updated_at: string | null;
   doc_count: number;
+  /** Generated Stage 3 hero image, used as the list thumbnail when present. */
+  stage3_hero_image_url: string | null;
+  /** JSON array of uploaded source image URLs — thumbnail fallback. */
+  uploaded_source_images: string | null;
 }
 
 export async function listRuns(): Promise<RunSummary[]> {
@@ -161,7 +165,7 @@ export async function listRuns(): Promise<RunSummary[]> {
   const result = await db.execute(`
     SELECT
       id, created_at, product_url, product_name, brand_name, status,
-      current_step, last_updated_at,
+      current_step, last_updated_at, stage3_hero_image_url, uploaded_source_images,
       (
         (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +
