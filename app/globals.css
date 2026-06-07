@@ -188,6 +188,20 @@ button { font-family: inherit; }
 
 .tr { transition: all .15s ease; }
 
+@keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+.sweep::after {
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-accent) 30%, transparent), transparent);
+  animation: sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes connector-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes node-fill { from { transform: scale(.6); } to { transform: scale(1); } }
+.node-fill { animation: node-fill .35s cubic-bezier(.34,1.56,.64,1) forwards; }
+
+@keyframes caret { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+.caret::after { content:"▌"; margin-left:1px; animation: caret 1s step-end infinite; color: var(--color-accent); }
+
 /* image tile placeholder mesh */
 .imgmesh { position: relative; overflow: hidden;
   background:

@@ -137,15 +137,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productDescription, sourceImages, productUrl, competitorUrls, submitting, uploadingImages]);
 
-  function loadDemo() {
-    setProductDescription(
-      "NackenFlow is a portable cervical traction device — a 'neck hammock' that cradles the head and applies gentle, gravity-assisted decompression to the cervical spine. Anchors to any door handle, post or railing; the user reclines for 10 minutes. Memory-foam neck cradle, adjustable nylon straps, travel pouch. For DE/AT/CH desk-workers 28–55 with screen-driven neck tension and 'tech neck'."
-    );
-    setProductUrl("https://www.aliexpress.com/item/100500.html");
-    setCompetitorUrls("https://www.amazon.de/neck-traction\nhttps://www.idealo.de/neck-hammock");
-    setShowAdvanced(true);
-  }
-
   const inputCls = [
     "w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)]",
     "rounded-lg px-[13px] py-[11px] text-sm font-[inherit] transition-all",
@@ -155,28 +146,19 @@ export default function Home() {
   return (
     <main className="px-7 py-7 max-w-[720px] w-full mx-auto">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <span className="eyebrow">Pipeline</span>
-            <span className="w-1 h-1 rounded-full bg-[var(--color-text-4)]" />
-            <span className="eyebrow">New run</span>
-          </div>
-          <h1 className="text-[28px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">
-            Brief the pipeline.
-          </h1>
-          <p className="text-[13px] text-[var(--color-text-2)] leading-relaxed mt-1.5 max-w-[52ch]">
-            Describe the product and drop in a few reference photos. We run Stage&nbsp;1 research,
-            Stage&nbsp;2 German copy, then pause before Stage&nbsp;3 images.
-          </p>
+      <div className="mb-6">
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <span className="eyebrow">Pipeline</span>
+          <span className="w-1 h-1 rounded-full bg-[var(--color-text-4)]" />
+          <span className="eyebrow">New run</span>
         </div>
-        <button
-          type="button"
-          onClick={loadDemo}
-          className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
-        >
-          <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" /> Load demo brief
-        </button>
+        <h1 className="text-[28px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">
+          Brief the pipeline.
+        </h1>
+        <p className="text-[13px] text-[var(--color-text-2)] leading-relaxed mt-1.5 max-w-[52ch]">
+          Describe the product and drop in a few reference photos. We run Stage&nbsp;1 research,
+          Stage&nbsp;2 German copy, then pause before Stage&nbsp;3 images.
+        </p>
       </div>
 
       {/* Form card */}
