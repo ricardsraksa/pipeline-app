@@ -6,11 +6,11 @@ import { version as APP_VERSION } from "../package.json";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
     const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-    const initial = saved || "light";
+    const initial = saved || "dark";
     setTheme(initial);
     document.documentElement.dataset.theme = initial;
   }, []);

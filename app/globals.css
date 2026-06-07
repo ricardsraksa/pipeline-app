@@ -1,100 +1,125 @@
 @import "tailwindcss";
 
 /*
- * Design system — v4 light/dark theme
- * Light mode default, dark mode via [data-theme="dark"] on <html>
+ * Design system — "Signal" direction (Command-center)
+ * Space Grotesk + JetBrains Mono, cool slate neutrals, slate accent.
+ * Dark is the default theme (set on <html data-theme="dark">); light values
+ * live in @theme inline and apply when data-theme="light".
  */
 
 @theme inline {
-  /* Surfaces */
-  --color-bg:           #f5f5f4;
+  /* Surfaces (Signal · light) */
+  --color-bg:           #f4f5f7;
   --color-surface:      #ffffff;
-  --color-surface-2:    #f7f7f6;
-  --color-surface-3:    #efefed;
+  --color-surface-2:    #f2f3f6;
+  --color-surface-3:    #e9ebf0;
 
   /* Borders */
-  --color-border:       #e7e6e3;
-  --color-border-hover: #d7d6d2;
-  --color-border-strong:#d7d6d2;
+  --color-border:       #e3e5ea;
+  --color-border-hover: #ccd0d9;
+  --color-border-strong:#ccd0d9;
 
   /* Text */
-  --color-text:         #1c1c1a;
-  --color-text-2:       #5d5c58;
-  --color-text-3:       #8c8b86;
-  --color-text-4:       #b8b7b2;
+  --color-text:         #12141b;
+  --color-text-2:       #565d6a;
+  --color-text-3:       #868d99;
+  --color-text-4:       #b5b9c4;
 
   /* Accent + semantic */
-  --color-accent:       #3f6c9e;
-  --color-accent-dim:   #34597f;
-  --color-success:      #3f8f5f;
-  --color-warn:         #9a740f;
-  --color-error:        #b1554d;
+  --color-accent:       #33363d;
+  --color-accent-dim:   #202228;
+  --color-success:      #1f9d57;
+  --color-warn:         #9a6b0f;
+  --color-error:        #c0524a;
 
-  /* New v4 tokens */
-  --color-primary:      #3f6c9e;
+  /* v4 tokens */
+  --color-primary:      #1d1f25;
   --color-on-primary:   #ffffff;
-  --color-accent-weak:  #e9eff6;
-  --color-accent-text:  #34597f;
-  --color-green:        #3f8f5f;
-  --color-green-bg:     #eaf2ec;
-  --color-amber:        #9a740f;
-  --color-amber-bg:     #f4eddc;
-  --color-red:          #b1554d;
-  --color-red-bg:       #f5e8e6;
-  --color-gray:         #7a796f;
-  --color-gray-bg:      #eeedea;
-  --color-soft:         #eef0f3;
-  --color-ring:         rgba(63,108,158,.22);
-  --radius:             11px;
-  --radius-sm:          8px;
+  --color-accent-weak:  #eef0f2;
+  --color-accent-text:  #1d1f25;
+  --color-green:        #1f9d57;
+  --color-green-bg:     #e4f3ea;
+  --color-amber:        #9a6b0f;
+  --color-amber-bg:     #f6eed8;
+  --color-red:          #c0524a;
+  --color-red-bg:       #f8e7e5;
+  --color-gray:         #717682;
+  --color-gray-bg:      #edeef1;
+  --color-soft:         #f0f1f3;
+  --color-ring:         rgba(40,43,50,.18);
 
-  --font-mono: var(--font-ibm-plex-mono);
-  --font-sans: var(--font-dm-sans);
+  /* Shape / density (Signal) */
+  --radius:             8px;
+  --radius-sm:          6px;
+  --radius-lg:          12px;
+  --pad:                17px;
+  --tracking-label:     0.14em;
+  --shadow-card:        0 1px 2px rgba(15,18,16,.05);
+  --shadow-pop:         0 8px 30px -6px rgba(15,18,16,.18), 0 2px 6px rgba(15,18,16,.06);
+
+  /* Fonts — Signal: Space Grotesk UI/display, JetBrains Mono.
+     Old variable names are aliased so existing component classes
+     (font-[var(--font-ibm-plex-mono)] etc.) keep resolving. */
+  --font-sans:          var(--font-space-grotesk);
+  --font-display:       var(--font-space-grotesk);
+  --font-mono:          var(--font-jetbrains-mono);
+  --font-ibm-plex-mono: var(--font-jetbrains-mono);
+  --font-dm-sans:       var(--font-space-grotesk);
 }
 
-/* Dark mode overrides */
+/* Dark mode (default) — Signal · dark */
 [data-theme="dark"] {
-  --color-bg:           #101113;
-  --color-surface:      #17181b;
-  --color-surface-2:    #1c1d21;
-  --color-surface-3:    #25272c;
-  --color-border:       #26282d;
-  --color-border-hover: #34373d;
-  --color-border-strong:#34373d;
-  --color-text:         #ececea;
-  --color-text-2:       #a3a39f;
-  --color-text-3:       #6f6f6b;
-  --color-text-4:       #4a4a4a;
-  --color-accent:       #7ba2d4;
-  --color-accent-dim:   #a8c6e8;
-  --color-success:      #5fae7f;
-  --color-warn:         #cda052;
-  --color-error:        #d4847c;
-  --color-primary:      #5b86b8;
-  --color-on-primary:   #ffffff;
-  --color-accent-weak:  #1a2535;
-  --color-accent-text:  #a8c6e8;
-  --color-green:        #5fae7f;
-  --color-green-bg:     #15271d;
-  --color-amber:        #cda052;
-  --color-amber-bg:     #2a2310;
-  --color-red:          #d4847c;
-  --color-red-bg:       #2a1816;
-  --color-gray:         #9a9a95;
-  --color-gray-bg:      #22242a;
-  --color-soft:         #232428;
-  --color-ring:         rgba(123,162,212,.28);
+  --color-bg:           #0a0c10;
+  --color-surface:      #12151b;
+  --color-surface-2:    #171b22;
+  --color-surface-3:    #20252e;
+  --color-border:       #20242c;
+  --color-border-hover: #2e333d;
+  --color-border-strong:#2e333d;
+  --color-text:         #e8eaf1;
+  --color-text-2:       #949ba7;
+  --color-text-3:       #646b78;
+  --color-text-4:       #3f444f;
+  --color-accent:       #e7e9ed;
+  --color-accent-dim:   #c4c7cd;
+  --color-success:      #43c98a;
+  --color-warn:         #d6a84f;
+  --color-error:        #df8079;
+  --color-primary:      #f1f2f4;
+  --color-on-primary:   #15171c;
+  --color-accent-weak:  #23262e;
+  --color-accent-text:  #f1f2f4;
+  --color-green:        #43c98a;
+  --color-green-bg:     #0f2a1d;
+  --color-amber:        #d6a84f;
+  --color-amber-bg:     #271f0f;
+  --color-red:          #df8079;
+  --color-red-bg:       #271513;
+  --color-gray:         #8a8f9b;
+  --color-gray-bg:      #1a1e26;
+  --color-soft:         #20232b;
+  --color-ring:         rgba(231,233,237,.22);
 }
 
 html, body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-dm-sans), "DM Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-space-grotesk), "Space Grotesk", system-ui, -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-variant-numeric: tabular-nums;
+}
+
+.ff-display { font-family: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif; }
+.ff-mono    { font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace; }
+
+/* Eyebrow label helper */
+.eyebrow {
+  font-size: 11px; font-weight: 650; text-transform: uppercase;
+  letter-spacing: var(--tracking-label, 0.1em); color: var(--color-text-3);
+  white-space: nowrap;
 }
 
 /* Selection */
@@ -103,16 +128,16 @@ html, body {
   color: var(--color-text);
 }
 
-/* Scrollbar — light style */
+/* Scrollbar — themed */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #d7d6d2;
+  background: var(--color-border-strong);
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #b8b7b2; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-4); background-clip: padding-box; }
 
 /* Focus ring */
 :focus-visible {
@@ -120,52 +145,63 @@ html, body {
   outline-offset: 2px;
   border-radius: 4px;
 }
-button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
-  outline-offset: 2px;
-}
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline-offset: 2px; }
+button { font-family: inherit; }
 
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* Utility animations */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
-}
+/* ── Animations / helpers ───────────────────────────────────────────────── */
+@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fade-in 0.18s ease-out forwards; }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.rise { animation: rise .42s cubic-bezier(.22,.61,.36,1) forwards; }
+
+@keyframes pop-in { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+.pop-in { animation: pop-in .42s cubic-bezier(.34,1.56,.64,1) forwards; }
+
+@keyframes log-line { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+.log-line { animation: log-line .25s ease-out forwards; }
+
+@keyframes ring-pulse {
+  0% { box-shadow: 0 0 0 0 var(--color-ring); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
+.ring-pulse { animation: ring-pulse 1.8s ease-out infinite; }
+
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.03) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--color-surface-3) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
 
+.tr { transition: all .15s ease; }
+
+/* image tile placeholder mesh */
+.imgmesh { position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 120% at 20% 15%, color-mix(in srgb, var(--m1) 85%, transparent), transparent 60%),
+    radial-gradient(120% 120% at 85% 80%, color-mix(in srgb, var(--m2) 80%, transparent), transparent 55%),
+    linear-gradient(140deg, var(--m1), var(--m2));
+}
+
 /* kbd shortcut chips */
 kbd.kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-family: var(--font-ibm-plex-mono), monospace;
-  font-size: 10px;
-  line-height: 1;
-  color: var(--color-text-2);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px; line-height: 1;
+  color: var(--color-text-2); background: var(--color-surface-2);
+  border: 1px solid var(--color-border); border-bottom-width: 2px; border-radius: 4px;
 }
