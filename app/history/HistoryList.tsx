@@ -87,6 +87,7 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const counts = runs.reduce(
     (a, r) => {
@@ -131,6 +132,23 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
     } finally { setDeleting(null); }
   }
 
+  // Bulk-delete every run currently matching the active tab (+ search).
+  async function deleteAll() {
+    const ids = filtered.map((r) => r.id);
+    if (!ids.length || bulkDeleting) return;
+    const label = (tabs.find((t) => t.id === filter)?.label ?? "matching").toLowerCase();
+    if (!window.confirm(`Delete all ${ids.length} ${label} run${ids.length > 1 ? "s" : ""}? This removes them and their outputs. This can't be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      // Cap concurrency so a big sweep doesn't hammer the DB.
+      const queue = [...ids];
+      const worker = async () => { while (queue.length) { const id = queue.shift()!; await fetch(`/api/runs/${id}`, { method: "DELETE" }).catch(() => {}); } };
+      await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker));
+      router.refresh();
+      setFilter("all");
+    } finally { setBulkDeleting(false); }
+  }
+
   return (
     <div className="px-7 py-7 max-w-[1080px] mx-auto">
       <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
@@ -170,10 +188,19 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
             </button>
           ))}
         </div>
-        <div className="relative flex-1 min-w-[180px] max-w-[300px]">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-text-3)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search runs…"
-            className="w-full pl-8 pr-3 py-[7px] text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-[180px]">
+          {filter !== "all" && filtered.length > 0 && (
+            <button onClick={deleteAll} disabled={bulkDeleting} title={`Delete all ${filtered.length} runs in this tab`}
+              className="cursor-pointer inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-[7px] text-[12px] font-[620] border tr hover:brightness-95 disabled:opacity-50 whitespace-nowrap shrink-0"
+              style={{ borderColor: "color-mix(in srgb, var(--color-red) 45%, transparent)", background: "var(--color-red-bg)", color: "var(--color-red)" }}>
+              <TrashIcon className="w-3.5 h-3.5" /> {bulkDeleting ? "Deleting…" : `Delete all ${filtered.length}`}
+            </button>
+          )}
+          <div className="relative flex-1 max-w-[300px]">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-text-3)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search runs…"
+              className="w-full pl-8 pr-3 py-[7px] text-[12.5px] rounded-[var(--radius-sm)] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+          </div>
         </div>
       </div>
 
