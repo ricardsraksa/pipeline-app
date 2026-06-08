@@ -10,6 +10,7 @@ import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
+import RunProductCode from "@/components/RunProductCode";
 import JSZip from "jszip";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -583,6 +584,7 @@ export default function RunPage() {
                   {displayName}
                 </h1>
                 <span className="font-[var(--font-ibm-plex-mono)] text-[12px] text-[var(--color-text-4)]">#{runId}</span>
+                {runId !== null && <RunProductCode runId={Number(runId)} />}
               </div>
               {run.meta.productUrl ? (
                 <a
