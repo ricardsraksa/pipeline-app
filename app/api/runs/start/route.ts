@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     sourceImages?: string[];
     productUrl?: string;
     competitorUrls?: string[];
+    productCode?: string;
     // Back-compat alias from the old form (treated the same as productUrl)
     url?: string;
   };
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
     product_description: productDescription,
     competitor_urls: competitorUrls.length ? competitorUrls : null,
     uploaded_source_images: sourceImages,
+    product_code: body.productCode?.trim() || null,
     status: "pending",
   });
 

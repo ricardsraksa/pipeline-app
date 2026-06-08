@@ -24,6 +24,7 @@ export default function Home() {
   const descRef = useRef<HTMLTextAreaElement>(null);
 
   const [productDescription, setProductDescription] = useState("");
+  const [productCode, setProductCode] = useState("");
   const [sourceImages, setSourceImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -111,6 +112,7 @@ export default function Home() {
           sourceImages,
           productUrl: productUrl.trim() || undefined,
           competitorUrls: competitorList.length ? competitorList : undefined,
+          productCode: productCode.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -163,6 +165,24 @@ export default function Home() {
 
       {/* Form card */}
       <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] divide-y divide-[var(--color-border)] overflow-hidden">
+        {/* Product code */}
+        <div className="px-5 py-4 flex items-center gap-3 flex-wrap">
+          <label htmlFor="product-code" className="block text-[11px] font-[600] uppercase tracking-[0.1em] text-[var(--color-text-3)] shrink-0">
+            Product code
+            <span className="text-[var(--color-text-4)] normal-case font-normal tracking-normal ml-1.5">optional · matches your sheet</span>
+          </label>
+          <input
+            id="product-code"
+            value={productCode}
+            onChange={(e) => setProductCode(e.target.value)}
+            placeholder="P50"
+            disabled={submitting}
+            spellCheck={false}
+            autoComplete="off"
+            className="ff-mono w-[110px] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[11px] py-[7px] text-[13px] placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:opacity-40"
+          />
+        </div>
+
         {/* Description */}
         <div className="px-5 py-5">
           <div className="flex items-center justify-between mb-2">

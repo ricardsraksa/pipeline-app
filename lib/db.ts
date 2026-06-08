@@ -131,6 +131,9 @@ async function migrateDB() {
     // AI placement: which image anchors each of the 3 body sections; the rest
     // are top-of-page product shots. JSON { section_1, section_2, section_3, reasons }.
     "stage3_placement TEXT",
+    // Operator-assigned product code (free text, e.g. "P50") to cross-reference
+    // an external product sheet.
+    "product_code TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -157,6 +160,8 @@ export interface RunSummary {
   stage3_hero_image_url: string | null;
   /** JSON array of uploaded source image URLs — thumbnail fallback. */
   uploaded_source_images: string | null;
+  /** Operator-assigned product code (e.g. "P50"). */
+  product_code: string | null;
 }
 
 export async function listRuns(): Promise<RunSummary[]> {
@@ -166,6 +171,7 @@ export async function listRuns(): Promise<RunSummary[]> {
     SELECT
       id, created_at, product_url, product_name, brand_name, status,
       current_step, last_updated_at, stage3_hero_image_url, uploaded_source_images,
+      product_code,
       (
         (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +
@@ -200,6 +206,7 @@ export async function createRun(data: {
   product_description?: string | null;
   competitor_urls?: string[] | null;
   uploaded_source_images?: string[] | null;
+  product_code?: string | null;
   status?: string;
 }): Promise<number> {
   const url = data.product_url ?? "";
@@ -211,9 +218,9 @@ export async function createRun(data: {
   const result = await db.execute({
     sql: `INSERT INTO runs (
             created_at, product_url, product_name, product_description,
-            competitor_urls, uploaded_source_images, status,
+            competitor_urls, uploaded_source_images, product_code, status,
             started_at, last_updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       new Date().toISOString(),
       url,
@@ -221,6 +228,7 @@ export async function createRun(data: {
       data.product_description ?? null,
       data.competitor_urls && data.competitor_urls.length ? JSON.stringify(data.competitor_urls) : null,
       data.uploaded_source_images && data.uploaded_source_images.length ? JSON.stringify(data.uploaded_source_images) : null,
+      data.product_code?.trim() || null,
       data.status ?? "pending",
       new Date().toISOString(),
       new Date().toISOString(),
@@ -407,4 +415,5 @@ export interface Run {
   stage3_remaining_prompts_edited: string | null;
   stage3_remaining_images: string | null;
   stage3_placement: string | null;
+  product_code: string | null;
 }

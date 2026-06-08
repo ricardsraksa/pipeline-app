@@ -102,6 +102,10 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [sort, setSort] = useState<"recent" | "code">("recent");
+  const [editingCodeId, setEditingCodeId] = useState<number | null>(null);
+  const [codeDraft, setCodeDraft] = useState("");
+  const [savingCode, setSavingCode] = useState(false);
 
   const counts = runs.reduce(
     (a, r) => {
@@ -127,7 +131,13 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
   };
   const query = q.trim().toLowerCase();
   const filtered = runs.filter(matchFilter).filter((r) =>
-    !query || `${r.brand_name || ""} ${r.product_name || ""} ${r.product_url || ""} #${r.id}`.toLowerCase().includes(query));
+    !query || `${r.product_code || ""} ${r.brand_name || ""} ${r.product_name || ""} ${r.product_url || ""} #${r.id}`.toLowerCase().includes(query));
+
+  // Optional sort by product code (natural: P2 before P10; uncoded runs last).
+  const codeNum = (c: string | null) => { const m = (c || "").match(/\d+/); return m ? parseInt(m[0], 10) : Number.POSITIVE_INFINITY; };
+  const sorted = sort === "code"
+    ? [...filtered].sort((a, b) => (codeNum(a.product_code) - codeNum(b.product_code)) || (a.product_code || "~").localeCompare(b.product_code || "~"))
+    : filtered;
 
   const tabs = [
     { id: "all", label: "All", n: runs.length },
@@ -153,6 +163,24 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
       });
       router.refresh();
     } finally { setSavingName(false); }
+  }
+
+  function startCode(id: number, current: string | null) {
+    setEditingCodeId(id);
+    setCodeDraft(current ?? "");
+  }
+  async function saveCode(id: number, prev: string | null) {
+    const v = codeDraft.trim();
+    setEditingCodeId(null);
+    if (v === (prev ?? "") || savingCode) return;
+    setSavingCode(true);
+    try {
+      await fetch(`/api/runs/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_code: v || null }),
+      });
+      router.refresh();
+    } finally { setSavingCode(false); }
   }
 
   async function del(id: number, name: string) {
@@ -237,7 +265,12 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
       </div>
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-4 py-[11px] bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
+        <div className="grid grid-cols-[58px_1fr_auto_auto_auto] items-center gap-4 px-4 py-[11px] bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
+          <button onClick={() => setSort((s) => (s === "code" ? "recent" : "code"))} title="Sort by code"
+            className={`eyebrow text-left inline-flex items-center gap-1 cursor-pointer tr ${sort === "code" ? "text-[var(--color-accent)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text-2)]"}`}>
+            Code
+            {sort === "code" && <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>}
+          </button>
           <span className="eyebrow text-[var(--color-text-3)]">Run</span>
           <span className="eyebrow text-[var(--color-text-3)] hidden sm:block">Status</span>
           <span className="eyebrow text-[var(--color-text-3)] hidden md:block">Updated</span>
@@ -248,7 +281,7 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
             <p className="text-[13px] text-[var(--color-text-3)]">No runs match{query ? ` "${q}"` : " this filter"}.</p>
           </div>
         )}
-        {filtered.map((r, i) => {
+        {sorted.map((r, i) => {
           const s = r.status ?? "";
           const stuck = isStuck(r);
           const active = ACTIVE.has(s);
@@ -257,8 +290,32 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
           const name = r.brand_name || r.product_name || "(unnamed)";
           return (
             <div key={r.id} onClick={() => router.push(`/runs/${r.id}`)}
-              className="group grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-4 py-[13px] border-b border-[var(--color-border)] last:border-0 cursor-pointer tr hover:bg-[var(--color-surface-2)] fade-in"
+              className="group grid grid-cols-[58px_1fr_auto_auto_auto] items-center gap-4 px-4 py-[13px] border-b border-[var(--color-border)] last:border-0 cursor-pointer tr hover:bg-[var(--color-surface-2)] fade-in"
               style={{ animationDelay: `${i * 22}ms`, opacity: deleting === r.id ? 0.4 : undefined }}>
+              {/* Product code */}
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                {editingCodeId === r.id ? (
+                  <input
+                    autoFocus value={codeDraft}
+                    onChange={(e) => setCodeDraft(e.target.value)}
+                    onBlur={() => saveCode(r.id, r.product_code)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveCode(r.id, r.product_code); } else if (e.key === "Escape") { e.preventDefault(); setEditingCodeId(null); } }}
+                    placeholder="P—"
+                    className="ff-mono w-[52px] text-[11px] text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded px-1.5 py-0.5 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+                    aria-label="Product code"
+                  />
+                ) : r.product_code ? (
+                  <button onClick={() => startCode(r.id, r.product_code)} title="Edit product code"
+                    className="ff-mono text-[11px] font-[600] px-1.5 py-0.5 rounded bg-[var(--color-accent-weak)] text-[var(--color-accent-text)] cursor-pointer hover:brightness-95 tr">
+                    {r.product_code}
+                  </button>
+                ) : (
+                  <button onClick={() => startCode(r.id, "")} title="Add product code"
+                    className="ff-mono text-[11px] text-[var(--color-text-4)] hover:text-[var(--color-text-2)] opacity-0 group-hover:opacity-100 tr cursor-pointer">
+                    + code
+                  </button>
+                )}
+              </div>
               <div className="min-w-0 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-[var(--radius-sm)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
                   {thumbUrl(r)
