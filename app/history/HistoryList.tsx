@@ -99,6 +99,9 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<number | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const counts = runs.reduce(
     (a, r) => {
@@ -133,6 +136,24 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
     { id: "complete", label: "Complete", n: counts.completed },
     { id: "failed", label: "Failed", n: counts.failed },
   ];
+
+  function startRename(id: number, current: string) {
+    setRenamingId(id);
+    setDraft(current);
+  }
+  async function saveName(id: number, fallback: string) {
+    const trimmed = draft.trim();
+    setRenamingId(null);
+    if (!trimmed || trimmed === fallback || savingName) return;
+    setSavingName(true);
+    try {
+      await fetch(`/api/runs/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand_name: trimmed }),
+      });
+      router.refresh();
+    } finally { setSavingName(false); }
+  }
 
   async function del(id: number, name: string) {
     if (!window.confirm(`Delete run "${name}"? This removes it and its outputs. This can't be undone.`)) return;
@@ -246,8 +267,34 @@ export default function HistoryList({ runs }: { runs: RunSummary[] }) {
                     : <MeshThumb id={r.id} className="w-full h-full" />}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <p className="font-[600] text-[13.5px] text-[var(--color-text)] truncate">{name}</p>
+                  <div className="flex items-center gap-2">
+                    {renamingId === r.id ? (
+                      <input
+                        autoFocus
+                        value={draft}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={() => saveName(r.id, name)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") { e.preventDefault(); saveName(r.id, name); }
+                          else if (e.key === "Escape") { e.preventDefault(); setRenamingId(null); }
+                        }}
+                        className="font-[600] text-[13.5px] text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded px-2 py-0.5 min-w-0 flex-1 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+                        aria-label="Run name"
+                      />
+                    ) : (
+                      <>
+                        <p className="font-[600] text-[13.5px] text-[var(--color-text)] truncate">{name}</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startRename(r.id, name); }}
+                          title="Rename" aria-label={`Rename run #${r.id}`}
+                          className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[var(--color-text-3)] hover:text-[var(--color-text)] tr p-0.5 cursor-pointer shrink-0"
+                        >
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                        </button>
+                      </>
+                    )}
                     <span className="ff-mono text-[10px] text-[var(--color-text-4)] shrink-0">#{r.id}</span>
                   </div>
                   <p className="ff-mono text-[11px] text-[var(--color-text-3)] truncate">{truncateUrl(r.product_url)}</p>
