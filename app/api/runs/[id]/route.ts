@@ -105,6 +105,35 @@ export async function PATCH(
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Merge a single Stage 3 image into stage3_remaining_images server-side.
+  // Read-modify-write here (instead of the client overwriting the whole array)
+  // makes per-image saves durable mid-generation and prevents two tabs / two
+  // in-flight regenerations from clobbering each other with stale snapshots.
+  if (body.type === "stage3_image_upsert") {
+    const { image } = body as { type: string; image?: { index?: number } & Record<string, unknown> };
+    if (!image || typeof image.index !== "number") {
+      return Response.json({ error: "image with numeric index required" }, { status: 400 });
+    }
+    const row = await db.execute({
+      sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?",
+      args: [Number(id)],
+    });
+    let arr: Array<{ index?: number }> = [];
+    try {
+      const raw = (row.rows[0] as unknown as { stage3_remaining_images: string | null })?.stage3_remaining_images;
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch { /* treat unparseable as empty */ }
+    const i = arr.findIndex((x) => x?.index === image.index);
+    if (i >= 0) arr[i] = image;
+    else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
+    await db.execute({
+      sql: "UPDATE runs SET stage3_remaining_images = ?, last_updated_at = ? WHERE id = ?",
+      args: [JSON.stringify(arr), new Date().toISOString(), Number(id)],
+    });
+    return Response.json({ success: true, images: arr });
+  }
+
   // Handle image_approval requests
   if (body.type === "image_approval") {
     const { approved_urls } = body as { type: string; approved_urls: string[] };

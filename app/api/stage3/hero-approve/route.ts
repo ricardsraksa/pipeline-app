@@ -5,7 +5,7 @@ import { generateRemainingPrompts } from '@/lib/stage3/hero'
 // Approve the hero → trigger Phase 2 prompt generation. The approved hero
 // image becomes the reference for all 8 derivative prompts. Lands at the
 // existing prompt-review gate (awaiting_qc).
-export const maxDuration = 300
+export const maxDuration = 600
 
 export async function POST(req: NextRequest) {
   const { runId } = (await req.json()) as { runId?: number }

@@ -58,8 +58,22 @@ export class PipelineCancelled extends Error {
 export function requestCancel(runId: number): void {
   CANCELLED.add(runId);
 }
-function guardCancel(runId: number): void {
+async function guardCancel(runId: number): Promise<void> {
   if (CANCELLED.has(runId)) throw new PipelineCancelled();
+  // The in-memory flag dies on a server restart; the DB status doesn't. A run
+  // cancelled just before a redeploy must still stop at the next boundary, so
+  // re-check the durable status too (stage boundaries are infrequent — a
+  // handful of reads per run).
+  try {
+    const r = await db.execute({ sql: "SELECT status FROM runs WHERE id = ?", args: [runId] });
+    if ((r.rows[0] as unknown as { status?: string })?.status === "cancelled") {
+      throw new PipelineCancelled();
+    }
+  } catch (err) {
+    if (err instanceof PipelineCancelled) throw err;
+    // DB hiccup — don't kill the run over a failed cancellation check.
+    console.error(`[guardCancel] status check failed for run ${runId}:`, err);
+  }
 }
 /** Catch-block helper: a cancelled run lands on 'cancelled', everything else
  *  on 'failed' with the error message. Always clears the cancel flag. */
@@ -70,10 +84,11 @@ async function markStopped(runId: number, err: unknown): Promise<void> {
       current_step: "Cancelled by user",
       error_message: null,
       last_updated_at: now(),
-    }).catch(() => {});
+    }).catch((e) => console.error(`[markStopped] failed to mark run ${runId} cancelled:`, e));
   } else {
     const message = err instanceof Error ? err.message : String(err);
-    await updateRun(runId, { status: "failed", error_message: message, last_updated_at: now() }).catch(() => {});
+    await updateRun(runId, { status: "failed", error_message: message, last_updated_at: now() })
+      .catch((e) => console.error(`[markStopped] failed to mark run ${runId} failed:`, e));
   }
   CANCELLED.delete(runId);
 }
@@ -387,21 +402,21 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   // ── Sub-step 1-5: Research modules (skip if already in DB) ──
   let research = run.step_research ?? "";
   if (!research) {
-    guardCancel(runId);
+    await guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
     const identify = await runIdentify(inputs);
 
-    guardCancel(runId);
+    await guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Market overview (2/5)", last_updated_at: now() });
     const market = await runMarket(inputs, identify);
 
-    guardCancel(runId);
+    await guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
     const competitive = await runCompetitive(inputs, identify, market);
 
     // Product analysis and visual strategy both depend only on identify +
     // market + competitive — neither consumes the other — so run them together.
-    guardCancel(runId);
+    await guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Product analysis + visual strategy (4/5)", last_updated_at: now() });
     const [productAnalysis, visual] = await Promise.all([
       runProductAnalysis(inputs, identify, market, competitive),
@@ -531,7 +546,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   // ── Sub-step 5: Chief final (skip if already in DB) ──
   let chiefFinal = run.step_chief_final ?? "";
   if (!chiefFinal) {
-    guardCancel(runId);
+    await guardCancel(runId);
     await updateRun(runId, { current_step: "Stage 1: Final chief review", last_updated_at: now() });
     chiefFinal = await anthropicMessage({
       system: CHIEF_FINAL_PROMPT,
@@ -625,7 +640,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
 }
 
 export async function runStage2(runId: number, run: Run): Promise<void> {
-  guardCancel(runId);
+  await guardCancel(runId);
   await updateRun(runId, { status: "stage2", current_step: "Stage 2: Preparing prompt", last_updated_at: now() });
 
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
@@ -634,7 +649,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const systemPrompt = (await getPrompt("stage2")) + (await buildStage2FeedbackBlock());
   const productName = run.brand_name ?? run.product_name ?? "";
 
-  guardCancel(runId);
+  await guardCancel(runId);
   await updateRun(runId, { current_step: "Stage 2: Generating German copy with Opus (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
@@ -865,15 +880,40 @@ const WATCHDOG_INTERVAL_MS = 2 * 60 * 1000;
 async function watchdogSweep(): Promise<void> {
   try {
     const result = await db.execute(
-      `SELECT id, last_updated_at FROM runs
-       WHERE status IN ('pending', 'scraping', 'stage1', 'stage2')`,
+      `SELECT id, status, last_updated_at, stage3_hero_image_url, stage3_remaining_prompts
+       FROM runs
+       WHERE status IN ('pending', 'scraping', 'stage1', 'stage2',
+                        'generating_hero', 'generating_remaining')`,
     );
     const cutoff = Date.now() - WATCHDOG_STALE_MS;
-    const rows = result.rows as unknown as { id: number; last_updated_at: string | null }[];
+    const rows = result.rows as unknown as {
+      id: number; status: string | null; last_updated_at: string | null;
+      stage3_hero_image_url: string | null; stage3_remaining_prompts: string | null;
+    }[];
     for (const row of rows) {
       if (!row.last_updated_at) continue;
       if (new Date(row.last_updated_at).getTime() >= cutoff) continue;
       if (RUNNING_PIPELINES.has(row.id)) continue; // still running here — leave it
+
+      // Stage 3 statuses aren't part of resumePipeline (the hero flow is
+      // user-triggered API routes). A run wedged there means the route died
+      // mid-generation — flip it back to the nearest recoverable gate so the
+      // UI offers the next action instead of an eternal spinner.
+      if (row.status === "generating_hero" || row.status === "generating_remaining") {
+        const next =
+          row.status === "generating_remaining" && row.stage3_remaining_prompts ? "awaiting_qc"
+          : row.stage3_hero_image_url ? "awaiting_hero_qc"
+          : "awaiting_user";
+        console.warn(`[watchdog] run ${row.id} stale in ${row.status} — flipping to ${next}`);
+        updateRun(row.id, {
+          status: next,
+          current_step: null,
+          error_message: "Stage 3 generation was interrupted (server restart) — pick up from here.",
+          last_updated_at: new Date().toISOString(),
+        }).catch((err) => console.error(`[watchdog] flip ${row.id} failed:`, err));
+        continue;
+      }
+
       console.warn(`[watchdog] run ${row.id} stale — auto-resuming`);
       resumePipeline(row.id).catch((err) =>
         console.error(`[watchdog] resume ${row.id} failed:`, err),

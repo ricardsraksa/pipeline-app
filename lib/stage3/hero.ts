@@ -9,7 +9,10 @@ import { jsonrepair } from 'jsonrepair'
 // The whole point: appearance is carried by the reference image, never by
 // prose. The prompts describe scene / lighting / composition / text only.
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// timeout: a hung prompt-writing call fails within 2 min instead of the SDK's
+// 10-min default — the route-level maxDuration would otherwise cut it off with
+// no useful error.
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 })
 const MODEL = 'claude-sonnet-4-5-20250929'
 
 export interface HeroPrompt {
@@ -134,15 +137,29 @@ export async function generateHeroPrompt(params: {
     'Generate the hero prompt JSON now. The source images are attached below.',
   ].join('\n')
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 2000,
-    system: HERO_SYSTEM,
-    messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(params.sourceImageUrls)] }],
-  })
-  const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
-  let parsed: HeroPrompt
-  try { parsed = JSON.parse(raw) } catch { parsed = JSON.parse(jsonrepair(raw)) }
+  // Retry the call + parse up to 3 times — transient API failures and the odd
+  // malformed-JSON response both recover on a fresh attempt (mirrors the
+  // remaining-prompts loop).
+  let parsed: HeroPrompt | null = null
+  let lastErr: unknown = null
+  for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
+    try {
+      const msg = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 2000,
+        system: HERO_SYSTEM,
+        messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(params.sourceImageUrls)] }],
+      })
+      const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
+      try { parsed = JSON.parse(raw) } catch { parsed = JSON.parse(jsonrepair(raw)) }
+    } catch (err) {
+      lastErr = err
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+    }
+  }
+  if (!parsed) {
+    throw new Error(`Hero prompt generation failed after 3 attempts: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`)
+  }
 
   return {
     model: parsed.model || 'nano_banana_2',

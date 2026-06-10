@@ -8,7 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // elements (product description, source-image references, German text) and
 // only adjust the parts the user actually mentioned.
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
 const MODEL = "claude-sonnet-4-5-20250929";
 
 const SYSTEM = `You are a senior product photographer and prompt engineer specializing in DTC marketing imagery. You will be given ONE existing image-generation prompt that didn't quite land, plus a short natural-language note from the operator about what to change.

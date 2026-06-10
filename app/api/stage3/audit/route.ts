@@ -2,7 +2,29 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { IMAGE_AUDIT_SYSTEM, buildAuditUserMessage } from '@/lib/prompts/image_audit'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// timeout: a hung vision call (usually Anthropic struggling to download the
+// image URL) fails in 90s instead of the SDK's 10-min default.
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 })
+
+export const maxDuration = 300
+
+// Anthropic occasionally fails transiently fetching the image URL ("timed out
+// while trying to download the file") — retry before giving up so a blip
+// doesn't mislabel an image.
+async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) {
+  let lastErr: unknown = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await anthropic.messages.create(body)
+    } catch (err) {
+      lastErr = err
+      const msg = err instanceof Error ? err.message : String(err)
+      if (/401|403|invalid api key|authentication/i.test(msg)) throw err
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)))
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
 
 export async function POST(req: NextRequest) {
   const { image_url, category, prompt_used, product_description, german_text_used } = await req.json()
@@ -14,7 +36,7 @@ export async function POST(req: NextRequest) {
   const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', german_text_used: german_text_used ?? null })
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await createWithRetry({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2000,
       system: IMAGE_AUDIT_SYSTEM,

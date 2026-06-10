@@ -6,7 +6,7 @@ import { generateRemainingPrompts } from '@/lib/stage3/hero'
 // SOURCE product photos (no separate hero shot). Lands at the same prompt
 // review gate (awaiting_qc); the source images become the reference for every
 // image generated there.
-export const maxDuration = 300
+export const maxDuration = 600
 
 function safeArr(json: string | null): string[] {
   if (!json) return []

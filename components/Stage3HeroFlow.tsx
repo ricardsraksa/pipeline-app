@@ -301,21 +301,27 @@ export default function Stage3HeroFlow({
       setPromptDrafts(next);
     };
 
+    // Images already generated in a previous (interrupted) pass — the loop
+    // skips these and resumes from the first missing one.
+    const existing = safeParse<RemImage[]>(run.stage3_remaining_images, []);
+    const doneByIndex = new Map(existing.filter((im) => im?.status === "done" && im.image_url).map((im) => [im.index, im]));
+
     const generateAll = async () => {
       setErr(null);
       setBusy("generate-8");
-      const results: (RemImage | null)[] = saved.map(() => null);
+      const results: (RemImage | null)[] = saved.map((p) => doneByIndex.get(p.index) ?? null);
       setGenImages(results);
       // Persist any prompt edits first.
       await fetch(`/api/runs/${runId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage3_remaining_prompts_edited: JSON.stringify(saved) }),
-      }).catch(() => {});
+      }).catch((e) => { console.error("persist prompt edits failed:", e); setErr("Couldn't save your prompt edits — generation continues with the edited text, but a refresh may show stale prompts."); });
 
       const productDesc = run.product_description ?? run.product_name ?? "";
       stopRef.current = false;
       for (let i = 0; i < saved.length; i++) {
         if (stopRef.current) break;
+        if (results[i]?.status === "done") continue; // already generated — resume skips it
         const p = saved[i];
         setGenIndex(i);
         try {
@@ -338,20 +344,36 @@ export default function Stage3HeroFlow({
             if (audit.success) {
               verdict = audit.result?.verdict === "pass" ? "pass" : "fail";
               issues = audit.result?.issues ?? [];
+            } else {
+              console.error("audit failed:", audit.error);
+              issues = ["Audit skipped (auditor unavailable) — review manually."];
             }
-          } catch { /* audit optional */ }
+          } catch (e) {
+            console.error("audit call failed:", e);
+            issues = ["Audit skipped (network error) — review manually."];
+          }
 
           results[i] = { index: p.index, category: p.category, image_url: gen.image_url, status: "done", verdict, issues };
         } catch (e) {
           results[i] = { index: p.index, category: p.category, image_url: "", status: "failed", error: e instanceof Error ? e.message : String(e) };
         }
         setGenImages([...results]);
+        // Persist THIS image immediately — a closed tab or crash mid-batch
+        // loses nothing, and the loop resumes from the next missing image.
+        await fetch(`/api/runs/${runId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "stage3_image_upsert", image: results[i] }),
+        }).catch((e) => console.error(`persist image #${p.index} failed:`, e));
       }
       setGenIndex(null);
-      await fetch(`/api/runs/${runId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stage3_remaining_images: JSON.stringify(results), status: "completed" }),
-      }).catch(() => {});
+      const allSettled = results.every((r) => r !== null);
+      if (allSettled) {
+        // Images are already persisted per-image; just flip the status.
+        await fetch(`/api/runs/${runId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "completed" }),
+        }).catch((e) => { console.error("complete status failed:", e); setErr("Images generated, but marking the run complete failed — hit Refresh."); });
+      }
       setBusy(null);
       await fetchRun();
     };
@@ -401,8 +423,13 @@ export default function Stage3HeroFlow({
             </div>
           ))}
         </div>
+        {doneByIndex.size > 0 && (
+          <p className="text-[12px] text-[var(--color-amber)]">
+            {doneByIndex.size} of {saved.length} images were already generated in an interrupted pass — generation resumes from the rest.
+          </p>
+        )}
         <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
-          Generate 8 Images →
+          {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : "Generate 8 Images →"}
         </button>
       </div>
     );
@@ -455,6 +482,32 @@ export default function Stage3HeroFlow({
         >
           Open in Stage 3 editor →
         </a>
+      </div>
+    );
+  }
+
+  // Dead-end recovery: states that should have data but don't (the generating
+  // route died before writing it). Offer the restart instead of a blank wall.
+  if ((status === "awaiting_hero_qc" && !heroUrl) || (status === "awaiting_qc" && !run.stage3_remaining_prompts)) {
+    const what = status === "awaiting_hero_qc" ? "The hero image failed to save" : "The 8 prompts failed to generate";
+    const restart = async () => {
+      setBusy("recover");
+      try {
+        await fetch(`/api/runs/${runId}/restart-stage`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stage: "stage3-prompts" }),
+        });
+      } finally { setBusy(null); await fetchRun(); }
+    };
+    return (
+      <div className="space-y-3">
+        <ErrBox msg={`${what} — the generation step was interrupted. Restart Stage 3 to try again from the start.`} />
+        <div className="flex gap-3 flex-wrap">
+          <button disabled={busy !== null} onClick={restart} className={btnPrimary}>
+            {busy === "recover" ? "Restarting…" : "Restart Stage 3"}
+          </button>
+          <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
+        </div>
       </div>
     );
   }
@@ -529,22 +582,30 @@ function CompletedReview({
     if (!placement && usable.length >= 3) { autoTried.current = true; runPlacement(); }
   }, [placement, images, runPlacement]);
 
-  // Persist current images array to the run. Serialized through a promise
-  // chain so concurrent regenerations commit in call order — otherwise two
-  // in-flight PATCHes could land out of order and an earlier (staler) write
-  // would clobber a later one.
+  // Persist ONE image via the server-side upsert (read-modify-write on the
+  // server). Each image saves independently, so a stale full-array snapshot —
+  // from a second tab or an in-flight regeneration — can never clobber other
+  // images. Serialized through a chain so saves commit in call order; failures
+  // surface instead of vanishing.
+  const [persistErr, setPersistErr] = useState<string | null>(null);
   const persistChain = useRef<Promise<unknown>>(Promise.resolve());
-  const persist = useCallback((next: RemImage[]) => {
+  const persistImage = useCallback((image: RemImage) => {
     persistChain.current = persistChain.current
       .catch(() => {})
       .then(() =>
         fetch(`/api/runs/${runId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stage3_remaining_images: JSON.stringify(next) }),
+          body: JSON.stringify({ type: "stage3_image_upsert", image }),
+        }).then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          setPersistErr(null);
         }),
       )
-      .catch(() => {});
+      .catch((e) => {
+        console.error(`persist image #${image.index} failed:`, e);
+        setPersistErr(`Saving image #${image.index} failed — your last change may not stick. Check your connection and retry.`);
+      });
     return persistChain.current;
   }, [runId]);
 
@@ -559,7 +620,7 @@ function CompletedReview({
       if (cur === null) nextOverride = auto === "pass" ? "fail" : "pass";
       else { const flip = cur === "pass" ? "fail" : "pass"; nextOverride = flip === auto ? null : flip; }
       const next = prev.map((x, j) => (j === i ? { ...x, user_override: nextOverride } : x));
-      persist(next);
+      persistImage(next[i]);
       return next;
     });
   };
@@ -589,23 +650,25 @@ function CompletedReview({
           body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, german_text_used: p.german_text || null }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
-      } catch { /* audit optional */ }
+        else { console.error("audit failed:", audit.error); issues = ["Audit skipped (auditor unavailable) — review manually."]; }
+      } catch (e) {
+        console.error("audit call failed:", e);
+        issues = ["Audit skipped (network error) — review manually."];
+      }
 
-      // Functional update + persist the freshly-merged array, so a concurrent
-      // regeneration of another tile can't overwrite this one with a stale
-      // snapshot captured when this handler was created.
+      // Functional update + per-image persist, so a concurrent regeneration of
+      // another tile can't overwrite this one with a stale snapshot.
       setImages((prev) => {
         const cur = prev[i];
         const updated: RemImage = { index: cur.index, category: cur.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null };
-        const next = prev.map((x, j) => (j === i ? updated : x));
-        persist(next);
-        return next;
+        persistImage(updated);
+        return prev.map((x, j) => (j === i ? updated : x));
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setImages((prev) => {
         const next = prev.map((x, j) => (j === i ? { ...x, status: "failed" as const, error: msg } : x));
-        persist(next);
+        persistImage(next[i]);
         return next;
       });
     } finally {
@@ -635,10 +698,13 @@ function CompletedReview({
   };
 
   // Download every image — the hero AND all generated derivatives — as one zip.
+  // Tracks fetch failures so a partial zip is reported, not silently shipped.
   const [zipping, setZipping] = useState(false);
+  const [zipNote, setZipNote] = useState<string | null>(null);
   const downloadAll = async () => {
     if (zipping) return;
     setZipping(true);
+    setZipNote(null);
     try {
       const zip = new JSZip();
       const targets: Array<{ url: string; name: string }> = [];
@@ -648,18 +714,22 @@ function CompletedReview({
           targets.push({ url: im.image_url, name: `${String(im.index).padStart(2, "0")}_${im.category || "image"}.png` });
         }
       }
+      let ok = 0;
       await Promise.all(
         targets.map(async (t) => {
           try {
-            const blob = await fetch(t.url).then((r) => r.blob());
+            const blob = await fetch(t.url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); });
             zip.file(t.name, blob);
-          } catch { /* skip any that fail to fetch */ }
+            ok++;
+          } catch (e) { console.error(`zip fetch failed for ${t.name}:`, e); }
         }),
       );
+      if (ok === 0) { setZipNote("Couldn't fetch any images — check your connection."); return; }
       const blob = await zip.generateAsync({ type: "blob" });
       const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "stage3_images.zip" });
       a.click();
       URL.revokeObjectURL(a.href);
+      setZipNote(ok < targets.length ? `Downloaded ${ok} of ${targets.length} images — ${targets.length - ok} couldn't be fetched.` : null);
     } finally {
       setZipping(false);
     }
@@ -777,6 +847,8 @@ function CompletedReview({
         </button>
       </div>
       {placeErr && <ErrBox msg={placeErr} />}
+      {persistErr && <ErrBox msg={persistErr} />}
+      {zipNote && <p className="text-[12px] text-[var(--color-amber)]">{zipNote}</p>}
 
       {/* ── Product shots — top of the page ────────────────────────────── */}
       <div className="space-y-2">

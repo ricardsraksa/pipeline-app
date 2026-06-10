@@ -6,7 +6,7 @@ import { generateStage3Image } from '@/lib/stage3/higgsfield'
 // Phase 1 of hero-first Stage 3: generate ONE hero studio shot from the
 // SOURCE product photos, then stop at the hero QC gate.
 // Submit + poll image gen can take ~40s, plus the prompt call — give it room.
-export const maxDuration = 300
+export const maxDuration = 600
 
 function safeArr(json: string | null): string[] {
   if (!json) return []
