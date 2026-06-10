@@ -147,4 +147,39 @@ export const Icon = {
       <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-5 7c-1.1 0-2-.9-2-2v-.88z" />
     </svg>
   ),
+  Plus: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  Trash: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  ),
+  Sun: (p: IconProps) => (
+    <svg {...base(p)}>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" />
+    </svg>
+  ),
+  Moon: (p: IconProps) => (
+    <svg {...base(p)}>
+      <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
+    </svg>
+  ),
+  Stop: (p: IconProps) => (
+    <svg className={p.className || "w-4 h-4"} viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden>
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+    </svg>
+  ),
+  Logo: (p: IconProps) => (
+    <svg className={p.className || "w-4 h-4"} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 18V6l7 5-7 5z" fill="currentColor" />
+      <path d="M12 18V6l8 6-8 6z" fill="currentColor" opacity="0.45" />
+    </svg>
+  ),
 };

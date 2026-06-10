@@ -592,3 +592,4 @@ function RunDetail({ run, engine, patch, push, onBack }) {
 
 window.RunDetail = RunDetail;
 window.OnePagerMarkdown = OnePagerMarkdown;
+Object.assign(window, { FeedbackButtons, AIRegenerate, EditableOutput, StageActions, LiveLog, Section, nextAction });

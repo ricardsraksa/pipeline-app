@@ -1,10 +1,17 @@
 "use client";
 
+// v2 run page (run2.jsx): header with thumb, live log while running, stepper +
+// accordion stage cards with progressive disclosure, sticky bottom action bar.
+// All real wiring preserved: polling, kill, resume, restart, Stage 2 approval,
+// editing, AI regenerate, feedback, Stage 3 hero flow, product code, downloads.
+
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
+import { MeshThumb, StatusBadge, elapsedTime, statusLabel, truncateUrl } from "@/components/ui/run-ui";
+import { useToast } from "@/components/Toasts";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
@@ -13,52 +20,38 @@ import EditableOutput from "@/components/EditableOutput";
 import RunProductCode from "@/components/RunProductCode";
 import JSZip from "jszip";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
-type Stage = "stage1" | "stage2" | "stage3";
+// ── Stage state ───────────────────────────────────────────────────────────────
+
+type StageKey = "stage1" | "stage2" | "stage3";
 type StageState = "pending" | "running" | "complete" | "error" | "waiting";
 
-function getStageState(run: RunStatus, stage: Stage): StageState {
+function getStageState(run: RunStatus, stage: StageKey): StageState {
   const isFailed = run.status === "failed";
-  const failedAt: Stage | null =
-    !isFailed
-      ? null
-      : run.outputs.stage2Output
-        ? "stage3"
-        : run.outputs.research
-          ? "stage2"
-          : "stage1";
-
+  const failedAt: StageKey | null = !isFailed ? null
+    : run.outputs.stage2Output ? "stage3"
+    : run.outputs.onePager || run.outputs.research ? "stage2"
+    : "stage1";
   if (failedAt === stage) return "error";
 
   switch (stage) {
     case "stage1":
       if (run.outputs.onePager) return "complete";
-      if (run.status === "stage1" || run.status === "scraping") return "running";
+      if (["stage1", "scraping", "pending"].includes(run.status)) return "running";
       if (run.outputs.research) return "running";
       return "pending";
     case "stage2":
       if (run.outputs.stage2Output) return "complete";
       if (run.status === "stage2") return "running";
-      // Paused at the new Stage 1 → Stage 2 QC gate: Stage 2 hasn't started yet.
       if (run.status === "awaiting_stage2_approval") return "waiting";
       return "pending";
     case "stage3":
       if (run.status === "completed") return "complete";
-      if (run.status === "awaiting_user") return "waiting";
-      if (run.status === "awaiting_qc") return "running";
+      if (["awaiting_user", "awaiting_qc", "awaiting_hero_qc"].includes(run.status)) return "waiting";
+      if (["generating_hero", "generating_remaining"].includes(run.status)) return "running";
       return "pending";
   }
-}
-
-type LastStage = "none" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
-
-function getLastCompletedStage(run: RunStatus): LastStage {
-  if (run.outputs.stage2Output && run.status === "completed") return "stage3-images";
-  if (run.status === "awaiting_qc") return "stage3-prompts";
-  if (run.outputs.stage2Output) return "stage2";
-  if (run.outputs.onePager) return "stage1";
-  return "none";
 }
 
 function isStuck(run: RunStatus): boolean {
@@ -70,145 +63,8 @@ function isStuck(run: RunStatus): boolean {
   );
 }
 
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    pending: "Starting…",
-    scraping: "Stage 1 — Research",
-    stage1: "Stage 1 — Research",
-    awaiting_stage2_approval: "Awaiting your review",
-    stage2: "Stage 2 — Copy",
-    awaiting_user: "Awaiting review",
-    awaiting_qc: "Awaiting QC",
-    generating_hero: "Stage 3 — Generating hero",
-    awaiting_hero_qc: "Stage 3 — Review hero",
-    generating_remaining: "Stage 3 — Writing prompts",
-    completed: "Complete",
-    failed: "Failed",
-    cancelled: "Cancelled",
-  };
-  return map[status] ?? status;
-}
+// ── One-pager markdown ────────────────────────────────────────────────────────
 
-function elapsedTime(startedAt: string | null, finishedAt: string | null): string | null {
-  if (!startedAt) return null;
-  const start = new Date(startedAt).getTime();
-  const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
-  const sec = Math.round((end - start) / 1000);
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ${sec % 60}s`;
-  const hr = Math.floor(min / 60);
-  return `${hr}h ${min % 60}m`;
-}
-
-// ── Components ────────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "completed") return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-green-bg)] text-[var(--color-green)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Complete
-    </span>
-  );
-  if (status === "failed") return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Failed
-    </span>
-  );
-  if (status === "cancelled") return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-gray-bg)] text-[var(--color-gray)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />Cancelled
-    </span>
-  );
-  if (status === "awaiting_user" || status === "awaiting_qc" || status === "awaiting_stage2_approval" || status === "awaiting_hero_qc") return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0" />{statusLabel(status)}
-    </span>
-  );
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-[620] px-2.5 py-1 rounded-full bg-[var(--color-accent-weak)] text-[var(--color-accent)] whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 pulse-dot" />{statusLabel(status)}
-    </span>
-  );
-}
-
-function PipelineProgress({ run }: { run: RunStatus }) {
-  const stages: { key: Stage; label: string }[] = [
-    { key: "stage1", label: "Research" },
-    { key: "stage2", label: "Copy" },
-    { key: "stage3", label: "Images" },
-  ];
-
-  return (
-    <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] px-5 py-4">
-      <div className="flex items-center gap-2">
-        {stages.map((s, i) => {
-          const state = getStageState(run, s.key);
-
-          const circleCls =
-            state === "complete"
-              ? "w-8 h-8 rounded-full bg-[var(--color-green)] text-white grid place-items-center font-bold text-sm border-2 border-[var(--color-green)]"
-              : state === "running"
-                ? "w-8 h-8 rounded-full bg-[var(--color-primary)] text-white grid place-items-center font-bold text-sm border-2 border-[var(--color-primary)]"
-                : state === "error"
-                  ? "w-8 h-8 rounded-full bg-[var(--color-red)] text-white grid place-items-center font-bold text-sm border-2 border-[var(--color-red)]"
-                  : state === "waiting"
-                    ? "w-8 h-8 rounded-full bg-[var(--color-amber)] text-white grid place-items-center font-bold text-sm border-2 border-[var(--color-amber)]"
-                    : "w-8 h-8 rounded-full border-2 border-[var(--color-border-strong)] text-[var(--color-text-3)] grid place-items-center font-bold text-sm";
-
-          const labelCls =
-            state === "pending"
-              ? "text-[var(--color-text-3)]"
-              : state === "running"
-                ? "text-[var(--color-accent)]"
-                : state === "error"
-                  ? "text-[var(--color-error)]"
-                  : state === "waiting"
-                    ? "text-[var(--color-warn)]"
-                    : "text-[var(--color-text)]";
-
-          const connectorCls =
-            state === "complete"
-              ? "flex-1 h-0.5 bg-[var(--color-green)] mx-3"
-              : "flex-1 h-0.5 bg-[var(--color-border-strong)] mx-3";
-
-          return (
-            <div key={s.key} className="flex items-center flex-1 min-w-0 last:flex-initial">
-              <div className="flex flex-col items-center gap-1.5 min-w-0">
-                <span className={circleCls} aria-label={`${s.label}: ${state}`}>
-                  {state === "complete" ? (
-                    <Icon.Check className="w-4 h-4" strokeWidth={3} />
-                  ) : state === "running" ? (
-                    <Icon.Loader className="w-3.5 h-3.5" />
-                  ) : state === "error" ? (
-                    <Icon.X className="w-4 h-4" strokeWidth={3} />
-                  ) : state === "waiting" ? (
-                    <span className="text-sm">!</span>
-                  ) : (
-                    <span className="text-sm">{i + 1}</span>
-                  )}
-                </span>
-                <span className={`text-[11px] font-[550] ${labelCls} whitespace-nowrap`}>{s.label}</span>
-              </div>
-              {i < stages.length - 1 && (
-                <div className={connectorCls} style={{ marginBottom: "18px" }} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {run.currentStep && !["completed", "failed", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval"].includes(run.status) && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--color-border)]">
-          <Icon.Loader className="w-3.5 h-3.5 text-[var(--color-accent)]" />
-          <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-2)] truncate">{run.currentStep}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// Minimal markdown renderer for the Stage 1 one-pager.
 function OnePagerMarkdown({ text }: { text: string }) {
   const lines = text.split("\n");
   const blocks: React.ReactNode[] = [];
@@ -217,10 +73,7 @@ function OnePagerMarkdown({ text }: { text: string }) {
   const flushList = () => {
     if (!listBuffer) return;
     const ListTag = listBuffer.type;
-    const cls =
-      listBuffer.type === "ol"
-        ? "list-decimal pl-5 space-y-1.5"
-        : "list-disc pl-5 space-y-1.5";
+    const cls = listBuffer.type === "ol" ? "list-decimal pl-5 space-y-1.5" : "list-disc pl-5 space-y-1.5";
     blocks.push(
       <ListTag key={`list-${blocks.length}`} className={cls}>
         {listBuffer.items.map((it, i) => (
@@ -240,18 +93,10 @@ function OnePagerMarkdown({ text }: { text: string }) {
     const ul = line.match(/^[-*]\s+(.+)$/);
     if (h1) {
       flushList();
-      blocks.push(
-        <h1 key={`h1-${blocks.length}`} className="text-xl font-bold tracking-tight text-[var(--color-text)] mb-1">
-          {h1[1]}
-        </h1>
-      );
+      blocks.push(<h1 key={`h1-${blocks.length}`} className="text-[20px] font-bold tracking-tight ff-display text-[var(--color-text)] mb-1">{h1[1]}</h1>);
     } else if (h2) {
       flushList();
-      blocks.push(
-        <h2 key={`h2-${blocks.length}`} className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-text-3)] mt-5 mb-2">
-          {h2[1]}
-        </h2>
-      );
+      blocks.push(<h2 key={`h2-${blocks.length}`} className="eyebrow block mt-5 mb-2">{h2[1]}</h2>);
     } else if (ol) {
       if (!listBuffer || listBuffer.type !== "ol") { flushList(); listBuffer = { type: "ol", items: [] }; }
       listBuffer.items.push(ol[1]);
@@ -260,123 +105,135 @@ function OnePagerMarkdown({ text }: { text: string }) {
       listBuffer.items.push(ul[1]);
     } else {
       flushList();
-      blocks.push(
-        <p key={`p-${blocks.length}`} className="text-[13px] text-[var(--color-text-2)] leading-relaxed">{line}</p>
-      );
+      blocks.push(<p key={`p-${blocks.length}`} className="text-[13px] text-[var(--color-text-2)] leading-relaxed">{line}</p>);
     }
   }
   flushList();
   return <div className="space-y-1">{blocks}</div>;
 }
 
-function Section({
-  id,
-  label,
-  children,
-  count,
-}: {
-  id: string;
-  label: string;
-  count?: number;
-  children: React.ReactNode;
-}) {
+// ── Live log (console feel during active runs) ────────────────────────────────
+
+type LogLine = { k: string; t: string };
+
+function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
+  const active = !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [log.length]);
+  if (!active || !log.length) return null;
   return (
-    <section id={id} className="space-y-3 scroll-mt-16">
-      <div className="flex items-center gap-3">
-        <h2 className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-text-2)]">
-          {label}
-        </h2>
-        {typeof count === "number" && (
-          <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-4)]">
-            {count} {count === 1 ? "doc" : "docs"}
-          </span>
-        )}
-        <div className="bg-[var(--color-border)] h-px flex-1" />
+    <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] overflow-hidden fade-in">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] pulse-dot" />
+        <span className="eyebrow text-[var(--color-text-2)]">Live · {statusLabel(run.status)}</span>
       </div>
-      {children}
-    </section>
+      <div ref={ref} className="bg-[var(--color-bg)] px-4 py-3 max-h-[150px] overflow-y-auto ff-mono text-[11.5px] leading-[1.8]">
+        {log.slice(-8).map((l, i, arr) => {
+          const last = i === arr.length - 1;
+          return (
+            <div key={l.k} className={cx("log-line flex gap-2", last ? "text-[var(--color-text)]" : "text-[var(--color-text-3)]")}>
+              <span className="text-[var(--color-accent)] shrink-0">{last ? "›" : "·"}</span>
+              <span className={last ? "caret" : ""}>{l.t}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
-// ── Failure recovery helpers ──────────────────────────────────────────────────
+// ── Stage accordion card ──────────────────────────────────────────────────────
 
-type FailableStage = "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
+  { key: "stage1", id: "v2-stage-1", n: 1, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
+  { key: "stage2", id: "v2-stage-2", n: 2, title: "German copy", what: "Full DTC copy kit from the approved research" },
+  { key: "stage3", id: "v2-stage-3", n: 3, title: "Images", what: "Hero shot first, then 8 derivatives" },
+];
 
-const STAGE_SECTION_ID: Record<FailableStage, string> = {
-  stage1: "stage-1-section",
-  stage2: "stage-2-section",
-  "stage3-prompts": "stage-3-section",
-  "stage3-images": "stage-3-section",
-};
+const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
 
-const STAGE_DISPLAY_NAME: Record<FailableStage, string> = {
-  stage1: "Stage 1",
-  stage2: "Stage 2",
-  "stage3-prompts": "Stage 3 Prompts",
-  "stage3-images": "Stage 3 Images",
-};
-
-function getFailedStage(run: RunStatus): FailableStage {
-  if (!run.outputs.onePager) return "stage1";
-  if (!run.outputs.stage2Output) return "stage2";
-  // Stage 3 outputs aren't exposed via the polling endpoint, so we can't
-  // distinguish stage3-prompts vs stage3-images here. Fall back to prompts —
-  // restarting prompts also clears any partial image generation.
-  return "stage3-prompts";
+function StageAccordion({ def, state, open, onToggle, summary, children, isLast }: {
+  def: typeof STAGE_DEFS[number];
+  state: StageState;
+  open: boolean;
+  onToggle: () => void;
+  summary: string | null;
+  children: React.ReactNode;
+  isLast: boolean;
+}) {
+  const stateIcon = {
+    complete: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-green)] text-[var(--color-on-primary)] border-2 border-[var(--color-green)]"><Icon.Check className="w-3.5 h-3.5" strokeWidth={3} /></span>,
+    running: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-primary)] text-[var(--color-on-primary)] border-2 border-[var(--color-primary)] ring-pulse"><Icon.Loader className="w-3.5 h-3.5" /></span>,
+    waiting: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-amber)] text-white border-2 border-[var(--color-amber)] text-[12px] font-bold">!</span>,
+    error: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-red)] text-white border-2 border-[var(--color-red)]"><Icon.X className="w-3.5 h-3.5" strokeWidth={3} /></span>,
+    pending: <span className="w-7 h-7 rounded-full grid place-items-center border-2 border-[var(--color-border-strong)] text-[var(--color-text-3)] text-[12px] font-bold bg-[var(--color-surface)]">{def.n}</span>,
+  }[state];
+  const stateLabel = { complete: "Done", running: "Running…", waiting: "Needs you", error: "Failed", pending: "Waiting" }[state];
+  const stateColor = {
+    complete: "text-[var(--color-green)]", running: "text-[var(--color-accent-text)]",
+    waiting: "text-[var(--color-amber)]", error: "text-[var(--color-red)]", pending: "text-[var(--color-text-4)]",
+  }[state];
+  const canOpen = state !== "pending";
+  return (
+    <div id={def.id} className="relative scroll-mt-24">
+      {!isLast && <div className="absolute left-[29px] top-[52px] bottom-[-14px] w-0.5 bg-[var(--color-border)]" aria-hidden="true" />}
+      <div className={cx("border rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] overflow-visible", open ? "border-[var(--color-border-strong)]" : "border-[var(--color-border)]")}>
+        <button onClick={() => canOpen && onToggle()} disabled={!canOpen}
+          className={cx("w-full flex items-center gap-3.5 px-4 py-3.5 text-left tr rounded-[var(--radius)]", canOpen ? "cursor-pointer hover:bg-[var(--color-surface-2)]" : "cursor-default opacity-70")}>
+          {stateIcon}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2.5 flex-wrap">
+              <p className="text-[14.5px] font-[680] text-[var(--color-text)] whitespace-nowrap">{def.title}</p>
+              <span className={cx("text-[11.5px] font-[620] whitespace-nowrap", stateColor)}>{stateLabel}</span>
+            </div>
+            <p className="text-[12px] text-[var(--color-text-3)] truncate mt-0.5">{summary || def.what}</p>
+          </div>
+          {canOpen && <Icon.ChevronRight className={cx("w-4 h-4 text-[var(--color-text-3)] transition-transform shrink-0", open && "rotate-90")} />}
+        </button>
+        {open && <div className="px-4 pb-5 pt-1 border-t border-[var(--color-border)] fade-in"><div className="pt-4 space-y-4">{children}</div></div>}
+      </div>
+    </div>
+  );
 }
 
-function getPreviousStage(stage: FailableStage): FailableStage | null {
-  if (stage === "stage2") return "stage1";
-  if (stage === "stage3-prompts") return "stage2";
-  if (stage === "stage3-images") return "stage3-prompts";
-  return null;
-}
+// ── Stage actions (back / restart) ────────────────────────────────────────────
 
-function scrollToStage(stage: FailableStage | null) {
-  if (!stage) return;
-  document.getElementById(STAGE_SECTION_ID[stage])?.scrollIntoView({
-    behavior: "smooth",
-    block: "start",
-  });
-}
+type RestartStage = "stage1" | "stage2" | "stage3-prompts";
 
-// Short label for the Restart button (STAGE_DISPLAY_NAME is verbose for stage 3).
-const RESTART_LABEL: Record<FailableStage, string> = {
-  stage1: "Stage 1",
-  stage2: "Stage 2",
-  "stage3-prompts": "Stage 3",
-  "stage3-images": "Stage 3 Images",
-};
-
-// Per-stage "go back / restart" controls, shown under every stage section.
-function StageActions({
-  stage,
-  previousStage,
-  onRestart,
-  restarting,
-}: {
-  stage: FailableStage;
-  previousStage: FailableStage | null;
-  onRestart: (s: FailableStage) => void;
+function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
+  stage: RestartStage;
+  prevLabel?: string;
+  prevId?: string;
+  onRestart: (s: RestartStage) => void;
   restarting: boolean;
 }) {
-  const btn =
-    "cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-60 whitespace-nowrap";
+  const btn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
+  const label = stage === "stage1" ? "Stage 1" : stage === "stage2" ? "Stage 2" : "Stage 3";
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      {previousStage && (
-        <button onClick={() => scrollToStage(previousStage)} className={btn}>
-          <Icon.ArrowLeft className="w-3.5 h-3.5" />
-          Back to {STAGE_DISPLAY_NAME[previousStage]}
+      {prevId && (
+        <button onClick={() => document.getElementById(prevId)?.scrollIntoView({ behavior: "smooth", block: "start" })} className={btn}>
+          <Icon.ArrowLeft className="w-3.5 h-3.5" /> Back to {prevLabel}
         </button>
       )}
       <button onClick={() => onRestart(stage)} disabled={restarting} className={btn}>
-        {restarting ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />}
-        Restart {RESTART_LABEL[stage]}
+        {restarting ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />} Restart {label}
       </button>
     </div>
   );
 }
+
+// ── Next action (bottom bar content) ──────────────────────────────────────────
+
+type NextAction = {
+  tone: "amber" | "red" | "green" | "accent";
+  icon?: "review" | "image" | "alert" | "check";
+  title: string;
+  sub?: string;
+  cta?: string;
+  running?: boolean;
+  onClick?: () => void;
+};
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -384,45 +241,46 @@ export default function RunPage() {
   const params = useParams();
   const runId = typeof params.id === "string" ? parseInt(params.id, 10) : null;
   const run = useRunPolling(runId);
-  const scrolledRef = useRef(false);
+  const { push } = useToast();
   const autoResumedRef = useRef(false);
   const [resuming, setResuming] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [killing, setKilling] = useState(false);
+  const [startingStage2, setStartingStage2] = useState(false);
+  const [overrides, setOverrides] = useState<Partial<Record<StageKey, boolean>>>({});
+  const [zippingImages, setZippingImages] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameOverride, setNameOverride] = useState<string | null>(null);
+
+  // Live log: accumulate status/step transitions from polling.
+  const [log, setLog] = useState<LogLine[]>([]);
+  const lastStepRef = useRef<string | null>(null);
+  const lastStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!run) return;
+    const entries: LogLine[] = [];
+    if (run.status !== lastStatusRef.current) {
+      lastStatusRef.current = run.status;
+      entries.push({ k: Math.random().toString(36).slice(2), t: `→ ${statusLabel(run.status)}` });
+    }
+    if (run.currentStep && run.currentStep !== lastStepRef.current) {
+      lastStepRef.current = run.currentStep;
+      entries.push({ k: Math.random().toString(36).slice(2), t: run.currentStep });
+    }
+    if (entries.length) setLog((prev) => [...prev, ...entries].slice(-40));
+  }, [run]);
+
+  // Reset manual accordion overrides when the pipeline state changes.
+  useEffect(() => { setOverrides({}); }, [run?.status]);
 
   async function handleKill() {
     if (!runId || killing) return;
     if (!window.confirm("Kill this run? It stops at the next stage boundary. You can Resume it later.")) return;
     setKilling(true);
-    try {
-      await fetch(`/api/runs/${runId}/cancel`, { method: "POST" });
-    } catch { /* ignore */ }
+    try { await fetch(`/api/runs/${runId}/cancel`, { method: "POST" }); } catch { /* ignore */ }
     finally { setTimeout(() => setKilling(false), 1200); }
   }
-  const [startingStage2, setStartingStage2] = useState(false);
-
-  // Auto-scroll to last completed stage on initial load
-  useEffect(() => {
-    if (!run || scrolledRef.current) return;
-    if (run.status === "pending") return;
-    scrolledRef.current = true;
-
-    const lastStage = getLastCompletedStage(run);
-    const targetId: Record<string, string> = {
-      "stage3-images": "stage-3-section",
-      "stage3-prompts": "stage-3-section",
-      stage2: "stage-2-section",
-      stage1: "stage-1-section",
-    };
-    if (targetId[lastStage]) {
-      setTimeout(() => {
-        document
-          .getElementById(targetId[lastStage])
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 200);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run?.status]);
 
   async function handleResume() {
     if (!runId || resuming) return;
@@ -430,25 +288,14 @@ export default function RunPage() {
     try {
       await fetch(`/api/runs/${runId}/resume`, { method: "POST" });
       setTimeout(() => setResuming(false), 1200);
-    } catch {
-      setResuming(false);
-    }
+    } catch { setResuming(false); }
   }
 
-  // Auto-resume a stuck run. A run is "stuck" when it's still in an active
-  // status but its timestamp has been cold for 10+ min — almost always the
-  // fire-and-forget pipeline being killed mid-run (e.g. dev server restart).
-  // resumePipeline + granular Stage 1 resume picks up from the last completed
-  // sub-step, so no work is lost. Fires once per stuck episode and re-arms
-  // once the run is healthy again, so repeated deaths still self-heal without
-  // spamming (a stuck run is, by definition, ≥10 min between attempts).
+  // Auto-resume stuck runs (pipeline killed by a server restart).
   useEffect(() => {
     if (!run || !runId) return;
     if (isStuck(run)) {
-      if (!autoResumedRef.current) {
-        autoResumedRef.current = true;
-        handleResume();
-      }
+      if (!autoResumedRef.current) { autoResumedRef.current = true; handleResume(); }
     } else {
       autoResumedRef.current = false;
     }
@@ -461,466 +308,392 @@ export default function RunPage() {
     try {
       const res = await fetch(`/api/runs/${runId}/start-stage2`, { method: "POST" });
       const data = await res.json();
-      if (!data.success) {
-        alert(`Failed to start Stage 2: ${data.error ?? "unknown error"}`);
-      }
+      if (!data.success) push(`Failed to start Stage 2: ${data.error ?? "unknown error"}`);
     } catch (err) {
-      alert(`Failed to start Stage 2: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setTimeout(() => setStartingStage2(false), 1200);
-    }
+      push(`Failed to start Stage 2: ${err instanceof Error ? err.message : String(err)}`);
+    } finally { setTimeout(() => setStartingStage2(false), 1200); }
   }
 
-  async function handleRestartStage(stage: FailableStage) {
+  async function handleRestartStage(stage: RestartStage) {
     if (!runId || restarting) return;
-    const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
-    if (
-      !window.confirm(
-        isStage3
-          ? "Restart Stage 3 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 3 start."
-          : `Restart ${RESTART_LABEL[stage]}? This clears that stage's output and re-runs it.`,
-      )
-    ) {
-      return;
-    }
+    const isStage3 = stage === "stage3-prompts";
+    if (!window.confirm(isStage3
+      ? "Restart Stage 3 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 3 start."
+      : `Restart ${stage === "stage1" ? "Stage 1" : "Stage 2"}? This clears that stage's output and re-runs it.`)) return;
     setRestarting(true);
     try {
       const res = await fetch(`/api/runs/${runId}/restart-stage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage }),
       });
       const data = await res.json();
-      if (!data.success) {
-        alert(`Restart failed: ${data.error ?? "unknown error"}`);
-        setRestarting(false);
-        return;
-      }
-      // Stage 3 lives in a self-contained component with its own fetched state;
-      // reload so it picks up the wiped columns and shows the entry screen.
+      if (!data.success) { push(`Restart failed: ${data.error ?? "unknown error"}`); setRestarting(false); return; }
       window.location.reload();
     } catch (err) {
-      alert(`Restart failed: ${err instanceof Error ? err.message : String(err)}`);
+      push(`Restart failed: ${err instanceof Error ? err.message : String(err)}`);
       setRestarting(false);
     }
   }
 
-  async function handleDownloadAll() {
+  async function saveName() {
+    const v = nameDraft.trim();
+    setRenaming(false);
+    if (!runId || !v || v === displayName) return;
+    setNameOverride(v);
+    try {
+      await fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand_name: v }),
+      });
+      push("Run renamed", "success");
+    } catch { push("Rename failed — try again"); }
+  }
+
+  async function handleDownloadDocs() {
     if (!run) return;
     const slug = run.meta.brandName ?? run.meta.productName ?? `run_${runId}`;
     const zip = new JSZip();
     const { outputs } = run;
     const files: [string | null, string][] = [
       [outputs.onePagerEdited ?? outputs.onePager, `${slug}_STAGE1_ONE_PAGER.md`],
-      [outputs.research,                  `${slug}_RESEARCH.txt`],
-      [outputs.chiefMid,                  `${slug}_CHIEF_MID.txt`],
-      [outputs.researchRevised,           `${slug}_RESEARCH_REVISED.txt`],
-      [outputs.avatar,                    `${slug}_AVATAR.txt`],
-      [outputs.avatarRevised,             `${slug}_AVATAR_REVISED.txt`],
-      [outputs.offerBrief,                `${slug}_OFFER_BRIEF.txt`],
-      [outputs.offerBriefRevised,         `${slug}_OFFER_BRIEF_REVISED.txt`],
-      [outputs.necessaryBeliefs,          `${slug}_NECESSARY_BELIEFS.txt`],
-      [outputs.necessaryBeliefsRevised,   `${slug}_NECESSARY_BELIEFS_REVISED.txt`],
-      [outputs.chiefFinal,                `${slug}_CHIEF_FINAL.txt`],
-      [outputs.stage2Output,              `${slug}_STAGE2_GERMAN_COPY.txt`],
+      [outputs.research, `${slug}_RESEARCH.txt`],
+      [outputs.chiefMid, `${slug}_CHIEF_MID.txt`],
+      [outputs.researchRevised, `${slug}_RESEARCH_REVISED.txt`],
+      [outputs.avatar, `${slug}_AVATAR.txt`],
+      [outputs.avatarRevised, `${slug}_AVATAR_REVISED.txt`],
+      [outputs.offerBrief, `${slug}_OFFER_BRIEF.txt`],
+      [outputs.offerBriefRevised, `${slug}_OFFER_BRIEF_REVISED.txt`],
+      [outputs.necessaryBeliefs, `${slug}_NECESSARY_BELIEFS.txt`],
+      [outputs.necessaryBeliefsRevised, `${slug}_NECESSARY_BELIEFS_REVISED.txt`],
+      [outputs.chiefFinal, `${slug}_CHIEF_FINAL.txt`],
+      [outputs.stage2Output, `${slug}_STAGE2_GERMAN_COPY.txt`],
     ];
     for (const [content, name] of files) if (content) zip.file(name, content);
     const blob = await zip.generateAsync({ type: "blob" });
-    const a = Object.assign(document.createElement("a"), {
-      href: URL.createObjectURL(blob),
-      download: `${slug}_run_${runId}.zip`,
-    });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${slug}_docs.zip` });
     a.click();
     URL.revokeObjectURL(a.href);
+    push("Bundled research + copy → docs.zip", "success");
   }
 
+  async function handleDownloadImages() {
+    if (!runId || zippingImages) return;
+    setZippingImages(true);
+    try {
+      const data = await fetch(`/api/runs/${runId}`).then((r) => r.json());
+      const r = data.run ?? {};
+      const targets: Array<{ url: string; name: string }> = [];
+      if (r.stage3_hero_image_url) targets.push({ url: r.stage3_hero_image_url, name: "01_hero.png" });
+      try {
+        const imgs = JSON.parse(r.stage3_remaining_images || "[]");
+        if (Array.isArray(imgs)) {
+          for (const im of imgs) {
+            if (im?.image_url && im.status !== "failed") {
+              targets.push({ url: im.image_url, name: `${String(im.index).padStart(2, "0")}_${im.category || "image"}.png` });
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      if (!targets.length) { push("No generated images on this run yet"); return; }
+      const zip = new JSZip();
+      let ok = 0;
+      await Promise.all(targets.map(async (t) => {
+        try {
+          const blob = await fetch(t.url).then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.blob(); });
+          zip.file(t.name, blob);
+          ok++;
+        } catch (e) { console.error(`zip fetch failed for ${t.name}:`, e); }
+      }));
+      if (!ok) { push("Couldn't fetch the images — check your connection"); return; }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "images.zip" });
+      a.click();
+      URL.revokeObjectURL(a.href);
+      push(ok < targets.length ? `Bundled ${ok} of ${targets.length} images → images.zip` : "Bundled hero + images → images.zip", "success");
+    } finally { setZippingImages(false); }
+  }
+
+  // ── Loading skeleton ──
   if (!run) {
     return (
-      <main className="px-7 py-7 max-w-[1080px] mx-auto">
-        <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-8 fade-in">
+      <div className="px-6 py-8 max-w-[880px] mx-auto">
+        <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] p-8 fade-in">
           <div className="flex items-center gap-2.5 text-[var(--color-text-3)]">
             <Icon.Loader className="w-4 h-4" />
             <span className="text-[13px]">Loading run&hellip;</span>
           </div>
           <div className="space-y-2 mt-5">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-3 rounded shimmer bg-[var(--color-surface-2)]" />
-            ))}
+            {[1, 2, 3].map((i) => <div key={i} className="h-3 rounded shimmer bg-[var(--color-surface-2)]" />)}
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   const { outputs } = run;
-  const hasAnyOutput = Object.values(outputs).some(Boolean);
-  const isFailed = run.status === "failed";
-  const isCancelled = run.status === "cancelled";
-  const isStuckRun = isStuck(run);
-  // Non-terminal = something is (or should be) running → can be killed.
   const isTerminal = ["completed", "failed", "cancelled"].includes(run.status);
-  const showResumeBanner = isFailed || isCancelled || isStuckRun;
-  const displayName = run.meta.brandName ?? run.meta.productName ?? `Run #${runId}`;
+  const displayName = nameOverride ?? run.meta.brandName ?? run.meta.productName ?? `Run #${runId}`;
   const elapsed = elapsedTime(run.timestamps.startedAt, run.timestamps.completedAt);
 
-  const hasOnePager = Boolean(outputs.onePager);
+  const states: Record<StageKey, StageState> = {
+    stage1: getStageState(run, "stage1"),
+    stage2: getStageState(run, "stage2"),
+    stage3: getStageState(run, "stage3"),
+  };
+  // The approval gate after research belongs on Stage 1 — that's what needs review.
+  if (run.status === "awaiting_stage2_approval") { states.stage1 = "waiting"; states.stage2 = "pending"; }
+
+  const autoOpen = (key: StageKey) => stageActionable(states[key]) || (run.status === "completed" && key === "stage3");
+  const isOpen = (key: StageKey) => overrides[key] !== undefined ? Boolean(overrides[key]) : autoOpen(key);
+  const toggle = (key: StageKey) => setOverrides((p) => ({ ...p, [key]: !isOpen(key) }));
+  const openStage = (key: StageKey) => {
+    setOverrides((p) => ({ ...p, [key]: true }));
+    setTimeout(() => document.getElementById("v2-stage-" + key.slice(-1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+
+  const summary = (key: StageKey): string | null => {
+    if (key === "stage1") {
+      if (!outputs.onePager) return null;
+      return (run.meta.brandName ? run.meta.brandName + " · " : "") + "research one-pager" + (outputs.onePagerEdited ? " · edited" : "");
+    }
+    if (key === "stage2") {
+      if (!outputs.stage2Output) return null;
+      return "German copy kit" + (outputs.stage2OutputEdited ? " · edited" : "");
+    }
+    if (run.status === "completed") return "hero + 8 images";
+    return null;
+  };
+
+  const present: Record<StageKey, boolean> = {
+    stage1: Boolean(outputs.onePager) || ["stage1", "scraping", "pending"].includes(run.status),
+    stage2: Boolean(outputs.stage2Output) || run.status === "stage2" || Boolean(outputs.onePager),
+    stage3: Boolean(outputs.stage2Output) ||
+      ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status),
+  };
+
+  // ── Next action ──
+  const nextAction = (): NextAction => {
+    const s = run.status;
+    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the German copy.", cta: startingStage2 ? "Starting…" : "Run Stage 2", onClick: handleStartStage2 };
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 3", onClick: () => openStage("stage3") };
+    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => openStage("stage3") };
+    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => openStage("stage3") };
+    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Pick up from the last completed step — nothing is lost.", cta: resuming ? "Resuming…" : "Resume pipeline", onClick: handleResume };
+    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue where it stopped.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete", sub: "All research, copy, and images are ready." };
+    return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
+  };
+  const a = nextAction();
+  const toneBar = { amber: "var(--color-amber)", red: "var(--color-red)", green: "var(--color-green)", accent: "var(--color-accent)" }[a.tone];
+  const hasDocs = Boolean(outputs.onePager || outputs.stage2Output);
+  const showPrimary = !a.running && run.status !== "completed";
 
   return (
-    <main className="px-7 py-7 max-w-[1080px] mx-auto">
-      <div className="space-y-6">
-
-        {/* Breadcrumb + header */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-1.5 text-[12px] text-[var(--color-text-3)]">
-            <Link href="/history" className="hover:text-[var(--color-text)] transition-colors inline-flex items-center gap-1">
-              <Icon.ArrowLeft className="w-3.5 h-3.5" />
-              Runs
-            </Link>
+    <div className="px-6 py-8 pb-32 max-w-[880px] mx-auto" data-screen-label="Run">
+      {/* header */}
+      <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-4">
+        <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
+      </Link>
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div className="min-w-0 flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-[var(--radius)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
+            {run.meta.uploadedSourceImages[0]
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
+              : <MeshThumb id={runId ?? 0} className="w-full h-full" />}
           </div>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-3 mb-1">
-                <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] truncate">
-                  {displayName}
-                </h1>
-                <span className="font-[var(--font-ibm-plex-mono)] text-[12px] text-[var(--color-text-4)]">#{runId}</span>
-                {runId !== null && <RunProductCode runId={Number(runId)} />}
-              </div>
-              {run.meta.productUrl ? (
-                <a
-                  href={run.meta.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-accent)] transition-colors max-w-full truncate"
-                >
-                  <span className="truncate">{run.meta.productUrl}</span>
-                  <Icon.ExternalLink className="w-3 h-3 flex-shrink-0" />
-                </a>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2.5 group/name">
+              {renaming ? (
+                <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
+                  onBlur={saveName}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveName(); } else if (e.key === "Escape") { e.preventDefault(); setRenaming(false); } }}
+                  className="text-[22px] font-bold tracking-tight ff-display text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded-[var(--radius-sm)] px-2 py-0.5 min-w-0 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+                  aria-label="Run name" />
               ) : (
-                <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-4)]">
-                  Description-only run
-                </span>
+                <>
+                  <h1 className="text-[22px] font-bold tracking-tight ff-display text-[var(--color-text)] truncate">{displayName}</h1>
+                  <button onClick={() => { setNameDraft(displayName); setRenaming(true); }} title="Rename run" aria-label="Rename run"
+                    className="opacity-0 group-hover/name:opacity-100 focus:opacity-100 text-[var(--color-text-3)] hover:text-[var(--color-text)] tr p-0.5 cursor-pointer shrink-0">
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                  </button>
+                </>
               )}
+              <span className="ff-mono text-[11.5px] text-[var(--color-text-4)]">#{runId}</span>
+              {runId !== null && <RunProductCode runId={Number(runId)} />}
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <StatusBadge status={run.status} />
-              {elapsed && (
-                <span className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-4)]">{elapsed}</span>
-              )}
-              {!isTerminal && (
-                <button
-                  onClick={handleKill}
-                  disabled={killing}
-                  title="Stop this run at the next stage boundary"
-                  className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95 whitespace-nowrap disabled:opacity-50"
-                >
-                  {killing ? "Killing…" : "■ Kill run"}
-                </button>
-              )}
-            </div>
+            <p className="text-[12px] text-[var(--color-text-3)] truncate mt-0.5">
+              {run.meta.productUrl ? (
+                <a href={run.meta.productUrl} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent-text)] tr">
+                  {truncateUrl(run.meta.productUrl, 56)}
+                </a>
+              ) : "Description-only run"}
+              {elapsed ? ` · ${elapsed}` : ""}
+            </p>
           </div>
         </div>
+        <StatusBadge status={run.status} stuck={isStuck(run)} />
+      </div>
 
-        {/* Progress */}
-        <PipelineProgress run={run} />
+      {/* live log while running */}
+      <div className="mb-5"><LiveLog run={run} log={log} /></div>
 
-        {/* Submitted inputs (description + source images) */}
-        {(run.meta.productDescription || run.meta.uploadedSourceImages.length > 0) && (
-          <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] px-5 py-4 space-y-3">
-            {run.meta.productDescription && (
-              <div>
-                <p className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-text-3)] mb-1.5">
-                  Description
-                </p>
-                <p className="text-[13px] text-[var(--color-text-2)] leading-relaxed whitespace-pre-wrap">
-                  {run.meta.productDescription}
-                </p>
-              </div>
-            )}
-            {run.meta.uploadedSourceImages.length > 0 && (
-              <div>
-                <p className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-text-3)] mb-1.5">
-                  Source images · {run.meta.uploadedSourceImages.length}
-                </p>
-                <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
-                  {run.meta.uploadedSourceImages.map((url, i) => (
-                    <a
-                      key={url + i}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="aspect-square rounded-[9px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)] transition-colors"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Source ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+      {/* stage accordion */}
+      <div className="space-y-3.5">
+        {STAGE_DEFS.filter((d) => present[d.key]).map((def, i, arr) => (
+          <StageAccordion key={def.key} def={def} state={states[def.key]} open={isOpen(def.key)} onToggle={() => toggle(def.key)}
+            summary={summary(def.key)} isLast={i === arr.length - 1}>
 
-        {/* Resume banner */}
-        {showResumeBanner && (
-          <div className="border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] border-l-4 border-l-[var(--color-amber)] rounded-[11px] px-[18px] py-4 flex items-center gap-4 flex-wrap fade-in">
-            <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] text-[var(--color-text)] font-[600]">
-                {isFailed ? "Run failed" : isCancelled ? "Run cancelled" : "Run appears stuck"}
-              </p>
-              {run.currentStep && (
-                <p className="text-[11px] text-[var(--color-text-3)] font-[var(--font-ibm-plex-mono)] mt-0.5">
-                  at: {run.currentStep}
-                </p>
-              )}
-              {run.error && (
-                <p className="text-[12px] text-[var(--color-text-2)] mt-1.5 leading-relaxed">
-                  {run.error}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handleResume}
-              disabled={resuming}
-              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
-            >
-              {resuming ? (
+            {def.key === "stage1" && (
+              outputs.onePager ? (
                 <>
-                  <Icon.Loader className="w-3.5 h-3.5" />
-                  Resuming&hellip;
-                </>
-              ) : (
-                <>
-                  <Icon.Play className="w-3.5 h-3.5" />
-                  Resume pipeline
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Go-back / restart row — only when the run actually failed (not just stuck) */}
-        {isFailed && (() => {
-          const failedStage = getFailedStage(run);
-          const previousStage = getPreviousStage(failedStage);
-          return (
-            <div className="flex gap-3 flex-wrap fade-in">
-              {previousStage && (
-                <button
-                  onClick={() => scrollToStage(previousStage)}
-                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
-                >
-                  <Icon.ArrowLeft className="w-3.5 h-3.5" />
-                  Go back to {STAGE_DISPLAY_NAME[previousStage]}
-                </button>
-              )}
-              <button
-                onClick={() => handleRestartStage(failedStage)}
-                disabled={restarting}
-                className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-accent)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
-              >
-                {restarting ? (
-                  <>
-                    <Icon.Loader className="w-3.5 h-3.5" />
-                    Restarting&hellip;
-                  </>
-                ) : (
-                  <>
-                    <Icon.Refresh className="w-3.5 h-3.5" />
-                    Restart {STAGE_DISPLAY_NAME[failedStage]}
-                  </>
-                )}
-              </button>
-            </div>
-          );
-        })()}
-
-        {/* Competitor scrape errors */}
-        {run.scrapeErrors && run.scrapeErrors.length > 0 && (
-          <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-amber-bg)] px-4 py-3 fade-in">
-            <div className="flex items-start gap-2.5">
-              <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-[var(--color-text)] font-[600] mb-1">
-                  {run.scrapeErrors.length} competitor URL{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be scraped
-                </p>
-                <ul className="space-y-0.5">
-                  {run.scrapeErrors.map((e, i) => (
-                    <li key={i} className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] truncate">
-                      <span className="text-[var(--color-text-2)]">{e.url}</span>
-                      <span className="mx-1.5 text-[var(--color-text-4)]">·</span>
-                      {e.error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stage 1 — single one-pager */}
-        {(hasOnePager || run.status === "stage1" || run.status === "scraping") && (
-          <Section id="stage-1-section" label="Stage 1 — Research summary">
-            {hasOnePager ? (
-              <>
-                <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] px-6 py-5">
-                  <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
-                </div>
-                {runId !== null && (
-                  <>
-                    <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-                      <StageActions
-                        stage="stage1"
-                        previousStage={null}
-                        onRestart={handleRestartStage}
-                        restarting={restarting}
-                      />
-                      <AIRegenerate
-                        runId={runId}
-                        stage="stage1"
-                        onRegenerated={() => window.location.reload()}
-                        initialFeedback={run.feedback?.stage1Note ?? null}
-                      />
-                    </div>
-                    <div className="flex items-start justify-between gap-3 flex-wrap pt-1">
-                      <FeedbackAppliedChip stage={1} />
-                      <FeedbackButtons
-                        runId={runId}
-                        stage="stage1"
-                        initialVote={run.feedback?.stage1 ?? null}
-                        initialNote={run.feedback?.stage1Note ?? null}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* QC gate — paused between Stage 1 and Stage 2 */}
-                {run.status === "awaiting_stage2_approval" && (
-                  <div className="mt-5 border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] border-l-4 border-l-[var(--color-amber)] rounded-[11px] px-[18px] py-4 flex items-center gap-4 flex-wrap fade-in">
-                    <Icon.Alert className="w-4 h-4 text-[var(--color-warn)] flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-[var(--color-text)] font-[600]">
-                        Review the research summary above
-                      </p>
-                      <p className="text-[12px] text-[var(--color-text-2)] mt-0.5 leading-relaxed">
-                        Edit it if needed, then run Stage 2 to generate the German copy.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleStartStage2}
-                      disabled={startingStage2}
-                      className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 whitespace-nowrap disabled:opacity-60"
-                    >
-                      {startingStage2 ? (
-                        <>
-                          <Icon.Loader className="w-3.5 h-3.5" />
-                          Starting Stage 2&hellip;
-                        </>
-                      ) : (
-                        <>
-                          Looks good — run Stage 2
-                          <Icon.ArrowRight className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
+                  <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface-2)] px-5 py-4">
+                    <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="border border-dashed border-[var(--color-border)] rounded-[11px] px-4 py-10 text-center bg-[var(--color-surface)]">
-                <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />
-                <p className="text-[12px] text-[var(--color-text-3)]">
-                  {run.currentStep ?? "Researching the product…"}
-                </p>
-              </div>
-            )}
-          </Section>
-        )}
-
-        {/* Stage 2 output */}
-        {(outputs.stage2Output || run.status === "stage2") && (
-          <Section id="stage-2-section" label="Stage 2 — German Copy">
-            {outputs.stage2Output ? (
-              <>
-                <EditableOutput
-                  runId={Number(runId)}
-                  field="stage2_copy"
-                  stage="stage2"
-                  originalValue={outputs.stage2Output}
-                  editedValue={outputs.stage2OutputEdited}
-                  editedAt={outputs.stage2EditedAt}
-                  label="German Copy Kit"
-                  monospace={false}
-                  downloadFilename="STAGE2_GERMAN_COPY.txt"
-                />
-                {runId !== null && (
-                  <>
-                    <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
-                      <AIRegenerate
-                        runId={runId}
-                        stage="stage2"
-                        onRegenerated={() => window.location.reload()}
-                        initialFeedback={run.feedback?.stage2Note ?? null}
-                      />
-                      <div className="flex items-start gap-3">
-                        <FeedbackAppliedChip stage={2} />
-                        <FeedbackButtons
-                          runId={runId}
-                          stage="stage2"
-                          initialVote={run.feedback?.stage2 ?? null}
-                          initialNote={run.feedback?.stage2Note ?? null}
-                        />
+                  {run.scrapeErrors && run.scrapeErrors.length > 0 && (
+                    <div className="rounded-[var(--radius-sm)] bg-[var(--color-amber-bg)] px-3.5 py-2.5">
+                      <p className="text-[11.5px] text-[var(--color-text)] font-[600] mb-1">
+                        {run.scrapeErrors.length} competitor URL{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be scraped
+                      </p>
+                      <ul className="space-y-0.5">
+                        {run.scrapeErrors.map((e, i) => (
+                          <li key={i} className="ff-mono text-[10px] text-[var(--color-text-3)] truncate">
+                            <span className="text-[var(--color-text-2)]">{e.url}</span>
+                            <span className="mx-1.5 text-[var(--color-text-4)]">·</span>{e.error}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {run.meta.uploadedSourceImages.length > 0 && (
+                    <div>
+                      <p className="eyebrow mb-2">Source images · {run.meta.uploadedSourceImages.length}</p>
+                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                        {run.meta.uploadedSourceImages.map((url, i) => (
+                          <a key={url + i} href={url} target="_blank" rel="noopener noreferrer"
+                            className="aspect-square rounded-[8px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)] tr">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`Source ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                          </a>
+                        ))}
                       </div>
                     </div>
-                    <StageActions
-                      stage="stage2"
-                      previousStage="stage1"
-                      onRestart={handleRestartStage}
-                      restarting={restarting}
-                    />
-                  </>
-                )}
+                  )}
+                  {runId !== null && (
+                    <>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <StageActions stage="stage1" onRestart={handleRestartStage} restarting={restarting} />
+                        <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
+                      </div>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <FeedbackAppliedChip stage={1} />
+                        <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
+                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
+                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Researching the product…"}</p>
+                </div>
+              )
+            )}
+
+            {def.key === "stage2" && (
+              outputs.stage2Output ? (
+                <>
+                  <EditableOutput
+                    runId={Number(runId)}
+                    field="stage2_copy"
+                    stage="stage2"
+                    originalValue={outputs.stage2Output}
+                    editedValue={outputs.stage2OutputEdited}
+                    editedAt={outputs.stage2EditedAt}
+                    label="German Copy Kit"
+                    monospace={false}
+                    downloadFilename="STAGE2_GERMAN_COPY.txt"
+                  />
+                  {runId !== null && (
+                    <>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
+                        <div className="flex items-start gap-3">
+                          <FeedbackAppliedChip stage={2} />
+                          <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
+                        </div>
+                      </div>
+                      <StageActions stage="stage2" prevLabel="Research" prevId="v2-stage-1" onRestart={handleRestartStage} restarting={restarting} />
+                    </>
+                  )}
+                </>
+              ) : run.status === "stage2" ? (
+                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
+                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
+                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">Generating German copy…</p>
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the research.</p>
+              )
+            )}
+
+            {def.key === "stage3" && (
+              <>
+                <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
+                <StageActions stage="stage3-prompts" prevLabel="German copy" prevId="v2-stage-2" onRestart={handleRestartStage} restarting={restarting} />
               </>
-            ) : (
-              <div className="border border-dashed border-[var(--color-border)] rounded-[11px] px-4 py-8 text-center bg-[var(--color-surface)]">
-                <Icon.Loader className="w-4 h-4 text-[var(--color-text-3)] mx-auto mb-2" />
-                <p className="text-[12px] text-[var(--color-text-3)]">Generating German copy…</p>
+            )}
+          </StageAccordion>
+        ))}
+      </div>
+
+      {/* sticky bottom action bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 pointer-events-none">
+        <div className="max-w-[880px] mx-auto pointer-events-auto">
+          <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)] border bg-[color-mix(in_srgb,var(--color-surface)_94%,transparent)] backdrop-blur-md shadow-[var(--shadow-pop)]"
+            style={{ borderColor: `color-mix(in srgb, ${toneBar} 30%, var(--color-border))` }}>
+            <span className="grid place-items-center w-8 h-8 rounded-full shrink-0 text-white" style={{ background: toneBar }}>
+              {a.running ? <Icon.Loader className="w-4 h-4" />
+                : a.icon === "alert" ? <Icon.Alert className="w-4 h-4" />
+                : a.icon === "check" ? <Icon.Check className="w-4 h-4" strokeWidth={3} />
+                : a.icon === "image" ? <Icon.Image className="w-4 h-4" />
+                : <Icon.Spark className="w-4 h-4" />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-[650] text-[var(--color-text)] truncate">{a.title}</p>
+              {a.sub && <p className="text-[11.5px] text-[var(--color-text-2)] truncate">{a.sub}</p>}
+            </div>
+            {(hasDocs || run.status === "completed") && (
+              <div className="flex items-center gap-2 shrink-0">
+                {hasDocs && (
+                  <button onClick={handleDownloadDocs}
+                    className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap">
+                    <Icon.Download className="w-3.5 h-3.5" /> Docs
+                  </button>
+                )}
+                <button onClick={handleDownloadImages} disabled={zippingImages}
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap">
+                  <Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "Zipping…" : "Images"}
+                </button>
               </div>
             )}
-          </Section>
-        )}
-
-        {/* Stage 3 — hero-first two-phase flow. Shows once Stage 2 has output,
-            or any time a hero-flow status is active. The component drives all
-            of its own states (entry → hero QC → prompt QC → grid) off the run
-            status it polls directly. */}
-        {(Boolean(outputs.stage2Output) ||
-          ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status)) && (
-          <Section id="stage-3-section" label="Stage 3 — Images">
-            <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
-            <StageActions
-              stage="stage3-prompts"
-              previousStage="stage2"
-              onRestart={handleRestartStage}
-              restarting={restarting}
-            />
-          </Section>
-        )}
-
-        {/* Download all */}
-        {hasAnyOutput && (
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={handleDownloadAll}
-              className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
-            >
-              <Icon.Download className="w-3.5 h-3.5" />
-              Download all docs (.zip)
-            </button>
+            {a.running ? (
+              !isTerminal && (
+                <button onClick={handleKill} disabled={killing}
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border bg-[var(--color-red-bg)] text-[var(--color-red)] tr hover:brightness-95 disabled:opacity-50 whitespace-nowrap"
+                  style={{ borderColor: "color-mix(in srgb, var(--color-red) 50%, transparent)" }}>
+                  <Icon.Stop className="w-3 h-3" /> {killing ? "Killing…" : "Kill"}
+                </button>
+              )
+            ) : showPrimary && a.cta && (
+              <button onClick={a.onClick} disabled={startingStage2 || resuming}
+                className="cursor-pointer shrink-0 inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent tr hover:brightness-110 disabled:opacity-60 whitespace-nowrap">
+                {a.cta}<Icon.ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

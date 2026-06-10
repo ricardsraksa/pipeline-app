@@ -150,6 +150,11 @@ export async function PATCH(
     if (!EDITABLE_FIELDS.includes(field as typeof EDITABLE_FIELDS[number])) {
       return Response.json({ error: "Unknown field" }, { status: 400 });
     }
+    // `stage` is interpolated into the column name — whitelist it so a
+    // malformed (or malicious) value can't inject SQL.
+    if (!["stage1", "stage2", "stage3"].includes(stage)) {
+      return Response.json({ error: "Unknown stage" }, { status: 400 });
+    }
     const editedCol = `${field}_edited`;
     const editedAtCol = `${stage}_edited_at`;
     const ts = new Date().toISOString();

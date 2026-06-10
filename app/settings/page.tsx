@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 
 type Stage = "stage1" | "stage2" | "stage3";
@@ -149,14 +150,17 @@ export default function SettingsPage() {
   if (!prompts) return null;
 
   return (
-    <main className="px-7 py-7 max-w-[720px] mx-auto">
+    <main className="px-6 py-8 max-w-[760px] mx-auto" data-screen-label="Settings">
+      <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-4">
+        <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
+      </Link>
       {/* Header */}
-      <div className="mb-7">
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)] mb-1">
+      <div className="mb-6">
+        <h1 className="text-[26px] font-bold tracking-tight ff-display text-[var(--color-text)] mb-1">
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
-          Edit the system prompts for each stage. Changes take effect on the next pipeline run. Old versions are kept in history — nothing is lost on reset.
+          The system prompts that drive each stage. Changes take effect on the next pipeline run. Old versions are kept in history — nothing is lost on reset.
         </p>
       </div>
 
