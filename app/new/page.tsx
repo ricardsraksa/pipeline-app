@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import { Icon } from "@/components/ui/Icon";
-import { useToast } from "@/components/Toasts";
 
 const MIN_DESC = 20;
 const MAX_IMG = 10;
@@ -32,7 +31,6 @@ function StepNum({ n, done }: { n: number; done: boolean }) {
 
 export default function NewRunPage() {
   const router = useRouter();
-  const { push } = useToast();
   const descRef = useRef<HTMLTextAreaElement>(null);
 
   const [desc, setDesc] = useState("");
@@ -84,14 +82,6 @@ export default function NewRunPage() {
     onDrop: uploadFiles,
   });
 
-  const prefill = () => {
-    setDesc("NackenFlow is a portable cervical traction device — a 'neck hammock' that cradles the head and applies gentle, gravity-assisted decompression to the cervical spine. Anchors to any door handle, post or railing; the user reclines for 10 minutes. Memory-foam neck cradle, adjustable nylon straps, travel pouch. For desk-workers 28–55 with screen-driven neck tension.");
-    setProductUrl("https://www.aliexpress.com/item/100500.html");
-    setCompetitors("https://www.amazon.de/neck-traction\nhttps://www.idealo.de/neck-hammock");
-    setShowUrls(true);
-    push("Demo product loaded — add photos to start", "success");
-  };
-
   async function start() {
     if (!canStart) return;
     setSubmitError(null);
@@ -128,15 +118,9 @@ export default function NewRunPage() {
       <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-4">
         <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
       </Link>
-      <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
-        <div>
-          <h1 className="text-[26px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">New run</h1>
-          <p className="text-[13px] text-[var(--color-text-2)] mt-1">Two things needed. We&rsquo;ll pause for your review between stages.</p>
-        </div>
-        <button onClick={prefill}
-          className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap">
-          <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" /> Load demo
-        </button>
+      <div className="mb-5">
+        <h1 className="text-[26px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">New run</h1>
+        <p className="text-[13px] text-[var(--color-text-2)] mt-1">Two things needed. We&rsquo;ll pause for your review between stages.</p>
       </div>
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] divide-y divide-[var(--color-border)] overflow-hidden">
