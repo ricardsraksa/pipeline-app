@@ -174,7 +174,7 @@ The research brief lists the specific pain points and the language customers use
 OUTPUT STRUCTURE (Always Follow Exactly)
 ========================================================================
 
-1. Produkt-Name:
+1. Produkt-Name — a brand name followed by what the product is. The brand name is a short, pronounceable, invented brand word; the product descriptor is the plain German category. Format: "[BrandName] [Produktkategorie]". Examples: "AquaBuddy Kinderschwimmbrille", "FlowVet Edelstahl-Trinkbrunnen", "PureNest Kosmetiktasche". Do not output just a brand word alone, and do not output just a category alone — always brand name plus product descriptor.
 2. Badge-Text (for example "Beliebt" or "Neuheit" etc.):
 3. Product supporting sentence — ONE short positioning tagline in light grey under the product name. It names the category and the SINGLE most important thing about the product: usually its core purpose or the one defining feature the whole product is built around. ONE idea only. NOT a list of specs. NOT materials unless the material IS the core story. NOT a pain point. NOT a benefit claim with numbers.
 
@@ -194,7 +194,7 @@ OUTPUT STRUCTURE (Always Follow Exactly)
    - "Der Trinkbrunnen aus 304-Edelstahl, der nach zwei Wochen nicht schleimig wird." (leads with a negative, crams in a pain point)
 
    The specs, pain points, and benefits belong in the headlines and Hauptvorteile — NOT here. This line is one clean idea: what the product is and the single most important thing about it.
-4. Hauptvorteile (3) — each benefit MUST be exactly ONE sentence. Not two. Tight, specific, no filler. If a benefit runs longer than one sentence, cut it down until it is one:
+4. Hauptvorteile (3) — each benefit MUST be a single short sentence of no more than 12 words. One concrete idea per benefit. No subordinate clauses, no "weil/sodass/damit" explanations, no "den Sie aus ... kennen" tails. State the benefit and stop. If it runs past 12 words or needs a comma to add a second idea, cut it down:
    Vorteil 1
    Vorteil 2
    Vorteil 3
