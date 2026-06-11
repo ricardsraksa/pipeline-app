@@ -240,6 +240,41 @@ function imageUrlOf(o: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+// media_import_url returns { media_id, type, content_type, source_url }. Pull
+// the id from structuredContent, the text content (JSON), or as a last resort a
+// UUID match — robust to which envelope the MCP server uses.
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+function mediaIdOf(result: ToolResult): string | undefined {
+  const sc = result.structuredContent as Record<string, unknown> | undefined;
+  if (sc && typeof sc.media_id === "string") return sc.media_id;
+  const text = result.content?.map((c) => c.text).filter(Boolean).join("") ?? "";
+  if (text) {
+    try {
+      const o = JSON.parse(text) as Record<string, unknown>;
+      if (typeof o.media_id === "string") return o.media_id;
+    } catch { /* not JSON — fall through to regex */ }
+    const m = text.match(UUID_RE);
+    if (m) return m[0];
+  }
+  return undefined;
+}
+
+// generate_image no longer accepts https:// URLs in medias — each reference must
+// first be imported into Higgsfield storage, which returns a confirmed media_id.
+async function importMediaId(url: string): Promise<string> {
+  const result = await callTool("media_import_url", { url, type: "image" });
+  const id = mediaIdOf(result);
+  if (!id) {
+    throw new Error(
+      "Higgsfield media_import_url returned no media_id for " +
+        url +
+        ". Response: " +
+        JSON.stringify(result.structuredContent ?? result.content).slice(0, 200),
+    );
+  }
+  return id;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export interface McpImageRequest {
@@ -267,7 +302,10 @@ export async function generateImageViaMcp(req: McpImageRequest): Promise<string>
     (u) => typeof u === "string" && u.startsWith("http"),
   );
   if (refs.length) {
-    params.medias = refs.map((u) => ({ value: u, role: "image" }));
+    // Import each reference URL → media_id, then pass the ids (NOT the URLs).
+    // Higgsfield's generate_image rejects raw https:// URLs in medias.
+    const mediaIds = await Promise.all(refs.map((u) => importMediaId(u)));
+    params.medias = mediaIds.map((id) => ({ value: id, role: "image" }));
   }
 
   const submit = await callTool("generate_image", { params });
