@@ -87,8 +87,9 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
               const [title, sub] = NEED_COPY[r.status ?? ""] || ["Waiting", ""];
               const failed = r.status === "failed";
               return (
-                <button key={r.id} onClick={() => open(r.id)}
-                  className="w-full text-left flex items-center gap-3.5 px-4 py-3.5 rounded-[var(--radius)] border bg-[var(--color-surface)] shadow-[var(--shadow-card)] tr cursor-pointer hover:border-[var(--color-text-3)] group"
+                <div key={r.id} role="button" tabIndex={0} onClick={() => open(r.id)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(r.id); } }}
+                  className="w-full text-left flex items-center gap-3.5 px-4 py-3.5 rounded-[var(--radius)] border bg-[var(--color-surface)] shadow-[var(--shadow-card)] tr cursor-pointer hover:border-[var(--color-text-3)] group focus:outline-none focus:shadow-[0_0_0_3px_var(--color-ring)]"
                   style={{ borderColor: `color-mix(in srgb, ${failed ? "var(--color-red)" : "var(--color-amber)"} 35%, var(--color-border))`, opacity: deleting === r.id ? 0.4 : undefined }}>
                   <RunThumb run={r} className="w-11 h-11" />
                   <div className="flex-1 min-w-0">
@@ -102,7 +103,11 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                   <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-[7px] rounded-[var(--radius-sm)] text-[12.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] group-hover:brightness-110 tr">
                     {failed ? "Resume" : "Review"} <Icon.ArrowRight className="w-3.5 h-3.5" />
                   </span>
-                </button>
+                  <button onClick={(e) => del(e, r)} title="Delete run" aria-label={`Delete run #${r.id}`}
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 grid place-items-center w-7 h-7 rounded-[var(--radius-sm)] text-[var(--color-text-3)] hover:text-[var(--color-red)] hover:bg-[var(--color-red-bg)] tr cursor-pointer shrink-0">
+                    <Icon.Trash className="w-[15px] h-[15px]" />
+                  </button>
+                </div>
               );
             })}
           </div>
