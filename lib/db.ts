@@ -134,6 +134,9 @@ async function migrateDB() {
     // Operator-assigned product code (free text, e.g. "P50") to cross-reference
     // an external product sheet.
     "product_code TEXT",
+    // Structured (JSON) form of the Stage 2 copy kit, derived from stage2_output
+    // for the per-field copy UI. The free text stays canonical.
+    "stage2_json TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -416,4 +419,5 @@ export interface Run {
   stage3_remaining_images: string | null;
   stage3_placement: string | null;
   product_code: string | null;
+  stage2_json: string | null;
 }

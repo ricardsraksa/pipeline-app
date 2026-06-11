@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, type Run } from "@/lib/db";
+import { structureStage2Copy } from "@/lib/stage2/format";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
@@ -59,6 +60,14 @@ export async function POST(
       [result.stageTimestamp]: ts,
       last_updated_at: ts,
     } as Partial<Run>);
+
+    // Regenerated Stage 2 copy → refresh the structured per-field JSON so the
+    // field view matches the new text. Best-effort, never blocks the response.
+    if (stage === "stage2") {
+      structureStage2Copy(result.output)
+        .then((j) => j && updateRun(runId, { stage2_json: JSON.stringify(j) }))
+        .catch((e) => console.error("[stage2 structure] regen:", e));
+    }
 
     return NextResponse.json({ success: true, output: result.output });
   } catch (err) {

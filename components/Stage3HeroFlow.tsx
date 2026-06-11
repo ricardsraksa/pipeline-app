@@ -47,6 +47,14 @@ function effVerdict(im: RemImage | null | undefined): "pass" | "fail" | null {
   return v === "pass" ? "pass" : v === "fail" ? "fail" : null;
 }
 
+// Why an image is in the fix list: a hard generation error and/or the auditor's
+// flagged issues, de-duplicated. Drives both the bulk-fix reasons display and
+// the per-image rewrite instruction.
+function reasonsFor(im: RemImage): string[] {
+  const all = [im.error, ...(im.issues ?? [])].map((s) => (s ?? "").trim()).filter(Boolean);
+  return Array.from(new Set(all));
+}
+
 // Human-readable label for each Stage 3 image template, so the operator knows
 // which part of the copy each image pairs with.
 const CATEGORY_LABELS: Record<string, string> = {
@@ -122,7 +130,6 @@ export default function Stage3HeroFlow({
   const [promptDrafts, setPromptDrafts] = useState<RemainingPrompt[] | null>(null);
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
-  const [genIndex, setGenIndex] = useState<number | null>(null);
   // Stop flag for the client-side 8-image loop (the run-page "Kill run" only
   // reaches server stages; this loop runs in the browser).
   const stopRef = useRef(false);
@@ -319,11 +326,11 @@ export default function Stage3HeroFlow({
 
       const productDesc = run.product_description ?? run.product_name ?? "";
       stopRef.current = false;
-      for (let i = 0; i < saved.length; i++) {
-        if (stopRef.current) break;
-        if (results[i]?.status === "done") continue; // already generated — resume skips it
+
+      // Generate one image: call Higgsfield, audit it, store + persist the
+      // result. Pulled out of the loop so a worker pool can run several at once.
+      const processOne = async (i: number) => {
         const p = saved[i];
-        setGenIndex(i);
         try {
           // Reference the image(s) this prompt was built around: the approved
           // hero, or the source product photos when the hero step was skipped.
@@ -359,13 +366,29 @@ export default function Stage3HeroFlow({
         }
         setGenImages([...results]);
         // Persist THIS image immediately — a closed tab or crash mid-batch
-        // loses nothing, and the loop resumes from the next missing image.
+        // loses nothing, and the loop resumes from the next missing image. The
+        // server upsert is atomic, so concurrent persists don't clobber.
         await fetch(`/api/runs/${runId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "stage3_image_upsert", image: results[i] }),
         }).catch((e) => console.error(`persist image #${p.index} failed:`, e));
-      }
-      setGenIndex(null);
+      };
+
+      // Work queue of indices still needing a generation (resume skips the ones
+      // already done). A pool of CONCURRENCY workers drains it, so up to 3
+      // images generate at once. "Stop after current" lets in-flight images
+      // finish but starts no new ones — workers exit when stopRef flips.
+      const CONCURRENCY = 3;
+      const queue = saved.map((_, i) => i).filter((i) => results[i]?.status !== "done");
+      const worker = async () => {
+        for (;;) {
+          if (stopRef.current) break;
+          const i = queue.shift();
+          if (i === undefined) break;
+          await processOne(i);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
       const allSettled = results.every((r) => r !== null);
       if (allSettled) {
         // Images are already persisted per-image; just flip the status.
@@ -392,7 +415,7 @@ export default function Stage3HeroFlow({
             </button>
           </div>
           <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
-            {genIndex != null ? `Image ${genIndex + 2} of 9` : "Finishing…"} · {heroUrl ? "all referencing the approved hero" : "all referencing your source product photos"}
+            {genImages.filter(Boolean).length} of {genImages.length} done · up to 3 at a time · {heroUrl ? "all referencing the approved hero" : "all referencing your source product photos"}
           </p>
           <GenGrid heroUrl={heroUrl} images={genImages} />
         </div>
@@ -544,7 +567,10 @@ function CompletedReview({
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
   const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
-  const [busyIdx, setBusyIdx] = useState<number | null>(null);
+  // Set of image indices currently (re)generating. A Set rather than a single
+  // index because bulk-fix runs several regenerations at once — each tile needs
+  // its own spinner, and one finishing must not clear the others'.
+  const [busyIdxs, setBusyIdxs] = useState<Set<number>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRunning, setBulkRunning] = useState(false);
   const [placement, setPlacement] = useState<Placement | null>(initialPlacement);
@@ -633,7 +659,7 @@ function CompletedReview({
     // Close the modal right away and flip the tile into a generating state so
     // the operator gets immediate feedback while the (slow) gen+audit runs.
     setRegenIdx(null);
-    setBusyIdx(i);
+    setBusyIdxs((s) => new Set(s).add(i));
     try {
       const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
       const gen = await fetch("/api/stage3/generate", {
@@ -672,26 +698,33 @@ function CompletedReview({
         return next;
       });
     } finally {
-      setBusyIdx(null);
+      setBusyIdxs((s) => { const n = new Set(s); n.delete(i); return n; });
     }
   };
 
   // Regenerate every failed/flagged image in one go, each with its (possibly
-  // bulk-edited) prompt. Sequential so tiles light up one at a time and we
-  // don't hammer Higgsfield; each call reuses the single-image regenerate path
-  // (functional state merge + serialized persist).
+  // bulk-edited) prompt. Runs 3 at a time via a small worker pool — each call
+  // reuses the single-image regenerate path (functional state merge + serialized
+  // persist), and the server upsert is atomic, so concurrency is safe.
   const regenerateAllFailed = async (drafts: Record<number, string>) => {
     setBulkOpen(false);
     setBulkRunning(true);
     try {
       const targets = images
         .map((im, i) => ({ im, i }))
-        .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail");
-      for (const { im, i } of targets) {
-        const text = drafts[i] ?? promptFor(im)?.prompt ?? "";
-        if (!text) continue;
-        await regenerate(i, text, im.category);
-      }
+        .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail")
+        .map(({ im, i }) => ({ i, text: drafts[i] ?? promptFor(im)?.prompt ?? "", cat: im.category }))
+        .filter((t) => t.text);
+      const CONCURRENCY = 3;
+      const queue = [...targets];
+      const worker = async () => {
+        for (;;) {
+          const t = queue.shift();
+          if (!t) break;
+          await regenerate(t.i, t.text, t.cat);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
     } finally {
       setBulkRunning(false);
     }
@@ -769,7 +802,7 @@ function CompletedReview({
     const v = effVerdict(im);
     const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
     const overridden = im.user_override != null;
-    const regenerating = busyIdx === i;
+    const regenerating = busyIdxs.has(i);
     return (
       <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
         {regenerating && (
@@ -822,7 +855,7 @@ function CompletedReview({
         {fixable.length > 0 && (
           <button
             onClick={() => setBulkOpen(true)}
-            disabled={bulkRunning || busyIdx !== null}
+            disabled={bulkRunning || busyIdxs.size > 0}
             className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95 disabled:opacity-50 whitespace-nowrap"
           >
             {bulkRunning ? "Regenerating failed…" : `Fix all ${fixable.length} failed →`}
@@ -917,7 +950,7 @@ function CompletedReview({
         <RegenImageModal
           image={images[regenIdx]}
           prompt={promptFor(images[regenIdx])}
-          busy={busyIdx === regenIdx}
+          busy={regenIdx != null && busyIdxs.has(regenIdx)}
           onClose={() => setRegenIdx(null)}
           onRegenerate={(promptText) => regenerate(regenIdx, promptText, images[regenIdx].category)}
         />
@@ -968,9 +1001,16 @@ function BulkFixModal({
       const results = await Promise.all(
         failed.map(async ({ im, i }) => {
           try {
+            // Fold in THIS image's own audit reasons so the rewrite targets the
+            // specific flag (wrong text, missing product, guideline rejection),
+            // not just the generic shared instruction.
+            const reasons = reasonsFor(im);
+            const perImageInstr = reasons.length
+              ? `${text}\n\nThis image was specifically flagged for:\n- ${reasons.join("\n- ")}`
+              : text;
             const res = await fetch("/api/stage3/edit-prompt", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: drafts[i], instructions: text, category: im.category }),
+              body: JSON.stringify({ prompt: drafts[i], instructions: perImageInstr, category: im.category }),
             });
             const data = await res.json();
             return { i, prompt: data.success && data.prompt ? (data.prompt as string) : null };
@@ -1016,10 +1056,15 @@ function BulkFixModal({
             <div key={i} className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">#{im.index} · {im.category}</span>
-                {im.status === "failed" && im.error && (
-                  <span className="text-[10px] text-[var(--color-red)] truncate max-w-[60%]" title={im.error}>{im.error}</span>
-                )}
+                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">{im.status === "failed" ? "gen failed" : "QC fail"}</span>
               </div>
+              {reasonsFor(im).length > 0 && (
+                <ul className="rounded-md bg-[var(--color-red-bg)] border border-[var(--color-red)]/25 px-2.5 py-1.5 space-y-0.5">
+                  {reasonsFor(im).map((r, k) => (
+                    <li key={k} className="text-[10.5px] leading-snug text-[var(--color-red)]">• {r}</li>
+                  ))}
+                </ul>
+              )}
               <textarea
                 value={drafts[i] ?? ""}
                 onChange={(e) => setDrafts((prev) => ({ ...prev, [i]: e.target.value }))}

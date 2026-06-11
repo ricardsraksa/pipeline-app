@@ -15,6 +15,7 @@ import { NECESSARY_BELIEFS_PROMPT } from "./prompts/necessary_beliefs";
 import { CHIEF_FINAL_PROMPT } from "./prompts/chief_final";
 import { REVISE_DOC_PROMPT } from "./prompts/revise_doc";
 import { getPrompt } from "./prompts";
+import { structureStage2Copy } from "./stage2/format";
 import {
   buildStage1FeedbackBlock,
   buildStage2FeedbackBlock as buildStage2NotesBlock,
@@ -137,7 +138,10 @@ async function withRetry<T>(
 }
 
 async function anthropicMessage(args: {
-  system: string;
+  // A plain string stays uncached (right for Stage 1's one-shot sub-step
+  // prompts). Pass an array of text blocks with cache_control to cache a large
+  // static prefix that repeats within the 5-min TTL (e.g. Stage 2).
+  system: string | Anthropic.TextBlockParam[];
   user: string;
   maxTokens: number;
   label: string;
@@ -213,11 +217,13 @@ async function buildStage2FeedbackBlock(): Promise<string> {
   const noteBlock = await buildStage2NotesBlock();
   try {
     const result = await db.execute(
-      `SELECT stage2_output FROM runs WHERE feedback_stage2 = 'up' AND stage2_output IS NOT NULL ORDER BY created_at DESC LIMIT 5`
+      `SELECT stage2_output FROM runs WHERE feedback_stage2 = 'up' AND stage2_output IS NOT NULL ORDER BY created_at DESC LIMIT 3`
     );
     const rows = result.rows as unknown as Pick<Run, "stage2_output">[];
     if (!rows.length) return noteBlock;
-    const summaries = rows.map((r) => (r.stage2_output as string).slice(0, 300));
+    // ~600 chars shows the actual structure (name + tagline + first benefits),
+    // not just the opening line. 3 examples keeps the uncached suffix lean.
+    const summaries = rows.map((r) => (r.stage2_output as string).slice(0, 600));
     return noteBlock + "\n\n--- PREVIOUS STAGE-2 OUTPUTS THAT WORKED WELL ---\n" + summaries.join("\n\n") + "\n---";
   } catch {
     return noteBlock;
@@ -646,14 +652,24 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
   if (!stage1Output) throw new Error("No Stage 1 output to run Stage 2");
 
-  const systemPrompt = (await getPrompt("stage2")) + (await buildStage2FeedbackBlock());
+  // Split the system into a cached static prefix (the big ~230-line prompt,
+  // re-sent verbatim on every Stage 2 run + every regeneration) and an uncached
+  // feedback suffix (changes per run). The cache breakpoint sits after the
+  // static block, so the expensive Opus input prefix is read from cache on
+  // repeat calls within the 5-min TTL.
+  const stage2Static = await getPrompt("stage2");
+  const stage2Feedback = await buildStage2FeedbackBlock();
+  const stage2System: Anthropic.TextBlockParam[] = [
+    { type: "text", text: stage2Static, cache_control: { type: "ephemeral" } },
+    ...(stage2Feedback.trim() ? [{ type: "text" as const, text: stage2Feedback }] : []),
+  ];
   const productName = run.brand_name ?? run.product_name ?? "";
 
   await guardCancel(runId);
   await updateRun(runId, { current_step: "Stage 2: Generating German copy with Opus (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
-    system: systemPrompt,
+    system: stage2System,
     user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete German copy kit now.`,
     maxTokens: 8192,
     label: "stage 2 German copy",
@@ -669,6 +685,17 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
     current_step: "Stage 2: Saving output",
     last_updated_at: now(),
   });
+
+  // Best-effort: derive the structured per-field JSON from the canonical text.
+  // Never blocks or fails the run — the text is the source of truth.
+  try {
+    const structured = await structureStage2Copy(output);
+    if (structured) {
+      await updateRun(runId, { stage2_json: JSON.stringify(structured), last_updated_at: now() });
+    }
+  } catch (err) {
+    console.error(`[stage2 structure] run ${runId}:`, err);
+  }
 }
 
 // ── Manual Stage 2 trigger (after the Stage 1 QC gate) ───────────────────────

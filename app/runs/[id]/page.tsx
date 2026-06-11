@@ -17,6 +17,8 @@ import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
+import Stage2Structured from "@/components/Stage2Structured";
+import type { Stage2Json } from "@/lib/stage2/format";
 import RunProductCode from "@/components/RunProductCode";
 import JSZip from "jszip";
 
@@ -248,6 +250,7 @@ export default function RunPage() {
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
   const [overrides, setOverrides] = useState<Partial<Record<StageKey, boolean>>>({});
+  const [stage2View, setStage2View] = useState<"text" | "fields">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -431,6 +434,8 @@ export default function RunPage() {
   }
 
   const { outputs } = run;
+  let stage2Json: Stage2Json | null = null;
+  if (outputs.stage2Json) { try { stage2Json = JSON.parse(outputs.stage2Json); } catch { stage2Json = null; } }
   const isTerminal = ["completed", "failed", "cancelled"].includes(run.status);
   const displayName = nameOverride ?? run.meta.brandName ?? run.meta.productName ?? `Run #${runId}`;
   const elapsed = elapsedTime(run.timestamps.startedAt, run.timestamps.completedAt);
@@ -603,6 +608,19 @@ export default function RunPage() {
             {def.key === "stage2" && (
               outputs.stage2Output ? (
                 <>
+                  {stage2Json && (
+                    <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
+                      {(["text", "fields"] as const).map((v) => (
+                        <button key={v} onClick={() => setStage2View(v)}
+                          className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
+                          {v === "text" ? "Full text" : "Fields"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {stage2Json && stage2View === "fields" ? (
+                    <Stage2Structured json={stage2Json} />
+                  ) : (
                   <EditableOutput
                     runId={Number(runId)}
                     field="stage2_copy"
@@ -614,6 +632,7 @@ export default function RunPage() {
                     monospace={false}
                     downloadFilename="STAGE2_GERMAN_COPY.txt"
                   />
+                  )}
                   {runId !== null && (
                     <>
                       <div className="flex items-center justify-between gap-3 flex-wrap">

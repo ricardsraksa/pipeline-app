@@ -13,7 +13,11 @@ import { jsonrepair } from 'jsonrepair'
 // 10-min default — the route-level maxDuration would otherwise cut it off with
 // no useful error.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 })
-const MODEL = 'claude-sonnet-4-5-20250929'
+// Stage 3 prompt writing (hero + the 8 derivatives). Sonnet handles it, but the
+// 8-template JSON occasionally needs the 3× retry + jsonrepair. Set
+// STAGE3_PROMPT_MODEL=claude-opus-4-8 to A/B a stronger model without a code
+// change (mirrors STAGE2_MODEL).
+const MODEL = process.env.STAGE3_PROMPT_MODEL?.trim() || 'claude-sonnet-4-5-20250929'
 
 export interface HeroPrompt {
   model: string
@@ -147,7 +151,7 @@ export async function generateHeroPrompt(params: {
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 2000,
-        system: HERO_SYSTEM,
+        system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(params.sourceImageUrls)] }],
       })
       const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
@@ -214,7 +218,7 @@ export async function generateRemainingPrompts(params: {
     const msg = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
-      system: REMAINING_SYSTEM,
+      system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],
     })
     const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')

@@ -46,8 +46,13 @@ async function backfillOnce(): Promise<void> {
   }
 }
 
+const NOTE_MAX = 200;
+
 async function recent(stage: 1 | 2 | 3): Promise<FeedbackRow[]> {
   await backfillOnce();
+  // Pull a wider window, then dedupe to the newest verdict per product so one
+  // product rated five times doesn't crowd out everything else. Ordered newest
+  // first; capped to RECENT_LIMIT distinct products.
   const result = await db.execute(
     `SELECT product_name, brand_name, vote, note
        FROM feedback_notes
@@ -55,10 +60,20 @@ async function recent(stage: 1 | 2 | 3): Promise<FeedbackRow[]> {
         AND ( (vote IS NOT NULL AND vote != '')
            OR (note IS NOT NULL AND note != '') )
       ORDER BY updated_at DESC
-      LIMIT ${RECENT_LIMIT}`,
+      LIMIT ${RECENT_LIMIT * 5}`,
     [stage],
   );
-  return result.rows as unknown as FeedbackRow[];
+  const rows = result.rows as unknown as FeedbackRow[];
+  const seen = new Set<string>();
+  const deduped: FeedbackRow[] = [];
+  for (const r of rows) {
+    const key = `${(r.brand_name ?? "").trim().toLowerCase()}|${(r.product_name ?? "").trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(r);
+    if (deduped.length >= RECENT_LIMIT) break;
+  }
+  return deduped;
 }
 
 function format(rows: FeedbackRow[]): string {
@@ -66,7 +81,8 @@ function format(rows: FeedbackRow[]): string {
     .map((r) => {
       const name = (r.brand_name ?? r.product_name ?? "previous run").trim();
       const verdict = r.vote === "up" ? "👍 worked well" : r.vote === "down" ? "👎 did NOT work" : "(no vote)";
-      const note = r.note?.trim();
+      let note = r.note?.trim();
+      if (note && note.length > NOTE_MAX) note = note.slice(0, NOTE_MAX) + "…";
       const noteSegment = note ? ` — user note: "${note}"` : "";
       return `- ${name}: ${verdict}${noteSegment}`;
     })

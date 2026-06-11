@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import axios from "axios";
+import http from "node:http";
+import https from "node:https";
+import { assertPublicUrl, safeLookup } from "@/lib/ssrf";
 
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -14,6 +17,12 @@ const USER_AGENTS = [
 function randomUA(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
+
+// `lookup` is honoured by the socket layer but not declared on AgentOptions, so
+// carry it on an intersection type to keep the SSRF connect-time check typed.
+const ssrfAgentOptions: http.AgentOptions & { lookup: typeof safeLookup } = {
+  lookup: safeLookup,
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -38,7 +47,16 @@ function mapScraperError(raw: string): string {
 
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
-  if (!url) return Response.json({ success: false, error: "URL required" }, { status: 400 });
+  if (!url || typeof url !== "string") return Response.json({ success: false, error: "URL required" }, { status: 400 });
+  if (url.length > 2048) return Response.json({ success: false, error: "URL too long" }, { status: 400 });
+
+  // SSRF guard — the scraper fetches this URL server-side, so reject internal
+  // targets (cloud metadata, localhost, RFC-1918) before any backend touches it.
+  try {
+    await assertPublicUrl(url);
+  } catch (e) {
+    return Response.json({ success: false, error: e instanceof Error ? e.message : "Blocked URL" }, { status: 400 });
+  }
 
   // Preferred path: dedicated Python scraper service (Playwright-based)
   const scraperServiceUrl = process.env.SCRAPER_SERVICE_URL;
@@ -115,6 +133,12 @@ export async function POST(req: NextRequest) {
           "Upgrade-Insecure-Requests": "1",
         },
         maxRedirects: 5,
+        // Validate the resolved IP at connect time so a 3xx redirect to an
+        // internal address can't bypass the up-front assertPublicUrl check.
+        // `lookup` isn't in AgentOptions' public type but is honoured at the
+        // socket layer, so attach it through a typed options object.
+        httpAgent: new http.Agent(ssrfAgentOptions),
+        httpsAgent: new https.Agent(ssrfAgentOptions),
       });
       html = res.data;
     }

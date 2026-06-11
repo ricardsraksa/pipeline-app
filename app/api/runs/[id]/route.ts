@@ -114,24 +114,43 @@ export async function PATCH(
     if (!image || typeof image.index !== "number") {
       return Response.json({ error: "image with numeric index required" }, { status: 400 });
     }
-    const row = await db.execute({
-      sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?",
-      args: [Number(id)],
-    });
-    let arr: Array<{ index?: number }> = [];
-    try {
-      const raw = (row.rows[0] as unknown as { stage3_remaining_images: string | null })?.stage3_remaining_images;
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) arr = parsed;
-    } catch { /* treat unparseable as empty */ }
-    const i = arr.findIndex((x) => x?.index === image.index);
-    if (i >= 0) arr[i] = image;
-    else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
-    await db.execute({
-      sql: "UPDATE runs SET stage3_remaining_images = ?, last_updated_at = ? WHERE id = ?",
-      args: [JSON.stringify(arr), new Date().toISOString(), Number(id)],
-    });
-    return Response.json({ success: true, images: arr });
+    // Generation runs up to 3 images concurrently, so two persists can be in
+    // flight at once. A plain SELECT-then-UPDATE would let both read the same
+    // array and the second UPDATE clobber the first's image (lost update). A
+    // write-locked transaction serializes the read-modify-write; the retry loop
+    // absorbs the rare SQLITE_BUSY when two transactions contend for the lock.
+    let images: Array<{ index?: number }> = [];
+    for (let attempt = 0; ; attempt++) {
+      const tx = await db.transaction("write");
+      try {
+        const row = await tx.execute({
+          sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?",
+          args: [Number(id)],
+        });
+        let arr: Array<{ index?: number }> = [];
+        try {
+          const raw = (row.rows[0] as unknown as { stage3_remaining_images: string | null })?.stage3_remaining_images;
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) arr = parsed;
+        } catch { /* treat unparseable as empty */ }
+        const i = arr.findIndex((x) => x?.index === image.index);
+        if (i >= 0) arr[i] = image;
+        else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
+        await tx.execute({
+          sql: "UPDATE runs SET stage3_remaining_images = ?, last_updated_at = ? WHERE id = ?",
+          args: [JSON.stringify(arr), new Date().toISOString(), Number(id)],
+        });
+        await tx.commit();
+        images = arr;
+        break;
+      } catch (e) {
+        try { await tx.rollback(); } catch { /* already closed/committed */ }
+        const busy = e instanceof Error && /SQLITE_BUSY|database is locked|stream expired/i.test(e.message);
+        if (busy && attempt < 4) { await new Promise((r) => setTimeout(r, 50 * (attempt + 1))); continue; }
+        throw e;
+      }
+    }
+    return Response.json({ success: true, images });
   }
 
   // Handle image_approval requests
@@ -149,6 +168,9 @@ export async function PATCH(
     const { field, value, stage } = body as { type: string; field: string; value: string; stage: string };
     if (!EDITABLE_FIELDS.includes(field as typeof EDITABLE_FIELDS[number])) {
       return Response.json({ error: "Unknown field" }, { status: 400 });
+    }
+    if (typeof value === "string" && value.length > 200_000) {
+      return Response.json({ error: "Edited value too long (max 200,000 characters)" }, { status: 413 });
     }
     // `stage` is interpolated into the column name — whitelist it so a
     // malformed (or malicious) value can't inject SQL.
@@ -207,6 +229,13 @@ export async function PATCH(
 
   if (fields.length === 0) {
     return Response.json({ success: true });
+  }
+
+  // Reject oversized payloads before they hit the DB. 500K covers the largest
+  // legitimate write (a full Stage 2 copy kit / serialized prompt array) with
+  // headroom; anything past it is abuse, not data.
+  if (values.some((v) => typeof v === "string" && v.length > 500_000)) {
+    return Response.json({ error: "Field value too long" }, { status: 413 });
   }
 
   await db.execute({

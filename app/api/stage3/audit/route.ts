@@ -39,7 +39,9 @@ export async function POST(req: NextRequest) {
     const message = await createWithRetry({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2000,
-      system: IMAGE_AUDIT_SYSTEM,
+      // Cache the static auditor prompt — it's re-sent for every one of the 8
+      // images in a run, so 7 of 8 calls read it from cache instead of re-billing.
+      system: [{ type: 'text', text: IMAGE_AUDIT_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
         content: [

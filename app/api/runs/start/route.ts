@@ -23,9 +23,18 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // Upper cap: anything past this is abuse, not a description — it would bloat
+  // the DB row and the downstream LLM prompt (and its cost).
+  if (productDescription.length > 20000) {
+    return NextResponse.json(
+      { error: "Product description too long (max 20,000 characters)" },
+      { status: 400 }
+    );
+  }
 
-  const sourceImages =
-    Array.isArray(body.sourceImages) ? body.sourceImages.filter(Boolean) : [];
+  const sourceImages = Array.isArray(body.sourceImages)
+    ? body.sourceImages.filter((s): s is string => typeof s === "string" && !!s && s.length <= 2048)
+    : [];
   if (sourceImages.length === 0) {
     return NextResponse.json(
       { error: "At least one source image required" },
@@ -37,8 +46,11 @@ export async function POST(req: NextRequest) {
   }
 
   const productUrl = (body.productUrl ?? body.url ?? "").trim();
+  if (productUrl.length > 2048) {
+    return NextResponse.json({ error: "Product URL too long" }, { status: 400 });
+  }
   const competitorUrls = Array.isArray(body.competitorUrls)
-    ? body.competitorUrls.map((u) => u.trim()).filter(Boolean).slice(0, 5)
+    ? body.competitorUrls.map((u) => u.trim()).filter((u) => !!u && u.length <= 2048).slice(0, 5)
     : [];
 
   const runId = await createRun({
@@ -46,7 +58,7 @@ export async function POST(req: NextRequest) {
     product_description: productDescription,
     competitor_urls: competitorUrls.length ? competitorUrls : null,
     uploaded_source_images: sourceImages,
-    product_code: body.productCode?.trim() || null,
+    product_code: body.productCode?.trim().slice(0, 100) || null,
     status: "pending",
   });
 

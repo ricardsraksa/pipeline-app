@@ -24,6 +24,7 @@ export interface RunStatus {
     stage2Output: string | null;
     stage2OutputEdited: string | null;
     stage2EditedAt: string | null;
+    stage2Json: string | null;
   };
   images: {
     scrapedUrls: string[];

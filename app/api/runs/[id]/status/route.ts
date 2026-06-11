@@ -46,6 +46,7 @@ export async function GET(
       stage2Output: run.stage2_output,
       stage2OutputEdited: run.stage2_copy_edited,
       stage2EditedAt: run.stage2_edited_at,
+      stage2Json: run.stage2_json,
     },
     images: {
       scrapedUrls: safeJson(run.scraped_image_urls) ?? [],
