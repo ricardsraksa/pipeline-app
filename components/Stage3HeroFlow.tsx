@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
@@ -730,8 +729,8 @@ function CompletedReview({
     }
   };
 
-  // Download every image — the hero AND all generated derivatives — as one zip.
-  // Tracks fetch failures so a partial zip is reported, not silently shipped.
+  // Download every image — the hero AND all generated derivatives — each as its
+  // own file (not a zip). Tracks fetch failures so a partial result is reported.
   const [zipping, setZipping] = useState(false);
   const [zipNote, setZipNote] = useState<string | null>(null);
   const downloadAll = async () => {
@@ -739,7 +738,6 @@ function CompletedReview({
     setZipping(true);
     setZipNote(null);
     try {
-      const zip = new JSZip();
       const targets: Array<{ url: string; name: string }> = [];
       if (heroUrl) targets.push({ url: heroUrl, name: "01_hero.png" });
       for (const im of images) {
@@ -748,20 +746,20 @@ function CompletedReview({
         }
       }
       let ok = 0;
-      await Promise.all(
-        targets.map(async (t) => {
-          try {
-            const blob = await fetch(t.url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); });
-            zip.file(t.name, blob);
-            ok++;
-          } catch (e) { console.error(`zip fetch failed for ${t.name}:`, e); }
-        }),
-      );
+      // One file per image. Sequential with a small gap so the browser doesn't
+      // drop the rapid-fire downloads (it asks once to allow multiple files).
+      for (const t of targets) {
+        try {
+          const blob = await fetch(t.url).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); });
+          const href = URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement("a"), { href, download: t.name });
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(href);
+          ok++;
+          await new Promise((r) => setTimeout(r, 350));
+        } catch (e) { console.error(`download failed for ${t.name}:`, e); }
+      }
       if (ok === 0) { setZipNote("Couldn't fetch any images — check your connection."); return; }
-      const blob = await zip.generateAsync({ type: "blob" });
-      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "stage3_images.zip" });
-      a.click();
-      URL.revokeObjectURL(a.href);
       setZipNote(ok < targets.length ? `Downloaded ${ok} of ${targets.length} images — ${targets.length - ok} couldn't be fetched.` : null);
     } finally {
       setZipping(false);
@@ -866,7 +864,7 @@ function CompletedReview({
           disabled={zipping}
           className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
         >
-          {zipping ? "Zipping…" : "↓ Download all (.zip)"}
+          {zipping ? "Downloading…" : "↓ Download all"}
         </button>
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">

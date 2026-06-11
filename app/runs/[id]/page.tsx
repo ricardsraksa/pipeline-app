@@ -18,6 +18,7 @@ import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Structured from "@/components/Stage2Structured";
+import Stage2Lines from "@/components/Stage2Lines";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
 import JSZip from "jszip";
@@ -250,7 +251,7 @@ export default function RunPage() {
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
   const [overrides, setOverrides] = useState<Partial<Record<StageKey, boolean>>>({});
-  const [stage2View, setStage2View] = useState<"text" | "fields">("text");
+  const [stage2View, setStage2View] = useState<"text" | "lines" | "fields">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -398,21 +399,22 @@ export default function RunPage() {
         }
       } catch { /* ignore */ }
       if (!targets.length) { push("No generated images on this run yet"); return; }
-      const zip = new JSZip();
       let ok = 0;
-      await Promise.all(targets.map(async (t) => {
+      // One file per image (not a zip). Sequential with a small gap so the
+      // browser doesn't drop the rapid-fire downloads.
+      for (const t of targets) {
         try {
           const blob = await fetch(t.url).then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.blob(); });
-          zip.file(t.name, blob);
+          const href = URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement("a"), { href, download: t.name });
+          document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(href);
           ok++;
-        } catch (e) { console.error(`zip fetch failed for ${t.name}:`, e); }
-      }));
+          await new Promise((res) => setTimeout(res, 350));
+        } catch (e) { console.error(`download failed for ${t.name}:`, e); }
+      }
       if (!ok) { push("Couldn't fetch the images — check your connection"); return; }
-      const blob = await zip.generateAsync({ type: "blob" });
-      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "images.zip" });
-      a.click();
-      URL.revokeObjectURL(a.href);
-      push(ok < targets.length ? `Bundled ${ok} of ${targets.length} images → images.zip` : "Bundled hero + images → images.zip", "success");
+      push(ok < targets.length ? `Downloaded ${ok} of ${targets.length} images` : "Downloaded hero + images", "success");
     } finally { setZippingImages(false); }
   }
 
@@ -608,18 +610,18 @@ export default function RunPage() {
             {def.key === "stage2" && (
               outputs.stage2Output ? (
                 <>
-                  {stage2Json && (
-                    <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
-                      {(["text", "fields"] as const).map((v) => (
-                        <button key={v} onClick={() => setStage2View(v)}
-                          className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-                          {v === "text" ? "Full text" : "Fields"}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {stage2Json && stage2View === "fields" ? (
+                  <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
+                    {((stage2Json ? ["text", "lines", "fields"] : ["text", "lines"]) as Array<"text" | "lines" | "fields">).map((v) => (
+                      <button key={v} onClick={() => setStage2View(v)}
+                        className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
+                        {v === "text" ? "Full text" : v === "lines" ? "Lines" : "Fields"}
+                      </button>
+                    ))}
+                  </div>
+                  {stage2View === "fields" && stage2Json ? (
                     <Stage2Structured json={stage2Json} />
+                  ) : stage2View === "lines" ? (
+                    <Stage2Lines text={outputs.stage2OutputEdited || outputs.stage2Output} />
                   ) : (
                   <EditableOutput
                     runId={Number(runId)}
@@ -692,7 +694,7 @@ export default function RunPage() {
                 )}
                 <button onClick={handleDownloadImages} disabled={zippingImages}
                   className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap">
-                  <Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "Zipping…" : "Images"}
+                  <Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "Downloading…" : "Images"}
                 </button>
               </div>
             )}
