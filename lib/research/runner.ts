@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getModel } from "@/lib/models";
 import { IDENTIFY_PROMPT } from "@/lib/prompts/research/identify";
 import { MARKET_PROMPT } from "@/lib/prompts/research/market";
 import { COMPETITIVE_PROMPT } from "@/lib/prompts/research/competitive";
@@ -151,7 +152,7 @@ async function createWithRetry(
 
 export async function runIdentify(inputs: ResearchInputs): Promise<string> {
   const msg = await createWithRetry({
-    model: "claude-sonnet-4-5-20250929",
+    model: await getModel("stage1"),
     max_tokens: 1500,
     system: IDENTIFY_PROMPT,
     messages: [
@@ -171,7 +172,7 @@ export async function runMarket(inputs: ResearchInputs, identifyOutput: string):
 
   const msg = await createWithRetry(
     {
-      model: "claude-sonnet-4-5-20250929",
+      model: await getModel("stage1"),
       max_tokens: 4000,
       system: withSearchDirective(MARKET_PROMPT),
       messages: [{ role: "user", content: userMessage }],
@@ -199,7 +200,7 @@ export async function runCompetitive(
 
   const msg = await createWithRetry(
     {
-      model: "claude-sonnet-4-5-20250929",
+      model: await getModel("stage1"),
       max_tokens: 4000,
       system: withSearchDirective(COMPETITIVE_PROMPT),
       messages: [{ role: "user", content: userMessage }],
@@ -230,7 +231,7 @@ export async function runProductAnalysis(
   ].join("");
 
   const msg = await createWithRetry({
-    model: "claude-sonnet-4-5-20250929",
+    model: await getModel("stage1"),
     max_tokens: 2000,
     system: PRODUCT_ANALYSIS_PROMPT,
     messages: [{ role: "user", content: userMessage }],
@@ -262,7 +263,7 @@ export async function runVisual(
   ].join("");
 
   const msg = await createWithRetry({
-    model: "claude-sonnet-4-5-20250929",
+    model: await getModel("stage1"),
     max_tokens: 2000,
     system: VISUAL_PROMPT,
     messages: [

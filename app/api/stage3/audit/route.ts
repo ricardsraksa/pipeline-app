@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { IMAGE_AUDIT_SYSTEM, buildAuditUserMessage } from '@/lib/prompts/image_audit'
+import { getModel } from '@/lib/models'
 
 // timeout: a hung vision call (usually Anthropic struggling to download the
 // image URL) fails in 90s instead of the SDK's 10-min default.
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const message = await createWithRetry({
-      model: 'claude-sonnet-4-5-20250929',
+      model: await getModel('stage3Audit'),
       max_tokens: 2000,
       // Cache the static auditor prompt — it's re-sent for every one of the 8
       // images in a run, so 7 of 8 calls read it from cache instead of re-billing.

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import ModelSettings from "@/components/ModelSettings";
 
 type Stage = "stage1" | "stage2" | "stage3";
 
@@ -160,9 +161,11 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
-          The system prompts that drive each stage. Changes take effect on the next pipeline run. Old versions are kept in history — nothing is lost on reset.
+          The models and system prompts that drive each stage. Changes take effect on the next pipeline run. Old prompt versions are kept in history — nothing is lost on reset.
         </p>
       </div>
+
+      <ModelSettings />
 
       <div className="space-y-5">
         {(["stage1", "stage2", "stage3"] as Stage[]).map((stage) => {

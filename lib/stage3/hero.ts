@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { jsonrepair } from 'jsonrepair'
+import { getModel } from '@/lib/models'
 
 // Hero-first Stage 3 prompt generation.
 //
@@ -13,11 +14,9 @@ import { jsonrepair } from 'jsonrepair'
 // 10-min default — the route-level maxDuration would otherwise cut it off with
 // no useful error.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 })
-// Stage 3 prompt writing (hero + the 8 derivatives). Sonnet handles it, but the
-// 8-template JSON occasionally needs the 3× retry + jsonrepair. Set
-// STAGE3_PROMPT_MODEL=claude-opus-4-8 to A/B a stronger model without a code
-// change (mirrors STAGE2_MODEL).
-const MODEL = process.env.STAGE3_PROMPT_MODEL?.trim() || 'claude-sonnet-4-5-20250929'
+// Stage 3 prompt writing (hero + the 8 derivatives) resolves via the
+// "stage3Prompt" role (lib/models.ts) — selectable in Settings. The 8-template
+// JSON occasionally needs the 3× retry + jsonrepair regardless of model.
 
 export interface HeroPrompt {
   model: string
@@ -149,7 +148,7 @@ export async function generateHeroPrompt(params: {
   for (let attempt = 0; attempt < 3 && !parsed; attempt++) {
     try {
       const msg = await anthropic.messages.create({
-        model: MODEL,
+        model: await getModel('stage3Prompt'),
         max_tokens: 2000,
         system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(params.sourceImageUrls)] }],
@@ -216,7 +215,7 @@ export async function generateRemainingPrompts(params: {
   let lastErr: unknown = null
   for (let attempt = 0; attempt < 3 && !arr; attempt++) {
     const msg = await anthropic.messages.create({
-      model: MODEL,
+      model: await getModel('stage3Prompt'),
       max_tokens: 16000,
       system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],

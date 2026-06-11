@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun } from "@/lib/db";
 import { ONE_PAGER_PROMPT } from "@/lib/prompts/one_pager";
+import { getModel } from "@/lib/models";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 
 export async function POST(req: NextRequest) {
   const { runId } = (await req.json()) as { runId?: number };
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await client.messages.create({
-      model: CLAUDE_MODEL,
+      model: await getModel("mechanical"),
       max_tokens: 2000,
       system: ONE_PAGER_PROMPT,
       messages: [

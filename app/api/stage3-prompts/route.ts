@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getPrompt } from "@/lib/prompts";
 import { db } from "@/lib/db";
 import type { Run } from "@/lib/db";
+import { getModel } from "@/lib/models";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -55,7 +56,7 @@ Generate the 7 image prompts as a JSON array now.`;
 
   try {
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: await getModel("stage3Prompt"),
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],

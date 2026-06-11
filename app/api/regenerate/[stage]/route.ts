@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, type Run } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
+import { getModel, type ModelRole } from "@/lib/models";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
 
 type Stage = "stage1" | "stage2" | "stage3-prompts";
 
@@ -79,9 +79,9 @@ export async function POST(
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-async function ask(args: { system: string; user: string; maxTokens: number }): Promise<string> {
+async function ask(args: { system: string; user: string; maxTokens: number; role: ModelRole }): Promise<string> {
   const response = await client.messages.create({
-    model: CLAUDE_MODEL,
+    model: await getModel(args.role),
     max_tokens: args.maxTokens,
     system: args.system,
     messages: [{ role: "user", content: args.user }],
@@ -158,7 +158,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
     beliefs,
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 2000 });
+  const output = await ask({ system, user, maxTokens: 2000, role: "stage1" });
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
 }
 
@@ -205,7 +205,7 @@ Return ONLY the regenerated German copy. No preamble, no explanation, no code fe
     "Now regenerate the German copy following the user's instructions.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 8000 });
+  const output = await ask({ system, user, maxTokens: 8000, role: "stage2" });
   return { field: "stage2_copy", stageTimestamp: "stage2_edited_at", output };
 }
 
@@ -254,7 +254,7 @@ Return ONLY the regenerated JSON array. No markdown code fences. No explanation.
     "Now regenerate the image prompts following the user's instructions.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 6000 });
+  const output = await ask({ system, user, maxTokens: 6000, role: "stage3Prompt" });
   return { field: "stage3_image_prompts", stageTimestamp: "stage3_edited_at", output };
 }
 

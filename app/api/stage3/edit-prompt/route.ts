@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { getModel } from "@/lib/models";
 
 // POST { prompt, instructions, category? }  →  { success, prompt }
 //
@@ -9,7 +10,6 @@ import Anthropic from "@anthropic-ai/sdk";
 // only adjust the parts the user actually mentioned.
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
-const MODEL = "claude-sonnet-4-5-20250929";
 
 const SYSTEM = `You are a senior product photographer and prompt engineer specializing in DTC marketing imagery. You will be given ONE existing image-generation prompt that didn't quite land, plus a short natural-language note from the operator about what to change.
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const msg = await client.messages.create({
-      model: MODEL,
+      model: await getModel("stage3Prompt"),
       max_tokens: 2000,
       system: SYSTEM,
       messages: [{ role: "user", content: userMsg }],

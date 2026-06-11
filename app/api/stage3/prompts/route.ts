@@ -6,6 +6,7 @@ import { buildFeedbackSummary } from '@/lib/stage3/learning'
 import { buildStage3FeedbackBlock } from '@/lib/feedback'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import { jsonrepair } from 'jsonrepair'
+import { getModel } from '@/lib/models'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     // finalMessage() collects the stream.
     const message = await anthropic.messages
       .stream({
-        model: 'claude-sonnet-4-5-20250929',
+        model: await getModel('stage3Prompt'),
         max_tokens: 32000,
         system: systemPrompt,
         messages: [{ role: 'user', content: messageContent }],

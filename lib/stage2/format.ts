@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
+import { getModel } from "@/lib/models";
 
 // Structured shape of the Stage 2 German copy kit. Derived from the canonical
 // free-text output (which stays untouched so the carefully-tuned copy and the
@@ -49,7 +50,7 @@ export async function structureStage2Copy(text: string): Promise<Stage2Json | nu
   if (!text || text.trim().length < 40) return null;
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: await getModel("mechanical"),
       max_tokens: 4000,
       system: [{ type: "text", text: STRUCTURE_SYSTEM, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: `COPY KIT TO PARSE:\n\n${text}` }],
