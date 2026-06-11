@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
   const scraperData = run.scraper_data ? (() => { try { return JSON.parse(run.scraper_data!) } catch { return null } })() : null
   const scraped: string[] = Array.isArray(scraperData?.images) ? scraperData.images : []
   const sourceImageUrls = [...uploaded, ...scraped].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 5)
+  // Operator-added Stage 3 reference images (scene/style) guide the regen too —
+  // sent to Higgsfield alongside the source product photos.
+  const extraRefs = safeArr(run.stage3_reference_images)
+  const referenceImages = [...sourceImageUrls, ...extraRefs].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 6)
 
   try {
     await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 3: Regenerating hero shot', last_updated_at: new Date().toISOString() })
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
     const imageUrl = await generateStage3Image({
       prompt: promptText,
       model: hero.model || 'nano_banana_2',
-      reference_images: sourceImageUrls,
+      reference_images: referenceImages,
       aspect_ratio: hero.aspect_ratio || '1:1',
     })
 

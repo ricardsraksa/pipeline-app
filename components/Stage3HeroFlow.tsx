@@ -235,9 +235,6 @@ export default function Stage3HeroFlow({
         <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
           This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
         </p>
-        <div className="max-w-md">
-          <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
-        </div>
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap">
           <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId }, "approve")} className={btnPrimary}>
@@ -274,6 +271,8 @@ export default function Stage3HeroFlow({
                 {heroAiLoading ? "Rewriting…" : "Rewrite prompt"}
               </button>
             </div>
+
+            <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
 
             <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Hero prompt (scene / lighting only — appearance comes from the photos)</label>
             <textarea
