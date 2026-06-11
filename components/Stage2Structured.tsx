@@ -5,8 +5,7 @@
 // lives in the EditableOutput above this — this is the convenience layer.
 
 import { useState } from "react";
-import type { Stage2Json } from "@/lib/stage2/format";
-import { stage2Warnings } from "@/lib/stage2/format";
+import { type Stage2Json, stage2Warnings } from "@/lib/stage2/shape";
 
 function CopyBtn({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);

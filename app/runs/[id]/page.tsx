@@ -18,7 +18,7 @@ import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Structured from "@/components/Stage2Structured";
-import type { Stage2Json } from "@/lib/stage2/format";
+import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
 import JSZip from "jszip";
 
