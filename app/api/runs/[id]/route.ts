@@ -94,6 +94,7 @@ export async function PATCH(
     stage3_remaining_prompts?: string | null;
     stage3_remaining_prompts_edited?: string | null;
     stage3_remaining_images?: string | null;
+    stage3_reference_images?: string | null;
     product_code?: string | null;
   };
 
@@ -225,6 +226,7 @@ export async function PATCH(
   if ("stage3_remaining_prompts" in body)         { fields.push("stage3_remaining_prompts = ?");         values.push(body.stage3_remaining_prompts ?? null); }
   if ("stage3_remaining_prompts_edited" in body)  { fields.push("stage3_remaining_prompts_edited = ?");  values.push(body.stage3_remaining_prompts_edited ?? null); }
   if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
+  if ("stage3_reference_images" in body)          { fields.push("stage3_reference_images = ?");          values.push(body.stage3_reference_images ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
 
   if (fields.length === 0) {

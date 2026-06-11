@@ -128,6 +128,10 @@ async function migrateDB() {
     "stage3_remaining_prompts TEXT",
     "stage3_remaining_prompts_edited TEXT",
     "stage3_remaining_images TEXT",
+    // Extra reference images the operator adds during Stage 3. The prompt writer
+    // sees them and chooses per image which to attach to Higgsfield (via each
+    // prompt's source_image_references). JSON array of R2 URLs.
+    "stage3_reference_images TEXT",
     // AI placement: which image anchors each of the 3 body sections; the rest
     // are top-of-page product shots. JSON { section_1, section_2, section_3, reasons }.
     "stage3_placement TEXT",
@@ -417,6 +421,7 @@ export interface Run {
   stage3_remaining_prompts: string | null;
   stage3_remaining_prompts_edited: string | null;
   stage3_remaining_images: string | null;
+  stage3_reference_images: string | null;
   stage3_placement: string | null;
   product_code: string | null;
   stage2_json: string | null;

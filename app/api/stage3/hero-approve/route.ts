@@ -29,8 +29,10 @@ export async function POST(req: NextRequest) {
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
     const visual = run.step_research_revised ?? run.step_research ?? ''
+    let extraReferenceUrls: string[] = []
+    try { const v = JSON.parse(run.stage3_reference_images || '[]'); if (Array.isArray(v)) extraReferenceUrls = v.filter((x) => typeof x === 'string') } catch { /* none */ }
 
-    const prompts = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl] })
+    const prompts = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls })
     if (!prompts.length) throw new Error('Phase 2 produced no prompts')
 
     await updateRun(runId, {

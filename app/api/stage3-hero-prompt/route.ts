@@ -35,14 +35,17 @@ export async function POST(req: NextRequest) {
     await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 3: Generating hero shot', last_updated_at: new Date().toISOString() })
 
     const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
-    const hero = await generateHeroPrompt({ onePager, sourceImageUrls })
+    const extraReferenceUrls = safeArr(run.stage3_reference_images)
+    const hero = await generateHeroPrompt({ onePager, sourceImageUrls, extraReferenceUrls })
 
     await updateRun(runId, { stage3_hero_prompt: JSON.stringify(hero), last_updated_at: new Date().toISOString() })
 
     const imageUrl = await generateStage3Image({
       prompt: hero.prompt,
       model: hero.model,
-      reference_images: sourceImageUrls,
+      // The model curates source_image_references (source photos + any scene
+      // extras it chose) — send exactly those to Higgsfield.
+      reference_images: hero.source_image_references.length ? hero.source_image_references : sourceImageUrls,
       aspect_ratio: hero.aspect_ratio,
     })
 

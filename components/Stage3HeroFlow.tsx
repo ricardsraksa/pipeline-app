@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Run } from "@/lib/db";
+import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
       pure client component without importing server code) ──────────────── */
@@ -234,6 +235,9 @@ export default function Stage3HeroFlow({
         <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
           This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
         </p>
+        <div className="max-w-md">
+          <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
+        </div>
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap">
           <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId }, "approve")} className={btnPrimary}>
@@ -880,6 +884,10 @@ function CompletedReview({
       {placeErr && <ErrBox msg={placeErr} />}
       {persistErr && <ErrBox msg={persistErr} />}
       {zipNote && <p className="text-[12px] text-[var(--color-amber)]">{zipNote}</p>}
+
+      <div className="max-w-xl">
+        <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
+      </div>
 
       {/* ── Product shots — top of the page ────────────────────────────── */}
       <div className="space-y-2">

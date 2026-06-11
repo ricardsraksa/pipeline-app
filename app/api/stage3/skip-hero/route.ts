@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     const prompts = await generateRemainingPrompts({
       onePager, copy, avatar, visual,
       referenceImageUrls: sourceImageUrls,
+      extraReferenceUrls: safeArr(run.stage3_reference_images),
       fromSource: true,
     })
     if (!prompts.length) throw new Error('Prompt generation produced no prompts')

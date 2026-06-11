@@ -44,6 +44,9 @@ Do NOT describe the product's appearance in words. Do not describe the spout sha
 You will receive:
 - Stage 1 one-pager (for product name and category only)
 - Source product image URLs
+- (Optionally) additional reference images the operator wants considered for scene/background/style
+
+ADDITIONAL REFERENCE IMAGES (optional): if extra references are attached, they show a scene, background, or style to aim for. The product still comes ONLY from the source product images — never from the extras. You MAY include an extra reference's exact URL in source_image_references if you want Higgsfield to match that scene/background; otherwise source_image_references is the source product images only.
 
 OUTPUT: A single JSON object:
 {
@@ -101,6 +104,9 @@ For each prompt:
 Every prompt must include this fidelity line verbatim:
 "Reproduce the exact product shown in the reference image — same shape, proportions, and details. Do not redesign or substitute a generic version."
 
+ADDITIONAL REFERENCE IMAGES (optional — may be none):
+Besides the approved hero, the operator may attach extra reference images: a desired scene, setting, background, style, prop, or model/person. These are NOT the product — the hero is always the product reference. For EACH prompt, judge which (if any) of these extras genuinely help Higgsfield render THAT specific image (for example a living-room photo for a lifestyle shot, or a hand/skin reference for a UGC shot), and put the exact URLs of the ones that fit into that prompt's source_image_references, ALONGSIDE the hero URL. Attach an extra only where it clearly helps; if none fit an image, that prompt's source_image_references is just the hero. Use the exact URLs provided — never invent a URL.
+
 OUTPUT: a JSON array of exactly 8 objects:
 {
   "index": <2-9>,
@@ -119,7 +125,23 @@ Return only the JSON array, no markdown fences.`
 
 type ImgBlock = { type: 'image'; source: { type: 'url'; url: string } }
 function imageBlocks(urls: string[]): ImgBlock[] {
-  return urls.slice(0, 5).map((u) => ({ type: 'image', source: { type: 'url', url: u } }))
+  // Cap vision at 5 images; callers order base/product refs first so extras
+  // only get dropped when there are already plenty of product references.
+  const seen = new Set<string>()
+  return urls.filter((u) => u && !seen.has(u) && seen.add(u)).slice(0, 5)
+    .map((u) => ({ type: 'image', source: { type: 'url', url: u } }))
+}
+
+// Final source_image_references for one prompt: the base/product refs are ALWAYS
+// kept; on top of that we keep only the extra refs the model actually chose AND
+// that belong to the known pool — so a hallucinated or product-substituting URL
+// can never slip into what we send to Higgsfield.
+function curateRefs(base: string[], chosen: unknown, pool: string[]): string[] {
+  const allowed = new Set(pool)
+  const picks = Array.isArray(chosen)
+    ? chosen.filter((u): u is string => typeof u === 'string' && allowed.has(u))
+    : []
+  return Array.from(new Set([...base.filter(Boolean), ...picks]))
 }
 
 function stripFences(s: string): string {
@@ -130,14 +152,19 @@ function stripFences(s: string): string {
 export async function generateHeroPrompt(params: {
   onePager: string
   sourceImageUrls: string[]
+  /** Optional extra reference images the operator added — scene/background/style
+   *  references. The product still comes only from the source photos. */
+  extraReferenceUrls?: string[]
 }): Promise<HeroPrompt> {
+  const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
   const userText = [
     'STAGE 1 ONE-PAGER (product name + category only):',
     params.onePager || '(none)',
     '',
-    `SOURCE PRODUCT IMAGE URLS (${params.sourceImageUrls.length}): ${params.sourceImageUrls.join(', ')}`,
+    `SOURCE PRODUCT IMAGE URLS (${params.sourceImageUrls.length}) — the product comes ONLY from these: ${params.sourceImageUrls.join(', ')}`,
+    ...(extras.length ? ['', `ADDITIONAL REFERENCE IMAGES (${extras.length}) — optional scene/background/style references; put a URL in source_image_references only if you want Higgsfield to match that scene: ${extras.join(', ')}`] : []),
     '',
-    'Generate the hero prompt JSON now. The source images are attached below.',
+    'Generate the hero prompt JSON now. The images are attached below.',
   ].join('\n')
 
   // Retry the call + parse up to 3 times — transient API failures and the odd
@@ -151,7 +178,7 @@ export async function generateHeroPrompt(params: {
         model: await getModel('stage3Prompt'),
         max_tokens: 2000,
         system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(params.sourceImageUrls)] }],
+        messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks([...params.sourceImageUrls, ...extras])] }],
       })
       const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
       try { parsed = JSON.parse(raw) } catch { parsed = JSON.parse(jsonrepair(raw)) }
@@ -168,8 +195,9 @@ export async function generateHeroPrompt(params: {
     model: parsed.model || 'nano_banana_2',
     aspect_ratio: parsed.aspect_ratio || '1:1',
     prompt: parsed.prompt || '',
-    // Always force the real source URLs — the model sometimes echoes placeholders.
-    source_image_references: params.sourceImageUrls,
+    // Source product images always; plus any extra scene refs the model chose
+    // (validated against the known pool so placeholders can't slip in).
+    source_image_references: curateRefs(params.sourceImageUrls, parsed.source_image_references, [...params.sourceImageUrls, ...extras]),
   }
 }
 
@@ -183,9 +211,14 @@ export async function generateRemainingPrompts(params: {
    *  the approved hero (1), or the source product photos when the hero step is
    *  skipped. */
   referenceImageUrls: string[]
+  /** Optional extra reference images the operator added during Stage 3. The
+   *  model sees them and decides, per image, which (if any) to attach to that
+   *  prompt's source_image_references — i.e. what gets sent to Higgsfield. */
+  extraReferenceUrls?: string[]
   fromSource?: boolean
 }): Promise<RemainingPrompt[]> {
   const refs = params.referenceImageUrls.filter(Boolean)
+  const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
   const refLine = params.fromSource
     ? `SOURCE PRODUCT IMAGE URLS (${refs.length}) — these are the reference for all 8; render the product exactly as shown: ${refs.join(', ')}`
     : `APPROVED HERO IMAGE URL (reference for all 8): ${refs[0] ?? ''}`
@@ -203,6 +236,7 @@ export async function generateRemainingPrompts(params: {
     [params.avatar, params.visual].filter(Boolean).join('\n\n') || '(none)',
     '',
     refLine,
+    ...(extras.length ? ['', `ADDITIONAL REFERENCE IMAGES (${extras.length}) — optional. For EACH prompt, include in its source_image_references the exact URLs of the ones that genuinely fit THAT image's scene/style/context (alongside the ${params.fromSource ? 'product photos' : 'hero'}). Omit any that don't fit; if none fit, source_image_references is just the ${params.fromSource ? 'product photos' : 'hero'}. Never invent a URL: ${extras.join(', ')}`] : []),
     '',
     tail,
   ].join('\n')
@@ -218,7 +252,7 @@ export async function generateRemainingPrompts(params: {
       model: await getModel('stage3Prompt'),
       max_tokens: 16000,
       system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks(refs)] }],
+      messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks([...refs, ...extras])] }],
     })
     const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
     // Isolate the JSON array even if the model wrapped it in prose.
@@ -246,6 +280,8 @@ export async function generateRemainingPrompts(params: {
     aspect_ratio: p.aspect_ratio || '1:1',
     prompt: p.prompt || '',
     german_text: p.german_text || '',
-    source_image_references: refs,
+    // Hero/product refs always; plus only the extra refs the model chose for
+    // this image (validated against the pool so nothing hallucinated slips in).
+    source_image_references: curateRefs(refs, p.source_image_references, [...refs, ...extras]),
   }))
 }
