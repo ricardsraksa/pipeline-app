@@ -815,7 +815,7 @@ function CompletedReview({
         {im.image_url ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={im.image_url} alt={im.category} className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
+            <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
             {v && (
               <button
                 onClick={() => toggleVerdict(i)}
@@ -898,7 +898,7 @@ function CompletedReview({
             <div className="flex flex-col gap-1.5">
               <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
+                <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
                 <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
               </div>
@@ -1216,7 +1216,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
       {heroUrl && (
         <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={heroUrl} alt="Hero" className="w-full h-full object-cover" />
+          <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
           <button onClick={() => dl(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
         </div>
@@ -1226,7 +1226,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
           {im?.image_url ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={im.image_url} alt={im.category} className="w-full h-full object-cover" />
+              <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" className="w-full h-full object-cover" />
               {im.verdict && (
                 <span className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white ${im.verdict === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{im.verdict}</span>
               )}
