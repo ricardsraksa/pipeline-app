@@ -113,7 +113,7 @@ export default function Stage3HeroFlow({
       const res = await fetch("/api/stage3/edit-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: heroDraft, instructions: instr, category: "hero_studio" }),
+        body: JSON.stringify({ prompt: heroDraft, instructions: instr, category: "hero_studio", reference_images: safeParse<string[]>(run?.stage3_reference_images, []) }),
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setHeroAiErr(data.error ?? `HTTP ${res.status}`); return; }

@@ -19,6 +19,7 @@ Your job is to rewrite the prompt incorporating the operator's note. Hard rules:
 - Preserve references to source images, German on-image text, and any explicit "do not" instructions, unless the operator's note explicitly contradicts them.
 - Apply the operator's note thoroughly — if they say "warmer lighting," every lighting cue should reflect that. If they say "remove the second person," every reference to a second person must be gone.
 - Keep the prompt in the same overall style and length as the original. Don't append commentary or explanations.
+- If reference images are attached, treat them as the desired SCENE / setting / lighting / style to move toward — never as the product. Describe what you actually see in them (a setting, a background, a mood, a prop) and fold it into the rewrite where the operator's note calls for it. The product still comes from the existing product references; do not describe an attached reference as the product.
 - Output ONLY the new prompt text. No preamble, no markdown headers, no quotes around it.`;
 
 export async function POST(req: NextRequest) {
@@ -26,10 +27,14 @@ export async function POST(req: NextRequest) {
     prompt?: string;
     instructions?: string;
     category?: string;
+    reference_images?: string[];
   };
   const prompt = body.prompt?.trim();
   const instructions = body.instructions?.trim();
   const category = body.category?.trim();
+  const referenceImages = Array.isArray(body.reference_images)
+    ? body.reference_images.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 5)
+    : [];
 
   if (!prompt || prompt.length < 10) {
     return NextResponse.json({ success: false, error: "prompt required" }, { status: 400 });
@@ -49,6 +54,9 @@ export async function POST(req: NextRequest) {
     "",
     "OPERATOR NOTE — what to change:",
     instructions,
+    referenceImages.length
+      ? `\n${referenceImages.length} reference image(s) are attached below — use them as the desired scene/setting/style and reflect them in the rewrite where the note calls for it. They are NOT the product.`
+      : null,
     "",
     "Return the rewritten prompt as plain text.",
   ]
@@ -60,7 +68,13 @@ export async function POST(req: NextRequest) {
       model: await getModel("stage3Prompt"),
       max_tokens: 2000,
       system: SYSTEM,
-      messages: [{ role: "user", content: userMsg }],
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text" as const, text: userMsg },
+          ...referenceImages.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })),
+        ],
+      }],
     });
     const out = msg.content.find((b) => b.type === "text")?.text?.trim() ?? "";
     if (!out) {
