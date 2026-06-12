@@ -476,6 +476,7 @@ export default function Stage3HeroFlow({
       [],
     );
     const placement = safeParse<Placement | null>(run.stage3_placement, null);
+    const referenceImages = safeParse<string[]>(run.stage3_reference_images, []);
     return (
       <CompletedReview
         runId={runId}
@@ -483,6 +484,7 @@ export default function Stage3HeroFlow({
         initialImages={imgs}
         prompts={prompts}
         initialPlacement={placement}
+        initialReferenceImages={referenceImages}
       />
     );
   }
@@ -560,12 +562,14 @@ function CompletedReview({
   initialImages,
   prompts,
   initialPlacement,
+  initialReferenceImages,
 }: {
   runId: number;
   heroUrl: string | null;
   initialImages: RemImage[];
   prompts: RemainingPrompt[];
   initialPlacement: Placement | null;
+  initialReferenceImages: string[];
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
   const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
@@ -885,7 +889,7 @@ function CompletedReview({
       {zipNote && <p className="text-[12px] text-[var(--color-amber)]">{zipNote}</p>}
 
       <div className="max-w-xl">
-        <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
+        <Stage3ReferenceImages runId={Number(runId)} initial={initialReferenceImages} />
       </div>
 
       {/* ── Product shots — top of the page ────────────────────────────── */}
