@@ -1,4 +1,4 @@
-export const REVISE_DOC_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is Germany and the customer speaks German, so you will reference German customer behaviour, German platforms, and EUR pricing — but the document itself is an English internal working document. Do NOT write any section, header, or summary in German. The only exception is direct German customer quotes (which must be followed by an English translation in parentheses).
+export const REVISE_DOC_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is the USA first, then other affluent English-speaking countries. The core customer is a middle-aged mother. The document is an English internal working document.
 
 You are revising a single document based on a senior strategist's review.
 

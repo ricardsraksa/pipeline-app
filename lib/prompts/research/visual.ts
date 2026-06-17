@@ -20,7 +20,7 @@ CROSS-COMPETITOR PATTERNS:
 - Image types that appear in every top competitor
 
 MUST-HAVE IMAGE TYPES (list 7-10):
-For each: image type name + "why this works" line specific to this product and German avatar
+For each: image type name + "why this works" line specific to this product and the middle-aged mom avatar in the US-led English-speaking market
 
 DIFFERENTIATED ANGLES (minimum 2):
 Visual angles no competitor currently uses — be specific and actionable, not generic ("more authentic" is not an angle)

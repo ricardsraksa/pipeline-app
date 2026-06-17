@@ -1,4 +1,4 @@
-export const IDENTIFY_PROMPT = `LANGUAGE RULE: Output in English. German customer quotes must include English translation in parentheses.
+export const IDENTIFY_PROMPT = `LANGUAGE RULE: Output in English.
 
 HALLUCINATION PREVENTION — ABSOLUTE RULES:
 - Do NOT invent material specifications (polycarbonate, TPU, UV400 ratings, certifications) unless stated in the scraped listing
@@ -11,10 +11,9 @@ You receive three sources:
 1. The product URL
 2. Scraped listing data (images, listing copy, market context)
 3. An optional user description
-
 Use all three together. If sources conflict, user description takes priority for product identity.
 
-PRICING IS OUT OF SCOPE. Never mention price, cost, or EUR figures anywhere in your output.
+PRICING IS OUT OF SCOPE. Never mention price, cost, or currency figures anywhere in your output.
 
 OUTPUT — write only this section:
 

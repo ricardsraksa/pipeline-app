@@ -1,16 +1,17 @@
-export const COMPETITIVE_PROMPT = `LANGUAGE RULE: Output in English. German customer quotes must include English translation in parentheses.
+export const COMPETITIVE_PROMPT = `LANGUAGE RULE: Output in English.
 
 COMPETITOR PROFILING METHODOLOGY:
 For each competitor, use web search to gather from:
 - Homepage: headline, value proposition, primary CTA, social proof claims, target audience signals
 - Product pages: how they describe features, what they emphasize as unique
 - What's included / bundle composition (NOT price — pricing is out of scope)
-- Amazon.de and idealo.de listings and reviews (ignore the prices shown)
+- Amazon.com (and .co.uk/.ca/.com.au) listings and reviews (ignore the prices shown)
 - Customer testimonial pages: named customers, case study themes
 
-PRICING IS OUT OF SCOPE for this entire analysis. Never state a competitor's price, an EUR figure, or a "budget/mid/premium" price band. Positioning is judged on messaging, features, and audience — not price.
+PRICING IS OUT OF SCOPE for this entire analysis. Never state a competitor's price, a currency figure, or a "budget/mid/premium" price band. Positioning is judged on messaging, features, and audience — not price.
 
 REQUIRED STRUCTURE PER COMPETITOR:
+
 ### [Competitor Name]
 **URL / Listing**: [source]
 **Positioning angle**: [how they position in one phrase]
@@ -27,11 +28,12 @@ REQUIRED STRUCTURE PER COMPETITOR:
 - [specific gap]
 
 SWITCH TRIGGERS — search for each major competitor:
-- "[competitor name] Erfahrungen schlecht"
-- "[competitor name] Alternative"
-- "[competitor name] Problem" or "[competitor name] Beschwerde"
+- "[competitor name] reviews problems"
+- "[competitor name] alternative"
+- "[competitor name] complaint" or "[competitor name] disappointed"
 
 Format switch triggers as:
+
 ### Switch Triggers — Why Buyers Leave [Competitor Name]
 1. [reason with evidence]
 2. [reason with evidence]
@@ -47,22 +49,25 @@ QUALITY RULES:
 OUTPUT — write only this section:
 
 5. COMPETITIVE LANDSCAPE
-
 Include:
 - Full profile of each provided competitor URL using the structure above
-- Plus 2-3 additional German market competitors found via search
+- Plus 2-3 additional competitors active in the US / English-speaking markets found via search
 
 Then add CROSS-COMPETITOR SYNTHESIS:
+
 **Commoditized claims everyone makes** (no longer differentiators):
 - [claim]
+
 **Positioning map** (by messaging angle, NOT price tier):
 - Quality / durability angle: [competitors here]
 - Convenience / ease angle: [competitors here]
 - Design / aesthetic angle: [competitors here]
 - Health / safety angle: [competitors here]
 (Use whatever angles actually appear — these are examples, not a fixed list. Never use price as an axis.)
+
 **Gaps no competitor fills** (must be specific and actionable):
 - [gap with reasoning — why this gap exists and how this product could own it]
+
 **Recommended positioning angle for this product**:
 [Specific recommendation with reasoning]
 

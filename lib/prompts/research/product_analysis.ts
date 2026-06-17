@@ -1,4 +1,4 @@
-export const PRODUCT_ANALYSIS_PROMPT = `LANGUAGE RULE: Output in English. German customer quotes must include English translation in parentheses.
+export const PRODUCT_ANALYSIS_PROMPT = `LANGUAGE RULE: Output in English.
 
 HALLUCINATION PREVENTION:
 - VERIFIED: only features explicitly stated in the scraped listing or user description
@@ -16,21 +16,20 @@ OUTPUT — write only these sections:
 - Features ranked by likely customer importance (cross-reference the pain points in Section 3)
 
 7. MARKET SOPHISTICATION
-- Awareness stage diagnosis: which Eugene Schwartz stage does the typical German buyer in this category start at? Provide evidence for this diagnosis.
-- Ad exposure level in this category in Germany: light / moderate / heavy — with reasoning
-- German-specific skepticism patterns:
-  - What triggers distrust in German buyers for this category
-  - What specifically builds trust: Trusted Shops, Käuferschutz, TÜV, Stiftung Warentest, or category-specific testing bodies — only mention the ones actually relevant
-  - German consumer archetypes for this category (e.g. "researches for weeks before buying", "reads every review", "trusts word of mouth only")
+- Awareness stage diagnosis: which Eugene Schwartz stage does the typical buyer (the middle-aged mom in the US-led English-speaking market) start at? Provide evidence for this diagnosis.
+- Ad exposure level in this category in the US / English-speaking markets: light / moderate / heavy — with reasoning
+- Skepticism patterns:
+  - What triggers distrust in buyers for this category
+  - What specifically builds trust: Trustpilot reviews, verified-purchase Amazon reviews, BBB accreditation, third-party lab testing, money-back guarantees, recognizable certification marks — only mention the ones actually relevant
+  - Consumer archetypes for this category (e.g. "researches for weeks before buying", "reads every review", "trusts word of mouth and mom groups only")
 
 8. LEVELS OF CONSCIOUSNESS
-Apply Eugene Schwartz's 5 levels to this product in the German market:
+Apply Eugene Schwartz's 5 levels to this product in the US-led English-speaking market:
 - Unaware: [% estimate] — what they're experiencing but not yet framing as a problem
 - Problem Aware: [% estimate] — know they have the problem, haven't found a solution category
 - Solution Aware: [% estimate] — know solutions exist, comparing options
 - Product Aware: [% estimate] — know this type of product exists, evaluating brands
 - Most Aware: [% estimate] — have bought before, looking to upgrade or switch
-
 Primary target segment: [which level to target and why — based on market size and conversion opportunity]
 Secondary target segment: [which level and why]
 
