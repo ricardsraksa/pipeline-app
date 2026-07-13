@@ -6,7 +6,7 @@ export const IMAGE_PROMPTS_SYSTEM = `You are a creative director and AI image ge
 
 You will receive:
 - The Stage 1 one-pager (product name, benefits, use cases, USPs)
-- The Stage 2 German copy (headlines, benefits, ad copy, FAQs)
+- The Stage 2 copy (headlines, benefits, ad copy, FAQs)
 - The Stage 1 visual strategy
 - The Stage 1 customer avatar
 - Source product images (R2 URLs)
@@ -21,13 +21,13 @@ Fill in the 9 templates below with values extracted from Stage 1 and Stage 2. Fo
 
 PLACEHOLDER EXTRACTION RULES:
 
-[PRODUCT_NAME] — Use the product name from the Stage 1 one-pager (English or German depending on context)
+[PRODUCT_NAME] — Use the product name from the Stage 1 one-pager
 [PRODUCT_CATEGORY] — Single phrase describing what the product is (e.g. "stainless steel pet water fountain")
 [PRIMARY_BENEFIT] — The strongest benefit from the one-pager
 [SECONDARY_BENEFIT] — Second strongest benefit
 [FEATURE_1], [FEATURE_2], [FEATURE_3] — Three concrete physical or functional features
 [USE_CASE_1], [USE_CASE_2] — Two use cases from the one-pager
-[TARGET_AUDIENCE] — Customer avatar description (concise, e.g. "German cat owners in urban apartments")
+[TARGET_AUDIENCE] — Customer avatar description (concise, e.g. "cat owners in urban apartments")
 [MARKETING_ANGLE] — The core positioning angle from the offer brief
 [EMOTIONAL_OUTCOME] — How the customer feels after using the product
 [PROBLEM_TO_SOLVE] — The specific problem this product addresses
@@ -39,7 +39,7 @@ PLACEHOLDER EXTRACTION RULES:
 [LIGHTING_STYLE] — Specific lighting setup
 [COMPOSITION_STYLE] — Specific composition approach
 [SCENE_LOCATION] — Specific physical location for lifestyle shots
-[TEXT_OVERLAY] — German copy taken verbatim from Stage 2 (never invent or translate new text)
+[TEXT_OVERLAY] — Copy taken verbatim from Stage 2 (never invent new text)
 [TEXT_POSITION] — Where the text sits in the frame
 [ASPECT_RATIO] — Always "1:1" for every image
 
@@ -62,7 +62,7 @@ A product-specific list of things to avoid. Include:
 - Anatomy/text rendering issues if applicable
 
 Example negative constraint for a cat fountain with cat lifestyle shots:
-"No plastic finish, no distorted cat anatomy (correct number of legs and paws, anatomically correct face), no garbled German text, no backwards letters, no fake water effects, no floating objects, no AI smoothing on metal surfaces, no cartoon cats, no exaggerated colors, no studio backdrop seams visible, no busy backgrounds that distract from the product."
+"No plastic finish, no distorted cat anatomy (correct number of legs and paws, anatomically correct face), no garbled text, no backwards letters, no fake water effects, no floating objects, no AI smoothing on metal surfaces, no cartoon cats, no exaggerated colors, no studio backdrop seams visible, no busy backgrounds that distract from the product."
 
 MODEL SELECTION:
 
@@ -92,7 +92,7 @@ Each object has these fields:
   "model": "<higgsfield model id>",
   "aspect_ratio": "<ratio>",
   "prompt": "<full filled-in template as one continuous string>",
-  "german_text": "<verbatim German text from Stage 2 if used, empty string if none>",
+  "overlay_text": "<verbatim on-image text from Stage 2 if used, empty string if none>",
   "source_image_references": ["<R2 URLs of source images Higgsfield should reference>"]
 }
 
@@ -349,7 +349,7 @@ OUTPUT FORMAT: Aspect ratio [ASPECT_RATIO]. Trust-building, conversion-focused.
 ---
 
 CRITICAL RULES:
-- All German text in [TEXT_OVERLAY] must come verbatim from Stage 2 copy. Never invent or translate new German text.
+- All text in [TEXT_OVERLAY] must come verbatim from Stage 2 copy. Never invent new text.
 - Fidelity Lock and Negative Constraint Block are product-specific — generate them fresh for each product based on source images and product description.
 - Every template must reference at least one source image URL in source_image_references.
 - All images use 1:1 aspect ratio.
@@ -390,7 +390,7 @@ ${offer_brief}
 NECESSARY BELIEFS:
 ${necessary_beliefs}
 
-GERMAN COPY (Stage 2 output):
+COPY (Stage 2 output):
 ${copy}
 
 SOURCE PRODUCT IMAGES (R2 URLs — use these in source_image_references):

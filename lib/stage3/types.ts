@@ -13,12 +13,12 @@ export interface ImagePrompt {
   category: ImageCategory
   image_type: string
   prompt: string
-  german_text: string
+  overlay_text: string
   source_image_references: string[]
   model: string
   aspect_ratio: string
   // Legacy fields kept optional for backward compatibility with old runs/feedback data.
-  german_text_used?: string | null
+  overlay_text_used?: string | null
   reference_image_index?: number
 }
 

@@ -4,7 +4,7 @@
 // the model resolver) so client components can import the type and the warnings
 // helper WITHOUT dragging server-only modules into the browser bundle.
 
-// Structured shape of the Stage 2 German copy kit. Derived from the canonical
+// Structured shape of the Stage 2 copy kit. Derived from the canonical
 // free-text output (which stays untouched so the carefully-tuned copy and the
 // 11pt-Arial Google-Docs paste are never disturbed). This JSON drives only the
 // per-field copy UI and structure validation.

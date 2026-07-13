@@ -253,7 +253,7 @@ function StageActions({ stage, prevLabel, prevId, onRestart, restarting }) {
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 function nextAction(run, engine, push) {
   const s = run.status, o = run.outputs;
-  if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the German copy.", cta: "Run Stage 2", onClick: engine.startStage2 };
+  if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the copy.", cta: "Run Stage 2", onClick: engine.startStage2 };
   if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 3", onClick: () => scrollTo("stage-3") };
   if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => scrollTo("stage-3") };
   if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => scrollTo("stage-3") };
@@ -536,7 +536,7 @@ function RunDetail({ run, engine, patch, push, onBack }) {
                       <Icon.Alert className="w-4 h-4 text-[var(--color-amber)] shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] text-[var(--color-text)] font-[600]">Review the research summary above</p>
-                        <p className="text-[12px] text-[var(--color-text-2)] mt-0.5">Edit it if needed, then run Stage 2 to generate the German copy.</p>
+                        <p className="text-[12px] text-[var(--color-text-2)] mt-0.5">Edit it if needed, then run Stage 2 to generate the copy.</p>
                       </div>
                       <Button onClick={engine.startStage2}>Looks good — run Stage 2 <Icon.ArrowRight className="w-3.5 h-3.5" /></Button>
                     </div>
@@ -548,17 +548,17 @@ function RunDetail({ run, engine, patch, push, onBack }) {
 
           {/* ── Stage 2 ── */}
           {(o.stage2Output || run.status === "stage2") && (
-            <Section id="stage-2" label="Stage 2 · German copy" accent={run.status === "stage2"}>
+            <Section id="stage-2" label="Stage 2 · Copy" accent={run.status === "stage2"}>
               {o.stage2Output ? (
                 <>
-                  <EditableOutput run={run} patch={patch} label="German copy kit" push={push} />
+                  <EditableOutput run={run} patch={patch} label="Copy kit" push={push} />
                   <div className="flex items-center justify-between pt-1 gap-3 flex-wrap">
                     <AIRegenerate stage="stage2" initialFeedback={run.feedback.stage2Note} onRegenerated={() => push("Stage 2 regenerated", "success")} />
                     <FeedbackButtons run={run} stage="stage2" patch={patch} />
                   </div>
                   <StageActions stage="stage2" prevLabel="Stage 1" prevId="stage-1" onRestart={doRestart} restarting={restarting} />
                 </>
-              ) : <Spinner label="Generating German copy…" />}
+              ) : <Spinner label="Generating copy…" />}
             </Section>
           )}
 

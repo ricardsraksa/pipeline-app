@@ -149,7 +149,7 @@ function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
 
 const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
   { key: "stage1", id: "v2-stage-1", n: 1, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
-  { key: "stage2", id: "v2-stage-2", n: 2, title: "German copy", what: "Full DTC copy kit from the approved research" },
+  { key: "stage2", id: "v2-stage-2", n: 2, title: "Copy", what: "Full DTC copy kit from the approved research" },
   { key: "stage3", id: "v2-stage-3", n: 3, title: "Images", what: "Hero shot first, then 8 derivatives" },
 ];
 
@@ -370,7 +370,7 @@ export default function RunPage() {
       [outputs.necessaryBeliefs, `${slug}_NECESSARY_BELIEFS.txt`],
       [outputs.necessaryBeliefsRevised, `${slug}_NECESSARY_BELIEFS_REVISED.txt`],
       [outputs.chiefFinal, `${slug}_CHIEF_FINAL.txt`],
-      [outputs.stage2Output, `${slug}_STAGE2_GERMAN_COPY.txt`],
+      [outputs.stage2Output, `${slug}_STAGE2_COPY.txt`],
     ];
     for (const [content, name] of files) if (content) zip.file(name, content);
     const blob = await zip.generateAsync({ type: "blob" });
@@ -465,7 +465,7 @@ export default function RunPage() {
     }
     if (key === "stage2") {
       if (!outputs.stage2Output) return null;
-      return "German copy kit" + (outputs.stage2OutputEdited ? " · edited" : "");
+      return "Copy kit" + (outputs.stage2OutputEdited ? " · edited" : "");
     }
     if (run.status === "completed") return "hero + 8 images";
     return null;
@@ -481,7 +481,7 @@ export default function RunPage() {
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
-    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the German copy.", cta: startingStage2 ? "Starting…" : "Run Stage 2", onClick: handleStartStage2 };
+    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the copy.", cta: startingStage2 ? "Starting…" : "Run Stage 2", onClick: handleStartStage2 };
     if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 3", onClick: () => openStage("stage3") };
     if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => openStage("stage3") };
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => openStage("stage3") };
@@ -630,9 +630,9 @@ export default function RunPage() {
                     originalValue={outputs.stage2Output}
                     editedValue={outputs.stage2OutputEdited}
                     editedAt={outputs.stage2EditedAt}
-                    label="German Copy Kit"
+                    label="Copy Kit"
                     monospace={false}
-                    downloadFilename="STAGE2_GERMAN_COPY.txt"
+                    downloadFilename="STAGE2_COPY.txt"
                   />
                   )}
                   {runId !== null && (
@@ -651,7 +651,7 @@ export default function RunPage() {
               ) : run.status === "stage2" ? (
                 <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
                   <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
-                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">Generating German copy…</p>
+                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">Generating copy…</p>
                 </div>
               ) : (
                 <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the research.</p>
@@ -661,7 +661,7 @@ export default function RunPage() {
             {def.key === "stage3" && (
               <>
                 <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
-                <StageActions stage="stage3-prompts" prevLabel="German copy" prevId="v2-stage-2" onRestart={handleRestartStage} restarting={restarting} />
+                <StageActions stage="stage3-prompts" prevLabel="Copy" prevId="v2-stage-2" onRestart={handleRestartStage} restarting={restarting} />
               </>
             )}
           </StageAccordion>

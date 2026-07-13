@@ -28,13 +28,13 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
 }
 
 export async function POST(req: NextRequest) {
-  const { image_url, category, prompt_used, product_description, german_text_used } = await req.json()
+  const { image_url, category, prompt_used, product_description, overlay_text_used } = await req.json()
 
   if (!image_url || !category || !prompt_used) {
     return Response.json({ success: false, error: 'image_url, category, prompt_used required' }, { status: 400 })
   }
 
-  const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', german_text_used: german_text_used ?? null })
+  const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', overlay_text_used: overlay_text_used ?? null })
 
   try {
     const message = await createWithRetry({

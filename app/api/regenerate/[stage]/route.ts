@@ -162,7 +162,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
 }
 
-// ── Stage 2: regenerate the German copy ───────────────────────────────────────
+// ── Stage 2: regenerate the copy ──────────────────────────────────────────────
 async function regenerateStage2(run: Run, instructions: string): Promise<RegenResult> {
   const currentCopy = run.stage2_copy_edited ?? run.stage2_output ?? "";
   if (!currentCopy) throw new Error("No Stage 2 copy to regenerate yet");
@@ -171,7 +171,7 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   const research = pickRevised(run, "step_research");
   const avatar = pickRevised(run, "step_avatar");
 
-  const system = `You are regenerating German DTC product page copy based on user feedback.
+  const system = `You are regenerating DTC product page copy based on user feedback.
 
 CURRENT COPY:
 ${currentCopy}
@@ -180,11 +180,11 @@ USER'S EDIT INSTRUCTIONS:
 ${instructions}
 
 YOUR TASK:
-Regenerate the German copy following the user's instructions. Keep the same section structure that was already in the current copy. Apply the requested changes consistently.
+Regenerate the copy following the user's instructions. Keep the same section structure that was already in the current copy. Apply the requested changes consistently.
 
 If they ask for "more technical" add specifications. If they ask for "shorter" condense. If they ask to "emphasise X" make that the focus. If they ask for "warmer tone" adjust language accordingly.
 
-Return ONLY the regenerated German copy. No preamble, no explanation, no code fences.`;
+Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`;
 
   const user = [
     "Here is the Stage 1 research context:",
@@ -202,7 +202,7 @@ Return ONLY the regenerated German copy. No preamble, no explanation, no code fe
     "AVATAR:",
     avatar,
     "",
-    "Now regenerate the German copy following the user's instructions.",
+    "Now regenerate the copy following the user's instructions.",
   ].join("\n");
 
   const output = await ask({ system, user, maxTokens: 8000, role: "stage2" });
@@ -243,7 +243,7 @@ Return ONLY the regenerated JSON array. No markdown code fences. No explanation.
     "",
     "---",
     "",
-    "STAGE 2 GERMAN COPY:",
+    "STAGE 2 COPY:",
     stage2Copy,
     "",
     "---",

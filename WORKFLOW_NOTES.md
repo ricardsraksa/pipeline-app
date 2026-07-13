@@ -1,6 +1,6 @@
 # Pipeline workflow — improvement notes
 
-Audit of the 3-stage pipeline (research → German copy → images) for speed, cost,
+Audit of the 3-stage pipeline (research → copy → images) for speed, cost,
 and output quality. Findings are grounded in the actual code (file:line refs),
 prioritized by impact ÷ effort. Nothing here is implemented yet — it's a menu.
 
@@ -30,7 +30,7 @@ Stage 1 is already well-built — leave it.
   avatar ∥ offer-brief ∥ beliefs (`lib/pipeline-runner.ts` `Promise.all`/
   `allSettled`). Good.
 - Web search is **off by default** (`RESEARCH_WEB_SEARCH=on` to enable); adds
-  ~30–60s when on. Leave off unless a category needs live German sources.
+  ~30–60s when on. Leave off unless a category needs live sources.
 - Minor: research text is re-sent to ~9 calls. Prompt caching (#2) would recover
   most of that input cost. Not worth restructuring otherwise.
 
@@ -86,7 +86,7 @@ not worth tuning. Generation speed is Higgsfield's, not ours.
 
 ---
 
-## Stage 2 (German copy) — quality + cost
+## Stage 2 (copy) — quality + cost
 
 ### Prompt caching (#2) — confirmed absent
 No `cache_control` anywhere in the codebase. The 230-line Stage 2 prompt is
@@ -142,7 +142,7 @@ slop rules. Not urgent — flagging as a lever.
 
 ## When Stage 2 → structured is picked up (the wanted one)
 - Change `STAGE2_PROMPT` to emit JSON: `{ product_name, badge, supporting_sentence,
-  benefits[3], sections[3]{headline,paragraph}, was_enthalten, faqs[2]{q,a},
+  benefits[3], sections[3]{headline,paragraph}, whats_included, faqs[2]{q,a},
   facebook{headline,primary,description}, one_liners[5] }`.
 - Parse + validate in the pipeline (catch "only 2 benefits", missing FAQ).
 - Store the JSON **and** a rendered markdown/text view (so the 11pt-Arial

@@ -148,7 +148,7 @@ function PromptQC({ run, engine, push }) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[12px] font-[600] text-[var(--color-text)]">#{p.index} {p.image_type}</span>
               <span className="ff-mono text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{p.model}</span>
-              {p.german_text && <span className="ff-mono text-[9px] text-[var(--color-text-3)] truncate max-w-xs">DE: {p.german_text}</span>}
+              {p.overlay_text && <span className="ff-mono text-[9px] text-[var(--color-text-3)] truncate max-w-xs">Text: {p.overlay_text}</span>}
             </div>
             <textarea value={p.prompt} onChange={(e) => setDraft(i, e.target.value)} rows={4}
               className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-3 py-2 text-[11px] ff-mono resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
@@ -281,7 +281,7 @@ function CompletedReview({ run, engine, push }) {
           <p className="eyebrow text-[var(--color-text-2)]">Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— problem → solution → proof</span></p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {sectionEntries.map(({ s, entry }) => {
-              const { im, i } = entry; const copy = (promptFor(im)?.german_text || "").trim();
+              const { im, i } = entry; const copy = (promptFor(im)?.overlay_text || "").trim();
               return (
                 <div key={i} className="flex flex-col gap-1.5">
                   {tile(im, i)}

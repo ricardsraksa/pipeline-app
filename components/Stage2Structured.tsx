@@ -65,7 +65,7 @@ export default function Stage2Structured({ json }: { json: Stage2Json }) {
       {json.sections.length > 0 && (
         <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] overflow-hidden">
           <div className="px-3.5 py-2 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
-            <span className="eyebrow text-[var(--color-text-2)]">Headlines &amp; Absätze</span>
+            <span className="eyebrow text-[var(--color-text-2)]">Headlines &amp; Paragraphs</span>
           </div>
           {json.sections.map((s, i) => (
             <div key={i} className="px-3.5 py-2.5 border-b border-[var(--color-border)] last:border-0 space-y-1.5">

@@ -79,7 +79,7 @@ function NewRun({ onStart, push }) {
           </h1>
           <p className="text-[13px] text-[var(--color-text-2)] leading-relaxed mt-1.5 max-w-[52ch]">
             Describe the product and drop a few reference photos. We run Stage&nbsp;1 research,
-            Stage&nbsp;2 German copy, then pause before Stage&nbsp;3 images.
+            Stage&nbsp;2 copy, then pause before Stage&nbsp;3 images.
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={prefill}>
@@ -181,7 +181,7 @@ function NewRun({ onStart, push }) {
       <div className="mt-7 grid sm:grid-cols-3 gap-3">
         {[
           { n: "01", title: "Research", body: "Product ID, market, avatar, offer brief, beliefs, one-pager." },
-          { n: "02", title: "German copy", body: "Full DTC copy kit. Auto-runs after you approve Stage 1." },
+          { n: "02", title: "Copy", body: "Full DTC copy kit. Auto-runs after you approve Stage 1." },
           { n: "03", title: "Images", body: "Pauses for approval. Hero shot first, then 8 derivatives." },
         ].map((s) => (
           <Card key={s.n} className="px-4 py-3.5">

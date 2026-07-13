@@ -11,7 +11,7 @@ export interface ImagePrompt {
   index: number;
   category: "INFOGRAPHIC" | "CONTEXTUAL";
   prompt: string;
-  german_text: string;
+  overlay_text: string;
   reference_image: string;
 }
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
 ${imageContext}
 
-GERMAN COPY (Stage 2 output):
+COPY (Stage 2 output):
 ${stage2_output}
 
 Generate the 7 image prompts as a JSON array now.`;

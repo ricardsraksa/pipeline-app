@@ -23,12 +23,12 @@ interface RawPromptObj {
   model?: string
   aspect_ratio?: string
   prompt?: string
-  german_text?: string
-  german_text_used?: string | null
+  overlay_text?: string
+  overlay_text_used?: string | null
   source_image_references?: unknown
 }
 
-// Forced tool call. Claude reliably mis-escapes the German marketing copy
+// Forced tool call. Claude reliably mis-escapes the marketing copy
 // (full of quotation marks) when hand-writing a ~40 KB JSON array as text,
 // which broke JSON.parse. Routing the 9 prompts through a tool call hands the
 // structure to the API's own JSON serialisation, so the result is always
@@ -51,12 +51,12 @@ const PROMPTS_TOOL: Anthropic.Tool = {
             model: { type: 'string' },
             aspect_ratio: { type: 'string' },
             prompt: { type: 'string' },
-            german_text: { type: 'string' },
+            overlay_text: { type: 'string' },
             source_image_references: { type: 'array', items: { type: 'string' } },
           },
           required: [
             'index', 'image_type', 'category', 'model',
-            'aspect_ratio', 'prompt', 'german_text', 'source_image_references',
+            'aspect_ratio', 'prompt', 'overlay_text', 'source_image_references',
           ],
         },
       },
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Forced tool call (see PROMPTS_TOOL): routes the 9 prompts through the
-    // API's JSON serialisation so German copy punctuation can't break parsing.
+    // API's JSON serialisation so copy punctuation can't break parsing.
     // Streaming is required by the SDK at this max_tokens budget;
     // finalMessage() collects the stream.
     const message = await anthropic.messages
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     // Claude usually returns `prompts` as a proper array, but for a payload
     // this large it sometimes emits it as a stringified JSON array instead.
     // Handle both — and run the string form through jsonrepair first, since
-    // the German marketing copy is prone to quote-escaping mistakes.
+    // the marketing copy is prone to quote-escaping mistakes.
     const rawPrompts = (toolUse.input as { prompts?: unknown }).prompts
     let parsed: RawPromptObj[]
     try {
@@ -193,20 +193,20 @@ export async function POST(req: NextRequest) {
         ? (p.source_image_references as unknown[]).filter((x): x is string => typeof x === 'string')
         : []
 
-      const germanText = typeof p.german_text === 'string'
-        ? p.german_text
-        : (typeof p.german_text_used === 'string' ? p.german_text_used : '')
+      const overlayText = typeof p.overlay_text === 'string'
+        ? p.overlay_text
+        : (typeof p.overlay_text_used === 'string' ? p.overlay_text_used : '')
 
       return {
         category: slug,
         image_type: p.image_type ?? IMAGE_CATEGORIES[i]?.label ?? slug,
         prompt: typeof p.prompt === 'string' ? p.prompt : '',
-        german_text: germanText,
+        overlay_text: overlayText,
         source_image_references: refs.length ? refs : visionUrls.slice(0, 1),
         model: p.model ?? IMAGE_CATEGORIES[i]?.default_model ?? 'nano_banana_pro',
         aspect_ratio: p.aspect_ratio ?? '1:1',
         // Back-compat shims for any old consumers.
-        german_text_used: germanText || null,
+        overlay_text_used: overlayText || null,
         reference_image_index: 0,
       }
     })

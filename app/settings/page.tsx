@@ -9,7 +9,7 @@ type Stage = "stage1" | "stage2" | "stage3";
 
 const STAGE_LABELS: Record<Stage, string> = {
   stage1: "Stage 1 — Research Brief",
-  stage2: "Stage 2 — German Copy",
+  stage2: "Stage 2 — Copy",
   stage3: "Stage 3 — Image Prompts",
 };
 

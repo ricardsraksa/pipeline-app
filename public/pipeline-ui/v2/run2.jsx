@@ -6,7 +6,7 @@
 
 const STAGE_DEFS = [
   { key: "stage1", id: "v2-stage-1", n: 1, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
-  { key: "stage2", id: "v2-stage-2", n: 2, title: "German copy", what: "Full DTC copy kit from the approved research" },
+  { key: "stage2", id: "v2-stage-2", n: 2, title: "Copy", what: "Full DTC copy kit from the approved research" },
   { key: "stage3", id: "v2-stage-3", n: 3, title: "Images", what: "Hero shot first, then 8 derivatives" },
 ];
 
@@ -20,7 +20,7 @@ function v2Summary(run, key) {
   }
   if (key === "stage2") {
     if (!o.stage2Output) return null;
-    return "German copy kit · 8 blocks" + (o.stage2OutputEdited ? " · edited" : "");
+    return "Copy kit · 8 blocks" + (o.stage2OutputEdited ? " · edited" : "");
   }
   if (run.status === "completed" && s3.images.length) {
     const pass = s3.images.filter((im) => (im.user_override ?? im.verdict) === "pass").length;
@@ -190,14 +190,14 @@ function RunV2({ run, engine, patch, push, onBack }) {
             {def.key === "stage2" && (
               o.stage2Output ? (
                 <>
-                  <EditableOutput run={run} patch={patch} label="German copy kit" push={push} />
+                  <EditableOutput run={run} patch={patch} label="Copy kit" push={push} />
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <AIRegenerate stage="stage2" initialFeedback={run.feedback.stage2Note} onRegenerated={() => push("Stage 2 regenerated", "success")} />
                     <FeedbackButtons run={run} stage="stage2" patch={patch} />
                   </div>
                   <StageActions stage="stage2" onRestart={doRestart} restarting={restarting} />
                 </>
-              ) : run.status === "stage2" ? <Spinner label="Generating German copy…" />
+              ) : run.status === "stage2" ? <Spinner label="Generating copy…" />
                 : <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the research.</p>
             )}
             {def.key === "stage3" && (

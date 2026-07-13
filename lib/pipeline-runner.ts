@@ -663,15 +663,15 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const productName = run.brand_name ?? run.product_name ?? "";
 
   await guardCancel(runId);
-  await updateRun(runId, { current_step: "Stage 2: Generating German copy (≈1–3 min)", last_updated_at: now() });
+  await updateRun(runId, { current_step: "Stage 2: Generating copy (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
     system: stage2System,
-    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete German copy kit now.`,
+    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete copy kit now.`,
     maxTokens: 8192,
-    label: "stage 2 German copy",
+    label: "stage 2 copy",
     model: await getModel("stage2"),
-    // Opus + an 8k-token German copy kit can run well past Sonnet's pace;
+    // Opus + an 8k-token copy kit can run well past Sonnet's pace;
     // give it 4 minutes before the client aborts.
     timeoutMs: 240_000,
   });

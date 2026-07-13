@@ -19,7 +19,7 @@ interface RemainingPrompt {
   model: string;
   aspect_ratio: string;
   prompt: string;
-  german_text: string;
+  overlay_text: string;
   source_image_references: string[];
 }
 interface RemImage {
@@ -348,7 +348,7 @@ export default function Stage3HeroFlow({
           try {
             const audit = await fetch("/api/stage3/audit", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, german_text_used: p.german_text || null }),
+              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null }),
             }).then((r) => r.json());
             if (audit.success) {
               verdict = audit.result?.verdict === "pass" ? "pass" : "fail";
@@ -437,7 +437,7 @@ export default function Stage3HeroFlow({
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[12px] font-[600] text-[var(--color-text)]">#{p.index} {p.image_type || p.category}</span>
                 <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{p.model}</span>
-                {p.german_text && <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] truncate max-w-xs">DE: {p.german_text}</span>}
+                {p.overlay_text && <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] truncate max-w-xs">Text: {p.overlay_text}</span>}
               </div>
               <textarea
                 value={p.prompt}
@@ -679,7 +679,7 @@ function CompletedReview({
       try {
         const audit = await fetch("/api/stage3/audit", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, german_text_used: p.german_text || null }),
+          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
         else { console.error("audit failed:", audit.error); issues = ["Audit skipped (auditor unavailable) — review manually."]; }
@@ -935,7 +935,7 @@ function CompletedReview({
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {sectionEntries.map(({ section, entry }) => {
               const { im, i } = entry;
-              const copy = (promptFor(im)?.german_text || "").trim();
+              const copy = (promptFor(im)?.overlay_text || "").trim();
               const reason = placement?.reasons?.[String(section)] || "";
               return (
                 <div key={i} className="flex flex-col gap-1.5">
@@ -997,7 +997,7 @@ function BulkFixModal({
     return d;
   });
   const [instr, setInstr] = useState(
-    "Reword to pass image-generation content guidelines: remove anything that could be flagged (injury, blood, medical claims, weapons, explicit or unsafe content, real brand names/logos). Keep the product, scene, and German text overlay intact.",
+    "Reword to pass image-generation content guidelines: remove anything that could be flagged (injury, blood, medical claims, weapons, explicit or unsafe content, real brand names/logos). Keep the product, scene, and text overlay intact.",
   );
   const [aiBusy, setAiBusy] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);

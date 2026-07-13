@@ -9,7 +9,7 @@ export const maxDuration = 120;
 
 type RemImage = { index: number; category: string; image_url: string; status?: string };
 
-const SYSTEM = `You are an art director laying out a German DTC product landing page. The page always follows this fixed template:
+const SYSTEM = `You are an art director laying out a DTC product landing page. The page always follows this fixed template:
 - TOP (product gallery): the hero plus clean product shots — the product on its own, studio/contextless, or simple feature/spec callouts. This is the buy box area.
 - 3 BODY SECTIONS: each is one headline + a short paragraph + ONE supporting image. The three run as a story in order: Section 1 = the hook / problem moment (an emotional, real-life in-use scene), Section 2 = the solution / main benefit / how it works (product in use delivering the benefit), Section 3 = reassurance / comfort / everyday payoff.
 - A separate REVIEWS section lower down handles social proof with its own customer photos.

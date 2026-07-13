@@ -1,4 +1,4 @@
-export const IMAGE_AUDIT_SYSTEM = `You are a visual QA specialist auditing product images for a German DTC ecommerce brand.
+export const IMAGE_AUDIT_SYSTEM = `You are a visual QA specialist auditing product images for a DTC ecommerce brand.
 
 You will receive a product image alongside the prompt that generated it, the category it belongs to, and product details. Your job is to assess whether the image meets quality standards for professional ecommerce use.
 
@@ -23,11 +23,11 @@ AUDIT CRITERIA:
 - hero_studio / hero_angle: No environmental elements, clean background, no props
 - worn_in_use: Exactly one person, exactly one product, no anatomical errors
 - versatility: Two distinct scenes in one frame, product shown separately in each
-- infographic_features / infographic_benefits: German text is legible and correctly spelled, no garbled characters
-- lifestyle: Environment feels authentic and German-relevant
+- infographic_features / infographic_benefits: text is legible and correctly spelled, no garbled characters
+- lifestyle: Environment feels authentic and relevant to the target market
 
-5. GERMAN TEXT (infographics only)
-- Is the German text legible?
+5. ON-IMAGE TEXT (infographics only)
+- Is the on-image text legible?
 - Are the characters correctly formed (no garbling, no substitutions)?
 - Does the text appear where specified?
 
@@ -51,9 +51,9 @@ export function buildAuditUserMessage(params: {
   category: string
   prompt_used: string
   product_description: string
-  german_text_used: string | null
+  overlay_text_used: string | null
 }): string {
-  const { category, prompt_used, product_description, german_text_used } = params
+  const { category, prompt_used, product_description, overlay_text_used } = params
   return `CATEGORY: ${category}
 
 PROMPT USED TO GENERATE THIS IMAGE:
@@ -62,7 +62,7 @@ ${prompt_used}
 PRODUCT DESCRIPTION:
 ${product_description || 'Not provided'}
 
-${german_text_used ? `GERMAN TEXT THAT SHOULD APPEAR IN IMAGE:\n${german_text_used}` : 'No German text required for this image.'}
+${overlay_text_used ? `TEXT THAT SHOULD APPEAR IN IMAGE:\n${overlay_text_used}` : 'No on-image text required for this image.'}
 
 Please audit the image above against these criteria and output your verdict as JSON.`
 }

@@ -8,9 +8,9 @@ import type { Stage2Json } from "./shape";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
 
-const STRUCTURE_SYSTEM = `You convert an already-written German DTC copy kit into structured JSON. You are a parser, not a writer.
+const STRUCTURE_SYSTEM = `You convert an already-written DTC copy kit into structured JSON. You are a parser, not a writer.
 
-ABSOLUTE RULE: copy the German text VERBATIM. Do not rewrite, translate, shorten, improve, or fix anything. Extract exactly what is written, character for character. If a section is missing, use an empty string or empty array.
+ABSOLUTE RULE: copy the text VERBATIM. Do not rewrite, shorten, improve, or fix anything. Extract exactly what is written, character for character. If a section is missing, use an empty string or empty array.
 
 Return ONLY this JSON, no markdown fences, no commentary:
 {

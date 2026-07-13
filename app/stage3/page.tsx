@@ -555,7 +555,7 @@ function PromptAiEditor({
 
 /**
  * Floating Stage 2 copy panel — a small button anchored to the right edge of
- * the viewport that toggles a slide-in panel containing the Stage 2 German
+ * the viewport that toggles a slide-in panel containing the Stage 2
  * copy. The text is plain (not a textarea) so the user can select arbitrary
  * spans and copy them into their Google Doc while images are generating.
  *
@@ -597,7 +597,7 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
       {/* Toggle button — right edge, vertically centered */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Show Stage 2 German copy — select + copy into your Google Doc"
+        title="Show Stage 2 copy — select + copy into your Google Doc"
         aria-label="Toggle Stage 2 copy panel"
         className="fixed right-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer flex items-center gap-1.5 px-2.5 py-3 rounded-l-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-[var(--color-border-strong)] border-r-0 shadow-[0_2px_6px_rgba(20,20,18,.10)] hover:brightness-105 transition-all"
       >
@@ -618,7 +618,7 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
           <div className="min-w-0">
             <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-3)]">Stage 2</p>
             <h3 className="text-[13px] font-[600] text-[var(--color-text)] truncate">
-              German copy {run?.brand_name ? `— ${run.brand_name}` : run?.product_name ? `— ${run.product_name}` : ''}
+              Copy {run?.brand_name ? `— ${run.brand_name}` : run?.product_name ? `— ${run.product_name}` : ''}
             </h3>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -759,7 +759,7 @@ function QCGate({
           <textarea
             value={bulkInstr}
             onChange={(e) => setBulkInstr(e.target.value)}
-            placeholder="e.g. Make the German overlay text shorter and bolder. Shift all backgrounds to a warmer palette. Add more lifestyle context to product shots."
+            placeholder="e.g. Make the overlay text shorter and bolder. Shift all backgrounds to a warmer palette. Add more lifestyle context to product shots."
             rows={3}
             autoFocus
             disabled={bulkLoading}
@@ -782,7 +782,7 @@ function QCGate({
                 : (<><Icon.Spark className="w-3.5 h-3.5" />Rewrite all {prompts.length}</>)}
             </button>
             <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)]">
-              Runs in parallel · per-prompt facts (product, refs, German text) are preserved
+              Runs in parallel · per-prompt facts (product, refs, on-image text) are preserved
             </p>
           </div>
         </div>
@@ -794,7 +794,7 @@ function QCGate({
           const refImg =
             (prompt.source_image_references && prompt.source_image_references[0]) ||
             (prompt.reference_image_index != null ? productImages[prompt.reference_image_index] : productImages[0])
-          const germanText = prompt.german_text || prompt.german_text_used || ''
+          const overlayText = prompt.overlay_text || prompt.overlay_text_used || ''
 
           return (
             <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] p-4 space-y-3">
@@ -856,10 +856,10 @@ function QCGate({
                   )}
                 </div>
               </div>
-              {germanText && (
+              {overlayText && (
                 <div className="bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-lg p-3">
-                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">German text used</p>
-                  <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)]">{germanText}</p>
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest mb-1">On-image text used</p>
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-2)]">{overlayText}</p>
                 </div>
               )}
               {prompt.source_image_references && prompt.source_image_references.length > 0 && (
@@ -1579,7 +1579,7 @@ function Stage3Page() {
             category: p.category,
             prompt_used: p.prompt,
             product_description: productDesc,
-            german_text_used: p.german_text || p.german_text_used || null,
+            overlay_text_used: p.overlay_text || p.overlay_text_used || null,
           }),
         })
         const data = await res.json()
@@ -1669,7 +1669,7 @@ function Stage3Page() {
       const auditRes = await fetch('/api/stage3/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: genData.image_url, category: p.category, prompt_used: newPrompt, product_description: productDesc, german_text_used: p.german_text || p.german_text_used || null }),
+        body: JSON.stringify({ image_url: genData.image_url, category: p.category, prompt_used: newPrompt, product_description: productDesc, overlay_text_used: p.overlay_text || p.overlay_text_used || null }),
       })
       const auditData = await auditRes.json()
 
@@ -1956,7 +1956,7 @@ function Stage3Page() {
             <textarea
               value={reprmptDraft}
               onChange={(e) => setReprmptDraft(e.target.value)}
-              placeholder="e.g. Use warmer lighting throughout. Move all German overlay text higher in frame. Drop the studio backgrounds — show product in real apartments instead."
+              placeholder="e.g. Use warmer lighting throughout. Move all overlay text higher in frame. Drop the studio backgrounds — show product in real apartments instead."
               rows={4}
               autoFocus
               className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-[13px] py-[11px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] resize-y placeholder:text-[var(--color-text-4)]"

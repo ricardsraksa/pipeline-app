@@ -211,7 +211,7 @@ function makeLiveRun() {
     current_step: "Queued…",
     startedAt: new Date().toISOString(),
     completedAt: null,
-    scrapeErrors: [{ url: "https://www.idealo.de/neck-traction.html", error: "403 — blocked by site" }],
+    scrapeErrors: [{ url: "https://www.walmart.com/ip/neck-traction.html", error: "403 — blocked by site" }],
     outputs: { onePager: null, onePagerEdited: null, stage2Output: null, stage2OutputEdited: null, stage2EditedAt: null },
     feedback: { stage1: null, stage1Note: "", stage2: null, stage2Note: "" },
     stage3: { started: false, heroUrl: null, prompts: null, images: [], placement: null, usedHero: true },
@@ -235,7 +235,7 @@ function buildRunFromSeed(seed) {
     scrapeErrors: [],
     outputs: {
       onePager: hasResearch ? PD.ONE_PAGER : null, onePagerEdited: null,
-      stage2Output: hasCopy ? PD.GERMAN_COPY : null, stage2OutputEdited: null, stage2EditedAt: null,
+      stage2Output: hasCopy ? PD.SAMPLE_COPY : null, stage2OutputEdited: null, stage2EditedAt: null,
     },
     feedback: { stage1: done ? "up" : null, stage1Note: "", stage2: null, stage2Note: "" },
     stage3: { started: hasCopy, heroUrl: null, prompts: null, images: [], placement: null, usedHero: true },

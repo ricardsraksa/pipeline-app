@@ -43,7 +43,7 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
   },
   stage2: {
     label: "Stage 2 · Copy",
-    description: "The German sales copy — the quality-critical creative output.",
+    description: "The sales copy — the quality-critical creative output.",
     env: "STAGE2_MODEL",
     default: "claude-opus-4-8",
   },

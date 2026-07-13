@@ -7,7 +7,7 @@ const V2_ACTIVE = new Set(["pending","scraping","stage1","stage2","generating_he
 const V2_WAITING = new Set(["awaiting_stage2_approval","awaiting_user","awaiting_qc","awaiting_hero_qc"]);
 
 const NEED_COPY = {
-  awaiting_stage2_approval: ["Research ready for review", "Approve it to generate the German copy"],
+  awaiting_stage2_approval: ["Research ready for review", "Approve it to generate the copy"],
   awaiting_user: ["Copy approved — images next", "Start Stage 3 to generate the hero shot"],
   awaiting_hero_qc: ["Hero shot needs approval", "It becomes the reference for all 8 images"],
   awaiting_qc: ["8 prompts ready to review", "Check them, then generate the images"],

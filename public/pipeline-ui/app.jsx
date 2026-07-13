@@ -41,7 +41,7 @@ function usePipelineEngine(setCurrentRun, syncList) {
   const PD = window.PD;
 
   const finishStage1 = useCallback(() => {
-    patch((prev) => ({ ...prev, status: "awaiting_stage2_approval", current_step: null, brand_name: "NackenFlow",
+    patch((prev) => ({ ...prev, status: "awaiting_stage2_approval", current_step: null, brand_name: "NeckEase",
       outputs: { ...prev.outputs, onePager: PD.ONE_PAGER } }));
   }, [patch]);
 
@@ -55,7 +55,7 @@ function usePipelineEngine(setCurrentRun, syncList) {
     clearTimers();
     runStage("stage2", PD.STEPS.stage2, () => {
       patch((prev) => ({ ...prev, status: "awaiting_user", current_step: null,
-        outputs: { ...prev.outputs, stage2Output: PD.GERMAN_COPY },
+        outputs: { ...prev.outputs, stage2Output: PD.SAMPLE_COPY },
         stage3: { ...prev.stage3, started: false } }));
     });
   }, [patch, runStage]);
@@ -226,8 +226,8 @@ function CommandBar({ route, dir, setDir, theme, setTheme }) {
 /* ── pipeline prompts (tweakable) ─────────────────────────────────────────*/
 const STAGE_PROMPTS = /*EDITMODE-BEGIN*/{
   "stage1Prompt": "You are a senior DTC product researcher.\n\nFrom the product description and reference photos, produce a single research one-pager:\n• Product ID — what it is and how it works\n• Market — who buys it, price tier, positioning\n• Avatar — one concrete customer, their day, their pain\n• Offer brief — price, guarantee, bundle, lead angle\n• Necessary beliefs — what they must believe to buy\n• One-pager summary\n\nBe concrete and specific. The description always wins over scraped data on conflicts.",
-  "stage2Prompt": "You are a German DTC copywriter.\n\nUsing the approved research one-pager, write a full German copy kit:\nHero headline + subhead, Problem, Solution, 3 Benefits, Social proof, Offer, and CTA.\n\nUse natural du-form, warm and concrete. No English, no literal translations — write as a native marketer would.",
-  "stage3Prompt": "You are an art director for DTC product imagery.\n\nGenerate a hero product shot first from the source photos, then 8 derivatives: lifestyle, problem→solution, feature callout, benefit, before/after, comparison, UGC/native, and review/social-proof.\n\nKeep the product identical to the approved hero. For each image specify scene, lighting, aspect ratio, and any German text overlay."
+  "stage2Prompt": "You are a DTC copywriter.\n\nUsing the approved research one-pager, write a full English copy kit:\nHero headline + subhead, Problem, Solution, 3 Benefits, Social proof, Offer, and CTA.\n\nWarm, concrete, and conversational — write as a native marketer would.",
+  "stage3Prompt": "You are an art director for DTC product imagery.\n\nGenerate a hero product shot first from the source photos, then 8 derivatives: lifestyle, problem→solution, feature callout, benefit, before/after, comparison, UGC/native, and review/social-proof.\n\nKeep the product identical to the approved hero. For each image specify scene, lighting, aspect ratio, and any text overlay."
 }/*EDITMODE-END*/;
 
 // multiline prompt control for the Tweaks panel
@@ -244,7 +244,7 @@ function TweakPrompt({ label, value, onChange }) {
 function SettingsPage({ prompts }) {
   const items = [
     { n: "01", title: "Stage 1 · Research prompt", body: prompts.stage1Prompt },
-    { n: "02", title: "Stage 2 · German copy prompt", body: prompts.stage2Prompt },
+    { n: "02", title: "Stage 2 · Copy prompt", body: prompts.stage2Prompt },
     { n: "03", title: "Stage 3 · Image prompt", body: prompts.stage3Prompt },
   ];
   return (
@@ -343,7 +343,7 @@ function App() {
       <TweaksPanel title="Prompts">
         <TweakSection label="Pipeline prompts" />
         <TweakPrompt label="Stage 1 · Research" value={tw.stage1Prompt} onChange={(v) => setTweak("stage1Prompt", v)} />
-        <TweakPrompt label="Stage 2 · German copy" value={tw.stage2Prompt} onChange={(v) => setTweak("stage2Prompt", v)} />
+        <TweakPrompt label="Stage 2 · Copy" value={tw.stage2Prompt} onChange={(v) => setTweak("stage2Prompt", v)} />
         <TweakPrompt label="Stage 3 · Images" value={tw.stage3Prompt} onChange={(v) => setTweak("stage3Prompt", v)} />
       </TweaksPanel>
     </div>

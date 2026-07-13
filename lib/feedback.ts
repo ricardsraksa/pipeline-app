@@ -108,7 +108,7 @@ export function buildStage1FeedbackBlock(): Promise<string> {
   );
 }
 
-/** For the Stage 2 German copy generation. */
+/** For the Stage 2 copy generation. */
 export function buildStage2FeedbackBlock(): Promise<string> {
   return build(
     2,
