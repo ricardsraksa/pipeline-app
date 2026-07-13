@@ -32,17 +32,17 @@ export interface RemainingPrompt {
   model: string
   aspect_ratio: string
   prompt: string
-  german_text: string
+  overlay_text: string
   source_image_references: string[]
 }
 
 const HERO_SYSTEM = `You are a product photography director. Generate ONE hero studio product image prompt for Higgsfield, using the source product images as the visual reference.
 
 CRITICAL FIDELITY RULE:
-Do NOT describe the product's appearance in words. Do not describe the spout shape, body shape, proportions, materials, colors, or features. The source images are the ground truth for what the product looks like. Describing it in words competes with the reference image and causes the model to drift toward a generic version. Your prompt handles ONLY scene, lighting, composition, and camera — never product appearance.
+The source images are the ground truth for what the product looks like. You MAY name the product category, its core function, and its key dimensions/specs where those are factually given in the Stage 1 inputs (this helps scale and staging). But you must NOT invent or embellish appearance details — no invented finishes, colors, textures, handles, grooves, or parts. When it comes to the actual look of the product (exact shape nuances, finish, edges, proportions), the reference image decides, not your words. Anywhere appearance could drift, defer to the reference image explicitly. Never describe a "premium" or idealized version — describe the real product in the reference, placed in a scene.
 
 You will receive:
-- Stage 1 one-pager (for product name and category only)
+- Stage 1 one-pager (product name, category, benefits, USPs, dimensions if present)
 - Source product image URLs
 - (Optionally) additional reference images the operator wants considered for scene/background/style
 
@@ -56,25 +56,44 @@ OUTPUT: A single JSON object:
   "source_image_references": ["<all source image URLs>"]
 }
 
-The prompt must follow this structure:
+The prompt must follow this exact section structure (fill each section from the Stage 1 inputs; keep the fidelity and negative sections deferring to the reference image):
 
-"Premium ecommerce hero product photograph.
+"IMAGE TYPE:
+Hero image
 
-SUBJECT: The exact product shown in the reference image. Reproduce it precisely — same shape, same proportions, same spout, same body, same window, same materials, same finish, same color. Do not stylize, redesign, or improve the product. It must be visually identical to the reference image, only placed in a clean studio scene.
+OBJECTIVE:
+Create a clean premium product-first studio image for [PRODUCT_NAME], showing it as [one-line plain description of what it is and what it's for, from Stage 1].
 
-SCENE: Clean studio setting. Soft warm light grey background with a gentle tonal gradient, no harsh edges, no visible backdrop seams. Product sits on a matching surface with a soft natural contact shadow underneath.
+PRODUCT CONTEXT:
+Product name: [PRODUCT_NAME].
+Product category: [category].
+[2-4 sentences on what the product is and does, drawn from Stage 1. You may state factual given specs and dimensions here. Do NOT invent appearance details not supported by the source images or Stage 1.]
 
-LIGHTING: Soft directional softbox from upper left, gentle fill from the right. Airy and premium, enough directional quality to show the product's real materials and surfaces. No dramatic shadows.
+SCENE INSTRUCTIONS:
+Place the product in a clean, bright studio setting with a soft warm-neutral background. Use subtle, category-relevant styling cues placed around the outer edges of the composition, but keep the product dominant. The scene should feel modern, calm, clean, and suitable for an ecommerce product page. Show the product clearly without over-staging. [Add one or two product-appropriate props that communicate the use case, if helpful.]
 
-COMPOSITION: Product centered with generous breathing room on all sides. Photographed straight on at eye level or a very slight three-quarter angle. Full product visible, nothing cropped.
+PRODUCT PLACEMENT:
+Position [PRODUCT_NAME] slightly angled in the center of the frame, main visual focus, realistic in scale. Reproduce the product exactly as it appears in the reference image. Do not hide its defining parts.
 
-CAMERA: 85mm lens equivalent, f/8, sharp throughout. Realistic commercial product photography.
+BENEFIT TO COMMUNICATE:
+[One line — the core benefit from Stage 1.]
 
-TEXT: None.
+TEXT OVERLAY:
+No embedded text preferred.
+Optional English overlay suggestions if text is added later:
+[2-3 short English overlay lines drawn from Stage 1/2, only if useful.]
 
-CRITICAL: The product must match the reference image exactly. If the reference shows a short angular spout, render a short angular spout. Keep the exact proportions, body shape, and window shape and placement from the reference. Do not substitute a generic or more elegant version of this product type.
+STYLE / CAMERA:
+Premium ecommerce studio photography, clean composition, soft diffused lighting, realistic shadows, sharp focus, high detail, 1:1 aspect ratio. Camera angle: slightly elevated three-quarter product angle that clearly reveals the product's form. Natural color grading, no excessive effects.
 
-NEGATIVE: do not redesign the product, do not change the spout shape, do not change proportions, do not change the body shape, do not change the window shape or position, do not make it taller or sleeker than the reference, no generic premium substitute, no invented features, no plastic finish if the reference is metal, no studio backdrop seams, no dramatic lighting, no text."
+PRODUCT FIDELITY RULES:
+Reproduce the exact product shown in the reference image — same shape, proportions, material, finish, color, edges, and all visible details. The reference image is the ground truth for appearance. Preserve the correct product category. Do not redesign the product or turn it into a different product category. Do not add unsupported parts such as handles, grooves, feet, trays, cables, batteries, buttons, ports, lights, screens, logos, labels, or decorative mechanisms that are not in the reference image. Do not remove visible parts. Do not make the product look more medical, luxury, industrial, futuristic, or complex than the reference shows. Do not substitute a generic or idealized version.
+
+NEGATIVE RULES:
+Avoid distorted proportions, warped geometry, wrong product category, extra parts, missing parts, incorrect scale, incorrect colors or materials, invented features, a generic premium substitute in place of the real product, cluttered composition, unrealistic effects, steam or glowing heat effects unless in the source, fake UI overlays, unreadable text, excessive text, non-English image text, mixed-language image text, backdrop seams, and unsupported medical, hygiene, food-safety, waterproof, clinical, guaranteed-effectiveness, or guaranteed-speed claims.
+
+OUTPUT FORMAT:
+Square 1:1 ecommerce-ready image, high-resolution, clean product-first composition."
 
 Always use model nano_banana_2 for the hero. Return only the JSON object, no markdown fences.`
 
@@ -87,7 +106,7 @@ When you need to refer to the product in a prompt, call it "the exact product sh
 
 INPUTS:
 - Stage 1 one-pager (product name, benefits, use cases, USPs)
-- Stage 2 German copy (headlines, benefits, FAQs, ad copy)
+- Stage 2 English copy (headlines, benefits, FAQs, ad copy)
 - Stage 1 avatar and visual strategy
 - The approved hero image URL (this is the reference for all 8)
 
@@ -96,10 +115,10 @@ Generate exactly 8 prompts for these templates (indices 2-9):
 
 For each prompt:
 - Fill scene, setting, lighting, composition from the template
-- Use verbatim German text from Stage 2 for any overlays (never invent or translate)
+- Use verbatim English text from Stage 2 for any overlays (never invent new claims; use the Stage 2 copy as written)
 - Pick the model: nano_banana_2 for realistic photography (2, 5, 8), gpt_image_2 for text/graphic-heavy (3, 4, 6, 7, 9)
 - Reference the approved hero image in source_image_references
-- Apply the brand aesthetic that fits the product (determine from Stage 1/2 — premium editorial, playful, bold, etc) but keep typography clean: no Alibaba pill badges, no clip-art icons, no drop shadows, mobile-readable German, no English text
+- Apply the brand aesthetic that fits the product (determine from Stage 1/2 — premium editorial, playful, bold, etc) but keep typography clean: no Alibaba pill badges, no clip-art icons, no drop shadows, mobile-readable English text, no garbled or mixed-language text
 
 Every prompt must include this fidelity line verbatim:
 "Reproduce the exact product shown in the reference image — same shape, proportions, and details. Do not redesign or substitute a generic version."
@@ -115,7 +134,7 @@ OUTPUT: a JSON array of exactly 8 objects:
   "model": "<nano_banana_2 | gpt_image_2>",
   "aspect_ratio": "1:1",
   "prompt": "<scene/lighting/text only — no product appearance description>",
-  "german_text": "<verbatim German from Stage 2 or empty>",
+  "overlay_text": "<verbatim English overlay text from Stage 2 or empty>",
   "source_image_references": ["<approved hero image URL>"]
 }
 
@@ -158,7 +177,7 @@ export async function generateHeroPrompt(params: {
 }): Promise<HeroPrompt> {
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
   const userText = [
-    'STAGE 1 ONE-PAGER (product name + category only):',
+    'STAGE 1 ONE-PAGER (product name, category, benefits, USPs, dimensions if present):',
     params.onePager || '(none)',
     '',
     `SOURCE PRODUCT IMAGE URLS (${params.sourceImageUrls.length}) — the product comes ONLY from these: ${params.sourceImageUrls.join(', ')}`,
@@ -176,7 +195,9 @@ export async function generateHeroPrompt(params: {
     try {
       const msg = await anthropic.messages.create({
         model: await getModel('stage3Prompt'),
-        max_tokens: 2000,
+        // The section-structured hero prompt is much longer than the old
+        // free-form one — give the JSON room so it never truncates mid-prompt.
+        max_tokens: 4000,
         system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text: userText }, ...imageBlocks([...params.sourceImageUrls, ...extras])] }],
       })
@@ -229,7 +250,7 @@ export async function generateRemainingPrompts(params: {
     'STAGE 1 ONE-PAGER:',
     params.onePager || '(none)',
     '',
-    'STAGE 2 GERMAN COPY (use German overlays verbatim):',
+    'STAGE 2 COPY (use overlays verbatim):',
     params.copy || '(none)',
     '',
     'STAGE 1 AVATAR + VISUAL STRATEGY:',
@@ -279,7 +300,7 @@ export async function generateRemainingPrompts(params: {
     model: p.model === 'gpt_image_2' ? 'gpt_image_2' : 'nano_banana_2',
     aspect_ratio: p.aspect_ratio || '1:1',
     prompt: p.prompt || '',
-    german_text: p.german_text || '',
+    overlay_text: p.overlay_text || '',
     // Hero/product refs always; plus only the extra refs the model chose for
     // this image (validated against the pool so nothing hallucinated slips in).
     source_image_references: curateRefs(refs, p.source_image_references, [...refs, ...extras]),
