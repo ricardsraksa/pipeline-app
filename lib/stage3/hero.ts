@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { jsonrepair } from 'jsonrepair'
-import { getModel } from '@/lib/models'
+import { getModel, modelSupportsSamplingParams } from '@/lib/models'
 import { validateHeroObject, validateRemainingArray, type Stage3Validation } from '@/lib/stage3-validation'
 
 // Hero-first Stage 3 prompt generation.
@@ -300,12 +300,15 @@ export async function generateHeroPrompt(params: {
   ].join('\n')
 
   const attachments = imageBlocks([...params.sourceImageUrls, ...extras])
+  const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<HeroPrompt> {
     const msg = await anthropic.messages.create({
-      model: await getModel('stage3Prompt'),
+      model,
       max_tokens: 4000,
-      temperature: 0,
+      // temperature:0 for run-to-run determinism, but only on models that still
+      // accept sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
+      ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
       system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
     })
@@ -399,12 +402,15 @@ export async function generateRemainingPrompts(params: {
   ].join('\n')
 
   const attachments = imageBlocks([...refs, ...extras])
+  const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<RemainingPrompt[] | null> {
     const msg = await anthropic.messages.create({
-      model: await getModel('stage3Prompt'),
+      model,
       max_tokens: 16000,
-      temperature: 0,
+      // temperature:0 for run-to-run determinism, but only on models that still
+      // accept sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
+      ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
       system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
     })

@@ -67,6 +67,23 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
   },
 };
 
+// The newer model tier (Fable 5, Opus 4.8/4.7, Sonnet 5, …) removed the
+// `temperature` / `top_p` / `top_k` sampling params and returns 400 if they are
+// sent; older models (Sonnet 4.6, Haiku 4.5) still accept them. Allowlist the
+// models known to accept sampling so anything new defaults to omitting it —
+// omitting is always valid, whereas sending it to a rejecting model is a hard
+// 400. (Ref: Claude API "Thinking & Effort" — sampling removed on 4.7+.)
+const SAMPLING_PARAM_MODELS = new Set<string>([
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+  "claude-haiku-4-5-20251001",
+]);
+
+/** Whether it's safe to send temperature/top_p/top_k to this model id. */
+export function modelSupportsSamplingParams(modelId: string): boolean {
+  return SAMPLING_PARAM_MODELS.has(modelId);
+}
+
 const KV_PREFIX = "model_"; // app_kv key per role, e.g. model_stage1
 
 export function isKnownRole(role: string): role is ModelRole {
