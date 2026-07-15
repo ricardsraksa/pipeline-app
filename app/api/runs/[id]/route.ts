@@ -115,16 +115,17 @@ export async function PATCH(
     if (!image || typeof image.index !== "number") {
       return Response.json({ error: "image with numeric index required" }, { status: 400 });
     }
-    // Generation runs up to 3 images concurrently, so two persists can be in
-    // flight at once. A plain SELECT-then-UPDATE would let both read the same
-    // array and the second UPDATE clobber the first's image (lost update). A
-    // write-locked transaction serializes the read-modify-write; the retry loop
-    // absorbs the rare SQLITE_BUSY when two transactions contend for the lock.
+    // Read-modify-write via plain db.execute — the same reliable path every
+    // other write uses. The previous db.transaction("write") (interactive
+    // transaction) proved unreliable against the remote database: writes failed
+    // silently, so generated images never persisted and every run stalled at
+    // awaiting_qc with an empty stage3_remaining_images. Generation runs a few
+    // images at once, so two saves can race and one lost update is possible; the
+    // client's authoritative full-array write on completion self-heals that.
     let images: Array<{ index?: number }> = [];
     for (let attempt = 0; ; attempt++) {
-      const tx = await db.transaction("write");
       try {
-        const row = await tx.execute({
+        const row = await db.execute({
           sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?",
           args: [Number(id)],
         });
@@ -137,16 +138,14 @@ export async function PATCH(
         const i = arr.findIndex((x) => x?.index === image.index);
         if (i >= 0) arr[i] = image;
         else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
-        await tx.execute({
+        await db.execute({
           sql: "UPDATE runs SET stage3_remaining_images = ?, last_updated_at = ? WHERE id = ?",
           args: [JSON.stringify(arr), new Date().toISOString(), Number(id)],
         });
-        await tx.commit();
         images = arr;
         break;
       } catch (e) {
-        try { await tx.rollback(); } catch { /* already closed/committed */ }
-        const busy = e instanceof Error && /SQLITE_BUSY|database is locked|stream expired/i.test(e.message);
+        const busy = e instanceof Error && /SQLITE_BUSY|database is locked/i.test(e.message);
         if (busy && attempt < 4) { await new Promise((r) => setTimeout(r, 50 * (attempt + 1))); continue; }
         throw e;
       }

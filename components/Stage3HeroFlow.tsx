@@ -394,10 +394,12 @@ export default function Stage3HeroFlow({
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
       const allSettled = results.every((r) => r !== null);
       if (allSettled) {
-        // Images are already persisted per-image; just flip the status.
+        // Authoritative write: persist the full images array alongside the
+        // status flip, so a completed run always has all 8 even if an individual
+        // per-image save was lost to a concurrent-write race mid-generation.
         await fetch(`/api/runs/${runId}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "completed" }),
+          body: JSON.stringify({ status: "completed", stage3_remaining_images: JSON.stringify(results) }),
         }).catch((e) => { console.error("complete status failed:", e); setErr("Images generated, but marking the run complete failed — hit Refresh."); });
       }
       setBusy(null);
