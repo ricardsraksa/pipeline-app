@@ -21,7 +21,7 @@ export interface Stage3Validation {
   retried?: boolean;
 }
 
-export function validatePromptText(prompt: string): string[] {
+export function validatePromptText(prompt: string, opts: { requireNoEmbeddedText?: boolean } = {}): string[] {
   const errors: string[] = [];
   let last = -1;
   for (const h of HEADERS) {
@@ -30,7 +30,11 @@ export function validatePromptText(prompt: string): string[] {
     if (idx < last) errors.push(`header out of order: ${h}`);
     last = idx;
   }
-  if (!prompt.includes('No embedded text preferred.'))
+  // Hero-only. The 8 derivative prompts legitimately carry real overlay text
+  // (problem/solution lines, callouts, Before/After labels), so they don't have
+  // this line — requiring it there fails every run and fires a wasteful full
+  // regeneration retry, doubling the time to write the prompts.
+  if (opts.requireNoEmbeddedText && !prompt.includes('No embedded text preferred.'))
     errors.push('missing "No embedded text preferred." line');
   if (!prompt.includes('Square 1:1 ecommerce-ready image, high-resolution,'))
     errors.push('OUTPUT FORMAT line does not start with the locked pattern');
@@ -47,7 +51,7 @@ export function validateHeroObject(obj: any): string[] {
   if (!Array.isArray(obj?.source_image_references) || obj.source_image_references.length === 0)
     errors.push('hero source_image_references missing or empty');
   if (typeof obj?.prompt !== 'string') { errors.push('hero prompt missing'); return errors; }
-  return errors.concat(validatePromptText(obj.prompt));
+  return errors.concat(validatePromptText(obj.prompt, { requireNoEmbeddedText: true }));
 }
 
 export function validateRemainingArray(arr: any): string[] {
