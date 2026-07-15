@@ -256,8 +256,54 @@ function curateRefs(base: string[], chosen: unknown, pool: string[]): string[] {
   return Array.from(new Set([...base.filter(Boolean), ...picks]))
 }
 
-function stripFences(s: string): string {
-  return s.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+// Forced tool calls. Claude reliably mis-escapes the gold-standard prompt text
+// (full of quotation marks) when hand-writing JSON as free text, which breaks
+// JSON.parse — especially the 8-object array, where one bad quote fails all 8.
+// Routing the output through a tool call hands structure to the API's own JSON
+// serialisation, so the result is always well-formed regardless of punctuation.
+// (Same technique the legacy app/api/stage3/prompts route uses.)
+const HERO_TOOL: Anthropic.Tool = {
+  name: 'submit_hero_prompt',
+  description: 'Submit the single hero image prompt.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      model: { type: 'string' },
+      aspect_ratio: { type: 'string' },
+      prompt: { type: 'string', description: 'The full hero prompt in the exact gold-standard format.' },
+      source_image_references: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['model', 'aspect_ratio', 'prompt', 'source_image_references'],
+  },
+}
+
+const REMAINING_TOOL: Anthropic.Tool = {
+  name: 'submit_image_prompts',
+  description: 'Submit the 8 derivative image prompt briefs, in order.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      prompts: {
+        type: 'array',
+        description: 'Exactly 8 image prompt objects (indices 2-9), in order.',
+        items: {
+          type: 'object',
+          properties: {
+            index: { type: 'number' },
+            image_type: { type: 'string' },
+            category: { type: 'string' },
+            model: { type: 'string' },
+            aspect_ratio: { type: 'string' },
+            prompt: { type: 'string', description: 'The full prompt in the exact gold-standard format.' },
+            overlay_text: { type: 'string' },
+            source_image_references: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['index', 'image_type', 'category', 'model', 'aspect_ratio', 'prompt', 'overlay_text', 'source_image_references'],
+        },
+      },
+    },
+    required: ['prompts'],
+  },
 }
 
 // Higgsfield only knows these two generators; anything else the model emits
@@ -311,9 +357,14 @@ export async function generateHeroPrompt(params: {
       ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
       system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
+      // Forced tool call → the API serialises the JSON, so quote-heavy prompt
+      // text can never break parsing (see HERO_TOOL).
+      tools: [HERO_TOOL],
+      tool_choice: { type: 'tool', name: 'submit_hero_prompt' },
     })
-    const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
-    try { return JSON.parse(raw) } catch { return JSON.parse(jsonrepair(raw)) }
+    const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') throw new Error('model did not return a hero prompt tool call')
+    return toolUse.input as HeroPrompt
   }
 
   // First result: retry transient API/parse failures up to 3 times (unchanged
@@ -405,27 +456,35 @@ export async function generateRemainingPrompts(params: {
   const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<RemainingPrompt[] | null> {
-    const msg = await anthropic.messages.create({
-      model,
-      max_tokens: 16000,
-      // temperature:0 for run-to-run determinism, but only on models that still
-      // accept sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
-      ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
-      system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
-    })
-    const raw = stripFences(msg.content.find((b) => b.type === 'text')?.text ?? '')
-    // Isolate the JSON array even if the model wrapped it in prose.
-    const start = raw.indexOf('[')
-    const end = raw.lastIndexOf(']')
-    const slice = start !== -1 && end > start ? raw.slice(start, end + 1) : raw
-    try {
-      const parsed = JSON.parse(slice)
-      return Array.isArray(parsed) ? parsed : null
-    } catch {
-      const repaired = JSON.parse(jsonrepair(slice))
+    // Forced tool call → the API serialises the 8-object array, so quote-heavy
+    // prompt text can't break parsing (the whole point — see REMAINING_TOOL).
+    // Streaming + a generous budget: 8 full gold-standard prompts are large, and
+    // the SDK requires streaming above ~16k max_tokens; finalMessage() collects it.
+    const msg = await anthropic.messages
+      .stream({
+        model,
+        max_tokens: 32000,
+        // temperature:0 for determinism, but only on models that still accept
+        // sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
+        ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
+        system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
+        tools: [REMAINING_TOOL],
+        tool_choice: { type: 'tool', name: 'submit_image_prompts' },
+      })
+      .finalMessage()
+    if (msg.stop_reason === 'max_tokens') return null // truncated — retry
+    const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') return null
+    // Usually a proper array; on very large payloads Claude occasionally emits a
+    // stringified array in the tool input — repair + parse that fallback.
+    const rawPrompts = (toolUse.input as { prompts?: unknown }).prompts
+    if (Array.isArray(rawPrompts)) return rawPrompts as RemainingPrompt[]
+    if (typeof rawPrompts === 'string') {
+      const repaired = JSON.parse(jsonrepair(rawPrompts))
       return Array.isArray(repaired) ? repaired : null
     }
+    return null
   }
 
   // First result: retry transient API/parse failures up to 3 times (unchanged
