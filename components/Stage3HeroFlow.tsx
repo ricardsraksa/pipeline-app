@@ -457,9 +457,19 @@ export default function Stage3HeroFlow({
             {doneByIndex.size} of {saved.length} images were already generated in an interrupted pass — generation resumes from the rest.
           </p>
         )}
-        <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
-          {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : "Generate 8 Images →"}
-        </button>
+        <div className="flex gap-3 flex-wrap items-center">
+          <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
+            {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : "Generate 8 Images →"}
+          </button>
+          {/* Recover images that already generated on Higgsfield but never
+              persisted (the pre-fix persistence bug) — no re-generation. */}
+          <button disabled={busy !== null} onClick={() => trigger("/api/stage3/recover-from-higgsfield", { runId }, "recover-hf")} className={btnSecondary}>
+            {busy === "recover-hf" ? "Recovering…" : "Recover from Higgsfield"}
+          </button>
+        </div>
+        <p className="text-[11px] text-[var(--color-text-3)]">
+          Already generated these on a previous try? &ldquo;Recover from Higgsfield&rdquo; pulls the finished images from your Higgsfield history instead of re-generating.
+        </p>
       </div>
     );
   }

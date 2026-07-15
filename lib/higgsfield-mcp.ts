@@ -351,3 +351,40 @@ export async function generateImageViaMcp(req: McpImageRequest): Promise<string>
     `Higgsfield generation timed out after ${Math.round(GENERATION_TIMEOUT_MS / 1000)}s.`,
   );
 }
+
+export interface HiggsfieldGeneration {
+  id: string;
+  status: string;
+  createdAt?: number;
+  params?: { prompt?: string };
+  results?: { rawUrl?: string; minUrl?: string };
+}
+
+/**
+ * List recent completed image generations from the account's Higgsfield history
+ * (newest first). Used to recover images that generated on Higgsfield but were
+ * never persisted to the pipeline. Walks a couple of pages via next_cursor.
+ */
+export async function listImageGenerations(max = 120): Promise<HiggsfieldGeneration[]> {
+  const out: HiggsfieldGeneration[] = [];
+  let cursor: number | undefined;
+  for (let page = 0; page < 4 && out.length < max; page++) {
+    const args: Record<string, unknown> = { type: "image", size: 60 };
+    if (cursor != null) args.cursor = cursor;
+    const res = await callTool("show_generations", args);
+
+    // Prefer structuredContent; fall back to JSON in the text content.
+    let payload = res.structuredContent as { items?: unknown; next_cursor?: unknown } | undefined;
+    if (!payload || !Array.isArray(payload.items)) {
+      const text = res.content?.map((c) => c.text).filter(Boolean).join("") ?? "";
+      try { payload = JSON.parse(text); } catch { payload = undefined; }
+    }
+    const items = payload && Array.isArray(payload.items) ? (payload.items as HiggsfieldGeneration[]) : [];
+    out.push(...items);
+
+    const nc = payload?.next_cursor;
+    if (typeof nc === "number" && items.length) cursor = nc;
+    else break;
+  }
+  return out;
+}
