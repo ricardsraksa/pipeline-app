@@ -141,6 +141,11 @@ async function migrateDB() {
     // Structured (JSON) form of the Stage 2 copy kit, derived from stage2_output
     // for the per-field copy UI. The free text stays canonical.
     "stage2_json TEXT",
+    // Format-validation results for the Stage 3 prompt generations. JSON
+    // Stage3Validation: {"passed":true} or {"passed":false,"errors":[...],"retried":true}.
+    // Informational only — the QC gates never block on these.
+    "stage3_hero_validation TEXT",
+    "stage3_remaining_validation TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -425,4 +430,7 @@ export interface Run {
   stage3_placement: string | null;
   product_code: string | null;
   stage2_json: string | null;
+  // Stage 3 prompt format-validation results (JSON Stage3Validation)
+  stage3_hero_validation: string | null;
+  stage3_remaining_validation: string | null;
 }

@@ -235,6 +235,7 @@ export default function Stage3HeroFlow({
         <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
           This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
         </p>
+        <ValidationBadge raw={run.stage3_hero_validation} />
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap">
           <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId }, "approve")} className={btnPrimary}>
@@ -430,6 +431,7 @@ export default function Stage3HeroFlow({
           <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the 8 prompts</h3>
           <p className="text-[12px] text-[var(--color-text-3)]">Edit any prompt before generating. Each references the approved hero — they handle scene, lighting, and text only.</p>
         </div>
+        <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
         <div className="space-y-3">
           {saved.map((p, i) => (
@@ -1205,6 +1207,34 @@ function Spinner({ label }: { label: string }) {
 function ErrBox({ msg }: { msg: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-red)] bg-[var(--color-red-bg)] px-3 py-2 text-[12px] text-[var(--color-text)]">{msg}</div>
+  );
+}
+
+/* Format-validation badge for the two QC gates. Informational only — a failed
+   check never blocks approval; it tells the operator to review carefully. */
+function ValidationBadge({ raw }: { raw: string | null | undefined }) {
+  if (!raw) return null;
+  let v: { passed?: boolean; errors?: string[]; retried?: boolean } | null = null;
+  try { v = JSON.parse(raw); } catch { return null; }
+  if (!v || typeof v.passed !== "boolean") return null;
+  if (v.passed) {
+    return (
+      <p className="text-[11px] text-[var(--color-green)]">
+        ✓ Format checks passed{v.retried ? " (after one retry)" : ""}
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-[var(--color-amber)] bg-[var(--color-amber-bg)] px-3 py-2 space-y-1">
+      <p className="text-[12px] font-[600] text-[var(--color-text)]">
+        Format checks failed{v.retried ? " (after one retry)" : ""} — review carefully before approving
+      </p>
+      <ul className="list-disc list-inside space-y-0.5">
+        {(v.errors ?? []).map((e, i) => (
+          <li key={i} className="text-[11px] text-[var(--color-text-2)]">{e}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImage | null)[] }) {

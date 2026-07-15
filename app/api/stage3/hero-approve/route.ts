@@ -32,11 +32,12 @@ export async function POST(req: NextRequest) {
     let extraReferenceUrls: string[] = []
     try { const v = JSON.parse(run.stage3_reference_images || '[]'); if (Array.isArray(v)) extraReferenceUrls = v.filter((x) => typeof x === 'string') } catch { /* none */ }
 
-    const prompts = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls })
+    const { prompts, validation } = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls })
     if (!prompts.length) throw new Error('Phase 2 produced no prompts')
 
     await updateRun(runId, {
       stage3_remaining_prompts: JSON.stringify(prompts),
+      stage3_remaining_validation: JSON.stringify(validation),
       status: 'awaiting_qc',
       current_step: 'Stage 3: Review the 8 prompts before generating',
       last_updated_at: new Date().toISOString(),

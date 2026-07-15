@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
     const visual = run.step_research_revised ?? run.step_research ?? ''
 
-    const prompts = await generateRemainingPrompts({
+    const { prompts, validation } = await generateRemainingPrompts({
       onePager, copy, avatar, visual,
       referenceImageUrls: sourceImageUrls,
       extraReferenceUrls: safeArr(run.stage3_reference_images),
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
 
     await updateRun(runId, {
       stage3_remaining_prompts: JSON.stringify(prompts),
+      stage3_remaining_validation: JSON.stringify(validation),
       status: 'awaiting_qc',
       current_step: 'Stage 3: Review the 8 prompts before generating',
       last_updated_at: new Date().toISOString(),

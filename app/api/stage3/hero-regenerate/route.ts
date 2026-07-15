@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const imageUrl = await generateStage3Image({
       prompt: promptText,
-      model: hero.model || 'nano_banana_2',
+      model: hero.model || 'gpt_image_2',
       reference_images: referenceImages,
       aspect_ratio: hero.aspect_ratio || '1:1',
     })
