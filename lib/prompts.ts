@@ -179,6 +179,11 @@ The research brief lists the specific pain points and the language customers use
 OUTPUT STRUCTURE (Always Follow Exactly)
 ========================================================================
 
+CHARACTER LIMITS — HARD RULES:
+- Product supporting sentence: maximum 56 characters including spaces
+- Every other text field (each paragraph, the What's Included answer, each FAQ answer, the Facebook primary text, the Facebook description): maximum 397 characters including spaces
+- Count characters before outputting each field. If a field exceeds its limit, cut it down before moving on. These are template field limits — output that exceeds them gets truncated in the store, so going over breaks the page
+
 1. Product Name — a brand name followed by what the product is. The brand name is a short, pronounceable, invented brand word; the product descriptor is the plain English category. Format: "[BrandName] [Product Category]". Examples: "AquaBuddy Kids Swim Goggles", "FlowVet Stainless Steel Fountain", "PureNest Makeup Bag". Do not output just a brand word alone, and do not output just a category alone — always brand name plus product descriptor.
 2. Badge Text (for example "Popular" or "New" etc.):
 3. Product supporting sentence — ONE short positioning tagline in light grey under the product name. It names the category and the SINGLE most important thing about the product: usually its core purpose or the one defining feature the whole product is built around. ONE idea only. NOT a list of specs. NOT materials unless the material IS the core story. NOT a pain point. NOT a benefit claim with numbers.
@@ -186,7 +191,7 @@ OUTPUT STRUCTURE (Always Follow Exactly)
    How to choose the one idea: ask "what is the single most important thing this product does or has?" For swim goggles built around fixed earplugs: "The kids' swim goggles with built-in earplugs." For a cat fountain whose core purpose is making cats drink more: "The fountain that gets your cat drinking more water." NOT a spec list like "made from 304 stainless steel with three drinking spots and a 30dB pump."
 
    Format pattern: "The [Category] that/with/for [single core purpose or defining feature]."
-   Maximum 12 words. One idea. No spec lists. No negatives. No relative clauses explaining a problem.
+   HARD LIMIT: maximum 56 characters including spaces and the final period. Count before outputting; if over 56, shorten until it fits. One idea. No spec lists. No negatives. No relative clauses explaining a problem.
 
    Examples of CORRECT format:
    - "The kids' swim goggles with built-in earplugs."
@@ -233,6 +238,7 @@ PER-SECTION SLOP CHECK
 ========================================================================
 
 After writing each section, before moving to the next, scan for:
+- Character limit breaches: supporting sentence over 56 characters, any other text field over 397 characters
 - Any forbidden phrase from the hard constraints list above
 - Any price or currency figure (pricing is out of scope)
 - Any markdown symbol (#, *, -, etc.) — output must be plain text
