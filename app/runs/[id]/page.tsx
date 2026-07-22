@@ -200,6 +200,45 @@ function StageAccordion({ def, state, open, onToggle, summary, children, isLast 
   );
 }
 
+// ── Start prompt (the input the operator typed to create the run) ─────────────
+
+function StartPrompt({ description, competitorUrls }: { description: string; competitorUrls: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr"
+      >
+        {open ? "Hide start prompt" : "View start prompt"}
+      </button>
+      {open && (
+        <div className="mt-2 border border-[var(--color-border)] rounded-[var(--radius-sm)] bg-[var(--color-surface)] overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
+            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">What you entered to start this run</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(description).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                });
+              }}
+              className="cursor-pointer text-[10.5px] px-2 py-0.5 rounded border border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] tr"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-text-2)] whitespace-pre-wrap break-words max-h-72 overflow-y-auto">{description}</p>
+          {competitorUrls.length > 0 && (
+            <div className="px-3 pb-2.5 text-[11px] text-[var(--color-text-3)] break-all">Competitor URLs: {competitorUrls.join(", ")}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
 type RestartStage = "stage1" | "stage2" | "stage3-prompts";
@@ -542,6 +581,11 @@ export default function RunPage() {
         </div>
         <StatusBadge status={run.status} stuck={isStuck(run)} />
       </div>
+
+      {/* the original input the operator typed to start this run */}
+      {run.meta.productDescription?.trim() && (
+        <StartPrompt description={run.meta.productDescription} competitorUrls={run.meta.competitorUrls ?? []} />
+      )}
 
       {/* live log while running */}
       <div className="mb-5"><LiveLog run={run} log={log} /></div>
