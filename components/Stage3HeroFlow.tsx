@@ -492,14 +492,17 @@ export default function Stage3HeroFlow({
     const placement = safeParse<Placement | null>(run.stage3_placement, null);
     const referenceImages = safeParse<string[]>(run.stage3_reference_images, []);
     return (
-      <CompletedReview
-        runId={runId}
-        heroUrl={heroUrl}
-        initialImages={imgs}
-        prompts={prompts}
-        initialPlacement={placement}
-        initialReferenceImages={referenceImages}
-      />
+      <div className="space-y-4">
+        <ShopifyPush runId={runId} />
+        <CompletedReview
+          runId={runId}
+          heroUrl={heroUrl}
+          initialImages={imgs}
+          prompts={prompts}
+          initialPlacement={placement}
+          initialReferenceImages={referenceImages}
+        />
+      </div>
     );
   }
 
@@ -1216,6 +1219,67 @@ function Spinner({ label }: { label: string }) {
     </div>
   );
 }
+/* ── Push a finished run to Shopify as a DRAFT product ───────────────────── */
+function ShopifyPush({ runId }: { runId: number }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<{ adminUrl: string; imageCount: number } | null>(null);
+
+  const push = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/shopify/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      });
+      const data = await res.json();
+      if (!data.success) { setErr(data.error || `Push failed (${res.status})`); return; }
+      setDone({ adminUrl: data.adminUrl, imageCount: data.imageCount });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="rounded-lg border border-[var(--color-green)] bg-[var(--color-green-bg)] px-3 py-2.5 space-y-1">
+        <p className="text-[12.5px] font-[600] text-[var(--color-text)]">
+          Draft product created in Shopify · {done.imageCount} images
+        </p>
+        <a
+          href={done.adminUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[12px] underline text-[var(--color-text-2)] hover:text-[var(--color-text)]"
+        >
+          Open in Shopify admin →
+        </a>
+        <p className="text-[11px] text-[var(--color-text-3)]">
+          It&apos;s a draft — set pricing and publish in Shopify when you&apos;re happy with it.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={push} disabled={busy} className={btnSecondary}>
+          {busy ? "Pushing to Shopify…" : "Push to Shopify (draft)"}
+        </button>
+        <span className="text-[11px] text-[var(--color-text-3)]">
+          Copy becomes the product description; hero + the 8 images become product media.
+        </span>
+      </div>
+      {err && <ErrBox msg={err} />}
+    </div>
+  );
+}
+
 function ErrBox({ msg }: { msg: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-red)] bg-[var(--color-red-bg)] px-3 py-2 text-[12px] text-[var(--color-text)]">{msg}</div>
