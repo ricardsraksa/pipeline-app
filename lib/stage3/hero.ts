@@ -39,7 +39,7 @@ export interface RemainingPrompt {
   source_image_references: string[]
 }
 
-const HERO_SYSTEM = `You are a product photography director. Generate ONE hero studio product image prompt for Higgsfield, using the source product images as the visual reference.
+export const HERO_SYSTEM = `You are a product photography director. Generate ONE hero studio product image prompt for Higgsfield, using the source product images as the visual reference.
 
 Your output prompt MUST follow the exact section structure, ordering, tone, and rule style of the GOLD STANDARD EXAMPLE below. Same section headers, same level of detail, same phrasing patterns. Only the product-specific content changes.
 
@@ -134,7 +134,7 @@ OUTPUT: A single JSON object, nothing before or after, no markdown fences:
   "source_image_references": ["<all source image URLs>"]
 }`
 
-const REMAINING_SYSTEM = `You are a creative director generating 8 image prompts for Higgsfield for a DTC product. The product's appearance is locked by an APPROVED HERO IMAGE which will be attached as the reference for every prompt.
+export const REMAINING_SYSTEM = `You are a creative director generating 8 image prompts for Higgsfield for a DTC product. The product's appearance is locked by an APPROVED HERO IMAGE which will be attached as the reference for every prompt.
 
 Every one of your 8 output prompts MUST follow the exact section structure, ordering, tone, and rule style of the GOLD STANDARD EXAMPLE below (a hero image for a different product). Same section headers, same level of detail, same phrasing patterns. Only the image type, scene content, and product-specific details change per prompt.
 

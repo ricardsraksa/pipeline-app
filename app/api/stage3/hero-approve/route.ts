@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getRun, updateRun } from '@/lib/db'
-import { generateRemainingPrompts } from '@/lib/stage3/hero'
+import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
+import { generateRemainingPrompts, REMAINING_SYSTEM } from '@/lib/stage3/hero'
 
 // Approve the hero → trigger Phase 2 prompt generation. The approved hero
 // image becomes the reference for all 8 derivative prompts. Lands at the
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
     let extraReferenceUrls: string[] = []
     try { const v = JSON.parse(run.stage3_reference_images || '[]'); if (Array.isArray(v)) extraReferenceUrls = v.filter((x) => typeof x === 'string') } catch { /* none */ }
 
+    // Audit trail: the system prompt the 8 derivative prompts ran with.
+    await recordPromptUsed(runId, 'stage3_remaining', REMAINING_SYSTEM)
     const { prompts, validation } = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls })
     if (!prompts.length) throw new Error('Phase 2 produced no prompts')
 

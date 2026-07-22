@@ -21,6 +21,7 @@ import Stage2Structured from "@/components/Stage2Structured";
 import Stage2Lines from "@/components/Stage2Lines";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
+import PromptUsed from "@/components/PromptUsed";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -596,6 +597,7 @@ export default function RunPage() {
                         <FeedbackAppliedChip stage={1} />
                         <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
                       </div>
+                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
                     </>
                   )}
                 </>
@@ -645,6 +647,7 @@ export default function RunPage() {
                         </div>
                       </div>
                       <StageActions stage="stage2" prevLabel="Research" prevId="v2-stage-1" onRestart={handleRestartStage} restarting={restarting} />
+                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
                     </>
                   )}
                 </>
@@ -662,6 +665,7 @@ export default function RunPage() {
               <>
                 <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
                 <StageActions stage="stage3-prompts" prevLabel="Copy" prevId="v2-stage-2" onRestart={handleRestartStage} restarting={restarting} />
+                <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
               </>
             )}
           </StageAccordion>

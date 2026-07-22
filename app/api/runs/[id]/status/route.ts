@@ -28,6 +28,9 @@ export async function GET(
     status,
     currentStep,
     error: run.error_message,
+    // JSON string: { stage1?, stage2?, stage3_hero?, stage3_remaining? } — the
+    // exact system prompts this run executed with (null on pre-v2.11 runs).
+    promptsUsed: run.prompts_used,
     // Stage outputs
     outputs: {
       research: run.step_research,

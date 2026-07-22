@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getRun, updateRun } from '@/lib/db'
-import { generateHeroPrompt } from '@/lib/stage3/hero'
+import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
+import { generateHeroPrompt, HERO_SYSTEM } from '@/lib/stage3/hero'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 
 // Phase 1 of hero-first Stage 3: generate ONE hero studio shot from the
@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
     const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
     const extraReferenceUrls = safeArr(run.stage3_reference_images)
+    // Audit trail: the system prompt the hero prompt-writer ran with.
+    await recordPromptUsed(runId, 'stage3_hero', HERO_SYSTEM)
     const { hero, validation } = await generateHeroPrompt({ onePager, copy, sourceImageUrls, extraReferenceUrls })
 
     await updateRun(runId, {

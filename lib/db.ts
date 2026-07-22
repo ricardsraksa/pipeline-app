@@ -146,6 +146,12 @@ async function migrateDB() {
     // Informational only — the QC gates never block on these.
     "stage3_hero_validation TEXT",
     "stage3_remaining_validation TEXT",
+    // Snapshot of the exact system prompt(s) used when each stage ran. JSON
+    // object keyed by stage ("stage1", "stage2", "stage3_hero",
+    // "stage3_remaining") → the full resolved prompt text (Settings override or
+    // default, plus any feedback suffix). Recorded at execution time so a run
+    // remains auditable after defaults/overrides change.
+    "prompts_used TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -258,6 +264,35 @@ export async function updateRun(id: number, fields: Partial<Run & { error_messag
     sql: `UPDATE runs SET ${setClauses} WHERE id = ?`,
     args: [...values, id],
   });
+}
+
+/**
+ * Record the exact system prompt a stage ran with (merged into the run's
+ * prompts_used JSON). Best-effort by design: prompt auditing must never fail
+ * or slow a run, so errors are logged and swallowed. Stages run sequentially,
+ * so the read-modify-write here doesn't race in practice.
+ */
+export async function recordPromptUsed(
+  id: number,
+  key: "stage1" | "stage2" | "stage3_hero" | "stage3_remaining",
+  prompt: string,
+): Promise<void> {
+  try {
+    const row = await db.execute({ sql: "SELECT prompts_used FROM runs WHERE id = ?", args: [id] });
+    let obj: Record<string, string> = {};
+    try {
+      const raw = (row.rows[0] as unknown as { prompts_used: string | null })?.prompts_used;
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) obj = parsed;
+    } catch { /* treat unparseable as empty */ }
+    obj[key] = prompt;
+    await db.execute({
+      sql: "UPDATE runs SET prompts_used = ? WHERE id = ?",
+      args: [JSON.stringify(obj), id],
+    });
+  } catch (err) {
+    console.error(`[prompts_used] run ${id} ${key}:`, err);
+  }
 }
 
 // ── Key/value store (Higgsfield MCP OAuth tokens, etc.) ──────────────────────
@@ -433,4 +468,7 @@ export interface Run {
   // Stage 3 prompt format-validation results (JSON Stage3Validation)
   stage3_hero_validation: string | null;
   stage3_remaining_validation: string | null;
+  // JSON: { stage1?, stage2?, stage3_hero?, stage3_remaining? } — the exact
+  // system prompt text each stage ran with (see migration comment).
+  prompts_used: string | null;
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { getRun, updateRun } from '@/lib/db'
-import { generateRemainingPrompts } from '@/lib/stage3/hero'
+import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
+import { generateRemainingPrompts, REMAINING_SYSTEM } from '@/lib/stage3/hero'
 
 // Skip the hero step: generate the 8 derivative prompts directly from the
 // SOURCE product photos (no separate hero shot). Lands at the same prompt
@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
     const visual = run.step_research_revised ?? run.step_research ?? ''
 
+    // Audit trail: the system prompt the 8 prompts ran with (hero skipped).
+    await recordPromptUsed(runId, 'stage3_remaining', REMAINING_SYSTEM)
     const { prompts, validation } = await generateRemainingPrompts({
       onePager, copy, avatar, visual,
       referenceImageUrls: sourceImageUrls,

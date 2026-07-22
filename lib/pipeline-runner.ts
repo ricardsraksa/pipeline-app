@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getRun, updateRun, db } from "./db";
+import { getRun, updateRun, recordPromptUsed, db } from "./db";
 import type { Run } from "./db";
 import { getModel } from "./models";
 import {
@@ -609,6 +609,8 @@ async function runStage1(runId: number, run: Run): Promise<void> {
 
     const stage1Feedback = await buildStage1FeedbackBlock();
     const onePagerSystem = await getPrompt("stage1");
+    // Audit trail: snapshot the exact system prompt this run's one-pager used.
+    await recordPromptUsed(runId, "stage1", onePagerSystem + stage1Feedback);
     const onePager = await anthropicMessage({
       system: onePagerSystem + stage1Feedback,
       user: [
@@ -656,6 +658,9 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   // repeat calls within the 5-min TTL.
   const stage2Static = await getPrompt("stage2");
   const stage2Feedback = await buildStage2FeedbackBlock();
+  // Audit trail: snapshot the exact system prompt (static + feedback suffix)
+  // this run's copy was generated with.
+  await recordPromptUsed(runId, "stage2", stage2Static + (stage2Feedback.trim() ? stage2Feedback : ""));
   const stage2System: Anthropic.TextBlockParam[] = [
     { type: "text", text: stage2Static, cache_control: { type: "ephemeral" } },
     ...(stage2Feedback.trim() ? [{ type: "text" as const, text: stage2Feedback }] : []),

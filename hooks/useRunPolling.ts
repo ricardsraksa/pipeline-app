@@ -7,6 +7,8 @@ export interface RunStatus {
   status: string;
   currentStep: string | null;
   error: string | null;
+  /** JSON string of the prompts this run executed with (null on older runs). */
+  promptsUsed: string | null;
   outputs: {
     research: string | null;
     chiefMid: string | null;
