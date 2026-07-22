@@ -5,7 +5,7 @@
 // lives in the EditableOutput above this — this is the convenience layer.
 
 import { useState } from "react";
-import { type Stage2Json, stage2Warnings } from "@/lib/stage2/shape";
+import { type Stage2Json, stage2Warnings, whatsIncluded } from "@/lib/stage2/shape";
 
 function CopyBtn({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -47,7 +47,7 @@ export default function Stage2Structured({ json }: { json: Stage2Json }) {
       )}
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] overflow-hidden">
-        <Field label="Produkt-Name" value={json.product_name} />
+        <Field label="Product name" value={json.product_name} />
         <Field label="Badge" value={json.badge} />
         <Field label="Supporting sentence" value={json.supporting_sentence} />
       </div>
@@ -55,10 +55,10 @@ export default function Stage2Structured({ json }: { json: Stage2Json }) {
       {json.benefits.length > 0 && (
         <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] overflow-hidden">
           <div className="flex items-center justify-between px-3.5 py-2 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
-            <span className="eyebrow text-[var(--color-text-2)]">Hauptvorteile</span>
+            <span className="eyebrow text-[var(--color-text-2)]">Key benefits</span>
             <CopyBtn text={json.benefits.join("\n")} label="all benefits" />
           </div>
-          {json.benefits.map((b, i) => <Field key={i} label={`Vorteil ${i + 1}`} value={b} />)}
+          {json.benefits.map((b, i) => <Field key={i} label={`Benefit ${i + 1}`} value={b} />)}
         </div>
       )}
 
@@ -80,7 +80,7 @@ export default function Stage2Structured({ json }: { json: Stage2Json }) {
       )}
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] overflow-hidden">
-        <Field label="Was ist enthalten?" value={json.was_enthalten} />
+        <Field label="What's included?" value={whatsIncluded(json)} />
         {json.faqs.map((f, i) => (
           <div key={i} className="px-3.5 py-2.5 border-b border-[var(--color-border)] last:border-0 space-y-1">
             <div className="flex items-start justify-between gap-3">

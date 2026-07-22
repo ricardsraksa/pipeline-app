@@ -14,16 +14,24 @@ export interface Stage2Json {
   supporting_sentence: string;
   benefits: string[];
   sections: { headline: string; paragraph: string }[];
-  was_enthalten: string;
+  whats_included: string;
+  /** Legacy key from the pre-English schema. Rows saved before the migration
+   *  still carry it, so always read this field via whatsIncluded(). */
+  was_enthalten?: string;
   faqs: { q: string; a: string }[];
   facebook: { headline: string; primary: string; description: string };
   one_liners: string[];
 }
 
+/** What's-included text, tolerating rows saved under the legacy key. */
+export function whatsIncluded(j: Stage2Json): string {
+  return j.whats_included || j.was_enthalten || "";
+}
+
 /** Quick structure warnings for the UI (informational — the text is canonical). */
 export function stage2Warnings(j: Stage2Json): string[] {
   const w: string[] = [];
-  if (j.benefits.length !== 3) w.push(`${j.benefits.length} Hauptvorteile (expected 3)`);
+  if (j.benefits.length !== 3) w.push(`${j.benefits.length} benefits (expected 3)`);
   if (j.sections.length !== 3) w.push(`${j.sections.length} headline sections (expected 3)`);
   if (j.faqs.length !== 2) w.push(`${j.faqs.length} FAQs (expected 2)`);
   if (j.one_liners.length !== 5) w.push(`${j.one_liners.length} one-liners (expected 5)`);

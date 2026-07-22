@@ -19,12 +19,12 @@ Return ONLY this JSON, no markdown fences, no commentary:
   "supporting_sentence": "<section 3 — the one-line tagline>",
   "benefits": ["<benefit 1>", "<benefit 2>", "<benefit 3>"],
   "sections": [
-    { "headline": "<headline 1>", "paragraph": "<absatz 1>" },
-    { "headline": "<headline 2>", "paragraph": "<absatz 2>" },
-    { "headline": "<headline 3>", "paragraph": "<absatz 3>" }
+    { "headline": "<headline 1>", "paragraph": "<paragraph 1>" },
+    { "headline": "<headline 2>", "paragraph": "<paragraph 2>" },
+    { "headline": "<headline 3>", "paragraph": "<paragraph 3>" }
   ],
-  "was_enthalten": "<section 6 — the one-sentence answer>",
-  "faqs": [ { "q": "<frage 1>", "a": "<antwort 1>" }, { "q": "<frage 2>", "a": "<antwort 2>" } ],
+  "whats_included": "<section 6 — the one-sentence answer>",
+  "faqs": [ { "q": "<question 1>", "a": "<answer 1>" }, { "q": "<question 2>", "a": "<answer 2>" } ],
   "facebook": { "headline": "<fb headline>", "primary": "<fb primary text>", "description": "<fb description>" },
   "one_liners": ["<1>", "<2>", "<3>", "<4>", "<5>"]
 }`;
@@ -58,7 +58,8 @@ export async function structureStage2Copy(text: string): Promise<Stage2Json | nu
       sections: Array.isArray(parsed.sections)
         ? parsed.sections.map((s) => ({ headline: String(s?.headline ?? ""), paragraph: String(s?.paragraph ?? "") }))
         : [],
-      was_enthalten: String(parsed.was_enthalten ?? ""),
+      // Accept the legacy key so re-parsing older copy kits still populates it.
+      whats_included: String(parsed.whats_included ?? parsed.was_enthalten ?? ""),
       faqs: Array.isArray(parsed.faqs) ? parsed.faqs.map((f) => ({ q: String(f?.q ?? ""), a: String(f?.a ?? "") })) : [],
       facebook: {
         headline: String(parsed.facebook?.headline ?? ""),
