@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
     await updateRun(runId, {
       ...(editedPrompt && editedPrompt.trim() ? { stage3_hero_prompt_edited: editedPrompt.trim() } : {}),
       stage3_hero_image_url: imageUrl,
+      // A NEW hero invalidates everything derived from the old one. Clearing
+      // here keeps the "back to hero" loop safe: without it, the generation
+      // resume logic would skip indices already "done" and silently mix
+      // old-hero images with new-hero prompts.
+      stage3_remaining_prompts: null,
+      stage3_remaining_prompts_edited: null,
+      stage3_remaining_images: null,
       status: 'awaiting_hero_qc',
       current_step: 'Stage 3: Review the hero shot',
       last_updated_at: new Date().toISOString(),
