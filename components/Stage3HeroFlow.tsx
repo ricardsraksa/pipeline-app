@@ -130,6 +130,7 @@ export default function Stage3HeroFlow({
   const [promptDrafts, setPromptDrafts] = useState<RemainingPrompt[] | null>(null);
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
+  const [heroZoom, setHeroZoom] = useState(false);
   // Stop flag for the client-side 8-image loop (the run-page "Kill run" only
   // reaches server stages; this loop runs in the browser).
   const stopRef = useRef(false);
@@ -231,7 +232,8 @@ export default function Stage3HeroFlow({
       <div className="space-y-4">
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the hero shot</h3>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={heroUrl} alt="Hero" className="rounded-lg max-w-md w-full border border-[var(--color-border)]" />
+        <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(true)} title="Click to view fullscreen" className="rounded-lg max-w-md w-full border border-[var(--color-border)] cursor-zoom-in" />
+        {heroZoom && <Lightbox items={[{ url: heroUrl, label: "Hero" }]} index={0} onClose={() => setHeroZoom(false)} onIndex={() => {}} />}
         <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
           This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
         </p>
@@ -609,6 +611,7 @@ function CompletedReview({
   const [placeErr, setPlaceErr] = useState<string | null>(null);
   const [relinking, setRelinking] = useState(false);
   const [relinkErr, setRelinkErr] = useState<string | null>(null);
+  const [lb, setLb] = useState<number | null>(null);
 
   // Re-link images that finished on Higgsfield but read "failed" here (e.g. the
   // 180s polling timeout hit while Higgsfield kept rendering). Pulls from the
@@ -848,6 +851,13 @@ function CompletedReview({
     .filter((s): s is { section: number; index: number; entry: { im: RemImage; i: number } } => !!s.entry);
   const productEntries = entries.filter((e) => !pickedIndexes.has(e.im.index));
 
+  // Fullscreen viewing — every visible image, hero first, in display order.
+  const lbItems = [
+    ...(heroUrl ? [{ url: heroUrl, label: "Hero" }] : []),
+    ...images.filter((im) => im.image_url).map((im) => ({ url: im.image_url, label: `#${im.index} ${im.category}` })),
+  ];
+  const openLb = (url: string) => { const i = lbItems.findIndex((x) => x.url === url); if (i >= 0) setLb(i); };
+
   // Render one interactive image tile (verdict badge, regenerate, fail banner,
   // generating overlay). Index `i` is the position in the `images` array so
   // toggleVerdict/regenerate stay correct after regrouping.
@@ -867,7 +877,7 @@ function CompletedReview({
         {im.image_url ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" className={`w-full h-full object-cover ${v === "fail" ? "opacity-80" : ""}`} />
+            <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className={`w-full h-full object-cover cursor-zoom-in ${v === "fail" ? "opacity-80" : ""}`} />
             {v && (
               <button
                 onClick={() => toggleVerdict(i)}
@@ -878,6 +888,7 @@ function CompletedReview({
               </button>
             )}
             <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
               <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
               <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
             </div>
@@ -931,6 +942,7 @@ function CompletedReview({
         </button>
       </div>
       {relinkErr && <ErrBox msg={relinkErr} />}
+      {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
         <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
         <button
@@ -959,9 +971,12 @@ function CompletedReview({
             <div className="flex flex-col gap-1.5">
               <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" onClick={() => openLb(heroUrl)} className="w-full h-full object-cover cursor-zoom-in" />
                 <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
-                <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+                <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => openLb(heroUrl)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+                  <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
+                </div>
               </div>
               <div className="px-0.5">
                 <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">Hero shot</p>
@@ -1320,6 +1335,82 @@ function ShopifyPush({ runId }: { runId: number }) {
   );
 }
 
+/* ── Fullscreen lightbox for Stage 3 images ──────────────────────────────
+   Opened from any image tile. Esc or backdrop click closes; ←/→ (keys or the
+   on-screen arrows) cycle through every image in the current grid. */
+function Lightbox({
+  items,
+  index,
+  onClose,
+  onIndex,
+}: {
+  items: { url: string; label: string }[];
+  index: number;
+  onClose: () => void;
+  onIndex: (i: number) => void;
+}) {
+  const item = items[index];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight" && items.length > 1) onIndex((index + 1) % items.length);
+      else if (e.key === "ArrowLeft" && items.length > 1) onIndex((index - 1 + items.length) % items.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, items.length, onClose, onIndex]);
+  if (!item) return null;
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex flex-col" onClick={onClose}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <span className="text-[11.5px] text-white/80 font-[var(--font-ibm-plex-mono)] uppercase tracking-wider truncate">
+          {item.label}{items.length > 1 ? ` · ${index + 1}/${items.length}` : ""}
+        </span>
+        <div className="flex items-center gap-3 shrink-0">
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11.5px] text-white/70 hover:text-white underline underline-offset-2"
+          >
+            Open original ↗
+          </a>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer text-white/80 hover:text-white text-[20px] leading-none px-1.5">
+            ✕
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center gap-2 px-3 pb-4">
+        {items.length > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onIndex((index - 1 + items.length) % items.length); }}
+            aria-label="Previous image"
+            className="cursor-pointer text-white/60 hover:text-white text-[30px] px-2 shrink-0 select-none"
+          >
+            ‹
+          </button>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.url}
+          alt={item.label}
+          className="max-h-full max-w-full object-contain rounded-md"
+          onClick={(e) => e.stopPropagation()}
+        />
+        {items.length > 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onIndex((index + 1) % items.length); }}
+            aria-label="Next image"
+            className="cursor-pointer text-white/60 hover:text-white text-[30px] px-2 shrink-0 select-none"
+          >
+            ›
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ErrBox({ msg }: { msg: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-red)] bg-[var(--color-red-bg)] px-3 py-2 text-[12px] text-[var(--color-text)]">{msg}</div>
@@ -1354,6 +1445,7 @@ function ValidationBadge({ raw }: { raw: string | null | undefined }) {
   );
 }
 function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImage | null)[] }) {
+  const [lb, setLb] = useState<number | null>(null);
   async function dl(url: string, name: string) {
     try {
       const res = await fetch(url); const blob = await res.blob();
@@ -1361,14 +1453,25 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
       a.click(); URL.revokeObjectURL(a.href);
     } catch { window.open(url, "_blank", "noopener"); }
   }
+  // Every image currently visible in the grid, in display order — the lightbox
+  // cycles through these.
+  const lbItems = [
+    ...(heroUrl ? [{ url: heroUrl, label: "Hero" }] : []),
+    ...images.filter((im): im is RemImage => Boolean(im?.image_url)).map((im) => ({ url: im.image_url, label: `#${im.index} ${im.category}` })),
+  ];
+  const openLb = (url: string) => { const i = lbItems.findIndex((x) => x.url === url); if (i >= 0) setLb(i); };
   return (
+    <>
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {heroUrl && (
         <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+          <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" onClick={() => openLb(heroUrl)} className="w-full h-full object-cover cursor-zoom-in" />
           <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
-          <button onClick={() => dl(heroUrl, "01_hero.png")} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+          <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => openLb(heroUrl)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+            <button onClick={() => dl(heroUrl, "01_hero.png")} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
+          </div>
         </div>
       )}
       {images.map((im, i) => (
@@ -1376,11 +1479,14 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
           {im?.image_url ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className="w-full h-full object-cover cursor-zoom-in" />
               {im.verdict && (
                 <span className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white ${im.verdict === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{im.verdict}</span>
               )}
-              <button onClick={() => dl(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)]">↓</button>
+              <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+                <button onClick={() => dl(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
+              </div>
             </>
           ) : im?.status === "failed" ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1 text-center">
@@ -1395,5 +1501,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
         </div>
       ))}
     </div>
+    {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
+    </>
   );
 }
