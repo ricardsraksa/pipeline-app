@@ -39,6 +39,10 @@ export async function POST(req: NextRequest) {
   let existing: StoredImage[] = []
   try { const p = JSON.parse(run.stage3_remaining_images || '[]'); if (Array.isArray(p)) existing = p } catch { /* none */ }
   const doneByIndex = new Map(existing.filter((im) => im?.status === 'done' && im.image_url).map((im) => [im.index, im]))
+  // ALL prior entries (including failed tiles) — an unmatched index keeps its
+  // failed entry so the completed view retains its "tap to regenerate" tile
+  // instead of the image silently disappearing.
+  const anyByIndex = new Map(existing.filter((im) => typeof im?.index === 'number').map((im) => [im.index, im]))
 
   let gens: HiggsfieldGeneration[]
   try {
@@ -67,6 +71,10 @@ export async function POST(req: NextRequest) {
       images.push({ index, category, image_url: urlOf(hit), status: 'done', recovered: true })
       matched.push(index)
     } else {
+      // Nothing in Higgsfield history for this prompt — keep whatever entry the
+      // run already had (typically a failed tile) rather than dropping it.
+      const prior = anyByIndex.get(index)
+      if (prior) images.push(prior)
       unmatched.push(index)
     }
   }

@@ -607,6 +607,29 @@ function CompletedReview({
   const [placement, setPlacement] = useState<Placement | null>(initialPlacement);
   const [placing, setPlacing] = useState(false);
   const [placeErr, setPlaceErr] = useState<string | null>(null);
+  const [relinking, setRelinking] = useState(false);
+  const [relinkErr, setRelinkErr] = useState<string | null>(null);
+
+  // Re-link images that finished on Higgsfield but read "failed" here (e.g. the
+  // 180s polling timeout hit while Higgsfield kept rendering). Pulls from the
+  // account's history by prompt match — no re-generation, no extra cost.
+  const relinkFromHiggsfield = async () => {
+    setRelinking(true);
+    setRelinkErr(null);
+    try {
+      const res = await fetch("/api/stage3/recover-from-higgsfield", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      });
+      const data = await res.json();
+      if (!data.success) { setRelinkErr(data.error || `Relink failed (${res.status})`); return; }
+      window.location.reload();
+    } catch (e) {
+      setRelinkErr(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setRelinking(false);
+    }
+  };
 
   const promptFor = useCallback(
     (im: RemImage) => prompts.find((p) => p.index === im.index) ?? null,
@@ -898,7 +921,16 @@ function CompletedReview({
         >
           {zipping ? "Downloading…" : "↓ Download all"}
         </button>
+        <button
+          onClick={relinkFromHiggsfield}
+          disabled={relinking || bulkRunning || busyIdxs.size > 0}
+          title="Failed tiles that actually finished on Higgsfield (e.g. a timeout while it was still rendering) get their images re-linked from your Higgsfield history — no re-generation, no extra cost."
+          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
+        >
+          {relinking ? "Relinking…" : "Relink from Higgsfield"}
+        </button>
       </div>
+      {relinkErr && <ErrBox msg={relinkErr} />}
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
         <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
         <button
