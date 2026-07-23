@@ -17,9 +17,7 @@ import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
-import Stage2Structured from "@/components/Stage2Structured";
 import Stage2Shopify from "@/components/Stage2Shopify";
-import Stage2Lines from "@/components/Stage2Lines";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
 import PromptUsed from "@/components/PromptUsed";
@@ -292,7 +290,7 @@ export default function RunPage() {
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
   const [overrides, setOverrides] = useState<Partial<Record<StageKey, boolean>>>({});
-  const [stage2View, setStage2View] = useState<"text" | "lines" | "fields" | "shopify">("text");
+  const [stage2View, setStage2View] = useState<"text" | "copy">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -658,19 +656,15 @@ export default function RunPage() {
               outputs.stage2Output ? (
                 <>
                   <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
-                    {((stage2Json ? ["text", "lines", "fields", "shopify"] : ["text", "lines"]) as Array<"text" | "lines" | "fields" | "shopify">).map((v) => (
+                    {((stage2Json ? ["text", "copy"] : ["text"]) as Array<"text" | "copy">).map((v) => (
                       <button key={v} onClick={() => setStage2View(v)}
                         className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-                        {v === "text" ? "Full text" : v === "lines" ? "Lines" : v === "fields" ? "Fields" : "Shopify"}
+                        {v === "text" ? "Full text" : "Copy"}
                       </button>
                     ))}
                   </div>
-                  {stage2View === "shopify" && stage2Json ? (
+                  {stage2View === "copy" && stage2Json ? (
                     <Stage2Shopify json={stage2Json} />
-                  ) : stage2View === "fields" && stage2Json ? (
-                    <Stage2Structured json={stage2Json} />
-                  ) : stage2View === "lines" ? (
-                    <Stage2Lines text={outputs.stage2OutputEdited || outputs.stage2Output} />
                   ) : (
                   <EditableOutput
                     runId={Number(runId)}
