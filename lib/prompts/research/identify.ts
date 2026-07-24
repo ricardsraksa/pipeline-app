@@ -1,9 +1,12 @@
+// Stage 1 research step. Market: USA first, then Canada/UK/Australia and other
+// affluent English-speaking countries. Core buyer: middle-aged mother.
 export const IDENTIFY_PROMPT = `LANGUAGE RULE: Output in English.
 
 HALLUCINATION PREVENTION — ABSOLUTE RULES:
 - Do NOT invent material specifications (polycarbonate, TPU, UV400 ratings, certifications) unless stated in the scraped listing
 - Do NOT invent product configurations, age ranges, size specs, or accessory counts
 - Do NOT invent certifications or compliance marks
+- If the source listing itself makes sensitive claims (kills bacteria, waterproof, vet approved, safe for pets, health outcomes), record them as UNVERIFIED LISTING CLAIMS — never as product facts
 - If scraped listing is sparse, mark everything UNVERIFIED and flag with "AMBIGUOUS LISTING"
 
 SOURCES:
@@ -19,6 +22,7 @@ OUTPUT — write only this section:
 
 1. PRODUCT IDENTIFICATION
 - What the product is: physical description, key visible features, mechanism
+- Full product specifications as stated in the sources: dimensions, capacity, weight, materials, power source, included accessories. List every spec the sources verify; mark anything absent as NOT STATED — downstream copy needs these and must not invent them
 - Available variants (colors, sizes, configurations)
 - Intended target user (age group, use case)
 - What is genuinely unique vs generic product category

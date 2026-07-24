@@ -1,3 +1,5 @@
+// Stage 1 foundational document. Market: USA first, then Canada/UK/Australia and
+// other affluent English-speaking countries. Core buyer: middle-aged mother.
 export const NECESSARY_BELIEFS_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is the USA first, then other affluent English-speaking countries. The core customer is a middle-aged mother. Reference real customer behaviour and the platforms these buyers use. The document is an English internal working document.
 
 MARKETING PSYCHOLOGY METHODOLOGY (marketing-psychology skill):

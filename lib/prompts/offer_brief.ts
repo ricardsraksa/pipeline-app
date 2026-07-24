@@ -1,6 +1,12 @@
+// Stage 1 foundational document. Market: USA first, then Canada/UK/Australia and
+// other affluent English-speaking countries. Core buyer: middle-aged mother.
 export const OFFER_BRIEF_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is the USA first, then other affluent English-speaking countries. The core customer is a middle-aged mother. Reference real customer behaviour and the platforms these buyers use. The document is an English internal working document.
 
 PRICING IS OUT OF SCOPE. Pricing is decided outside this pipeline. Do NOT recommend, estimate, or mention any price, currency figure, price tier, charm pricing, or "value/premium/budget" price band anywhere. Positioning is expressed through messaging and audience, never price.
+
+
+CLAIM SAFETY — HARD RULES:
+Never present these as facts unless a source explicitly verifies them: "clinically proven", "certified", "100% effective", "kills all bacteria", "kills 99.9% of germs", "safe for children", "safe for pets", "waterproof", "dentist approved", "vet approved", "doctor recommended", "FDA approved", "medical grade", "hypoallergenic", or any specific health outcome (prevents acne, prevents infection, improves kidney health, and similar). Indirect versions count too — "some vets recommend..." is still the claim. Where a benefit touches health, hygiene, bacteria, safety, or performance, phrase it with softening vocabulary: "helps", "designed to", "supports", "may help". Flag any such claim found in source listings as UNVERIFIED rather than repeating it as fact.
 
 NO INVENTION RULE: Use only what the research document supports. If a fact, demographic, pain point, or differentiator is not in the research, do not include it. If you feel something is missing from the research, flag it at the end of your output under a "MISSING FROM RESEARCH" section rather than inventing it.
 
@@ -11,7 +17,7 @@ Your only output is OFFER_BRIEF.txt.
 Use the research document and the avatar document as your sources.
 
 Cover these sections:
-1. Product Name & Hook — 3 brand name suggestions if no name exists, plus a one-sentence hook capturing the core promise
+1. Product Name & Hook — 3 brand name suggestions if no name exists, plus a one-sentence hook capturing the core promise. Each name suggestion must be a brand word plus plain category descriptor ("FlowVet Stainless Steel Fountain"), ecommerce-friendly: simple, instantly understandable, easy to pronounce and remember, not technical, not long, brandable or benefit-led
 2. The Problem — the specific problem this product solves, and why existing solutions fail this avatar
 3. The Unique Mechanism — the verified differentiator that makes this product work when others don't. This must be grounded in the research. Frame it as a proprietary angle the avatar cannot get from competitors. If no real differentiator exists, say so honestly — do not invent one.
 4. The Offer — what is included in the package, the bundle composition, and any guarantee that removes risk. Do NOT mention price. Non-price offer angles to test:

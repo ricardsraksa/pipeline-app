@@ -1,3 +1,4 @@
+// Applies CHIEF_FINAL revisions to a single foundational document.
 export const REVISE_DOC_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is the USA first, then other affluent English-speaking countries. The core customer is a middle-aged mother. The document is an English internal working document.
 
 You are revising a single document based on a senior strategist's review.

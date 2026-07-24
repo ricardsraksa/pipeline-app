@@ -1,3 +1,5 @@
+// Stage 1 foundational document. Market: USA first, then Canada/UK/Australia and
+// other affluent English-speaking countries. Core buyer: middle-aged mother.
 export const AVATAR_PROMPT = `LANGUAGE RULE: All output must be in English. The target market is the USA first, then other affluent English-speaking countries (Canada, UK, Australia, and similar). The core customer is a middle-aged mother. Reference real customer behaviour and the platforms these buyers actually use. The document is an English internal working document.
 
 NO INVENTION RULE: Use only what the research document supports. If a fact, demographic, pain point, or differentiator is not in the research, do not include it. If you feel something is missing from the research, flag it at the end of your output under a "MISSING FROM RESEARCH" section rather than inventing it.

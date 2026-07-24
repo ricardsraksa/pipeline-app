@@ -1,3 +1,5 @@
+// Stage 1 research step. Market: USA first, then Canada/UK/Australia and other
+// affluent English-speaking countries. Core buyer: middle-aged mother.
 export const PRODUCT_ANALYSIS_PROMPT = `LANGUAGE RULE: Output in English.
 
 HALLUCINATION PREVENTION:

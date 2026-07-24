@@ -1,3 +1,5 @@
+// Stage 1 research step. Market: USA first, then Canada/UK/Australia and other
+// affluent English-speaking countries. Core buyer: middle-aged mother.
 export const MARKET_PROMPT = `LANGUAGE RULE: Output in English.
 
 CUSTOMER RESEARCH METHODOLOGY — DIGITAL WATERING HOLE:
