@@ -36,29 +36,114 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function Stage2Shopify({ json }: { json: Stage2Json }) {
-  const rows: Array<{ label: string; value: string }> = [
-    { label: "Product Title", value: json.product_name },
-    { label: "PDP Badge Text", value: json.badge },
-    { label: "PDP Title Support Text", value: json.supporting_sentence },
-    { label: "PDP Benefit 1", value: json.benefits[0] ?? "" },
-    { label: "PDP Benefit 2", value: json.benefits[1] ?? "" },
-    { label: "PDP Benefit 3", value: json.benefits[2] ?? "" },
-    { label: "What's Included (Answer)", value: whatsIncluded(json) },
-    { label: "Product Specific Question 1", value: json.faqs[0]?.q ?? "" },
-    { label: "Product Specific Answer 1", value: json.faqs[0]?.a ?? "" },
-    { label: "Product Specific Question 2", value: json.faqs[1]?.q ?? "" },
-    { label: "Product Specific Answer 2", value: json.faqs[1]?.a ?? "" },
-    { label: "Section 1 Heading", value: json.sections[0]?.headline ?? "" },
-    { label: "Section 1 Text", value: json.sections[0]?.paragraph ?? "" },
-    { label: "Section 2 Headline", value: json.sections[1]?.headline ?? "" },
-    { label: "Section 2 Text", value: json.sections[1]?.paragraph ?? "" },
-    { label: "Section 3 Headline", value: json.sections[2]?.headline ?? "" },
-    { label: "Section 3 Text", value: json.sections[2]?.paragraph ?? "" },
-  ];
+/** A card of rows with an optional "Copy all" for the whole group. */
+function Group({
+  title,
+  rows,
+  copyAll,
+}: {
+  title?: string;
+  rows: Array<{ label: string; value: string }>;
+  copyAll?: string;
+}) {
+  const filled = rows.filter((r) => r.value?.trim());
+  if (!filled.length) return null;
   return (
     <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] overflow-hidden">
-      {rows.map((r) => <Row key={r.label} label={r.label} value={r.value} />)}
+      {title && (
+        <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
+          <span className="eyebrow text-[var(--color-text-2)]">{title}</span>
+          {copyAll?.trim() && <CopyBtn text={copyAll} label={`all of ${title}`} />}
+        </div>
+      )}
+      {filled.map((r) => <Row key={r.label} label={r.label} value={r.value} />)}
+    </div>
+  );
+}
+
+export default function Stage2Shopify({ json }: { json: Stage2Json }) {
+  const section = (i: number) => json.sections[i] ?? { headline: "", paragraph: "" };
+  // "Copy all" for a section gives heading + text as one block — for pasting
+  // both fields at once, or into anything that takes the whole section.
+  const sectionAll = (i: number) => {
+    const s = section(i);
+    return [s.headline, s.paragraph].filter((x) => x?.trim()).join("\n\n");
+  };
+
+  return (
+    <div className="space-y-3">
+      <Group
+        rows={[
+          { label: "Product Title", value: json.product_name },
+          { label: "PDP Badge Text", value: json.badge },
+          { label: "PDP Title Support Text", value: json.supporting_sentence },
+        ]}
+      />
+      <Group
+        title="Benefits"
+        copyAll={json.benefits.filter((b) => b?.trim()).join("\n")}
+        rows={[
+          { label: "PDP Benefit 1", value: json.benefits[0] ?? "" },
+          { label: "PDP Benefit 2", value: json.benefits[1] ?? "" },
+          { label: "PDP Benefit 3", value: json.benefits[2] ?? "" },
+        ]}
+      />
+      <Group rows={[{ label: "What's Included (Answer)", value: whatsIncluded(json) }]} />
+      <Group
+        title="FAQs"
+        copyAll={json.faqs
+          .filter((f) => f?.q?.trim() || f?.a?.trim())
+          .map((f) => [f.q, f.a].filter((x) => x?.trim()).join("\n"))
+          .join("\n\n")}
+        rows={[
+          { label: "Product Specific Question 1", value: json.faqs[0]?.q ?? "" },
+          { label: "Product Specific Answer 1", value: json.faqs[0]?.a ?? "" },
+          { label: "Product Specific Question 2", value: json.faqs[1]?.q ?? "" },
+          { label: "Product Specific Answer 2", value: json.faqs[1]?.a ?? "" },
+        ]}
+      />
+      <Group
+        title="Section 1"
+        copyAll={sectionAll(0)}
+        rows={[
+          { label: "Section 1 Heading", value: section(0).headline },
+          { label: "Section 1 Text", value: section(0).paragraph },
+        ]}
+      />
+      <Group
+        title="Section 2"
+        copyAll={sectionAll(1)}
+        rows={[
+          { label: "Section 2 Headline", value: section(1).headline },
+          { label: "Section 2 Text", value: section(1).paragraph },
+        ]}
+      />
+      <Group
+        title="Section 3"
+        copyAll={sectionAll(2)}
+        rows={[
+          { label: "Section 3 Headline", value: section(2).headline },
+          { label: "Section 3 Text", value: section(2).paragraph },
+        ]}
+      />
+      <Group
+        title="Facebook ad"
+        copyAll={[
+          json.facebook?.headline && `Headline: ${json.facebook.headline}`,
+          json.facebook?.primary && `Primary text: ${json.facebook.primary}`,
+          json.facebook?.description && `Description: ${json.facebook.description}`,
+        ].filter(Boolean).join("\n\n")}
+        rows={[
+          { label: "Facebook Headline", value: json.facebook?.headline ?? "" },
+          { label: "Facebook Primary Text", value: json.facebook?.primary ?? "" },
+          { label: "Facebook Description", value: json.facebook?.description ?? "" },
+        ]}
+      />
+      <Group
+        title="One-liners"
+        copyAll={json.one_liners.filter((o) => o?.trim()).join("\n")}
+        rows={json.one_liners.map((o, i) => ({ label: `One-liner ${i + 1}`, value: o }))}
+      />
     </div>
   );
 }

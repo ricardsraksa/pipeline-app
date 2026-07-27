@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { db, detachRunFeedback, upsertFeedbackNote, type FeedbackStage } from "@/lib/db";
 import type { Run } from "@/lib/db";
+import { structureStage2Copy } from "@/lib/stage2/format";
+
+// A stage2_copy edit re-derives the structured JSON via a (small) model call,
+// so this route needs more than the default budget.
+export const maxDuration = 120;
 
 export async function GET(
   _req: NextRequest,
@@ -184,6 +189,26 @@ export async function PATCH(
       sql: `UPDATE runs SET ${editedCol} = ?, ${editedAtCol} = ? WHERE id = ?`,
       args: [value, ts, Number(id)],
     });
+
+    // Editing the Stage 2 copy must also refresh the structured JSON — it's what
+    // the per-field Copy tab renders, and it was previously derived once at
+    // generation time, so edits never reached it. Re-derive from the edited text
+    // (cheap mechanical model, same helper the generate/regenerate paths use).
+    // Best-effort: the free text stays canonical, so a failure here never fails
+    // the save — the Copy tab just keeps showing the previous structure.
+    if (field === "stage2_copy" && typeof value === "string" && value.trim()) {
+      try {
+        const structured = await structureStage2Copy(value);
+        if (structured) {
+          await db.execute({
+            sql: "UPDATE runs SET stage2_json = ? WHERE id = ?",
+            args: [JSON.stringify(structured), Number(id)],
+          });
+        }
+      } catch (err) {
+        console.error(`[field_edit] re-structuring stage2_json for run ${id} failed:`, err);
+      }
+    }
     return Response.json({ success: true });
   }
 
