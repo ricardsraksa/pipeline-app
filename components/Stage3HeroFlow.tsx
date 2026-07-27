@@ -508,7 +508,7 @@ export default function Stage3HeroFlow({
           runId={runId}
           heroUrl={heroUrl}
           initialImages={imgs}
-          prompts={prompts}
+          initialPrompts={prompts}
           initialPlacement={placement}
           initialReferenceImages={referenceImages}
         />
@@ -587,18 +587,22 @@ function CompletedReview({
   runId,
   heroUrl,
   initialImages,
-  prompts,
+  initialPrompts,
   initialPlacement,
   initialReferenceImages,
 }: {
   runId: number;
   heroUrl: string | null;
   initialImages: RemImage[];
-  prompts: RemainingPrompt[];
+  initialPrompts: RemainingPrompt[];
   initialPlacement: Placement | null;
   initialReferenceImages: string[];
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
+  // Prompts are stateful: a regenerate with an edited prompt saves it back, so
+  // the NEXT rewrite starts from the prompt that was last actually used rather
+  // than reverting to the original.
+  const [prompts, setPrompts] = useState<RemainingPrompt[]>(initialPrompts);
   const [regenIdx, setRegenIdx] = useState<number | null>(null); // index into images
   // Set of image indices currently (re)generating. A Set rather than a single
   // index because bulk-fix runs several regenerations at once — each tile needs
@@ -692,6 +696,28 @@ function CompletedReview({
     return persistChain.current;
   }, [runId]);
 
+  // Persist an edited prompt for one image back onto the run, so reopening the
+  // regenerate modal (or a later AI rewrite) builds on the prompt that was last
+  // used rather than the original. Mirrors the prompt-review gate's write to
+  // stage3_remaining_prompts_edited. Best-effort: a failed save never blocks
+  // the generation the operator just asked for.
+  const savePromptText = useCallback((promptIndex: number, text: string) => {
+    setPrompts((prev) => {
+      const next = prev.map((p) => (p.index === promptIndex ? { ...p, prompt: text } : p));
+      persistChain.current = persistChain.current
+        .catch(() => {})
+        .then(() =>
+          fetch(`/api/runs/${runId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stage3_remaining_prompts_edited: JSON.stringify(next) }),
+          }),
+        )
+        .catch((e) => console.error(`persist prompt #${promptIndex} failed:`, e));
+      return next;
+    });
+  }, [runId]);
+
   // Toggle the operator override pass ↔ fail ↔ (clear).
   const toggleVerdict = (i: number) => {
     setImages((prev) => {
@@ -717,6 +743,11 @@ function CompletedReview({
     // the operator gets immediate feedback while the (slow) gen+audit runs.
     setRegenIdx(null);
     setBusyIdxs((s) => new Set(s).add(i));
+    // Save the prompt actually used, so the next rewrite/regeneration starts
+    // from it instead of reverting to the original generated prompt.
+    if (newPromptText.trim() && newPromptText !== p.prompt) {
+      savePromptText(p.index, newPromptText);
+    }
     try {
       const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
       const gen = await fetch("/api/stage3/generate", {
@@ -1181,13 +1212,19 @@ function RegenImageModal({
   onRegenerate: (promptText: string) => void;
 }) {
   const issues = image.issues?.filter(Boolean) ?? [];
-  const originalPrompt = prompt?.prompt ?? "";
-  const [draft, setDraft] = useState(originalPrompt);
+  // The prompt this image was LAST generated with (edits are persisted after
+  // each regenerate), so rewrites build on the current state, not the original.
+  const lastUsedPrompt = prompt?.prompt ?? "";
+  const [draft, setDraft] = useState(lastUsedPrompt);
   const [aiInstr, setAiInstr] = useState(issues.length ? "Fix the audit issues:\n- " + issues.join("\n- ") : "");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [updated, setUpdated] = useState(false); // prompt was changed since open
 
+  // Rewrite the prompt with AI, then immediately regenerate the image with it —
+  // rewriting is only ever a step toward a new image, so the second click was
+  // pure friction. `draft` is the prompt LAST USED (persisted after each
+  // regenerate), so successive rewrites compound instead of starting over.
   async function runAi() {
     const instr = aiInstr.trim();
     if (instr.length < 5) { setAiErr("Tell Claude what to change (5+ chars)"); return; }
@@ -1199,8 +1236,13 @@ function RegenImageModal({
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setAiErr(data.error ?? `HTTP ${res.status}`); return; }
-      setDraft(data.prompt as string);
+      const rewritten = data.prompt as string;
+      setDraft(rewritten);
       setUpdated(true);
+      // Hand straight off to generation (this also closes the modal and marks
+      // the tile busy). Not in `finally` — on a rewrite failure we keep the
+      // modal open with the error instead of generating the unchanged prompt.
+      onRegenerate(rewritten);
     } catch (e) { setAiErr(e instanceof Error ? e.message : "Network error"); }
     finally { setAiLoading(false); }
   }
@@ -1223,9 +1265,10 @@ function RegenImageModal({
             className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
           {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={runAi} disabled={aiLoading || aiInstr.trim().length < 5}
+            <button onClick={runAi} disabled={aiLoading || busy || aiInstr.trim().length < 5}
+              title="Rewrites the prompt with your instructions, then regenerates the image straight away"
               className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
-              {aiLoading ? "Rewriting…" : "Rewrite prompt"}
+              {aiLoading ? "Rewriting…" : "Rewrite prompt & regenerate"}
             </button>
             {updated && !aiLoading && (
               <span className="inline-flex items-center gap-1 text-[11px] font-[620] text-[var(--color-green)]">
@@ -1238,12 +1281,12 @@ function RegenImageModal({
         {/* manual prompt */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt {updated && <span className="text-[var(--color-green)] normal-case tracking-normal">· edited</span>}</label>
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt <span className="normal-case tracking-normal text-[var(--color-text-4)]">· last used</span> {updated && <span className="text-[var(--color-green)] normal-case tracking-normal">· edited</span>}</label>
             {updated && (
-              <button onClick={() => { setDraft(originalPrompt); setUpdated(false); }} className="text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer">Revert</button>
+              <button onClick={() => { setDraft(lastUsedPrompt); setUpdated(false); }} className="text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer">Revert</button>
             )}
           </div>
-          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setUpdated(e.target.value !== originalPrompt); }} rows={8}
+          <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setUpdated(e.target.value !== lastUsedPrompt); }} rows={8}
             className={`w-full border bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] ${updated ? "border-[var(--color-green)]" : "border-[var(--color-border-strong)]"}`} />
         </div>
         <div className="flex items-center gap-3">
