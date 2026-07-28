@@ -285,21 +285,6 @@ export default function Stage3HeroFlow({
             </div>
 
             <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
-
-            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Hero prompt (scene / lighting only — appearance comes from the photos)</label>
-            <textarea
-              value={heroDraft}
-              onChange={(e) => setHeroDraft(e.target.value)}
-              rows={10}
-              className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
-            />
-            <button
-              disabled={busy !== null}
-              onClick={() => trigger("/api/stage3/hero-regenerate", { runId, editedPrompt: heroDraft }, "regen-hero").then(() => setHeroEditing(false))}
-              className={btnPrimary}
-            >
-              {busy === "regen-hero" ? "Regenerating…" : "Regenerate with this prompt"}
-            </button>
           </div>
         )}
       </div>
