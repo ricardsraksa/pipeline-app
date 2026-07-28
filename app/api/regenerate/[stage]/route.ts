@@ -6,6 +6,10 @@ import { getModel, type ModelRole } from "@/lib/models";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
+// rewrite plus the mechanical re-structuring for the Copy tab) — give it room.
+export const maxDuration = 300;
+
 type Stage = "stage1" | "stage2" | "stage3-prompts";
 
 interface RegenResult {
@@ -62,11 +66,17 @@ export async function POST(
     } as Partial<Run>);
 
     // Regenerated Stage 2 copy → refresh the structured per-field JSON so the
-    // field view matches the new text. Best-effort, never blocks the response.
+    // Copy tab matches the new text. This must be AWAITED: the client reloads
+    // the page as soon as this response returns, so a fire-and-forget refresh
+    // loses the race and the Copy tab keeps showing the old structure. Still
+    // best-effort — a structuring failure never fails the regeneration itself.
     if (stage === "stage2") {
-      structureStage2Copy(result.output)
-        .then((j) => j && updateRun(runId, { stage2_json: JSON.stringify(j) }))
-        .catch((e) => console.error("[stage2 structure] regen:", e));
+      try {
+        const structured = await structureStage2Copy(result.output);
+        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured) });
+      } catch (e) {
+        console.error("[stage2 structure] regen:", e);
+      }
     }
 
     return NextResponse.json({ success: true, output: result.output });
