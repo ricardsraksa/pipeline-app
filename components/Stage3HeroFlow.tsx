@@ -32,6 +32,9 @@ interface RemImage {
   issues?: string[];
   /** Operator override of the auditor's verdict. Wins over `verdict`. */
   user_override?: "pass" | "fail" | null;
+  /** Previous versions of this image (newest first), kept when regenerating so
+   *  the operator can go back — each with the prompt that produced it. */
+  history?: Array<{ image_url: string; prompt?: string }>;
 }
 
 interface Placement {
@@ -117,8 +120,14 @@ export default function Stage3HeroFlow({
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setHeroAiErr(data.error ?? `HTTP ${res.status}`); return; }
-      setHeroDraft(data.prompt as string);
+      const rewritten = data.prompt as string;
+      setHeroDraft(rewritten);
       setHeroAiInstr("");
+      // Rewriting is only ever a step toward a new hero — regenerate with the
+      // rewritten prompt immediately instead of waiting for a second click.
+      // (On a rewrite failure we return above and never regenerate.)
+      setHeroEditing(false);
+      await trigger("/api/stage3/hero-regenerate", { runId, editedPrompt: rewritten }, "regen-hero");
     } catch (e) {
       setHeroAiErr(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -271,7 +280,7 @@ export default function Stage3HeroFlow({
                 disabled={heroAiLoading || heroAiInstr.trim().length < 5}
                 className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {heroAiLoading ? "Rewriting…" : "Rewrite prompt"}
+                {heroAiLoading ? "Rewriting…" : "Rewrite & regenerate"}
               </button>
             </div>
 
@@ -718,6 +727,31 @@ function CompletedReview({
     });
   }, [runId]);
 
+  // Bring back a previous version of an image. The current image moves into
+  // history (nothing is ever lost), the restored one becomes current, and its
+  // prompt becomes the "last used" prompt so an edit builds on what actually
+  // produced the image on screen.
+  const restoreVersion = (i: number, entry: { image_url: string; prompt?: string }) => {
+    setRegenIdx(null);
+    setImages((prev) => {
+      const cur = prev[i];
+      const curPrompt = prompts.find((p) => p.index === cur.index)?.prompt;
+      const history = [
+        ...(cur.image_url ? [{ image_url: cur.image_url, prompt: curPrompt }] : []),
+        ...(cur.history ?? []).filter((h) => h.image_url !== entry.image_url),
+      ].slice(0, 5);
+      // Restored version predates the current audit — no verdict badge until
+      // it's regenerated or manually overridden.
+      const updated: RemImage = { index: cur.index, category: cur.category, image_url: entry.image_url, status: "done", history };
+      persistImage(updated);
+      return prev.map((x, j) => (j === i ? updated : x));
+    });
+    if (entry.prompt?.trim()) {
+      const im = images[i];
+      if (im) savePromptText(im.index, entry.prompt);
+    }
+  };
+
   // Toggle the operator override pass ↔ fail ↔ (clear).
   const toggleVerdict = (i: number) => {
     setImages((prev) => {
@@ -774,7 +808,13 @@ function CompletedReview({
       // another tile can't overwrite this one with a stale snapshot.
       setImages((prev) => {
         const cur = prev[i];
-        const updated: RemImage = { index: cur.index, category: cur.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null };
+        // Keep the replaced image (and the prompt that produced it) so the
+        // operator can go back to it. Newest first, capped at 5 versions.
+        const history = [
+          ...(cur.image_url ? [{ image_url: cur.image_url, prompt: p.prompt }] : []),
+          ...(cur.history ?? []),
+        ].slice(0, 5);
+        const updated: RemImage = { index: cur.index, category: cur.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null, history };
         persistImage(updated);
         return prev.map((x, j) => (j === i ? updated : x));
       });
@@ -1065,6 +1105,7 @@ function CompletedReview({
           busy={regenIdx != null && busyIdxs.has(regenIdx)}
           onClose={() => setRegenIdx(null)}
           onRegenerate={(promptText) => regenerate(regenIdx, promptText, images[regenIdx].category)}
+          onUseVersion={(entry) => restoreVersion(regenIdx, entry)}
         />
       )}
 
@@ -1130,12 +1171,18 @@ function BulkFixModal({
         }),
       );
       const failedCount = results.filter((r) => !r.prompt).length;
-      setDrafts((prev) => {
-        const next = { ...prev };
-        for (const r of results) if (r.prompt) next[r.i] = r.prompt;
-        return next;
-      });
-      if (failedCount) setAiErr(`${failedCount} prompt(s) couldn't be rewritten — edit those manually below.`);
+      const next = { ...drafts };
+      for (const r of results) if (r.prompt) next[r.i] = r.prompt;
+      setDrafts(next);
+      if (failedCount) {
+        // Partial rewrite: stay open so the operator can fix the stragglers —
+        // auto-regenerating here would burn credits on unchanged prompts.
+        setAiErr(`${failedCount} prompt(s) couldn't be rewritten — edit those manually below, then hit Regenerate all.`);
+      } else {
+        // Every prompt rewritten — hand straight off to regeneration (closes
+        // the modal and runs the batch), no second click needed.
+        onRegenerateAll(next);
+      }
     } catch (e) {
       setAiErr(e instanceof Error ? e.message : "Rewrite failed");
     } finally { setAiBusy(false); }
@@ -1158,7 +1205,7 @@ function BulkFixModal({
           {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
           <button onClick={rewriteAll} disabled={aiBusy}
             className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
-            {aiBusy ? "Rewriting all…" : `Rewrite all ${failed.length} prompts`}
+            {aiBusy ? "Rewriting all…" : `Rewrite all ${failed.length} & regenerate`}
           </button>
         </div>
 
@@ -1204,12 +1251,14 @@ function RegenImageModal({
   busy,
   onClose,
   onRegenerate,
+  onUseVersion,
 }: {
   image: RemImage;
   prompt: RemainingPrompt | null;
   busy: boolean;
   onClose: () => void;
   onRegenerate: (promptText: string) => void;
+  onUseVersion: (entry: { image_url: string; prompt?: string }) => void;
 }) {
   const issues = image.issues?.filter(Boolean) ?? [];
   // The prompt this image was LAST generated with (edits are persisted after
@@ -1256,6 +1305,32 @@ function RegenImageModal({
           <div className="space-y-1">
             <p className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] uppercase tracking-widest">Audit issues</p>
             {issues.map((iss, k) => <p key={k} className="text-[11px] text-[var(--color-red)]">• {iss}</p>)}
+          </div>
+        )}
+        {/* Previous versions — go back to an earlier generation: use it as-is,
+            or load its prompt and edit from there. */}
+        {(image.history?.length ?? 0) > 0 && (
+          <div className="space-y-1.5">
+            <p className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Previous versions</p>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {image.history!.map((h, k) => (
+                <div key={k} className="shrink-0 w-[104px] space-y-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={h.image_url} alt={`Version ${k + 1} back`} loading="lazy" className="w-[104px] h-[104px] object-cover rounded-[8px] border border-[var(--color-border)]" />
+                  <button onClick={() => onUseVersion(h)} disabled={busy}
+                    className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] disabled:opacity-40">
+                    Use this image
+                  </button>
+                  {h.prompt?.trim() && (
+                    <button onClick={() => { setDraft(h.prompt!); setUpdated(true); }} disabled={busy || aiLoading}
+                      title="Load this version's prompt into the editor below"
+                      className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border)] text-[var(--color-text-2)] hover:text-[var(--color-text)] disabled:opacity-40">
+                      Edit from this
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {/* AI edit */}

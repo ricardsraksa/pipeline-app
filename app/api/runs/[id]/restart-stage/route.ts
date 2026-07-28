@@ -52,6 +52,10 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage3_remaining_prompts_edited: null,
         stage3_remaining_images: null,
         stage3_placement: null,
+        // Format-validation results from the previous pass — stale after a
+        // restart, and their badges would otherwise show against fresh prompts.
+        stage3_hero_validation: null,
+        stage3_remaining_validation: null,
         // Legacy /stage3 flow columns.
         image_prompts: null,
         stage3_image_prompts_edited: null,
