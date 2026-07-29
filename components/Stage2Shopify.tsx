@@ -69,6 +69,12 @@ export default function Stage2Shopify({ json }: { json: Stage2Json }) {
     const s = section(i);
     return [s.headline, s.paragraph].filter((x) => x?.trim()).join("\n\n");
   };
+  const faq = (i: number) => json.faqs[i] ?? { q: "", a: "" };
+  // Question + answer as one block, for pasting the pair in one go.
+  const faqAll = (i: number) => {
+    const f = faq(i);
+    return [f.q, f.a].filter((x) => x?.trim()).join("\n\n");
+  };
 
   return (
     <div className="space-y-3">
@@ -90,16 +96,19 @@ export default function Stage2Shopify({ json }: { json: Stage2Json }) {
       />
       <Group rows={[{ label: "What's Included (Answer)", value: whatsIncluded(json) }]} />
       <Group
-        title="FAQs"
-        copyAll={json.faqs
-          .filter((f) => f?.q?.trim() || f?.a?.trim())
-          .map((f) => [f.q, f.a].filter((x) => x?.trim()).join("\n"))
-          .join("\n\n")}
+        title="FAQ 1"
+        copyAll={faqAll(0)}
         rows={[
-          { label: "Product Specific Question 1", value: json.faqs[0]?.q ?? "" },
-          { label: "Product Specific Answer 1", value: json.faqs[0]?.a ?? "" },
-          { label: "Product Specific Question 2", value: json.faqs[1]?.q ?? "" },
-          { label: "Product Specific Answer 2", value: json.faqs[1]?.a ?? "" },
+          { label: "Product Specific Question 1", value: faq(0).q },
+          { label: "Product Specific Answer 1", value: faq(0).a },
+        ]}
+      />
+      <Group
+        title="FAQ 2"
+        copyAll={faqAll(1)}
+        rows={[
+          { label: "Product Specific Question 2", value: faq(1).q },
+          { label: "Product Specific Answer 2", value: faq(1).a },
         ]}
       />
       <Group
