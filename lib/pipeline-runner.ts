@@ -693,7 +693,16 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   try {
     const structured = await structureStage2Copy(output);
     if (structured) {
-      await updateRun(runId, { stage2_json: JSON.stringify(structured), last_updated_at: now() });
+      // Stage 2 names the product properly ("BrandName Product Category"), which
+      // beats the Stage 1 brand-word guess the run has been displaying — adopt it
+      // as the run name. brand_name is what the UI shows, and the operator can
+      // still rename manually afterwards.
+      const stage2Name = structured.product_name?.trim();
+      await updateRun(runId, {
+        stage2_json: JSON.stringify(structured),
+        ...(stage2Name ? { brand_name: stage2Name } : {}),
+        last_updated_at: now(),
+      });
     }
   } catch (err) {
     console.error(`[stage2 structure] run ${runId}:`, err);
