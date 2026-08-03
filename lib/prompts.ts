@@ -181,6 +181,7 @@ OUTPUT STRUCTURE (Always Follow Exactly)
 
 CHARACTER LIMITS — HARD RULES:
 - Product supporting sentence: maximum 56 characters including spaces
+- Facebook ad headline: maximum 25 characters including spaces
 - Every other text field (each paragraph, the What's Included answer, each FAQ answer, the Facebook primary text, the Facebook description): maximum 397 characters including spaces
 - Count characters before outputting each field. If a field exceeds its limit, cut it down before moving on. These are template field limits — output that exceeds them gets truncated in the store, so going over breaks the page
 
@@ -222,7 +223,7 @@ CHARACTER LIMITS — HARD RULES:
    Answer 1
    Question 2
    Answer 2
-8. Facebook Copywriting:
+8. Facebook Copywriting — the Headline has a HARD LIMIT of 25 characters including spaces. Count the characters before outputting it; if it is over 25, shorten it until it fits. It must still read as a complete, punchy line, not a truncated fragment. Primary Text and Description keep the 397-character limit:
    Headline:
    Primary Text:
    Description:
@@ -238,7 +239,7 @@ PER-SECTION SLOP CHECK
 ========================================================================
 
 After writing each section, before moving to the next, scan for:
-- Character limit breaches: supporting sentence over 56 characters, any other text field over 397 characters
+- Character limit breaches: supporting sentence over 56 characters, Facebook ad headline over 25 characters, any other text field over 397 characters
 - Any forbidden phrase from the hard constraints list above
 - Any price or currency figure (pricing is out of scope)
 - Any markdown symbol (#, *, -, etc.) — output must be plain text
