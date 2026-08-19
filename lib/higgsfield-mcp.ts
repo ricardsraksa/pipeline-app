@@ -14,6 +14,7 @@
 // Env: HIGGSFIELD_MCP_CLIENT_ID, HIGGSFIELD_MCP_REFRESH_TOKEN (seed).
 
 import { getKV, setKV } from "./db";
+import { ensurePngUrl } from "./hf-png";
 
 const MCP_URL = "https://mcp.higgsfield.ai/mcp";
 const TOKEN_URL = "https://mcp.higgsfield.ai/oauth2/token";
@@ -261,7 +262,7 @@ function mediaIdOf(result: ToolResult): string | undefined {
 
 // generate_image no longer accepts https:// URLs in medias — each reference must
 // first be imported into Higgsfield storage, which returns a confirmed media_id.
-async function importMediaId(url: string): Promise<string> {
+async function importOnce(url: string): Promise<string> {
   const result = await callTool("media_import_url", { url, type: "image" });
   const id = mediaIdOf(result);
   if (!id) {
@@ -273,6 +274,22 @@ async function importMediaId(url: string): Promise<string> {
     );
   }
   return id;
+}
+
+// Higgsfield's importer only accepts PNG sources right now — see lib/hf-png.ts.
+// Normalize first; if a URL that looked like a PNG still trips their signing
+// bug, its extension lied about the real bytes, so convert it and retry once.
+async function importMediaId(url: string): Promise<string> {
+  const normalized = await ensurePngUrl(url);
+  try {
+    return await importOnce(normalized);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/SignatureDoesNotMatch|Upload failed \(403\)/i.test(msg)) throw err;
+    const forced = await ensurePngUrl(url, true);
+    if (forced === normalized) throw err;
+    return await importOnce(forced);
+  }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -304,7 +321,31 @@ export async function generateImageViaMcp(req: McpImageRequest): Promise<string>
   if (refs.length) {
     // Import each reference URL → media_id, then pass the ids (NOT the URLs).
     // Higgsfield's generate_image rejects raw https:// URLs in medias.
-    const mediaIds = await Promise.all(refs.map((u) => importMediaId(u)));
+    //
+    // A single reference can be rejected on their side (their moderation turns
+    // down some product photos with a bare "Something went wrong"). Losing one
+    // of several references is far better than failing the whole generation, so
+    // drop the ones that won't import and only give up when none survive.
+    const settled = await Promise.allSettled(refs.map((u) => importMediaId(u)));
+    const mediaIds: string[] = [];
+    const rejected: string[] = [];
+    settled.forEach((r, i) => {
+      if (r.status === "fulfilled") mediaIds.push(r.value);
+      else rejected.push(`${refs[i]} — ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`);
+    });
+    if (!mediaIds.length) {
+      throw new Error(
+        `Higgsfield rejected every reference image (${refs.length}). ` +
+          "Replace the product photos and retry.\n" +
+          rejected.join("\n").slice(0, 600),
+      );
+    }
+    if (rejected.length) {
+      console.warn(
+        `[higgsfield] ${rejected.length}/${refs.length} reference image(s) could not be imported; ` +
+          `generating from the remaining ${mediaIds.length}.\n${rejected.join("\n")}`,
+      );
+    }
     params.medias = mediaIds.map((id) => ({ value: id, role: "image" }));
   }
 
