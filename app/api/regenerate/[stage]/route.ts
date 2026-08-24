@@ -96,8 +96,9 @@ async function ask(args: { system: string; user: string; maxTokens: number; role
     messages: [{ role: "user", content: args.user }],
   });
   void recordUsage(args.runId ?? null, args.label ?? `regenerate ${args.role}`, model, response.usage);
-  const block = response.content[0];
-  return block && block.type === "text" ? block.text : "";
+  // Opus 5 thinks by default, so content[0] can be a thinking block — find the
+  // text block instead of assuming it comes first.
+  return response.content.find((b) => b.type === "text")?.text ?? "";
 }
 
 /** Return revised version if present, else original. */
