@@ -185,6 +185,20 @@ export async function PATCH(
     const editedCol = `${field}_edited`;
     const editedAtCol = `${stage}_edited_at`;
     const ts = new Date().toISOString();
+    // Snapshot the pre-save Stage 2 text so the re-structuring below can skip
+    // its (billed) Haiku call when a Save click didn't actually change anything.
+    let stage2TextUnchanged = false;
+    if (field === "stage2_copy" && typeof value === "string") {
+      try {
+        const prev = await db.execute({
+          sql: "SELECT stage2_copy_edited, stage2_output FROM runs WHERE id = ?",
+          args: [Number(id)],
+        });
+        const prevRow = prev.rows[0] as unknown as { stage2_copy_edited: string | null; stage2_output: string | null } | undefined;
+        const prevText = prevRow?.stage2_copy_edited ?? prevRow?.stage2_output ?? "";
+        stage2TextUnchanged = prevText.trim() === value.trim();
+      } catch { /* on any doubt, re-structure */ }
+    }
     await db.execute({
       sql: `UPDATE runs SET ${editedCol} = ?, ${editedAtCol} = ? WHERE id = ?`,
       args: [value, ts, Number(id)],
@@ -196,9 +210,9 @@ export async function PATCH(
     // (cheap mechanical model, same helper the generate/regenerate paths use).
     // Best-effort: the free text stays canonical, so a failure here never fails
     // the save — the Copy tab just keeps showing the previous structure.
-    if (field === "stage2_copy" && typeof value === "string" && value.trim()) {
+    if (field === "stage2_copy" && typeof value === "string" && value.trim() && !stage2TextUnchanged) {
       try {
-        const structured = await structureStage2Copy(value);
+        const structured = await structureStage2Copy(value, Number(id));
         if (structured) {
           await db.execute({
             sql: "UPDATE runs SET stage2_json = ? WHERE id = ?",

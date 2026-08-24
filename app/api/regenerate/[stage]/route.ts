@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getRun, updateRun, type Run } from "@/lib/db";
+import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
 
@@ -48,8 +48,6 @@ export async function POST(
       result = await regenerateStage1(run, instructions.trim());
     } else if (stage === "stage2") {
       result = await regenerateStage2(run, instructions.trim());
-    } else if (stage === "stage3-prompts") {
-      result = await regenerateStage3Prompts(run, instructions.trim());
     } else {
       return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
     }
@@ -72,7 +70,7 @@ export async function POST(
     // best-effort — a structuring failure never fails the regeneration itself.
     if (stage === "stage2") {
       try {
-        const structured = await structureStage2Copy(result.output);
+        const structured = await structureStage2Copy(result.output, runId);
         if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured) });
       } catch (e) {
         console.error("[stage2 structure] regen:", e);
@@ -89,13 +87,15 @@ export async function POST(
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-async function ask(args: { system: string; user: string; maxTokens: number; role: ModelRole }): Promise<string> {
+async function ask(args: { system: string; user: string; maxTokens: number; role: ModelRole; runId?: number; label?: string }): Promise<string> {
+  const model = await getModel(args.role);
   const response = await client.messages.create({
-    model: await getModel(args.role),
+    model,
     max_tokens: args.maxTokens,
     system: args.system,
     messages: [{ role: "user", content: args.user }],
   });
+  void recordUsage(args.runId ?? null, args.label ?? `regenerate ${args.role}`, model, response.usage);
   const block = response.content[0];
   return block && block.type === "text" ? block.text : "";
 }
@@ -168,7 +168,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
     beliefs,
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 2000, role: "stage1" });
+  const output = await ask({ system, user, maxTokens: 2000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
 }
 
@@ -215,65 +215,9 @@ Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`;
     "Now regenerate the copy following the user's instructions.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 8000, role: "stage2" });
+  const output = await ask({ system, user, maxTokens: 8000, role: "stage2", runId: run.id, label: "stage2: edit with AI" });
   return { field: "stage2_copy", stageTimestamp: "stage2_edited_at", output };
 }
 
-// ── Stage 3: regenerate the image prompts ─────────────────────────────────────
-async function regenerateStage3Prompts(run: Run, instructions: string): Promise<RegenResult> {
-  const currentPrompts = run.stage3_image_prompts_edited ?? run.image_prompts ?? "";
-  if (!currentPrompts) throw new Error("No Stage 3 image prompts to regenerate yet");
 
-  const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "";
-  const stage2Copy = run.stage2_copy_edited ?? run.stage2_output ?? "";
 
-  const scrapedImages = safeJsonArray(run.scraped_image_urls);
-  const approvedImages = safeJsonArray(run.approved_image_urls);
-
-  const system = `You are regenerating Higgsfield image generation prompts based on user feedback.
-
-CURRENT PROMPTS (JSON):
-${currentPrompts}
-
-USER'S EDIT INSTRUCTIONS:
-${instructions}
-
-YOUR TASK:
-Regenerate the image prompts following the user's instructions. Maintain the same JSON structure and the same number of prompts as the current version. Keep all required fields per prompt (index, category, prompt, model, aspect_ratio, etc. — whatever the current prompts contain).
-
-If they ask for "darker backgrounds" adjust the background spec. If they ask for "more dramatic lighting" update lighting. If they ask to "focus on X feature" emphasise that. Apply the changes consistently across all prompts where relevant.
-
-Return ONLY the regenerated JSON array. No markdown code fences. No explanation.`;
-
-  const user = [
-    "Here is the context:",
-    "",
-    "STAGE 1 ONE-PAGER:",
-    onePager,
-    "",
-    "---",
-    "",
-    "STAGE 2 COPY:",
-    stage2Copy,
-    "",
-    "---",
-    "",
-    `${scrapedImages.length} scraped product images available.`,
-    `${approvedImages.length} approved reference images.`,
-    "",
-    "Now regenerate the image prompts following the user's instructions.",
-  ].join("\n");
-
-  const output = await ask({ system, user, maxTokens: 6000, role: "stage3Prompt" });
-  return { field: "stage3_image_prompts", stageTimestamp: "stage3_edited_at", output };
-}
-
-function safeJsonArray(s: string | null): unknown[] {
-  if (!s) return [];
-  try {
-    const v = JSON.parse(s);
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
-}

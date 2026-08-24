@@ -21,6 +21,7 @@ import Stage2Shopify from "@/components/Stage2Shopify";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
 import PromptUsed from "@/components/PromptUsed";
+import RunCost from "@/components/RunCost";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -585,6 +586,9 @@ export default function RunPage() {
       {run.meta.productDescription?.trim() && (
         <StartPrompt description={run.meta.productDescription} competitorUrls={run.meta.competitorUrls ?? []} />
       )}
+
+      {/* per-run Anthropic API cost (token usage captured from every call) */}
+      {runId !== null && <div className="mb-5"><RunCost runId={runId} /></div>}
 
       {/* live log while running */}
       <div className="mb-5"><LiveLog run={run} log={log} /></div>

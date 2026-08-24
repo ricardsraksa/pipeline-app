@@ -158,6 +158,25 @@ async function migrateDB() {
       await db.execute(`ALTER TABLE runs ADD COLUMN ${col}`);
     } catch { /* column already exists — safe to ignore */ }
   }
+
+  // Cost tracker: one row per Anthropic API call. Usage numbers come free in
+  // every API response — recording them costs nothing extra.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS api_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER,
+      label TEXT NOT NULL,
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_api_usage_run ON api_usage(run_id)`,
+  );
 }
 
 // ── DB helper functions ───────────────────────────────────────────────────────
@@ -293,6 +312,65 @@ export async function recordPromptUsed(
   } catch (err) {
     console.error(`[prompts_used] run ${id} ${key}:`, err);
   }
+}
+
+// Loose shape of the SDK's response.usage — field names vary slightly across
+// SDK versions, so read defensively.
+export interface AnthropicUsageLike {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+}
+
+// Cost tracker insert. Best-effort: a DB hiccup must never fail the API call
+// whose usage is being recorded.
+export async function recordUsage(
+  runId: number | null,
+  label: string,
+  model: string,
+  usage: AnthropicUsageLike | null | undefined,
+): Promise<void> {
+  if (!usage) return;
+  try {
+    await db.execute({
+      sql: `INSERT INTO api_usage
+              (run_id, label, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        runId,
+        label,
+        model,
+        usage.input_tokens ?? 0,
+        usage.output_tokens ?? 0,
+        usage.cache_read_input_tokens ?? 0,
+        usage.cache_creation_input_tokens ?? 0,
+        new Date().toISOString(),
+      ],
+    });
+  } catch (err) {
+    console.error(`[api_usage] ${label}:`, err);
+  }
+}
+
+export interface ApiUsageRow {
+  id: number;
+  run_id: number | null;
+  label: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  created_at: string;
+}
+
+export async function getUsageForRun(runId: number): Promise<ApiUsageRow[]> {
+  const res = await db.execute({
+    sql: "SELECT * FROM api_usage WHERE run_id = ? ORDER BY id ASC",
+    args: [runId],
+  });
+  return res.rows as unknown as ApiUsageRow[];
 }
 
 // ── Key/value store (Higgsfield MCP OAuth tokens, etc.) ──────────────────────

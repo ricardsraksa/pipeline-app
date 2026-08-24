@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun } from "@/lib/db";
 import { getModel } from "@/lib/models";
+import { recordUsage } from "@/lib/db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
 
@@ -47,12 +48,14 @@ export async function POST(req: NextRequest) {
   });
 
   try {
+    const model = await getModel("stage3Prompt");
     const message = await anthropic.messages.create({
-      model: await getModel("stage3Prompt"),
+      model,
       max_tokens: 1000,
       system: SYSTEM,
       messages: [{ role: "user", content }],
     });
+    void recordUsage(Number(runId) || null, "stage3: placement", model, message.usage);
     const raw = message.content.find((b) => b.type === "text")?.text ?? "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return Response.json({ success: false, error: "No JSON in response", raw }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
-import { generateRemainingPrompts, REMAINING_SYSTEM } from '@/lib/stage3/hero'
+import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
 
 // Skip the hero step: generate the 8 derivative prompts directly from the
 // SOURCE product photos (no separate hero shot). Lands at the same prompt
@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
     const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
-    const visual = run.step_research_revised ?? run.step_research ?? ''
+    // Only the visual-strategy section — the full research doc was pure token waste here.
+    const visual = extractVisualSection(run.step_research_revised ?? run.step_research ?? '')
 
     // Audit trail: the system prompt the 8 prompts ran with (hero skipped).
     await recordPromptUsed(runId, 'stage3_remaining', REMAINING_SYSTEM)
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       referenceImageUrls: sourceImageUrls,
       extraReferenceUrls: safeArr(run.stage3_reference_images),
       fromSource: true,
+      runId,
     })
     if (!prompts.length) throw new Error('Prompt generation produced no prompts')
 

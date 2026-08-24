@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getRun, updateRun, recordPromptUsed, db } from "./db";
+import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import type { Run } from "./db";
 import { getModel } from "./models";
 import {
@@ -119,8 +119,16 @@ async function withRetry<T>(
     } catch (err) {
       lastErr = err;
       const message = err instanceof Error ? err.message : String(err);
-      // Don't retry obvious user errors
-      if (/401|403|invalid api key|authentication/i.test(message)) throw err;
+      // Only transient failures are worth re-billing: 429, 5xx, overload,
+      // timeouts, connection drops. A 4xx is deterministic — retrying it just
+      // multiplies the cost of the same failure.
+      const status = (err as { status?: number })?.status;
+      const transient =
+        status === 429 ||
+        (typeof status === "number" && status >= 500) ||
+        (typeof status !== "number" &&
+          /timeout|timed out|overloaded|econnreset|econnrefused|socket|network|fetch failed/i.test(message));
+      if (!transient) throw err;
       if (attempt === maxRetries) break;
       const delay = 1000 * Math.pow(2, attempt) + Math.random() * 500;
       console.warn(`[${opts.label}] attempt ${attempt + 1} failed: ${message}. Retrying in ${Math.round(delay)}ms`);
@@ -142,6 +150,8 @@ async function anthropicMessage(args: {
   /** Per-request timeout override (ms). Defaults to the client's 120s.
    *  Opus is slower than Sonnet, so the Stage 2 call passes a larger value. */
   timeoutMs?: number;
+  /** Run to attribute this call's token usage to in the cost tracker. */
+  runId?: number;
 }): Promise<string> {
   // Resolve the model once, here — the retry thunk below is not async, so the
   // await can't live inside it. Default role is Stage 1 reasoning; callers that
@@ -160,6 +170,7 @@ async function anthropicMessage(args: {
       ),
     { label: args.label },
   );
+  void recordUsage(args.runId ?? null, args.label, model, msg.usage);
   return msg.content.find((b) => b.type === "text")?.text ?? "";
 }
 
@@ -244,12 +255,13 @@ function parseRevisions(chiefFinal: string): DocRevision[] {
   return revisions;
 }
 
-async function reviseDoc(original: string, docType: string, changes: string): Promise<string> {
+async function reviseDoc(runId: number, original: string, docType: string, changes: string): Promise<string> {
   const text = await anthropicMessage({
     system: REVISE_DOC_PROMPT,
     user: `Document type: ${docType}\n\nOriginal document:\n\n${original}\n\n---\n\nRequired changes:\n\n${changes}`,
     maxTokens: 4000,
     label: `revise ${docType}`,
+    runId,
     // Mechanical doc editing against an explicit changelist — the cheap model.
     model: await getModel("mechanical"),
   });
@@ -394,6 +406,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   }>(run.scraper_data, {});
 
   const inputs: ResearchInputs = {
+    runId,
     product_url: run.product_url,
     product_description: run.product_description ?? undefined,
     scraped_text: scraperData.scraped_text ?? "",
@@ -481,6 +494,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
             user: `RESEARCH.txt:\n\n${researchRevised}`,
             maxTokens: 3500,
             label: "avatar",
+            runId,
           }),
       });
     }
@@ -493,6 +507,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
             user: `RESEARCH.txt:\n\n${researchRevised}`,
             maxTokens: 3500,
             label: "offer brief",
+            runId,
           }),
       });
     }
@@ -505,6 +520,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
             user: `RESEARCH.txt:\n\n${researchRevised}`,
             maxTokens: 3500,
             label: "necessary beliefs",
+            runId,
           }),
       });
     }
@@ -561,6 +577,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       ].join(""),
       maxTokens: 4000,
       label: "chief final review",
+      runId,
     });
     await updateRun(runId, { step_chief_final: chiefFinal, last_updated_at: now() });
   }
@@ -579,11 +596,11 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       await Promise.all(
         revisions.map(async (rev) => {
           if (rev.docName === "AVATAR.txt") {
-            avatarRevised = await reviseDoc(avatar, "AVATAR.txt", rev.changes);
+            avatarRevised = await reviseDoc(runId, avatar, "AVATAR.txt", rev.changes);
           } else if (rev.docName === "OFFER_BRIEF.txt") {
-            offerBriefRevised = await reviseDoc(offerBrief, "OFFER_BRIEF.txt", rev.changes);
+            offerBriefRevised = await reviseDoc(runId, offerBrief, "OFFER_BRIEF.txt", rev.changes);
           } else if (rev.docName === "NECESSARY_BELIEFS.txt") {
-            necessaryBeliefsRevised = await reviseDoc(necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
+            necessaryBeliefsRevised = await reviseDoc(runId, necessaryBeliefs, "NECESSARY_BELIEFS.txt", rev.changes);
           }
         })
       );
@@ -636,6 +653,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       ].join("\n"),
       maxTokens: 2000,
       label: "one-pager synthesis",
+      runId,
       // Pure summarization of finished docs — the cheap model.
       model: await getModel("mechanical"),
     });
@@ -675,6 +693,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
     user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete copy kit now.`,
     maxTokens: 8192,
     label: "stage 2 copy",
+      runId,
     model: await getModel("stage2"),
     // Opus + an 8k-token copy kit can run well past Sonnet's pace;
     // give it 4 minutes before the client aborts.

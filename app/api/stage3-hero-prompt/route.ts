@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const extraReferenceUrls = safeArr(run.stage3_reference_images)
     // Audit trail: the system prompt the hero prompt-writer ran with.
     await recordPromptUsed(runId, 'stage3_hero', HERO_SYSTEM)
-    const { hero, validation } = await generateHeroPrompt({ onePager, copy, sourceImageUrls, extraReferenceUrls })
+    const { hero, validation } = await generateHeroPrompt({ onePager, copy, sourceImageUrls, extraReferenceUrls, runId })
 
     await updateRun(runId, {
       stage3_hero_prompt: JSON.stringify(hero),

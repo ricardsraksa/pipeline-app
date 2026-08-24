@@ -116,7 +116,7 @@ export default function Stage3HeroFlow({
       const res = await fetch("/api/stage3/edit-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: heroDraft, instructions: instr, category: "hero_studio", reference_images: safeParse<string[]>(run?.stage3_reference_images, []) }),
+        body: JSON.stringify({ prompt: heroDraft, instructions: instr, category: "hero_studio", reference_images: safeParse<string[]>(run?.stage3_reference_images, []), run_id: runId }),
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setHeroAiErr(data.error ?? `HTTP ${res.status}`); return; }
@@ -345,7 +345,7 @@ export default function Stage3HeroFlow({
           try {
             const audit = await fetch("/api/stage3/audit", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null }),
+              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null, run_id: runId }),
             }).then((r) => r.json());
             if (audit.success) {
               verdict = audit.result?.verdict === "pass" ? "pass" : "fail";
@@ -524,12 +524,6 @@ export default function Stage3HeroFlow({
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Stage 3 images ({imgs.length})</h3>
         <p className="text-[11px] text-[var(--color-text-3)]">Generated on the previous Stage 3 flow.</p>
         <GenGrid heroUrl={null} images={imgs} />
-        <a
-          href={`/stage3?runId=${runId}`}
-          className={btnSecondary + " no-underline"}
-        >
-          Open in Stage 3 editor →
-        </a>
       </div>
     );
   }
@@ -780,7 +774,7 @@ function CompletedReview({
       try {
         const audit = await fetch("/api/stage3/audit", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null }),
+          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null, run_id: runId }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
         else { console.error("audit failed:", audit.error); issues = ["Audit skipped (auditor unavailable) — review manually."]; }
@@ -1085,6 +1079,7 @@ function CompletedReview({
 
       {regenIdx != null && images[regenIdx] && (
         <RegenImageModal
+          runId={runId}
           image={images[regenIdx]}
           prompt={promptFor(images[regenIdx])}
           busy={regenIdx != null && busyIdxs.has(regenIdx)}
@@ -1096,6 +1091,7 @@ function CompletedReview({
 
       {bulkOpen && fixable.length > 0 && (
         <BulkFixModal
+          runId={runId}
           failed={fixable}
           promptFor={promptFor}
           onClose={() => setBulkOpen(false)}
@@ -1114,11 +1110,13 @@ function BulkFixModal({
   promptFor,
   onClose,
   onRegenerateAll,
+  runId,
 }: {
   failed: Array<{ im: RemImage; i: number }>;
   promptFor: (im: RemImage) => RemainingPrompt | null;
   onClose: () => void;
   onRegenerateAll: (drafts: Record<number, string>) => void;
+  runId: number;
 }) {
   const [drafts, setDrafts] = useState<Record<number, string>>(() => {
     const d: Record<number, string> = {};
@@ -1148,7 +1146,7 @@ function BulkFixModal({
               : text;
             const res = await fetch("/api/stage3/edit-prompt", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: drafts[i], instructions: perImageInstr, category: im.category }),
+              body: JSON.stringify({ prompt: drafts[i], instructions: perImageInstr, category: im.category, run_id: runId }),
             });
             const data = await res.json();
             return { i, prompt: data.success && data.prompt ? (data.prompt as string) : null };
@@ -1237,6 +1235,7 @@ function RegenImageModal({
   onClose,
   onRegenerate,
   onUseVersion,
+  runId,
 }: {
   image: RemImage;
   prompt: RemainingPrompt | null;
@@ -1244,6 +1243,7 @@ function RegenImageModal({
   onClose: () => void;
   onRegenerate: (promptText: string) => void;
   onUseVersion: (entry: { image_url: string; prompt?: string }) => void;
+  runId: number;
 }) {
   const issues = image.issues?.filter(Boolean) ?? [];
   // The prompt this image was LAST generated with (edits are persisted after
@@ -1266,7 +1266,7 @@ function RegenImageModal({
     try {
       const res = await fetch("/api/stage3/edit-prompt", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: draft, instructions: instr, category: image.category }),
+        body: JSON.stringify({ prompt: draft, instructions: instr, category: image.category, run_id: runId }),
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setAiErr(data.error ?? `HTTP ${res.status}`); return; }

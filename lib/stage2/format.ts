@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { getModel } from "@/lib/models";
+import { recordUsage } from "@/lib/db";
 // Stage2Json + stage2Warnings live in ./shape (server-free) so client
 // components can import them without pulling this module's server-only deps
 // (the Anthropic SDK and the DB-backed model resolver).
@@ -34,15 +35,19 @@ Return ONLY this JSON, no markdown fences, no commentary:
  * returns null on any failure (the caller keeps the canonical text and the UI
  * falls back to the plain text view). Uses Haiku — this is mechanical extraction.
  */
-export async function structureStage2Copy(text: string): Promise<Stage2Json | null> {
+export async function structureStage2Copy(text: string, runId?: number): Promise<Stage2Json | null> {
   if (!text || text.trim().length < 40) return null;
   try {
+    const model = await getModel("mechanical");
     const msg = await anthropic.messages.create({
-      model: await getModel("mechanical"),
+      model,
       max_tokens: 4000,
-      system: [{ type: "text", text: STRUCTURE_SYSTEM, cache_control: { type: "ephemeral" } }],
+      // No cache_control: at ~290 tokens this prompt is far below Haiku's 4096-token
+      // minimum cacheable prefix, so the marker was a silent no-op.
+      system: STRUCTURE_SYSTEM,
       messages: [{ role: "user", content: `COPY KIT TO PARSE:\n\n${text}` }],
     });
+    void recordUsage(runId ?? null, "stage2: structure copy", model, msg.usage);
     const raw = msg.content.find((b) => b.type === "text")?.text ?? "";
     const start = raw.indexOf("{");
     const end = raw.lastIndexOf("}");

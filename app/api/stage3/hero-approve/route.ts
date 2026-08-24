@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
-import { generateRemainingPrompts, REMAINING_SYSTEM } from '@/lib/stage3/hero'
+import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
 
 // Approve the hero → trigger Phase 2 prompt generation. The approved hero
 // image becomes the reference for all 8 derivative prompts. Lands at the
@@ -28,13 +28,14 @@ export async function POST(req: NextRequest) {
     const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? ''
-    const visual = run.step_research_revised ?? run.step_research ?? ''
+    // Only the visual-strategy section — the full research doc was pure token waste here.
+    const visual = extractVisualSection(run.step_research_revised ?? run.step_research ?? '')
     let extraReferenceUrls: string[] = []
     try { const v = JSON.parse(run.stage3_reference_images || '[]'); if (Array.isArray(v)) extraReferenceUrls = v.filter((x) => typeof x === 'string') } catch { /* none */ }
 
     // Audit trail: the system prompt the 8 derivative prompts ran with.
     await recordPromptUsed(runId, 'stage3_remaining', REMAINING_SYSTEM)
-    const { prompts, validation } = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls })
+    const { prompts, validation } = await generateRemainingPrompts({ onePager, copy, avatar, visual, referenceImageUrls: [heroUrl], extraReferenceUrls, runId })
     if (!prompts.length) throw new Error('Phase 2 produced no prompts')
 
     await updateRun(runId, {

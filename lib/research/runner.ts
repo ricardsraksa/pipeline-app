@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/models";
+import { recordUsage } from "@/lib/db";
 import { IDENTIFY_PROMPT } from "@/lib/prompts/research/identify";
 import { MARKET_PROMPT } from "@/lib/prompts/research/market";
 import { COMPETITIVE_PROMPT } from "@/lib/prompts/research/competitive";
@@ -53,6 +54,8 @@ function collectText(content: Anthropic.ContentBlock[]): string {
 }
 
 export interface ResearchInputs {
+  /** Run to attribute API token usage to in the cost tracker. */
+  runId?: number;
   /** May be null in the description-first flow (user provided description + images instead). */
   product_url: string | null;
   product_description?: string;
@@ -123,13 +126,15 @@ function buildCompetitorContext(inputs: ResearchInputs): string {
 // single hiccup doesn't fail the whole run.
 async function createWithRetry(
   body: Anthropic.MessageCreateParamsNonStreaming,
-  opts?: { timeout?: number },
+  opts?: { timeout?: number; usageLabel?: string; runId?: number },
 ): Promise<Anthropic.Message> {
   const maxAttempts = 4
   let lastErr: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await anthropic.messages.create(body, opts)
+      const msg = await anthropic.messages.create(body, opts?.timeout ? { timeout: opts.timeout } : undefined)
+      void recordUsage(opts?.runId ?? null, opts?.usageLabel ?? 'stage1: research', body.model, msg.usage)
+      return msg
     } catch (err) {
       lastErr = err
       const status = (err as { status?: number })?.status
@@ -158,7 +163,7 @@ export async function runIdentify(inputs: ResearchInputs): Promise<string> {
     messages: [
       { role: "user", content: buildMessageContent(buildBaseContext(inputs), inputs.source_image_urls) },
     ],
-  });
+  }, { usageLabel: "stage1: identify", runId: inputs.runId });
   return msg.content.find((b) => b.type === "text")?.text ?? "";
 }
 
@@ -179,7 +184,7 @@ export async function runMarket(inputs: ResearchInputs, identifyOutput: string):
       ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
     },
     // Web search adds round trips; give it more headroom than a plain call.
-    WEB_SEARCH_ENABLED ? { timeout: 180_000 } : undefined,
+    { ...(WEB_SEARCH_ENABLED ? { timeout: 180_000 } : {}), usageLabel: "stage1: market", runId: inputs.runId },
   );
   return collectText(msg.content);
 }
@@ -206,7 +211,7 @@ export async function runCompetitive(
       messages: [{ role: "user", content: userMessage }],
       ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
     },
-    WEB_SEARCH_ENABLED ? { timeout: 180_000 } : undefined,
+    { ...(WEB_SEARCH_ENABLED ? { timeout: 180_000 } : {}), usageLabel: "stage1: competitive", runId: inputs.runId },
   );
   return collectText(msg.content);
 }
@@ -235,7 +240,7 @@ export async function runProductAnalysis(
     max_tokens: 2000,
     system: PRODUCT_ANALYSIS_PROMPT,
     messages: [{ role: "user", content: userMessage }],
-  });
+  }, { usageLabel: "stage1: product analysis", runId: inputs.runId });
   return msg.content.find((b) => b.type === "text")?.text ?? "";
 }
 
@@ -269,6 +274,6 @@ export async function runVisual(
     messages: [
       { role: "user", content: buildMessageContent(userMessage, inputs.source_image_urls) },
     ],
-  });
+  }, { usageLabel: "stage1: visual", runId: inputs.runId });
   return msg.content.find((b) => b.type === "text")?.text ?? "";
 }

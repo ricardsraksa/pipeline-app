@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { IMAGE_AUDIT_SYSTEM, buildAuditUserMessage } from '@/lib/prompts/image_audit'
 import { getModel } from '@/lib/models'
+import { recordUsage } from '@/lib/db'
 
 // timeout: a hung vision call (usually Anthropic struggling to download the
 // image URL) fails in 90s instead of the SDK's 10-min default.
@@ -20,7 +21,14 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
     } catch (err) {
       lastErr = err
       const msg = err instanceof Error ? err.message : String(err)
-      if (/401|403|invalid api key|authentication/i.test(msg)) throw err
+      // Only transient failures are worth re-billing (429/5xx/timeouts). A 4xx
+      // is deterministic — retrying just multiplies the cost of the same error.
+      const status = (err as { status?: number })?.status
+      const transient =
+        status === 429 ||
+        (typeof status === 'number' && status >= 500) ||
+        (typeof status !== 'number' && /timeout|timed out|overloaded|econnreset|socket|network|fetch failed/i.test(msg))
+      if (!transient) throw err
       if (attempt < 2) await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)))
     }
   }
@@ -28,7 +36,7 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
 }
 
 export async function POST(req: NextRequest) {
-  const { image_url, category, prompt_used, product_description, overlay_text_used } = await req.json()
+  const { image_url, category, prompt_used, product_description, overlay_text_used, run_id } = await req.json()
 
   if (!image_url || !category || !prompt_used) {
     return Response.json({ success: false, error: 'image_url, category, prompt_used required' }, { status: 400 })
@@ -37,12 +45,13 @@ export async function POST(req: NextRequest) {
   const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', overlay_text_used: overlay_text_used ?? null })
 
   try {
+    const model = await getModel('stage3Audit')
     const message = await createWithRetry({
-      model: await getModel('stage3Audit'),
+      model,
       max_tokens: 2000,
-      // Cache the static auditor prompt — it's re-sent for every one of the 8
-      // images in a run, so 7 of 8 calls read it from cache instead of re-billing.
-      system: [{ type: 'text', text: IMAGE_AUDIT_SYSTEM, cache_control: { type: 'ephemeral' } }],
+      // No cache_control: at ~590 tokens the auditor prompt is below the model's
+      // 1024-token minimum cacheable prefix, so a cache marker here never caches.
+      system: IMAGE_AUDIT_SYSTEM,
       messages: [{
         role: 'user',
         content: [
@@ -52,6 +61,7 @@ export async function POST(req: NextRequest) {
       }],
     })
 
+    void recordUsage(typeof run_id === 'number' ? run_id : null, 'stage3: image audit', model, message.usage)
     const raw = message.content.find(b => b.type === 'text')?.text ?? ''
 
     let parsed: { verdict: string; issues: string[]; requires_regeneration: boolean }

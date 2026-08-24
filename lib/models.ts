@@ -9,7 +9,7 @@
 
 import { getKV, setKV } from "./db";
 
-export type ModelRole = "stage1" | "stage2" | "stage3Prompt" | "stage3Audit" | "mechanical";
+export type ModelRole = "stage1" | "stage2" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "mechanical";
 
 export interface ModelOption {
   id: string;
@@ -21,7 +21,8 @@ export interface ModelOption {
 // keep in sync with the Claude model catalog.
 export const MODEL_CATALOG: ModelOption[] = [
   { id: "claude-fable-5", label: "Fable 5", hint: "Most powerful · $10 / $50 per 1M" },
-  { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Top Opus · $5 / $25 per 1M" },
+  { id: "claude-opus-5", label: "Opus 5", hint: "Top Opus · $5 / $25 per 1M" },
+  { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Prior Opus · $5 / $25 per 1M" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "Balanced · $3 / $15 per 1M" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hint: "Fast & cheap · $1 / $5 per 1M" },
 ];
@@ -45,12 +46,18 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 2 · Copy",
     description: "The sales copy — the quality-critical creative output.",
     env: "STAGE2_MODEL",
-    default: "claude-opus-4-8",
+    default: "claude-opus-5",
   },
   stage3Prompt: {
     label: "Stage 3 · Prompts",
-    description: "Writing & editing image prompts and deciding image placement.",
+    description: "Writing the hero + 8 image prompts and deciding image placement.",
     env: "STAGE3_PROMPT_MODEL",
+    default: "claude-sonnet-4-6",
+  },
+  stage3Edit: {
+    label: "Stage 3 · Rewrites",
+    description: "Rewriting/editing an existing image prompt from an operator note.",
+    env: "STAGE3_EDIT_MODEL",
     default: "claude-sonnet-4-6",
   },
   stage3Audit: {
@@ -78,6 +85,37 @@ const SAMPLING_PARAM_MODELS = new Set<string>([
   "claude-haiku-4-5",
   "claude-haiku-4-5-20251001",
 ]);
+
+// Per-1M-token pricing for the cost tracker. Cache reads bill at 0.1× the
+// input rate, cache writes at 1.25× — computed from these bases in costOfUsage.
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  "claude-fable-5": { input: 10, output: 50 },
+  "claude-opus-5": { input: 5, output: 25 },
+  "claude-opus-4-8": { input: 5, output: 25 },
+  "claude-sonnet-4-6": { input: 3, output: 15 },
+  "claude-haiku-4-5": { input: 1, output: 5 },
+  "claude-haiku-4-5-20251001": { input: 1, output: 5 },
+};
+
+export interface UsageTokens {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+}
+
+/** Dollar cost of one call's token usage on a model. 0 for unknown models. */
+export function costOfUsage(modelId: string, u: UsageTokens): number {
+  const p = MODEL_PRICING[modelId];
+  if (!p) return 0;
+  return (
+    (u.input_tokens * p.input +
+      u.output_tokens * p.output +
+      u.cache_read_tokens * p.input * 0.1 +
+      u.cache_write_tokens * p.input * 1.25) /
+    1_000_000
+  );
+}
 
 /** Whether it's safe to send temperature/top_p/top_k to this model id. */
 export function modelSupportsSamplingParams(modelId: string): boolean {

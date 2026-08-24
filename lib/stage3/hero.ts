@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { jsonrepair } from 'jsonrepair'
 import { getModel, modelSupportsSamplingParams } from '@/lib/models'
+import { recordUsage } from '@/lib/db'
 import { validateHeroObject, validateRemainingArray, type Stage3Validation } from '@/lib/stage3-validation'
 
 // Hero-first Stage 3 prompt generation.
@@ -330,6 +331,8 @@ export async function generateHeroPrompt(params: {
   /** Optional extra reference images the operator added — scene/background/style
    *  references. The product still comes only from the source photos. */
   extraReferenceUrls?: string[]
+  /** Run to attribute API token usage to in the cost tracker. */
+  runId?: number
 }): Promise<{ hero: HeroPrompt; validation: Stage3Validation }> {
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
   const userText = [
@@ -362,6 +365,7 @@ export async function generateHeroPrompt(params: {
       tools: [HERO_TOOL],
       tool_choice: { type: 'tool', name: 'submit_hero_prompt' },
     })
+    void recordUsage(params.runId ?? null, 'stage3: hero prompt', model, msg.usage)
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') throw new Error('model did not return a hero prompt tool call')
     return toolUse.input as HeroPrompt
@@ -413,6 +417,21 @@ export async function generateHeroPrompt(params: {
 }
 
 /** Phase 2 — generate the 8 derivative prompts that reference the approved hero. */
+/**
+ * Slice the combined Stage 1 research doc down to the visual-strategy section
+ * (the part the remaining-prompts writer actually uses as its "visual" input).
+ * The full doc is identify+market+competitive+analysis+visual — tens of
+ * thousands of chars that were previously shipped whole into a 32k-max-token
+ * call. Falls back to the full doc if the section header isn't found.
+ */
+export function extractVisualSection(researchDoc: string): string {
+  const m = researchDoc.match(/^\s*9\.\s*WINNING BRAND IMAGE/im)
+  if (m && typeof m.index === 'number') return researchDoc.slice(m.index)
+  const alt = researchDoc.search(/WINNING BRAND IMAGE STRATEGY/i)
+  if (alt >= 0) return researchDoc.slice(alt)
+  return researchDoc
+}
+
 export async function generateRemainingPrompts(params: {
   onePager: string
   copy: string
@@ -427,6 +446,8 @@ export async function generateRemainingPrompts(params: {
    *  prompt's source_image_references — i.e. what gets sent to Higgsfield. */
   extraReferenceUrls?: string[]
   fromSource?: boolean
+  /** Run to attribute API token usage to in the cost tracker. */
+  runId?: number
 }): Promise<{ prompts: RemainingPrompt[]; validation: Stage3Validation }> {
   const refs = params.referenceImageUrls.filter(Boolean)
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
@@ -473,6 +494,7 @@ export async function generateRemainingPrompts(params: {
         tool_choice: { type: 'tool', name: 'submit_image_prompts' },
       })
       .finalMessage()
+    void recordUsage(params.runId ?? null, 'stage3: remaining prompts', model, msg.usage)
     if (msg.stop_reason === 'max_tokens') return null // truncated — retry
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') return null

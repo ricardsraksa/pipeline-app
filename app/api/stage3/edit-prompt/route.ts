@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/models";
+import { recordUsage } from "@/lib/db";
 
 // POST { prompt, instructions, category? }  →  { success, prompt }
 //
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
     instructions?: string;
     category?: string;
     reference_images?: string[];
+    run_id?: number;
   };
   const prompt = body.prompt?.trim();
   const instructions = body.instructions?.trim();
@@ -64,8 +66,11 @@ export async function POST(req: NextRequest) {
     .join("\n");
 
   try {
+    // Rewrites/edits run on the cheaper stage3Edit role (Sonnet by default) —
+    // this is the most-clicked Stage 3 call (single rewrites + bulk fix).
+    const model = await getModel("stage3Edit");
     const msg = await client.messages.create({
-      model: await getModel("stage3Prompt"),
+      model,
       max_tokens: 2000,
       system: SYSTEM,
       messages: [{
@@ -76,6 +81,7 @@ export async function POST(req: NextRequest) {
         ],
       }],
     });
+    void recordUsage(typeof body.run_id === "number" ? body.run_id : null, "stage3: prompt rewrite", model, msg.usage);
     const out = msg.content.find((b) => b.type === "text")?.text?.trim() ?? "";
     if (!out) {
       return NextResponse.json(
