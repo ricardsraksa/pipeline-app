@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
+import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 
 // Skip the hero step: generate the 8 derivative prompts directly from the
 // SOURCE product photos (no separate hero shot). Lands at the same prompt
@@ -20,12 +21,9 @@ export async function POST(req: NextRequest) {
   const run = await getRun(runId)
   if (!run) return Response.json({ success: false, error: 'Run not found' }, { status: 404 })
 
-  // Same source resolution as the hero step: prefer uploaded source images,
-  // fall back to scraped product images, cap to 5.
-  const uploaded = safeArr(run.uploaded_source_images)
-  const scraperData = run.scraper_data ? (() => { try { return JSON.parse(run.scraper_data!) } catch { return null } })() : null
-  const scraped: string[] = Array.isArray(scraperData?.images) ? scraperData.images : []
-  const sourceImageUrls = [...uploaded, ...scraped].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 5)
+  // Same source resolution as the hero step: uploaded + scraped, minus any the
+  // operator excluded in the source-image picker, cap to 5.
+  const sourceImageUrls = stage3ActiveSourceImages(run)
 
   if (sourceImageUrls.length === 0) {
     return Response.json({ success: false, error: 'No source product images to generate from' }, { status: 400 })

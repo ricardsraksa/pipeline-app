@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getRun, updateRun } from '@/lib/db'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 import type { HeroPrompt } from '@/lib/stage3/hero'
+import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 
 // Regenerate the hero image at the QC gate. Optionally accepts an edited
 // prompt (the operator tweaked it). Stays at awaiting_hero_qc.
@@ -24,10 +25,8 @@ export async function POST(req: NextRequest) {
   if (!hero) return Response.json({ success: false, error: 'No hero prompt to regenerate' }, { status: 400 })
 
   const promptText = (editedPrompt && editedPrompt.trim()) || hero.prompt
-  const uploaded = safeArr(run.uploaded_source_images)
-  const scraperData = run.scraper_data ? (() => { try { return JSON.parse(run.scraper_data!) } catch { return null } })() : null
-  const scraped: string[] = Array.isArray(scraperData?.images) ? scraperData.images : []
-  const sourceImageUrls = [...uploaded, ...scraped].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 5)
+  // Uploaded + scraped, minus any the operator excluded in the picker.
+  const sourceImageUrls = stage3ActiveSourceImages(run)
   // Operator-added Stage 3 reference images (scene/style) guide the regen too —
   // sent to Higgsfield alongside the source product photos.
   const extraRefs = safeArr(run.stage3_reference_images)

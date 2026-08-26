@@ -132,6 +132,9 @@ async function migrateDB() {
     // sees them and chooses per image which to attach to Higgsfield (via each
     // prompt's source_image_references). JSON array of R2 URLs.
     "stage3_reference_images TEXT",
+    // Source photos the operator EXCLUDED from Stage 3 reference use (JSON
+    // array of URLs). Uploads default to included; this is the blacklist.
+    "stage3_source_blacklist TEXT",
     // AI placement: which image anchors each of the 3 body sections; the rest
     // are top-of-page product shots. JSON { section_1, section_2, section_3, reasons }.
     "stage3_placement TEXT",
@@ -540,6 +543,7 @@ export interface Run {
   stage3_remaining_prompts_edited: string | null;
   stage3_remaining_images: string | null;
   stage3_reference_images: string | null;
+  stage3_source_blacklist: string | null;
   stage3_placement: string | null;
   product_code: string | null;
   stage2_json: string | null;

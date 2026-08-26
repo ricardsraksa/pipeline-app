@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Run } from "@/lib/db";
 import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
+import Stage3SourcePicker from "@/components/Stage3SourcePicker";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
       pure client component without importing server code) ──────────────── */
@@ -185,6 +186,18 @@ export default function Stage3HeroFlow({
     return <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Loading Stage 3…</p>;
   }
 
+  // Source-image picker data: all candidate photos (uploaded + scraped, deduped)
+  // and the operator's current exclusions. Mirrors lib/stage3/sources.ts.
+  const srcUploaded = safeParse<string[]>(run.uploaded_source_images, []);
+  const srcScraped = (() => {
+    try {
+      const sd = run.scraper_data ? JSON.parse(run.scraper_data) : null;
+      return Array.isArray(sd?.images) ? (sd.images as unknown[]).filter((x): x is string => typeof x === "string") : [];
+    } catch { return []; }
+  })();
+  const sourceCandidates = [...srcUploaded, ...srcScraped].filter((u, i, a) => u && a.indexOf(u) === i);
+  const sourceBlacklist = safeParse<string[]>(run.stage3_source_blacklist, []);
+
   const heroPrompt = safeParse<HeroPrompt | null>(run.stage3_hero_prompt, null);
   const heroPromptText = (run.stage3_hero_prompt_edited?.trim() || heroPrompt?.prompt || "");
   const heroUrl = run.stage3_hero_image_url;
@@ -205,6 +218,7 @@ export default function Stage3HeroFlow({
         <p className="text-[13px] text-[var(--color-text-2)]">
           Stage 3 generates a <strong>hero shot first</strong> from your source product photos. You approve it, then the other 8 images are built using the approved hero as the reference — so the product stays consistent.
         </p>
+        <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap items-center">
           <button
@@ -283,6 +297,8 @@ export default function Stage3HeroFlow({
                 {heroAiLoading ? "Rewriting…" : "Rewrite & regenerate"}
               </button>
             </div>
+
+            <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
 
             <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
           </div>

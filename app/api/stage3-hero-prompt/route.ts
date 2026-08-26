@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateHeroPrompt, HERO_SYSTEM } from '@/lib/stage3/hero'
+import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 
 // Phase 1 of hero-first Stage 3: generate ONE hero studio shot from the
@@ -20,12 +21,9 @@ export async function POST(req: NextRequest) {
   const run = await getRun(runId)
   if (!run) return Response.json({ success: false, error: 'Run not found' }, { status: 404 })
 
-  // Source product photos = the references the hero is built from. Prefer the
-  // user-uploaded source images; fall back to scraped product images.
-  const uploaded = safeArr(run.uploaded_source_images)
-  const scraperData = run.scraper_data ? (() => { try { return JSON.parse(run.scraper_data!) } catch { return null } })() : null
-  const scraped: string[] = Array.isArray(scraperData?.images) ? scraperData.images : []
-  const sourceImageUrls = [...uploaded, ...scraped].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 5)
+  // Source product photos = the references the hero is built from: uploaded +
+  // scraped, minus any the operator excluded in the source-image picker.
+  const sourceImageUrls = stage3ActiveSourceImages(run)
 
   if (sourceImageUrls.length === 0) {
     return Response.json({ success: false, error: 'No source product images to build a hero from' }, { status: 400 })
