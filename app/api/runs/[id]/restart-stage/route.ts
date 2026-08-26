@@ -51,6 +51,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage3_remaining_prompts: null,
         stage3_remaining_prompts_edited: null,
         stage3_remaining_images: null,
+        stage3_ref_overrides: null,
         stage3_placement: null,
         // Format-validation results from the previous pass — stale after a
         // restart, and their badges would otherwise show against fresh prompts.

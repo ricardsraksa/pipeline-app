@@ -101,6 +101,7 @@ export async function PATCH(
     stage3_remaining_images?: string | null;
     stage3_reference_images?: string | null;
     stage3_source_blacklist?: string | null;
+    stage3_ref_overrides?: string | null;
     product_code?: string | null;
   };
 
@@ -267,6 +268,7 @@ export async function PATCH(
   if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
   if ("stage3_reference_images" in body)          { fields.push("stage3_reference_images = ?");          values.push(body.stage3_reference_images ?? null); }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
 
   if (fields.length === 0) {

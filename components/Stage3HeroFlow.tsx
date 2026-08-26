@@ -141,6 +141,9 @@ export default function Stage3HeroFlow({
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
   const [heroZoom, setHeroZoom] = useState(false);
+  // Per-image reference overrides (prompt index → urls). Local edits shadow the
+  // persisted value until the next run refetch.
+  const [refOverrides, setRefOverrides] = useState<Record<string, string[]> | null>(null);
   // Stop flag for the client-side 8-image loop (the run-page "Kill run" only
   // reaches server stages; this loop runs in the browser).
   const stopRef = useRef(false);
@@ -201,6 +204,34 @@ export default function Stage3HeroFlow({
   const heroPrompt = safeParse<HeroPrompt | null>(run.stage3_hero_prompt, null);
   const heroPromptText = (run.stage3_hero_prompt_edited?.trim() || heroPrompt?.prompt || "");
   const heroUrl = run.stage3_hero_image_url;
+  // Candidates offered by the per-image reference pickers: the approved hero,
+  // the active source photos, and any operator scene references.
+  const extraRefUrls = safeParse<string[]>(run.stage3_reference_images, []);
+  const refCandidates: RefCandidate[] = [
+    ...(heroUrl ? [{ url: heroUrl, label: "HERO" }] : []),
+    ...sourceCandidates.filter((u) => !sourceBlacklist.includes(u)).map((u) => ({ url: u, label: "SOURCE" })),
+    ...extraRefUrls.map((u) => ({ url: u, label: "REF" })),
+  ].filter((c, i, a) => a.findIndex((x) => x.url === c.url) === i);
+  const effRefOverrides = refOverrides ?? safeParse<Record<string, string[]>>(run.stage3_ref_overrides, {});
+  // A prompt's current refs can include urls outside the base candidates (e.g.
+  // a model-curated scraped photo) — surface those too so they stay toggleable.
+  const candidatesFor = (p: RemainingPrompt): RefCandidate[] => {
+    const cur = refsFor(p, effRefOverrides, heroUrl);
+    const extra = cur.filter((u) => !refCandidates.some((c) => c.url === u)).map((u) => ({ url: u, label: "REF" }));
+    return [...refCandidates, ...extra];
+  };
+  const toggleRefOverride = (p: RemainingPrompt, url: string) => {
+    const cur = refsFor(p, effRefOverrides, heroUrl);
+    const next = cur.includes(url) ? cur.filter((x) => x !== url) : [...cur, url];
+    if (!next.length) { setErr("Each image needs at least one reference."); return; }
+    setErr(null);
+    const merged = { ...effRefOverrides, [String(p.index)]: next };
+    setRefOverrides(merged);
+    fetch(`/api/runs/${runId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage3_ref_overrides: JSON.stringify(merged) }),
+    }).catch(() => {});
+  };
   // Backward compat: a run completed under the OLD Stage 3 path stores its
   // images in `generated_images`. Treat that as "already has Stage 3" so we
   // don't offer the hero entry on a finished old run.
@@ -347,9 +378,9 @@ export default function Stage3HeroFlow({
       const processOne = async (i: number) => {
         const p = saved[i];
         try {
-          // Reference the image(s) this prompt was built around: the approved
-          // hero, or the source product photos when the hero step was skipped.
-          const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
+          // Reference the image(s) this prompt was built around — the operator's
+          // per-image selection when set, else the prompt's curated defaults.
+          const refs = refsFor(p, effRefOverrides, heroUrl);
           const gen = await fetch("/api/stage3/generate", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ prompt: p.prompt, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
@@ -461,6 +492,10 @@ export default function Stage3HeroFlow({
                 rows={5}
                 className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
               />
+              <div className="pt-0.5 space-y-1">
+                <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
+                <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} />
+              </div>
             </div>
           ))}
         </div>
@@ -521,6 +556,8 @@ export default function Stage3HeroFlow({
           initialPrompts={prompts}
           initialPlacement={placement}
           initialReferenceImages={referenceImages}
+          refCandidates={refCandidates}
+          initialRefOverrides={effRefOverrides}
         />
       </div>
     );
@@ -586,6 +623,51 @@ export default function Stage3HeroFlow({
   );
 }
 
+/* ── Per-image reference selection ─────────────────────────────────────── */
+
+type RefCandidate = { url: string; label: string };
+
+// The references image generation actually uses for one of the 8 prompts:
+// the operator's per-index override when set, else the prompt's curated
+// source_image_references, else the approved hero.
+function refsFor(p: RemainingPrompt, overrides: Record<string, string[]>, heroUrl: string | null): string[] {
+  const o = overrides[String(p.index)];
+  if (o && o.length) return o;
+  return p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
+}
+
+// Compact multi-select of candidate reference images. Selected = full color +
+// accent border; unselected = dimmed. Min-1 is enforced by the callers.
+function RefPicker({ candidates, selected, onToggle, disabled }: {
+  candidates: RefCandidate[];
+  selected: string[];
+  onToggle: (url: string) => void;
+  disabled?: boolean;
+}) {
+  if (!candidates.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {candidates.map((c) => {
+        const on = selected.includes(c.url);
+        return (
+          <button
+            key={c.url}
+            type="button"
+            onClick={() => onToggle(c.url)}
+            disabled={disabled}
+            title={`${c.label} — ${on ? "referenced; click to remove" : "not referenced; click to add"}`}
+            className={`relative w-[52px] h-[52px] rounded-[7px] overflow-hidden border-2 cursor-pointer tr ${on ? "border-[var(--color-accent)]" : "border-[var(--color-border)] opacity-40 grayscale hover:opacity-75"}`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={c.url} alt="" className="w-full h-full object-cover" />
+            <span className="absolute inset-x-0 bottom-0 bg-black/65 text-white text-[7px] font-[700] text-center py-[1px] tracking-wider">{c.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ── Completed review: per-image verdict override, fail reason, regenerate ── */
 function CompletedReview({
   runId,
@@ -594,6 +676,8 @@ function CompletedReview({
   initialPrompts,
   initialPlacement,
   initialReferenceImages,
+  refCandidates,
+  initialRefOverrides,
 }: {
   runId: number;
   heroUrl: string | null;
@@ -601,8 +685,26 @@ function CompletedReview({
   initialPrompts: RemainingPrompt[];
   initialPlacement: Placement | null;
   initialReferenceImages: string[];
+  refCandidates: RefCandidate[];
+  initialRefOverrides: Record<string, string[]>;
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
+  // Per-image reference overrides — updated when the operator changes the
+  // selection in the regenerate modal, persisted so later passes reuse it.
+  const [refOverrides, setRefOverrides] = useState<Record<string, string[]>>(initialRefOverrides);
+  const saveRefOverride = (index: number, refs: string[]) => {
+    const merged = { ...refOverrides, [String(index)]: refs };
+    setRefOverrides(merged);
+    fetch(`/api/runs/${runId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage3_ref_overrides: JSON.stringify(merged) }),
+    }).catch(() => {});
+  };
+  const candidatesFor = (pp: RemainingPrompt): RefCandidate[] => {
+    const cur = refsFor(pp, refOverrides, heroUrl);
+    const extra = cur.filter((u) => !refCandidates.some((c) => c.url === u)).map((u) => ({ url: u, label: "REF" }));
+    return [...refCandidates, ...extra];
+  };
   // Prompts are stateful: a regenerate with an edited prompt saves it back, so
   // the NEXT rewrite starts from the prompt that was last actually used rather
   // than reverting to the original.
@@ -764,7 +866,7 @@ function CompletedReview({
   };
 
   // Regenerate a single image with an (optionally AI-rewritten) prompt.
-  const regenerate = async (i: number, newPromptText: string, productDesc: string) => {
+  const regenerate = async (i: number, newPromptText: string, productDesc: string, refsExplicit?: string[]) => {
     const im = images[i];
     const p = promptFor(im);
     if (!p) return;
@@ -778,7 +880,10 @@ function CompletedReview({
       savePromptText(p.index, newPromptText);
     }
     try {
-      const refs = p.source_image_references?.length ? p.source_image_references : (heroUrl ? [heroUrl] : []);
+      // Operator-picked refs from the modal win; else the stored per-image
+      // override; else the prompt's curated defaults.
+      const refs = refsExplicit?.length ? refsExplicit : refsFor(p, refOverrides, heroUrl);
+      if (refsExplicit?.length) saveRefOverride(p.index, refsExplicit);
       const gen = await fetch("/api/stage3/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: newPromptText, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
@@ -1100,8 +1205,10 @@ function CompletedReview({
           prompt={promptFor(images[regenIdx])}
           busy={regenIdx != null && busyIdxs.has(regenIdx)}
           onClose={() => setRegenIdx(null)}
-          onRegenerate={(promptText) => regenerate(regenIdx, promptText, images[regenIdx].category)}
+          onRegenerate={(promptText, refs) => regenerate(regenIdx, promptText, images[regenIdx].category, refs)}
           onUseVersion={(entry) => restoreVersion(regenIdx, entry)}
+          candidates={promptFor(images[regenIdx]) ? candidatesFor(promptFor(images[regenIdx])!) : refCandidates}
+          initialRefs={promptFor(images[regenIdx]) ? refsFor(promptFor(images[regenIdx])!, refOverrides, heroUrl) : []}
         />
       )}
 
@@ -1252,14 +1359,18 @@ function RegenImageModal({
   onRegenerate,
   onUseVersion,
   runId,
+  candidates,
+  initialRefs,
 }: {
   image: RemImage;
   prompt: RemainingPrompt | null;
   busy: boolean;
   onClose: () => void;
-  onRegenerate: (promptText: string) => void;
+  onRegenerate: (promptText: string, refs: string[]) => void;
   onUseVersion: (entry: { image_url: string; prompt?: string }) => void;
   runId: number;
+  candidates: RefCandidate[];
+  initialRefs: string[];
 }) {
   const issues = image.issues?.filter(Boolean) ?? [];
   // The prompt this image was LAST generated with (edits are persisted after
@@ -1270,6 +1381,19 @@ function RegenImageModal({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [updated, setUpdated] = useState(false); // prompt was changed since open
+  // Which reference images this regeneration will send to Higgsfield.
+  const [refs, setRefs] = useState<string[]>(initialRefs);
+  const [refErr, setRefErr] = useState<string | null>(null);
+  const toggleModalRef = (url: string) => {
+    setRefErr(null);
+    setRefs((cur) => {
+      if (cur.includes(url)) {
+        if (cur.length <= 1) { setRefErr("Keep at least one reference."); return cur; }
+        return cur.filter((x) => x !== url);
+      }
+      return [...cur, url];
+    });
+  };
 
   // Rewrite the prompt with AI, then immediately regenerate the image with it —
   // rewriting is only ever a step toward a new image, so the second click was
@@ -1292,7 +1416,7 @@ function RegenImageModal({
       // Hand straight off to generation (this also closes the modal and marks
       // the tile busy). Not in `finally` — on a rewrite failure we keep the
       // modal open with the error instead of generating the unchanged prompt.
-      onRegenerate(rewritten);
+      onRegenerate(rewritten, refs);
     } catch (e) { setAiErr(e instanceof Error ? e.message : "Network error"); }
     finally { setAiLoading(false); }
   }
@@ -1365,8 +1489,15 @@ function RegenImageModal({
           <textarea value={draft} onChange={(e) => { setDraft(e.target.value); setUpdated(e.target.value !== lastUsedPrompt); }} rows={8}
             className={`w-full border bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] ${updated ? "border-[var(--color-green)]" : "border-[var(--color-border-strong)]"}`} />
         </div>
+        {candidates.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Reference images <span className="normal-case tracking-normal text-[var(--color-text-4)]">· what Higgsfield copies the product from</span></label>
+            <RefPicker candidates={candidates} selected={refs} onToggle={toggleModalRef} disabled={busy} />
+            {refErr && <p className="text-[11px] text-[var(--color-red)]">{refErr}</p>}
+          </div>
+        )}
         <div className="flex items-center gap-3">
-          <button onClick={() => onRegenerate(draft)} disabled={busy} className={btnPrimary}>
+          <button onClick={() => onRegenerate(draft, refs)} disabled={busy} className={btnPrimary}>
             {busy ? "Starting…" : updated ? "Regenerate with new prompt" : "Regenerate this image"}
           </button>
           <button onClick={onClose} disabled={busy} className={btnSecondary}>Cancel</button>

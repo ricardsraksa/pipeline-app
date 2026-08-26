@@ -135,6 +135,10 @@ async function migrateDB() {
     // Source photos the operator EXCLUDED from Stage 3 reference use (JSON
     // array of URLs). Uploads default to included; this is the blacklist.
     "stage3_source_blacklist TEXT",
+    // Per-image reference overrides for the 8 derivative images: JSON object
+    // { "<prompt index>": [urls] }. When set for an index, generation uses
+    // exactly those references instead of the prompt's curated defaults.
+    "stage3_ref_overrides TEXT",
     // AI placement: which image anchors each of the 3 body sections; the rest
     // are top-of-page product shots. JSON { section_1, section_2, section_3, reasons }.
     "stage3_placement TEXT",
@@ -544,6 +548,7 @@ export interface Run {
   stage3_remaining_images: string | null;
   stage3_reference_images: string | null;
   stage3_source_blacklist: string | null;
+  stage3_ref_overrides: string | null;
   stage3_placement: string | null;
   product_code: string | null;
   stage2_json: string | null;

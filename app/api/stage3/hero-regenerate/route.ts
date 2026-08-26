@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       stage3_remaining_prompts: null,
       stage3_remaining_prompts_edited: null,
       stage3_remaining_images: null,
+      stage3_ref_overrides: null,
       status: 'awaiting_hero_qc',
       current_step: 'Stage 3: Review the hero shot',
       last_updated_at: new Date().toISOString(),
