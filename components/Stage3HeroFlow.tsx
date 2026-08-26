@@ -693,12 +693,16 @@ function CompletedReview({
   // selection in the regenerate modal, persisted so later passes reuse it.
   const [refOverrides, setRefOverrides] = useState<Record<string, string[]>>(initialRefOverrides);
   const saveRefOverride = (index: number, refs: string[]) => {
-    const merged = { ...refOverrides, [String(index)]: refs };
-    setRefOverrides(merged);
-    fetch(`/api/runs/${runId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage3_ref_overrides: JSON.stringify(merged) }),
-    }).catch(() => {});
+    // Functional update: bulk fix persists several overrides concurrently, and
+    // merging from a stale closure would drop sibling writes.
+    setRefOverrides((prev) => {
+      const merged = { ...prev, [String(index)]: refs };
+      fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage3_ref_overrides: JSON.stringify(merged) }),
+      }).catch(() => {});
+      return merged;
+    });
   };
   const candidatesFor = (pp: RemainingPrompt): RefCandidate[] => {
     const cur = refsFor(pp, refOverrides, heroUrl);
@@ -934,7 +938,7 @@ function CompletedReview({
   // bulk-edited) prompt. Runs 3 at a time via a small worker pool — each call
   // reuses the single-image regenerate path (functional state merge + serialized
   // persist), and the server upsert is atomic, so concurrency is safe.
-  const regenerateAllFailed = async (drafts: Record<number, string>) => {
+  const regenerateAllFailed = async (drafts: Record<number, string>, refsByIdx?: Record<number, string[]>) => {
     setBulkOpen(false);
     setBulkRunning(true);
     try {
@@ -949,7 +953,7 @@ function CompletedReview({
         for (;;) {
           const t = queue.shift();
           if (!t) break;
-          await regenerate(t.i, t.text, t.cat);
+          await regenerate(t.i, t.text, t.cat, refsByIdx?.[t.i]);
         }
       };
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
@@ -1217,6 +1221,8 @@ function CompletedReview({
           runId={runId}
           failed={fixable}
           promptFor={promptFor}
+          candidatesFor={candidatesFor}
+          initialRefsFor={(pp) => refsFor(pp, refOverrides, heroUrl)}
           onClose={() => setBulkOpen(false)}
           onRegenerateAll={regenerateAllFailed}
         />
@@ -1234,18 +1240,42 @@ function BulkFixModal({
   onClose,
   onRegenerateAll,
   runId,
+  candidatesFor,
+  initialRefsFor,
 }: {
   failed: Array<{ im: RemImage; i: number }>;
   promptFor: (im: RemImage) => RemainingPrompt | null;
   onClose: () => void;
-  onRegenerateAll: (drafts: Record<number, string>) => void;
+  onRegenerateAll: (drafts: Record<number, string>, refsByIdx: Record<number, string[]>) => void;
   runId: number;
+  candidatesFor: (p: RemainingPrompt) => RefCandidate[];
+  initialRefsFor: (p: RemainingPrompt) => string[];
 }) {
   const [drafts, setDrafts] = useState<Record<number, string>>(() => {
     const d: Record<number, string> = {};
     for (const { im, i } of failed) d[i] = promptFor(im)?.prompt ?? "";
     return d;
   });
+  // Per-image reference selection, seeded from each image's current refs.
+  const [refSel, setRefSel] = useState<Record<number, string[]>>(() => {
+    const r: Record<number, string[]> = {};
+    for (const { im, i } of failed) {
+      const pp = promptFor(im);
+      if (pp) r[i] = initialRefsFor(pp);
+    }
+    return r;
+  });
+  const toggleBulkRef = (i: number, url: string) => {
+    setAiErr(null);
+    setRefSel((prev) => {
+      const cur = prev[i] ?? [];
+      if (cur.includes(url)) {
+        if (cur.length <= 1) { setAiErr(`Image #${failed.find((f) => f.i === i)?.im.index ?? ""} needs at least one reference.`); return prev; }
+        return { ...prev, [i]: cur.filter((x) => x !== url) };
+      }
+      return { ...prev, [i]: [...cur, url] };
+    });
+  };
   const [instr, setInstr] = useState(
     "Reword to pass image-generation content guidelines: remove anything that could be flagged (injury, blood, medical claims, weapons, explicit or unsafe content, real brand names/logos). Keep the product, scene, and text overlay intact.",
   );
@@ -1287,7 +1317,7 @@ function BulkFixModal({
       } else {
         // Every prompt rewritten — hand straight off to regeneration (closes
         // the modal and runs the batch), no second click needed.
-        onRegenerateAll(next);
+        onRegenerateAll(next, refSel);
       }
     } catch (e) {
       setAiErr(e instanceof Error ? e.message : "Rewrite failed");
@@ -1336,12 +1366,18 @@ function BulkFixModal({
                 rows={4}
                 className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
               />
+              {promptFor(im) && (
+                <div className="pt-0.5 space-y-1">
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
+                  <RefPicker candidates={candidatesFor(promptFor(im)!)} selected={refSel[i] ?? []} onToggle={(u) => toggleBulkRef(i, u)} disabled={aiBusy} />
+                </div>
+              )}
             </div>
           ))}
         </div>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => onRegenerateAll(drafts)} disabled={aiBusy} className={btnPrimary}>
+          <button onClick={() => onRegenerateAll(drafts, refSel)} disabled={aiBusy} className={btnPrimary}>
             Regenerate all {failed.length}
           </button>
           <button onClick={onClose} disabled={aiBusy} className={btnSecondary}>Cancel</button>
