@@ -23,6 +23,7 @@ export const MODEL_CATALOG: ModelOption[] = [
   { id: "claude-fable-5", label: "Fable 5", hint: "Most powerful · $10 / $50 per 1M" },
   { id: "claude-opus-5", label: "Opus 5", hint: "Top Opus · $5 / $25 per 1M" },
   { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Prior Opus · $5 / $25 per 1M" },
+  { id: "claude-sonnet-5", label: "Sonnet 5", hint: "Newest Sonnet · $3 / $15 per 1M" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "Balanced · $3 / $15 per 1M" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hint: "Fast & cheap · $1 / $5 per 1M" },
 ];
@@ -92,6 +93,7 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "claude-fable-5": { input: 10, output: 50 },
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
+  "claude-sonnet-5": { input: 3, output: 15 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
   "claude-haiku-4-5": { input: 1, output: 5 },
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
