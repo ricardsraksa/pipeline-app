@@ -50,6 +50,7 @@ export async function GET(
       stage2OutputEdited: run.stage2_copy_edited,
       stage2EditedAt: run.stage2_edited_at,
       stage2Json: run.stage2_json,
+      gdocAppendedAt: run.gdoc_appended_at ?? null,
     },
     images: {
       scrapedUrls: safeJson(run.scraped_image_urls) ?? [],

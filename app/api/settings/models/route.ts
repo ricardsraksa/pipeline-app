@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { MODEL_CATALOG, getAllModelSelections, setModel, isKnownRole } from "@/lib/models";
 
 // Read the model catalog + current per-role selections for the Settings UI.
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = requireSession(req); if (denied) return denied;
   const selections = await getAllModelSelections();
   return NextResponse.json({ catalog: MODEL_CATALOG, selections });
 }
 
 // Save one or more role → model selections. Body: { selections: { role: modelId } }.
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req); if (denied) return denied;
   let body: { selections?: Record<string, string> };
   try {
     body = await req.json();

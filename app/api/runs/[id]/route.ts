@@ -266,7 +266,19 @@ export async function PATCH(
   if ("stage3_remaining_prompts" in body)         { fields.push("stage3_remaining_prompts = ?");         values.push(body.stage3_remaining_prompts ?? null); }
   if ("stage3_remaining_prompts_edited" in body)  { fields.push("stage3_remaining_prompts_edited = ?");  values.push(body.stage3_remaining_prompts_edited ?? null); }
   if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
-  if ("stage3_reference_images" in body)          { fields.push("stage3_reference_images = ?");          values.push(body.stage3_reference_images ?? null); }
+  if ("stage3_reference_images" in body) {
+    // Validate on write: these URLs later feed server-side generation fetches.
+    const raw = body.stage3_reference_images;
+    if (raw !== null && raw !== undefined) {
+      let arr: unknown;
+      try { arr = JSON.parse(String(raw)); } catch { return Response.json({ error: "stage3_reference_images must be JSON" }, { status: 400 }); }
+      if (!Array.isArray(arr) || arr.length > 20 || !arr.every((u) => typeof u === "string" && /^https:\/\//.test(u) && u.length < 2048)) {
+        return Response.json({ error: "stage3_reference_images must be an array of https URLs" }, { status: 400 });
+      }
+    }
+    fields.push("stage3_reference_images = ?");
+    values.push(raw ?? null);
+  }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }

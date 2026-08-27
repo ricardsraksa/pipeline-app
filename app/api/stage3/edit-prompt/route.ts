@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
+import { assertPublicUrl } from "@/lib/ssrf";
 
 // POST { prompt, instructions, category? }  →  { success, prompt }
 //
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
   const referenceImages = Array.isArray(body.reference_images)
     ? body.reference_images.filter((u): u is string => typeof u === "string" && u.startsWith("http")).slice(0, 5)
     : [];
+  try {
+    await Promise.all(referenceImages.map((u) => assertPublicUrl(u)));
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : "blocked reference URL" }, { status: 400 });
+  }
 
   if (!prompt || prompt.length < 10) {
     return NextResponse.json({ success: false, error: "prompt required" }, { status: 400 });

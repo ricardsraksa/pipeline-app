@@ -65,6 +65,15 @@ export function safeLookup(
   });
 }
 
+// Agent options that route every socket's DNS lookup through safeLookup —
+// attach to http(s).Agent so redirects and DNS rebinding are covered too.
+// `lookup` is honoured by the socket layer but not declared on AgentOptions,
+// so carry it on an intersection type.
+import type http from "node:http";
+export const ssrfAgentOptions: http.AgentOptions & { lookup: typeof safeLookup } = {
+  lookup: safeLookup,
+};
+
 // Pre-flight check: parse, enforce http(s), reject embedded credentials, and
 // resolve the host to confirm no address is private/reserved. Throws on any
 // violation. Use before handing a URL to any server-side fetcher.

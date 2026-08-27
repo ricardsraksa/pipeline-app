@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
+import { scrapeProduct } from "./scrape";
+import { appendStage2ToMasterDoc, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
 import {
@@ -32,7 +34,6 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout
 // Hard cap on each scrape HTTP call — a slow/unresponsive supplier site must
 // not hang the whole pipeline. Unbounded scrape fetches were the primary cause
 // of runs stuck at Stage 1.
-const SCRAPE_TIMEOUT_MS = 45_000;
 
 // In-memory lock to prevent a runId from being executed concurrently in the
 // same process (covers the common case of double-resume clicks). On a multi-
@@ -91,13 +92,6 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function getBaseUrl(): string {
-  return (
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    "http://localhost:3000"
-  );
-}
 
 function safeJson<T = unknown>(s: string | null | undefined, fallback: T): T {
   if (!s) return fallback;
@@ -297,7 +291,6 @@ async function runScrape(runId: number, run: Run): Promise<void> {
 
   // Scraping runs silently — no status/current_step updates so the UI never shows a scraping state.
 
-  const baseUrl = getBaseUrl();
 
   // Scrape the product URL when provided. Failures are non-fatal in the new
   // flow because the user description is the source of truth.
@@ -305,13 +298,8 @@ async function runScrape(runId: number, run: Run): Promise<void> {
   let productImages: string[] = [];
   if (hasProductUrl) {
     try {
-      const res = await fetch(`${baseUrl}/api/scrape`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: run.product_url }),
-        signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
-      });
-      const scrapeData = await res.json();
+      // Direct call — no HTTP hop, and immune to the app's auth gate.
+      const scrapeData = await scrapeProduct(run.product_url!);
       if (scrapeData.success) {
         const d = scrapeData.data ?? scrapeData;
         productScrapedText = d.scraped_text ?? "";
@@ -344,14 +332,7 @@ async function runScrape(runId: number, run: Run): Promise<void> {
   const competitorErrors: { url: string; error: string }[] = [];
   if (competitorUrls.length > 0) {
     const results = await Promise.allSettled(
-      competitorUrls.map((u) =>
-        fetch(`${baseUrl}/api/scrape`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: u }),
-          signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
-        }).then((r) => r.json())
-      )
+      competitorUrls.map((u) => scrapeProduct(u))
     );
     results.forEach((r, i) => {
       const url = competitorUrls[i];
@@ -724,6 +705,15 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
         ...(stage2Name ? { brand_name: stage2Name } : {}),
         last_updated_at: now(),
       });
+      // Auto-export to the master Google Doc. Fire-and-forget: the doc is a
+      // convenience mirror and must never fail (or slow) a run.
+      if (googleDocConfigured()) {
+        void appendStage2ToMasterDoc(stage2Name ?? "", structured).then(async (r) => {
+          const ts = now();
+          if (r.ok) await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts });
+          else await updateRun(runId, { gdoc_append_error: r.error ?? "unknown", last_updated_at: ts });
+        }).catch((e) => console.error(`[google-doc] run ${runId}:`, e));
+      }
     }
   } catch (err) {
     console.error(`[stage2 structure] run ${runId}:`, err);

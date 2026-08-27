@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requireSession } from "@/lib/auth";
 import { STAGE1_PROMPT, STAGE2_PROMPT, STAGE3_PROMPT, getPrompt } from "@/lib/prompts";
 import {
   loadPromptsFile,
@@ -11,7 +12,8 @@ import {
 
 const STAGES: PromptStage[] = ["stage1", "stage2", "stage3"];
 
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = requireSession(req); if (denied) return denied;
   const data = await loadPromptsFile();
   const [stage1, stage2, stage3] = await Promise.all([
     getPrompt("stage1"),
@@ -41,6 +43,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const denied = requireSession(req); if (denied) return denied;
   const { stage, prompt } = (await req.json()) as { stage: string; prompt: string };
 
   if (!STAGES.includes(stage as PromptStage)) {
@@ -71,6 +74,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const denied = requireSession(req); if (denied) return denied;
   const { stage } = (await req.json()) as { stage: string };
 
   if (!STAGES.includes(stage as PromptStage)) {

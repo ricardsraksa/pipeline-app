@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { requireSession } from '@/lib/auth'
 import { getRun } from '@/lib/db'
 import { createDraftProduct } from '@/lib/shopify'
 import { whatsIncluded, type Stage2Json } from '@/lib/stage2/shape'
@@ -55,6 +56,7 @@ function buildDescriptionHtml(j: Stage2Json | null, fallbackText: string): strin
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req); if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

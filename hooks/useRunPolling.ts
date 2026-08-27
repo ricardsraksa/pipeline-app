@@ -27,6 +27,7 @@ export interface RunStatus {
     stage2OutputEdited: string | null;
     stage2EditedAt: string | null;
     stage2Json: string | null;
+    gdocAppendedAt: string | null;
   };
   images: {
     scrapedUrls: string[];

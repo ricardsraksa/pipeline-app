@@ -19,6 +19,10 @@
 // Higgsfield signs with the content type it actually sends.
 
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import axios from "axios";
+import http from "node:http";
+import https from "node:https";
+import { assertPublicUrl, ssrfAgentOptions } from "@/lib/ssrf";
 import { createHash } from "crypto";
 import sharp from "sharp";
 
@@ -80,10 +84,25 @@ export async function ensurePngUrl(url: string, force = false): Promise<string> 
   if (!cfg) return url;
 
   try {
-    const res = await fetch(url);
-    if (!res.ok) return url;
+    // SSRF guard: this URL is caller-influenced and the fetched bytes land in
+    // public R2 — reject private targets up front AND at every socket connect
+    // (the agent-level lookup covers redirects and DNS rebinding).
+    try {
+      await assertPublicUrl(url);
+    } catch (e) {
+      console.warn("[hf-png] blocked reference URL:", url, e instanceof Error ? e.message : e);
+      return url;
+    }
+    const res = await axios.get<ArrayBuffer>(url, {
+      responseType: "arraybuffer",
+      timeout: 30_000,
+      maxRedirects: 5,
+      maxContentLength: MAX_SOURCE_BYTES,
+      httpAgent: new http.Agent(ssrfAgentOptions),
+      httpsAgent: new https.Agent(ssrfAgentOptions),
+    });
 
-    const source = Buffer.from(await res.arrayBuffer());
+    const source = Buffer.from(res.data);
     if (!source.length || source.length > MAX_SOURCE_BYTES) return url;
 
     // Already a PNG despite the extension — nothing to do.

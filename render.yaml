@@ -9,5 +9,7 @@ services:
         value: production
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: PIPELINE_PASSWORD
+        sync: false
       - key: HIGGSFIELD_API_KEY
         sync: false

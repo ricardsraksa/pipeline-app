@@ -71,7 +71,7 @@ export async function POST(
     if (stage === "stage2") {
       try {
         const structured = await structureStage2Copy(result.output, runId);
-        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured) });
+        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), gdoc_appended_at: null });
       } catch (e) {
         console.error("[stage2 structure] regen:", e);
       }

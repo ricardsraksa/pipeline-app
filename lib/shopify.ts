@@ -10,9 +10,11 @@
 // Products are created as DRAFT — nothing reaches the storefront until a human
 // sets pricing and publishes in Shopify.
 
-const API_VERSION = "2024-10";
+// Shopify supports an API version for ~12 months. Env-overridable so a bump is
+// a Render env change, not a deploy.
+const API_VERSION = process.env.SHOPIFY_API_VERSION?.trim() || "2026-01";
 
-function shopConfig(): { domain: string; token: string } {
+export function shopConfig(): { domain: string; token: string } {
   const domain = process.env.SHOPIFY_STORE_DOMAIN?.trim()
     .replace(/^https?:\/\//, "")
     .replace(/\/+$/, "");
@@ -32,7 +34,7 @@ interface GraphQLResponse<T> {
   errors?: Array<{ message: string }>;
 }
 
-async function shopifyGraphQL<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+export async function shopifyGraphQL<T>(query: string, variables: Record<string, unknown>): Promise<T> {
   const { domain, token } = shopConfig();
   const res = await fetch(`https://${domain}/admin/api/${API_VERSION}/graphql.json`, {
     method: "POST",

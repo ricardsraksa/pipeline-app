@@ -22,6 +22,7 @@ import type { Stage2Json } from "@/lib/stage2/shape";
 import RunProductCode from "@/components/RunProductCode";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
+import SendToDoc from "@/components/SendToDoc";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -668,7 +669,10 @@ export default function RunPage() {
                     ))}
                   </div>
                   {stage2View === "copy" && stage2Json ? (
-                    <Stage2Shopify json={stage2Json} />
+                    <div className="space-y-3">
+                      {runId !== null && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
+                      <Stage2Shopify json={stage2Json} />
+                    </div>
                   ) : (
                   <EditableOutput
                     runId={Number(runId)}

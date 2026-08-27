@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { type Stage2Json, whatsIncluded } from "@/lib/stage2/shape";
+import { SHOPIFY_FIELDS } from "@/lib/shopify/fields";
 
 function CopyBtn({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -81,8 +82,7 @@ export default function Stage2Shopify({ json }: { json: Stage2Json }) {
       <Group
         rows={[
           { label: "Product Title", value: json.product_name },
-          { label: "PDP Badge Text", value: json.badge },
-          { label: "PDP Title Support Text", value: json.supporting_sentence },
+          ...SHOPIFY_FIELDS.slice(0, 2).map((f) => ({ label: f.label, value: f.get(json) })),
         ]}
       />
       <Group

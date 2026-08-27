@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { IMAGE_AUDIT_SYSTEM, buildAuditUserMessage } from '@/lib/prompts/image_audit'
 import { getModel } from '@/lib/models'
 import { recordUsage } from '@/lib/db'
+import { assertPublicUrl } from '@/lib/ssrf'
 
 // timeout: a hung vision call (usually Anthropic struggling to download the
 // image URL) fails in 90s instead of the SDK's 10-min default.
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
 
   if (!image_url || !category || !prompt_used) {
     return Response.json({ success: false, error: 'image_url, category, prompt_used required' }, { status: 400 })
+  }
+  try {
+    await assertPublicUrl(String(image_url))
+  } catch (e) {
+    return Response.json({ success: false, error: e instanceof Error ? e.message : 'blocked image URL' }, { status: 400 })
   }
 
   const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', overlay_text_used: overlay_text_used ?? null })

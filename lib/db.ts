@@ -159,6 +159,13 @@ async function migrateDB() {
     // default, plus any feedback suffix). Recorded at execution time so a run
     // remains auditable after defaults/overrides change.
     "prompts_used TEXT",
+    // Google Doc export bookkeeping: when the Stage 2 copy kit was appended to
+    // the master doc (appends are not idempotent, so this gates re-sends).
+    "gdoc_appended_at TEXT",
+    "gdoc_append_error TEXT",
+    // Shopify fill bookkeeping: which product this run last pushed to and
+    // which image URLs were already appended (re-push dedupe).
+    "shopify_push_state TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -549,6 +556,9 @@ export interface Run {
   stage3_reference_images: string | null;
   stage3_source_blacklist: string | null;
   stage3_ref_overrides: string | null;
+  gdoc_appended_at: string | null;
+  gdoc_append_error: string | null;
+  shopify_push_state: string | null;
   stage3_placement: string | null;
   product_code: string | null;
   stage2_json: string | null;

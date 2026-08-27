@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 import { version } from "./package.json";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // With a proxy present, Next buffers request bodies and silently TRUNCATES
+    // past this limit (default 10MB). Source-image upload allows 10 x 8MB.
+    proxyClientMaxBodySize: "100mb",
+  },
   env: {
     // Baked in at build time — the TopBar shows the version of the DEPLOYED
     // build, so it also tells you whether the latest push has gone live.
