@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import { scrapeProduct } from "./scrape";
-import { appendStage2ToMasterDoc, googleDocConfigured } from "./google/docs";
+import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
 import {
@@ -705,14 +705,18 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
         ...(stage2Name ? { brand_name: stage2Name } : {}),
         last_updated_at: now(),
       });
-      // Auto-export to the master Google Doc. Fire-and-forget: the doc is a
-      // convenience mirror and must never fail (or slow) a run.
+      // Auto-fill the product's tab in the master Google Doc. Fire-and-forget:
+      // the doc is a convenience mirror and must never fail (or slow) a run.
+      // Needs the run's product code (picks the tab) — refetched in case the
+      // operator set it after starting the run.
       if (googleDocConfigured()) {
-        void appendStage2ToMasterDoc(stage2Name ?? "", structured).then(async (r) => {
+        void (async () => {
+          const fresh = await getRun(runId);
+          const r = await fillProductTab({ productCode: fresh?.product_code ?? "", json: structured });
           const ts = now();
           if (r.ok) await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts });
           else await updateRun(runId, { gdoc_append_error: r.error ?? "unknown", last_updated_at: ts });
-        }).catch((e) => console.error(`[google-doc] run ${runId}:`, e));
+        })().catch((e) => console.error(`[google-doc] run ${runId}:`, e));
       }
     }
   } catch (err) {

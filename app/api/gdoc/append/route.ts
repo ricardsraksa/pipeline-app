@@ -1,6 +1,6 @@
 import { getRun, updateRun } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
-import { appendStage2ToMasterDoc } from "@/lib/google/docs";
+import { fillProductTab } from "@/lib/google/docs";
 import type { Stage2Json } from "@/lib/stage2/shape";
 
 export const maxDuration = 60;
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const denied = requireSession(req);
   if (denied) return denied;
 
-  const { runId, force } = (await req.json()) as { runId?: number; force?: boolean };
+  const { runId, force, dryRun } = (await req.json()) as { runId?: number; force?: boolean; dryRun?: boolean };
   if (typeof runId !== "number" || !Number.isInteger(runId)) {
     return Response.json({ success: false, error: "runId (integer) required" }, { status: 400 });
   }
@@ -30,12 +30,14 @@ export async function POST(req: Request) {
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* fall through */ }
   if (!json) return Response.json({ success: false, error: "No structured Stage 2 copy on this run yet" }, { status: 400 });
 
-  const result = await appendStage2ToMasterDoc(run.brand_name ?? json.product_name ?? "", json);
+  const result = await fillProductTab({ productCode: run.product_code ?? "", json, dryRun: dryRun === true });
   const ts = new Date().toISOString();
   if (!result.ok) {
     await updateRun(runId, { gdoc_append_error: result.error ?? "unknown", last_updated_at: ts }).catch(() => {});
-    return Response.json({ success: false, error: result.error }, { status: 502 });
+    return Response.json({ success: false, error: result.error, availableTabs: result.availableTabs }, { status: 502 });
   }
-  await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts }).catch(() => {});
-  return Response.json({ success: true, appended_at: ts });
+  if (!result.dryRun) {
+    await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts }).catch(() => {});
+  }
+  return Response.json({ success: true, appended_at: ts, tab: result.tabTitle, rows: result.rows, dryRun: result.dryRun ?? false });
 }
