@@ -137,6 +137,8 @@ OUTPUT: A single JSON object, nothing before or after, no markdown fences:
 
 export const REMAINING_SYSTEM = `You are a creative director generating 8 image prompts for Higgsfield for a DTC product. The product's appearance is locked by an APPROVED HERO IMAGE which will be attached as the reference for every prompt.
 
+PRODUCT STATES: Some products have more than one physical state — open/closed, folded/unfolded, packed/deployed. The hero locks the product's appearance in the ONE state it shows. When a scene genuinely calls for a different state (for example a pill organizer zipped closed inside a handbag, or a foldable seat carried folded), (1) say the state explicitly in SCENE INSTRUCTIONS and PRODUCT PLACEMENT, and (2) set that image's source_image_references to the SOURCE PRODUCT PHOTO URL(s) that show the product in that state — in place of the hero, or alongside it when both states appear. Only switch states when the scene requires it; the default for every image is the hero and the state it shows.
+
 Every one of your 8 output prompts MUST follow the exact section structure, ordering, tone, and rule style of the GOLD STANDARD EXAMPLE below (a hero image for a different product). Same section headers, same level of detail, same phrasing patterns. Only the image type, scene content, and product-specific details change per prompt.
 
 ========================================================================
@@ -233,7 +235,7 @@ OUTPUT: A JSON array of exactly 8 objects, nothing before or after, no markdown 
   "aspect_ratio": "1:1",
   "prompt": "<the full prompt in the exact gold-standard format, sections separated by blank lines>",
   "overlay_text": "<the overlay text used, or empty string>",
-  "source_image_references": ["<approved hero image URL>"]
+  "source_image_references": ["<approved hero image URL — or the source photo URL(s) showing the product state this scene needs>"]
 }`
 
 type ImgBlock = { type: 'image'; source: { type: 'url'; url: string } }
@@ -445,12 +447,19 @@ export async function generateRemainingPrompts(params: {
    *  model sees them and decides, per image, which (if any) to attach to that
    *  prompt's source_image_references — i.e. what gets sent to Higgsfield. */
   extraReferenceUrls?: string[]
+  /** Source product photos (hero path only) — they can show product states the
+   *  hero doesn't (closed, folded, packed), so per-image prompts may reference
+   *  them when a scene needs that state. */
+  sourceImageUrls?: string[]
   fromSource?: boolean
   /** Run to attribute API token usage to in the cost tracker. */
   runId?: number
 }): Promise<{ prompts: RemainingPrompt[]; validation: Stage3Validation }> {
   const refs = params.referenceImageUrls.filter(Boolean)
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
+  // State refs only make sense on the hero path — on skip-hero the sources ARE
+  // the main references already.
+  const stateRefs = params.fromSource ? [] : (params.sourceImageUrls ?? []).filter(Boolean).filter((u) => !refs.includes(u))
   const refLine = params.fromSource
     ? `SOURCE PRODUCT IMAGE URLS (${refs.length}) — these are the reference for all 8; render the product exactly as shown: ${refs.join(', ')}`
     : `APPROVED HERO IMAGE URL (reference for all 8): ${refs[0] ?? ''}`
@@ -468,12 +477,13 @@ export async function generateRemainingPrompts(params: {
     [params.avatar, params.visual].filter(Boolean).join('\n\n') || '(none)',
     '',
     refLine,
+    ...(stateRefs.length ? ['', `SOURCE PRODUCT PHOTOS (${stateRefs.length}) — these may show the product in OTHER STATES than the hero (closed, folded, packed). If a scene needs one of those states, put the matching URL(s) in that image's source_image_references per the PRODUCT STATES rule: ${stateRefs.join(', ')}`] : []),
     ...(extras.length ? ['', `ADDITIONAL REFERENCE IMAGES (${extras.length}) — optional. For EACH prompt, include in its source_image_references the exact URLs of the ones that genuinely fit THAT image's scene/style/context (alongside the ${params.fromSource ? 'product photos' : 'hero'}). Omit any that don't fit; if none fit, source_image_references is just the ${params.fromSource ? 'product photos' : 'hero'}. Never invent a URL: ${extras.join(', ')}`] : []),
     '',
     tail,
   ].join('\n')
 
-  const attachments = imageBlocks([...refs, ...extras])
+  const attachments = imageBlocks([...refs, ...stateRefs, ...extras])
   const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<RemainingPrompt[] | null> {
