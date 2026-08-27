@@ -141,6 +141,8 @@ export default function Stage3HeroFlow({
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
   const [heroZoom, setHeroZoom] = useState(false);
+  // Prompt-review gate: which cards have their full prompt expanded for editing.
+  const [editingPromptIdxs, setEditingPromptIdxs] = useState<Set<number>>(new Set());
   // Per-image reference overrides (prompt index → urls). Local edits shadow the
   // persisted value until the next run refetch.
   const [refOverrides, setRefOverrides] = useState<Record<string, string[]> | null>(null);
@@ -474,30 +476,53 @@ export default function Stage3HeroFlow({
       <div className="space-y-4">
         <div>
           <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the 8 prompts</h3>
-          <p className="text-[12px] text-[var(--color-text-3)]">Edit any prompt before generating. Each references the approved hero — they handle scene, lighting, and text only.</p>
+          <p className="text-[12px] text-[var(--color-text-3)]">What each image will show. Open “Edit full prompt” on a card to change the wording; each image references the approved hero unless you pick different references.</p>
         </div>
         <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
         <div className="space-y-3">
-          {saved.map((p, i) => (
-            <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-3 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[12px] font-[600] text-[var(--color-text)]">#{p.index} {p.image_type || p.category}</span>
-                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{p.model}</span>
-                {p.overlay_text && <span className="font-[var(--font-ibm-plex-mono)] text-[9px] text-[var(--color-text-3)] truncate max-w-xs">Text: {p.overlay_text}</span>}
+          {saved.map((p, i) => {
+            const objective = promptSection(p.prompt, "OBJECTIVE");
+            const scene = promptSection(p.prompt, "SCENE INSTRUCTIONS");
+            const benefit = promptSection(p.prompt, "BENEFIT TO COMMUNICATE");
+            const summary = objective || p.prompt.replace(/\s+/g, " ").slice(0, 220);
+            const editing = editingPromptIdxs.has(i);
+            return (
+              <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-3 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[12px] font-[600] text-[var(--color-text)]">#{p.index} {p.image_type || p.category}</span>
+                  <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{p.aspect_ratio}</span>
+                  <button
+                    onClick={() => setEditingPromptIdxs((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
+                    className="ml-auto cursor-pointer text-[10.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline"
+                  >
+                    {editing ? "Hide full prompt" : "Edit full prompt"}
+                  </button>
+                </div>
+                <p className="text-[12.5px] leading-relaxed text-[var(--color-text)]">{summary}</p>
+                {scene && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Scene:</span> {scene}</p>}
+                {benefit && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Communicates:</span> {benefit}</p>}
+                {p.overlay_text && (
+                  <p className="text-[11.5px] text-[var(--color-text-2)]">
+                    <span className="font-[620]">Text on image:</span>{" "}
+                    <span className="font-[var(--font-ibm-plex-mono)] bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded px-1.5 py-0.5">{p.overlay_text}</span>
+                  </p>
+                )}
+                {editing && (
+                  <textarea
+                    value={p.prompt}
+                    onChange={(e) => setDraft(i, e.target.value)}
+                    rows={10}
+                    className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+                  />
+                )}
+                <div className="pt-0.5 space-y-1">
+                  <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
+                  <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} />
+                </div>
               </div>
-              <textarea
-                value={p.prompt}
-                onChange={(e) => setDraft(i, e.target.value)}
-                rows={5}
-                className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
-              />
-              <div className="pt-0.5 space-y-1">
-                <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
-                <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} />
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {doneByIndex.size > 0 && (
           <p className="text-[12px] text-[var(--color-amber)]">
@@ -621,6 +646,25 @@ export default function Stage3HeroFlow({
       <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
     </div>
   );
+}
+
+/* ── Prompt summaries for the picture-first review ─────────────────────── */
+
+// The gold-standard prompts are structured with ALL-CAPS section headers.
+// Pull one section's text so the review can show WHAT the image will be
+// without dumping the whole prompt.
+function promptSection(prompt: string, header: string): string {
+  const lines = prompt.split("\n");
+  const isHeader = (l: string) => /^[A-Z][A-Z /&_-]{2,}:\s*$/.test(l.trim()) || /^[A-Z][A-Z /&_-]{2,}:\s+\S/.test(l.trim());
+  const start = lines.findIndex((l) => l.trim().toUpperCase().startsWith(header.toUpperCase() + ":"));
+  if (start === -1) return "";
+  const first = lines[start].slice(lines[start].indexOf(":") + 1).trim();
+  const out: string[] = first ? [first] : [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (isHeader(lines[i])) break;
+    out.push(lines[i]);
+  }
+  return out.join(" ").replace(/\s+/g, " ").trim();
 }
 
 /* ── Per-image reference selection ─────────────────────────────────────── */
