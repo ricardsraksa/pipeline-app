@@ -680,7 +680,9 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   // this run's copy was generated with.
   await recordPromptUsed(runId, "stage2", stage2Static + (stage2Feedback.trim() ? stage2Feedback : ""));
   const stage2System: Anthropic.TextBlockParam[] = [
-    { type: "text", text: stage2Static, cache_control: { type: "ephemeral" } },
+    // 1h TTL: runs are batched in sessions, but usually more than 5 minutes
+    // apart — the tracker showed a cache WRITE on every run and zero reads.
+    { type: "text", text: stage2Static, cache_control: { type: "ephemeral", ttl: "1h" } },
     ...(stage2Feedback.trim() ? [{ type: "text" as const, text: stage2Feedback }] : []),
   ];
   const productName = run.brand_name ?? run.product_name ?? "";

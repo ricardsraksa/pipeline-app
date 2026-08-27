@@ -358,7 +358,7 @@ export async function generateHeroPrompt(params: {
       // temperature:0 for run-to-run determinism, but only on models that still
       // accept sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
       ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
-      system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral' } }],
+      system: [{ type: 'text', text: HERO_SYSTEM, cache_control: { type: 'ephemeral', ttl: '1h' } }],
       messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
       // Forced tool call → the API serialises the JSON, so quote-heavy prompt
       // text can never break parsing (see HERO_TOOL).
@@ -488,7 +488,7 @@ export async function generateRemainingPrompts(params: {
         // temperature:0 for determinism, but only on models that still accept
         // sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
         ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),
-        system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: REMAINING_SYSTEM, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
         tools: [REMAINING_TOOL],
         tool_choice: { type: 'tool', name: 'submit_image_prompts' },

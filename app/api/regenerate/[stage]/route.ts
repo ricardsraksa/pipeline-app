@@ -87,7 +87,7 @@ export async function POST(
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-async function ask(args: { system: string; user: string; maxTokens: number; role: ModelRole; runId?: number; label?: string }): Promise<string> {
+async function ask(args: { system: string | Anthropic.TextBlockParam[]; user: string; maxTokens: number; role: ModelRole; runId?: number; label?: string }): Promise<string> {
   const model = await getModel(args.role);
   const response = await client.messages.create({
     model,
@@ -119,15 +119,16 @@ async function regenerateStage1(run: Run, instructions: string): Promise<RegenRe
   const offer = pickRevised(run, "step_offer_brief");
   const beliefs = pickRevised(run, "step_necessary_beliefs");
 
-  const system = `You are regenerating a Stage 1 product research one-pager based on user feedback.
+  // Cache layout: the task rules + the big research context are byte-stable
+  // across edit clicks, so they form the cached prefix. The things that change
+  // per click (the current one-pager, the instructions) live in the user
+  // message, after the breakpoint. Repeat clicks re-bill only those.
+  const system: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: `You are regenerating a Stage 1 product research one-pager based on user feedback.
 
 You have access to all the underlying research documents, so you can pull in more detail, change focus, adjust tone, etc.
-
-CURRENT ONE-PAGER:
-${currentOnePager}
-
-USER'S EDIT INSTRUCTIONS:
-${instructions}
 
 YOUR TASK:
 Regenerate the one-pager following the user's instructions. Maintain the same markdown structure:
@@ -145,28 +146,43 @@ Regenerate the one-pager following the user's instructions. Maintain the same ma
 
 Apply the user's requested changes while keeping the format consistent. If they ask for "more technical detail" pull from the research docs. If they ask for "warmer tone" adjust the language. If they ask to "focus on X" prioritise that aspect.
 
-Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no code fences.`;
+Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no code fences.`,
+    },
+    {
+      type: "text",
+      text: [
+        "FULL RESEARCH CONTEXT:",
+        "",
+        "PRODUCT RESEARCH (identification, market, competitive, product analysis, visual):",
+        research,
+        "",
+        "---",
+        "",
+        "CUSTOMER AVATAR:",
+        avatar,
+        "",
+        "---",
+        "",
+        "OFFER BRIEF:",
+        offer,
+        "",
+        "---",
+        "",
+        "NECESSARY BELIEFS:",
+        beliefs,
+      ].join("\n"),
+      cache_control: { type: "ephemeral" },
+    },
+  ];
 
   const user = [
-    "Here is the full research context. Use it to regenerate the one-pager per the instructions.",
+    "CURRENT ONE-PAGER:",
+    currentOnePager,
     "",
-    "PRODUCT RESEARCH (identification, market, competitive, product analysis, visual):",
-    research,
+    "USER'S EDIT INSTRUCTIONS:",
+    instructions,
     "",
-    "---",
-    "",
-    "CUSTOMER AVATAR:",
-    avatar,
-    "",
-    "---",
-    "",
-    "OFFER BRIEF:",
-    offer,
-    "",
-    "---",
-    "",
-    "NECESSARY BELIEFS:",
-    beliefs,
+    "Regenerate the one-pager now.",
   ].join("\n");
 
   const output = await ask({ system, user, maxTokens: 2000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
@@ -182,36 +198,50 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   const research = pickRevised(run, "step_research");
   const avatar = pickRevised(run, "step_avatar");
 
-  const system = `You are regenerating DTC product page copy based on user feedback.
-
-CURRENT COPY:
-${currentCopy}
-
-USER'S EDIT INSTRUCTIONS:
-${instructions}
+  // Same cache layout as stage 1: stable rules + research context cached,
+  // the per-click parts (current copy, instructions) after the breakpoint.
+  // Observed cost of NOT doing this: 5 edit clicks on one run = 125k Opus
+  // input tokens billed in full ($0.85).
+  const system: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: `You are regenerating DTC product page copy based on user feedback.
 
 YOUR TASK:
 Regenerate the copy following the user's instructions. Keep the same section structure that was already in the current copy. Apply the requested changes consistently.
 
 If they ask for "more technical" add specifications. If they ask for "shorter" condense. If they ask to "emphasise X" make that the focus. If they ask for "warmer tone" adjust language accordingly.
 
-Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`;
+Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`,
+    },
+    {
+      type: "text",
+      text: [
+        "STAGE 1 RESEARCH CONTEXT:",
+        "",
+        "ONE-PAGER (English summary):",
+        onePager,
+        "",
+        "---",
+        "",
+        "FULL PRODUCT RESEARCH:",
+        research,
+        "",
+        "---",
+        "",
+        "AVATAR:",
+        avatar,
+      ].join("\n"),
+      cache_control: { type: "ephemeral" },
+    },
+  ];
 
   const user = [
-    "Here is the Stage 1 research context:",
+    "CURRENT COPY:",
+    currentCopy,
     "",
-    "ONE-PAGER (English summary):",
-    onePager,
-    "",
-    "---",
-    "",
-    "FULL PRODUCT RESEARCH:",
-    research,
-    "",
-    "---",
-    "",
-    "AVATAR:",
-    avatar,
+    "USER'S EDIT INSTRUCTIONS:",
+    instructions,
     "",
     "Now regenerate the copy following the user's instructions.",
   ].join("\n");

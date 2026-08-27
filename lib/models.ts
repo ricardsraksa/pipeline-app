@@ -88,7 +88,8 @@ const SAMPLING_PARAM_MODELS = new Set<string>([
 ]);
 
 // Per-1M-token pricing for the cost tracker. Cache reads bill at 0.1× the
-// input rate, cache writes at 1.25× — computed from these bases in costOfUsage.
+// input rate; writes bill 1.25× (5m TTL) or 2× (1h TTL) — the tracker prices
+// all writes at 2× so it never understates (the big static prefixes use 1h).
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   "claude-fable-5": { input: 10, output: 50 },
   "claude-opus-5": { input: 5, output: 25 },
@@ -114,7 +115,7 @@ export function costOfUsage(modelId: string, u: UsageTokens): number {
     (u.input_tokens * p.input +
       u.output_tokens * p.output +
       u.cache_read_tokens * p.input * 0.1 +
-      u.cache_write_tokens * p.input * 1.25) /
+      u.cache_write_tokens * p.input * 2.0) /
     1_000_000
   );
 }
