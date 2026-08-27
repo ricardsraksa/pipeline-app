@@ -499,15 +499,22 @@ export default function Stage3HeroFlow({
                     {editing ? "Hide full prompt" : "Edit full prompt"}
                   </button>
                 </div>
-                <p className="text-[12.5px] leading-relaxed text-[var(--color-text)]">{summary}</p>
-                {scene && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Scene:</span> {scene}</p>}
-                {benefit && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Communicates:</span> {benefit}</p>}
-                {p.overlay_text && (
-                  <p className="text-[11.5px] text-[var(--color-text-2)]">
-                    <span className="font-[620]">Text on image:</span>{" "}
-                    <span className="font-[var(--font-ibm-plex-mono)] bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded px-1.5 py-0.5">{p.overlay_text}</span>
-                  </p>
-                )}
+                <div className="flex gap-3 flex-wrap">
+                  <div className="w-[220px] shrink-0">
+                    <PromptPreview p={p} heroUrl={heroUrl} />
+                  </div>
+                  <div className="flex-1 min-w-[220px] space-y-1.5">
+                    <p className="text-[12.5px] leading-relaxed text-[var(--color-text)]">{summary}</p>
+                    {scene && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Scene:</span> {scene}</p>}
+                    {benefit && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Communicates:</span> {benefit}</p>}
+                    {p.overlay_text && (
+                      <p className="text-[11.5px] text-[var(--color-text-2)]">
+                        <span className="font-[620]">Text on image:</span>{" "}
+                        <span className="font-[var(--font-ibm-plex-mono)] bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded px-1.5 py-0.5">{p.overlay_text}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
                 {editing && (
                   <textarea
                     value={p.prompt}
@@ -665,6 +672,60 @@ function promptSection(prompt: string, header: string): string {
     out.push(lines[i]);
   }
   return out.join(" ").replace(/\s+/g, " ").trim();
+}
+
+// Storyboard mock of what the image will look like. Not a render — a frame in
+// the image's real aspect ratio: split shots (comparison / before-after /
+// problem-solution) show problem-left vs fixed-right with the product in the
+// right half; everything else shows the product (hero) with the overlay text
+// placed on the frame the way it will appear on the image.
+function PromptPreview({ p, heroUrl }: { p: RemainingPrompt; heroUrl: string | null }) {
+  const split = ["comparison", "before_after", "problem_solution"].includes(p.category);
+  const ratio = (p.aspect_ratio || "1:1").replace(":", " / ");
+  const overlayParts = (p.overlay_text || "").split(/\s*\/\s*/).map((x) => x.trim()).filter(Boolean);
+  const frameCls = "relative w-full overflow-hidden rounded-[9px] border border-[var(--color-border-strong)] bg-[var(--color-surface-2)]";
+
+  if (split) {
+    return (
+      <div className={frameCls} style={{ aspectRatio: ratio }}>
+        <div className="absolute inset-0 flex">
+          {/* problem half */}
+          <div className="w-1/2 h-full bg-[var(--color-surface-2)] flex flex-col items-center justify-center gap-1.5 p-2 text-center">
+            <span className="font-[var(--font-ibm-plex-mono)] text-[8px] uppercase tracking-widest text-[var(--color-text-4)]">Problem</span>
+            <span className="text-[10px] leading-snug font-[640] text-[var(--color-text-2)]">{overlayParts[0] || "the messy before"}</span>
+          </div>
+          {/* fixed-with-product half */}
+          <div className="w-1/2 h-full bg-[var(--color-accent-weak)] flex flex-col items-center justify-center gap-1.5 p-2 text-center border-l border-dashed border-[var(--color-border-strong)]">
+            <span className="font-[var(--font-ibm-plex-mono)] text-[8px] uppercase tracking-widest text-[var(--color-accent-text)]">With product</span>
+            {heroUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={heroUrl} alt="" className="w-[42%] max-h-[45%] object-contain rounded" />
+            )}
+            <span className="text-[10px] leading-snug font-[640] text-[var(--color-text)]">{overlayParts[1] || overlayParts[0] || "fixed by the product"}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={frameCls} style={{ aspectRatio: ratio }}>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2">
+        {heroUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={heroUrl} alt="" className="w-[52%] max-h-[55%] object-contain rounded" />
+        )}
+        <span className="font-[var(--font-ibm-plex-mono)] text-[8px] uppercase tracking-widest text-[var(--color-text-4)]">{(p.image_type || p.category || "").toString()}</span>
+      </div>
+      {p.overlay_text && (
+        <div className="absolute inset-x-0 top-0 p-2 text-center">
+          <span className="inline-block text-[10px] leading-snug font-[700] text-[var(--color-text)] bg-[var(--color-surface)]/85 rounded px-1.5 py-0.5 max-w-full">
+            {p.overlay_text}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ── Per-image reference selection ─────────────────────────────────────── */
