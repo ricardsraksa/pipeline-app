@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
+import { probeImportUrl } from '@/lib/higgsfield-mcp'
 
 // Approve the hero → trigger Phase 2 prompt generation. The approved hero
 // image becomes the reference for all 8 derivative prompts. Lands at the
@@ -19,6 +20,20 @@ export async function POST(req: NextRequest) {
   if (!heroUrl) return Response.json({ success: false, error: 'No hero image to approve' }, { status: 400 })
 
   try {
+    // Gate check: Higgsfield's import moderation must accept the hero as a
+    // reference, or all 8 generations will fail identically. Probe BEFORE the
+    // (paid) prompt-writing call and fail at the gate with a fix the operator
+    // can act on. Their filter most commonly trips on bare skin — even in
+    // images their own generator produced.
+    const probe = await probeImportUrl(heroUrl)
+    if (!probe.ok) {
+      const message =
+        "Higgsfield refuses this hero as a reference (their content filter — bare skin or body parts are the usual trigger, even in images they generated). " +
+        "Regenerate the hero without visible skin (e.g. “product-only studio shot, no person”) — the 8 scene images can still depict people; only the reference can't."
+      await updateRun(runId, { status: 'awaiting_hero_qc', error_message: message, last_updated_at: new Date().toISOString() })
+      return Response.json({ success: false, error: message }, { status: 422 })
+    }
+
     await updateRun(runId, {
       stage3_hero_approved: 1,
       status: 'generating_remaining',

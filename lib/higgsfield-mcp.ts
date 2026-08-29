@@ -292,6 +292,20 @@ async function importMediaId(url: string): Promise<string> {
   }
 }
 
+// Probe whether Higgsfield's importer will accept a URL as a reference.
+// Their import moderation is separate from generation moderation — it refuses
+// some images (bare skin most commonly) with an opaque "Something went wrong",
+// INCLUDING images their own generator produced. Probing at the hero gate
+// turns an 8-image failure cascade into one actionable message.
+export async function probeImportUrl(url: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await importMediaId(url);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export interface McpImageRequest {
