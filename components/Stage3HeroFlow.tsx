@@ -144,6 +144,12 @@ export default function Stage3HeroFlow({
   const [heroZoom, setHeroZoom] = useState(false);
   // Prompt-review gate: which cards have their full prompt expanded for editing.
   const [editingPromptIdxs, setEditingPromptIdxs] = useState<Set<number>>(new Set());
+  // Prompt-review gate: per-card "Edit with AI" (rewrite the prompt from a
+  // natural-language note BEFORE any image is generated). One open at a time.
+  const [aiCardIdx, setAiCardIdx] = useState<number | null>(null);
+  const [aiCardText, setAiCardText] = useState("");
+  const [aiCardBusy, setAiCardBusy] = useState(false);
+  const [aiCardErr, setAiCardErr] = useState<string | null>(null);
   // Per-image reference overrides (prompt index → urls). Local edits shadow the
   // persisted value until the next run refetch.
   const [refOverrides, setRefOverrides] = useState<Record<string, string[]> | null>(null);
@@ -362,6 +368,30 @@ export default function Stage3HeroFlow({
     const existing = safeParse<RemImage[]>(run.stage3_remaining_images, []);
     const doneByIndex = new Map(existing.filter((im) => im?.status === "done" && im.image_url).map((im) => [im.index, im]));
 
+    // AI-rewrite one card's prompt from the operator's note. Only the prompt
+    // text changes here — nothing generates until "Generate 8 Images".
+    const aiRewriteCard = async (i: number) => {
+      const instr = aiCardText.trim();
+      if (instr.length < 5) { setAiCardErr("Describe the change (5+ characters)"); return; }
+      setAiCardBusy(true);
+      setAiCardErr(null);
+      try {
+        const res = await fetch("/api/stage3/edit-prompt", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: saved[i].prompt, instructions: instr, category: saved[i].category, run_id: runId }),
+        });
+        const data = await res.json();
+        if (!data.success || !data.prompt) { setAiCardErr(data.error ?? `HTTP ${res.status}`); return; }
+        setDraft(i, data.prompt as string);
+        setAiCardIdx(null);
+        setAiCardText("");
+      } catch (e) {
+        setAiCardErr(e instanceof Error ? e.message : "Network error");
+      } finally {
+        setAiCardBusy(false);
+      }
+    };
+
     const generateAll = async () => {
       setErr(null);
       setBusy("generate-8");
@@ -494,12 +524,39 @@ export default function Stage3HeroFlow({
                   <span className="text-[12px] font-[600] text-[var(--color-text)]">#{p.index} {p.image_type || p.category}</span>
                   <span className="font-[var(--font-ibm-plex-mono)] text-[9px] bg-[var(--color-surface-2)] text-[var(--color-text-2)] border border-[var(--color-border)] px-2 py-0.5 rounded">{p.aspect_ratio}</span>
                   <button
+                    onClick={() => { setAiCardIdx(aiCardIdx === i ? null : i); setAiCardText(""); setAiCardErr(null); }}
+                    className="ml-auto cursor-pointer text-[10.5px] font-[620] text-[var(--color-accent-text)] hover:underline"
+                  >
+                    {aiCardIdx === i ? "Cancel AI edit" : "✦ Edit with AI"}
+                  </button>
+                  <button
                     onClick={() => setEditingPromptIdxs((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
-                    className="ml-auto cursor-pointer text-[10.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline"
+                    className="cursor-pointer text-[10.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline"
                   >
                     {editing ? "Hide full prompt" : "Edit full prompt"}
                   </button>
                 </div>
+                {aiCardIdx === i && (
+                  <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-2.5 space-y-2">
+                    <textarea
+                      value={aiCardText}
+                      onChange={(e) => setAiCardText(e.target.value)}
+                      placeholder="Change the premise — e.g. “set this in a bathroom instead of the kitchen”, “no people, product only”, “make it winter”"
+                      rows={2}
+                      autoFocus
+                      disabled={aiCardBusy}
+                      className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-2.5 py-1.5 text-[12px] resize-y placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)]"
+                    />
+                    {aiCardErr && <p className="text-[11px] text-[var(--color-red)]">{aiCardErr}</p>}
+                    <button
+                      onClick={() => aiRewriteCard(i)}
+                      disabled={aiCardBusy || aiCardText.trim().length < 5}
+                      className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {aiCardBusy ? "Rewriting…" : "Rewrite prompt"}
+                    </button>
+                  </div>
+                )}
                 <div className="flex gap-3 flex-wrap">
                   <div className="w-[220px] shrink-0">
                     <PromptPreview p={p} heroUrl={heroUrl} />
