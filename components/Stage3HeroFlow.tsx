@@ -40,7 +40,8 @@ interface RemImage {
 }
 
 interface Placement {
-  section_1: number;
+  /** Legacy — old runs auto-placed section 1 too; it is now always manual (GIF). */
+  section_1?: number;
   section_2: number;
   section_3: number;
   reasons?: Record<string, string>;
@@ -943,7 +944,7 @@ function CompletedReview({
   useEffect(() => {
     if (autoTried.current) return;
     const usable = images.filter((im) => im.image_url && im.status !== "failed");
-    if (!placement && usable.length >= 3) { autoTried.current = true; runPlacement(); }
+    if (!placement && usable.length >= 2) { autoTried.current = true; runPlacement(); }
   }, [placement, images, runPlacement]);
 
   // Persist ONE image via the server-side upsert (read-modify-write on the
@@ -1182,7 +1183,8 @@ function CompletedReview({
   const entries = images.map((im, i) => ({ im, i }));
   const sectionPicks: Array<{ section: number; index: number }> = placement
     ? [
-        { section: 1, index: placement.section_1 },
+        // Section 1 is the operator's manual GIF — only legacy placements carry it.
+        ...(typeof placement.section_1 === "number" ? [{ section: 1, index: placement.section_1 }] : []),
         { section: 2, index: placement.section_2 },
         { section: 3, index: placement.section_3 },
       ]
