@@ -66,7 +66,7 @@ function cellInsertIndex(cell: TableCell): number | null {
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-function flattenTabs(tabs: Tab[]): Tab[] {
+export function flattenTabs(tabs: Tab[]): Tab[] {
   const out: Tab[] = [];
   for (const t of tabs) {
     out.push(t);
@@ -96,6 +96,49 @@ function valuesForLabels(j: Stage2Json): Array<{ match: string; value: string }>
     { match: "description", value: j.facebook?.description ?? "" },
     { match: "oneliners", value: (j.one_liners ?? []).filter((o) => o?.trim()).join("\n") },
   ];
+}
+
+/** The tab whose title starts with the product code (case-insensitive). */
+export function findProductTab(tabs: Tab[], code: string): Tab | undefined {
+  const codeNorm = code.trim().toLowerCase();
+  return tabs.find((t) => {
+    const title = (t.tabProperties?.title ?? "").trim().toLowerCase();
+    return title === codeNorm || title.startsWith(codeNorm + " ") || title.startsWith(codeNorm + "-") || title.startsWith(codeNorm + "_");
+  });
+}
+
+/** Pure fill planner: walk the tab's tables, match label rows, target the
+ *  empty cell in the row below each. Exported for unit tests. */
+export function planFills(tab: Tab, json: Stage2Json): { rows: FillRow[]; inserts: Array<{ index: number; text: string }> } {
+  const wanted = valuesForLabels(json);
+  const rows: FillRow[] = [];
+  const inserts: Array<{ index: number; text: string }> = [];
+  const seen = new Set<string>();
+
+  for (const el of tab.documentTab?.body?.content ?? []) {
+    const tableRows = el.table?.tableRows ?? [];
+    for (let r = 0; r < tableRows.length - 1; r++) {
+      const labelCells = tableRows[r].tableCells ?? [];
+      if (!labelCells.length) continue;
+      const label = norm(cellText(labelCells[0]));
+      const target = wanted.find((w) => w.match === label);
+      if (!target || seen.has(target.match)) continue;
+      seen.add(target.match);
+
+      if (!target.value.trim()) { rows.push({ label: target.match, status: "empty-value" }); continue; }
+      const valueCell = (tableRows[r + 1].tableCells ?? [])[0];
+      if (!valueCell) { rows.push({ label: target.match, status: "label-not-found" }); continue; }
+      if (cellText(valueCell).trim()) { rows.push({ label: target.match, status: "already-filled" }); continue; }
+      const idx = cellInsertIndex(valueCell);
+      if (idx === null) { rows.push({ label: target.match, status: "label-not-found" }); continue; }
+      inserts.push({ index: idx, text: target.value });
+      rows.push({ label: target.match, status: "filled" });
+    }
+  }
+  for (const w of wanted) {
+    if (!seen.has(w.match)) rows.push({ label: w.match, status: "label-not-found" });
+  }
+  return { rows, inserts };
 }
 
 // ── The fill ────────────────────────────────────────────────────────────────
@@ -150,11 +193,7 @@ export async function fillProductTab(params: {
     const tabs = flattenTabs(doc.tabs ?? []);
 
     // Tab titled "P58 - ..." (case-insensitive, code at the start).
-    const codeNorm = code.toLowerCase();
-    const tab = tabs.find((t) => {
-      const title = (t.tabProperties?.title ?? "").trim().toLowerCase();
-      return title === codeNorm || title.startsWith(codeNorm + " ") || title.startsWith(codeNorm + "-") || title.startsWith(codeNorm + "_");
-    });
+    const tab = findProductTab(tabs, code);
     if (!tab || !tab.tabProperties?.tabId) {
       return {
         ok: false,
@@ -165,36 +204,8 @@ export async function fillProductTab(params: {
     const tabId = tab.tabProperties.tabId;
     const tabTitle = tab.tabProperties.title ?? code;
 
-    // Walk every table in the tab; when a row's first cell matches a label,
-    // the value's home is the first cell of the NEXT row.
-    const wanted = valuesForLabels(params.json);
-    const rows: FillRow[] = [];
-    const inserts: Array<{ index: number; text: string }> = [];
-    const seen = new Set<string>();
-
-    for (const el of tab.documentTab?.body?.content ?? []) {
-      const tableRows = el.table?.tableRows ?? [];
-      for (let r = 0; r < tableRows.length - 1; r++) {
-        const labelCells = tableRows[r].tableCells ?? [];
-        if (!labelCells.length) continue;
-        const label = norm(cellText(labelCells[0]));
-        const target = wanted.find((w) => w.match === label);
-        if (!target || seen.has(target.match)) continue;
-        seen.add(target.match);
-
-        if (!target.value.trim()) { rows.push({ label: target.match, status: "empty-value" }); continue; }
-        const valueCell = (tableRows[r + 1].tableCells ?? [])[0];
-        if (!valueCell) { rows.push({ label: target.match, status: "label-not-found" }); continue; }
-        if (cellText(valueCell).trim()) { rows.push({ label: target.match, status: "already-filled" }); continue; }
-        const idx = cellInsertIndex(valueCell);
-        if (idx === null) { rows.push({ label: target.match, status: "label-not-found" }); continue; }
-        inserts.push({ index: idx, text: target.value });
-        rows.push({ label: target.match, status: "filled" });
-      }
-    }
-    for (const w of wanted) {
-      if (!seen.has(w.match)) rows.push({ label: w.match, status: "label-not-found" });
-    }
+    // Pure planning step (unit-tested against a replica of the template).
+    const { rows, inserts } = planFills(tab, params.json);
 
     if (params.dryRun) return { ok: true, dryRun: true, tabTitle, rows };
 
