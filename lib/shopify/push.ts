@@ -103,6 +103,7 @@ export interface PushReport {
   orphans: Array<{ name: string; namespace: string; key: string }>;
   titleUpdate: { from: string; to: string; applied: boolean } | null;
   images: { toAdd: Array<{ url: string; alt: string }>; skipped: number; added: number };
+  sectionFiles?: Record<string, string>;
 }
 
 const METAFIELDS_SET = `
@@ -116,6 +117,13 @@ const PRODUCT_UPDATE_TITLE = `
 mutation Title($product: ProductUpdateInput!) {
   productUpdate(product: $product) {
     product { id title }
+    userErrors { field message }
+  }
+}`;
+const FILE_CREATE = `
+mutation Files($files: [FileCreateInput!]!) {
+  fileCreate(files: $files) {
+    files { id alt }
     userErrors { field message }
   }
 }`;
@@ -133,8 +141,12 @@ export async function applyToProduct(params: {
   productName: string;
   images: Array<{ url: string; category: string }>;
   /** Placement-driven image metafields, e.g. Section 2/3 Photo (file_reference
-   *  definitions matched by name). Section 1 stays manual (operator's GIF). */
-  sectionPhotos?: Array<{ defName: string; category: string }>;
+   *  definitions matched by name). Section 1 stays manual (operator's GIF).
+   *  These images are uploaded to the store's FILES area, not product media,
+   *  so nothing appears twice on the PDP. */
+  sectionPhotos?: Array<{ defName: string; category: string; url: string }>;
+  /** category → File GID from a previous push (re-push reuse, no duplicate files). */
+  sectionFileIds?: Record<string, string>;
   alreadyPushedUrls: string[];
   includeTitle: boolean;
   dryRun: boolean;
@@ -189,15 +201,13 @@ export async function applyToProduct(params: {
   for (const t of toSet) rows.push({ label: t.label, status: "set", value: t.value });
 
   if (dryRun) {
-    // Section photos in the preview: report what WOULD link where.
+    // Section photos in the preview: uploaded as store FILES (not gallery
+    // media), then referenced — so nothing shows twice on the PDP.
     for (const sp of params.sectionPhotos ?? []) {
       const def = defs.find((d) => normalize(d.name) === normalize(sp.defName));
-      if (!def) { rows.push({ label: sp.defName, status: "no-definition" }); continue; }
-      const wantAlt = mkAltFor(sp.category);
-      const inPlan = toAdd.some((m) => m.alt === wantAlt) || product.existingMedia.some((m) => m.alt === wantAlt);
-      rows.push(inPlan
+      rows.push(def
         ? { label: sp.defName, status: "set", value: sp.category }
-        : { label: sp.defName, status: "error", detail: `no image with alt "${wantAlt}" in plan` });
+        : { label: sp.defName, status: "no-definition" });
     }
     return report;
   }
@@ -250,23 +260,51 @@ export async function applyToProduct(params: {
     report.images.added = toAdd.length;
   }
 
-  // 4) Section photo metafields (file_reference → MediaImage GID), driven by
-  //    the run's placement. Matched to the product's media by the alt text we
-  //    set on upload, so re-pushes find previously-added images too.
+  // 4) Section photo metafields: upload the placed image to the store's FILES
+  //    area (NOT product media — the operator wants no image visible twice on
+  //    the PDP) and point the file_reference metafield at it. File ids are
+  //    returned in the report so re-pushes reuse them instead of duplicating.
+  const sectionFiles: Record<string, string> = { ...(params.sectionFileIds ?? {}) };
   for (const sp of params.sectionPhotos ?? []) {
     const def = defs.find((d) => normalize(d.name) === normalize(sp.defName));
     if (!def) { rows.push({ label: sp.defName, status: "no-definition" }); continue; }
-    const wantAlt = mkAltFor(sp.category);
-    const media = [...createdMedia, ...product.existingMedia].find((m) => m.alt === wantAlt);
-    if (!media) { rows.push({ label: sp.defName, status: "error", detail: `no product image with alt "${wantAlt}"` }); continue; }
-    if (dryRun) { rows.push({ label: sp.defName, status: "set", value: sp.category }); continue; }
+
+    let fileId = sectionFiles[sp.category];
+    if (!fileId) {
+      try {
+        const data = await mutate<{ fileCreate: { files: Array<{ id: string }> | null; userErrors: Array<{ message: string }> } }>(
+          FILE_CREATE,
+          { files: [{ originalSource: sp.url, contentType: "IMAGE", alt: mkAltFor(sp.category) }] },
+        );
+        const errs = data.fileCreate.userErrors ?? [];
+        if (errs.length || !data.fileCreate.files?.[0]?.id) {
+          const msg = errs.map((e) => e.message).join("; ") || "no file returned";
+          const hint = /access|permission|scope/i.test(msg)
+            ? " — the app version likely needs the write_files scope (add it in the Dev Dashboard and approve on the store)"
+            : "";
+          rows.push({ label: sp.defName, status: "error", detail: msg + hint });
+          continue;
+        }
+        fileId = data.fileCreate.files[0].id;
+        sectionFiles[sp.category] = fileId;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const hint = /access|permission|scope|denied/i.test(msg)
+          ? " — the app version likely needs the write_files scope (add it in the Dev Dashboard and approve on the store)"
+          : "";
+        rows.push({ label: sp.defName, status: "error", detail: msg + hint });
+        continue;
+      }
+    }
+
     const data = await mutate<{ metafieldsSet: { userErrors: Array<{ message: string }> } }>(METAFIELDS_SET, {
-      metafields: [{ ownerId: product.id, namespace: def.namespace, key: def.key, type: def.type, value: media.id }],
+      metafields: [{ ownerId: product.id, namespace: def.namespace, key: def.key, type: def.type, value: fileId }],
     });
     const errs = data.metafieldsSet.userErrors ?? [];
     if (errs.length) rows.push({ label: sp.defName, status: "error", detail: errs.map((e) => e.message).join("; ") });
     else rows.push({ label: sp.defName, status: "set", value: sp.category });
   }
+  report.sectionFiles = sectionFiles;
 
   return report;
 }

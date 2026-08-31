@@ -12,6 +12,8 @@ interface PushState {
   adminUrl: string;
   pushedImageUrls: string[];
   lastPushAt: string;
+  /** category → File GID for section photos (re-push reuse). */
+  sectionFileIds?: Record<string, string>;
 }
 
 // Fill an EXISTING product with the run's copy + images. Strict/reversible:
@@ -75,24 +77,28 @@ export async function POST(req: Request) {
     } catch { /* no remaining images */ }
 
     // Placement → Section 2/3 Photo metafields. Section 1 Photo is left for
-    // the operator's manual GIF, by explicit choice.
-    const sectionPhotos: Array<{ defName: string; category: string }> = [];
+    // the operator's manual GIF, by explicit choice. Section images are kept
+    // OUT of the gallery below — no image appears twice on the PDP.
+    const sectionPhotos: Array<{ defName: string; category: string; url: string }> = [];
     try {
       const placement = JSON.parse(run.stage3_placement ?? "null") as { section_2?: number; section_3?: number } | null;
       const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
       for (const n of [2, 3] as const) {
         const idx = placement?.[`section_${n}`];
         const im = rem.find((x) => x?.index === idx && x.image_url && x.status === "done");
-        if (im?.category) sectionPhotos.push({ defName: `Section ${n} Photo`, category: im.category });
+        if (im?.category && im.image_url) sectionPhotos.push({ defName: `Section ${n} Photo`, category: im.category, url: im.image_url });
       }
     } catch { /* no placement — no section photos */ }
+    const sectionUrls = new Set(sectionPhotos.map((sp) => sp.url));
+    const galleryImages = images.filter((im) => !sectionUrls.has(im.url));
 
     const report = await applyToProduct({
       product,
       json,
       productName: (run.brand_name ?? json.product_name ?? "").trim(),
-      images,
+      images: galleryImages,
       sectionPhotos,
+      sectionFileIds: pushState?.productId ? pushState.sectionFileIds : undefined,
       alreadyPushedUrls: pushState?.productId === product.numericId ? pushState.pushedImageUrls : [],
       includeTitle: body.includeTitle === true,
       dryRun: body.dryRun !== false, // dry run unless explicitly disabled
@@ -105,6 +111,7 @@ export async function POST(req: Request) {
         adminUrl: product.adminUrl,
         pushedImageUrls: [...new Set([...prevUrls, ...report.images.toAdd.map((m) => m.url)])],
         lastPushAt: new Date().toISOString(),
+        sectionFileIds: report.sectionFiles ?? pushState?.sectionFileIds,
       };
       await updateRun(runId, { shopify_push_state: JSON.stringify(newState), last_updated_at: newState.lastPushAt }).catch(() => {});
     }
