@@ -42,6 +42,8 @@ export interface RemainingPrompt {
 
 export const HERO_SYSTEM = `You are a product photography director. Generate ONE hero studio product image prompt for Higgsfield, using the source product images as the visual reference.
 
+BRAND SAFETY: No brand logos, brand names, trademarks, or recognizable branded products may appear anywhere in the image — the only exception is branding physically present on the product itself in the source photos. The prompt's NEGATIVE RULES must forbid logos, brand names, and branded props explicitly.
+
 Your output prompt MUST follow the exact section structure, ordering, tone, and rule style of the GOLD STANDARD EXAMPLE below. Same section headers, same level of detail, same phrasing patterns. Only the product-specific content changes.
 
 ========================================================================
@@ -136,6 +138,8 @@ OUTPUT: A single JSON object, nothing before or after, no markdown fences:
 }`
 
 export const REMAINING_SYSTEM = `You are a creative director generating 8 image prompts for Higgsfield for a DTC product. The product's appearance is locked by an APPROVED HERO IMAGE which will be attached as the reference for every prompt.
+
+BRAND SAFETY: No brand logos, brand names, trademarks, or recognizable branded products may appear anywhere in any of the 8 scenes — not on props, clothing, packaging, or backgrounds. The only exception is branding physically present on the product itself in the reference images. Every prompt's NEGATIVE RULES must forbid logos, brand names, and branded props explicitly.
 
 PRODUCT STATES: Some products have more than one physical state — open/closed, folded/unfolded, packed/deployed. The hero locks the product's appearance in the ONE state it shows. When a scene genuinely calls for a different state (for example a pill organizer zipped closed inside a handbag, or a foldable seat carried folded), (1) say the state explicitly in SCENE INSTRUCTIONS and PRODUCT PLACEMENT, and (2) set that image's source_image_references to the SOURCE PRODUCT PHOTO URL(s) that show the product in that state — in place of the hero, or alongside it when both states appear. Only switch states when the scene requires it; the default for every image is the hero and the state it shows.
 

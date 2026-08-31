@@ -26,7 +26,8 @@ ABSOLUTE PRODUCT FIDELITY — non-negotiable, takes priority over any other inst
 - DO NOT redesign, restyle, "clean up", recolor, or upgrade the product. No alternate finishes, no extra branding, no removed branding, no rearranged controls, no swapped materials.
 - Preserve exact shape, proportions, dimensions, surface finish, color, materials, button/control layout, lettering, logos, every visible marking.
 - If the requested scene composition can't be rendered without altering the product, simplify the scene rather than altering the product.
-- This is product photography — the camera and lighting may change, the product itself may not.`
+- This is product photography — the camera and lighting may change, the product itself may not.
+- BRAND SAFETY: no brand logos, brand names, trademarks, or recognizable branded products anywhere in the scene — not on props, clothing, packaging, screens, or backgrounds. The ONLY exception is branding physically present on this product itself in the reference media. Any other text or mark that reads as a brand must be absent or generic.`
 
 export async function generateStage3Image(params: {
   prompt: string

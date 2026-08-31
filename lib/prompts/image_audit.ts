@@ -31,6 +31,11 @@ AUDIT CRITERIA:
 - Are the characters correctly formed (no garbling, no substitutions)?
 - Does the text appear where specified?
 
+6. BRAND SAFETY (every image)
+- No brand logos, brand names, trademarks, or recognizable branded products anywhere in the frame — props, clothing, packaging, screens, backgrounds included.
+- The ONLY acceptable branding is what is physically printed on this product itself.
+- Any legible or near-legible third-party brand mark is an automatic FAIL.
+
 OUTPUT FORMAT (JSON only, no preamble):
 {
   "verdict": "pass" | "fail",
@@ -40,7 +45,7 @@ OUTPUT FORMAT (JSON only, no preamble):
 
 VERDICT DEFINITIONS — binary, no middle ground:
 - "pass": Image is ready to ship. Minor cosmetic imperfections (slight crop, mild colour cast, subtle lighting quirks) are acceptable.
-- "fail": Anything you'd want to redo — wrong product, drifted product details, garbled text, bad anatomy, off-brand composition, prompt not followed. If you'd hesitate to ship it, fail it.
+- "fail": Anything you'd want to redo — wrong product, drifted product details, garbled text, bad anatomy, off-brand composition, prompt not followed, or ANY third-party brand mark visible. If you'd hesitate to ship it, fail it.
 
 REQUIRES_REGENERATION: Mirrors verdict — true for "fail", false for "pass".
 
