@@ -170,7 +170,7 @@ Match the language level of the actual target customer:
 - Older buyers — clear, respectful, careful explanations, no slang
 
 VOICE-OF-CUSTOMER FAQs:
-FAQs must come from real questions customers ask in the research, not invented hypotheticals. If the research shows customers worry about durability, that becomes an FAQ. If no one asks about something, do not invent the question.
+The two FAQs must each tackle one of the TWO MOST COMMON OBJECTIONS to buying this product, ranked by how often they show up in the research (pain points, competitor complaints, belief gaps). Phrase each as the question a hesitant buyer would actually ask, in their own words, and answer it head-on so the objection is neutralized — concrete facts from the research, not reassurance fluff. Do not invent objections the research does not show; if it surfaces fewer than two, use the strongest doubt a first-time buyer of this product category would have.
 
 PAIN POINT VOCABULARY:
 The research brief lists the specific pain points and the language customers use to describe them. Use that exact language in the copy. "Stings my kid's eyes" is what customers actually type into Google. "Causes ocular irritation" is what nobody says.
