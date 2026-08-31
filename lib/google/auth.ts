@@ -9,7 +9,12 @@
 
 import { createSign } from "node:crypto";
 
-const SCOPE = "https://www.googleapis.com/auth/documents"; // no Drive scope — cannot create/list files
+// Docs + Drive. The Drive scope is still sharing-bounded: the service account
+// can only see/write inside folders explicitly shared with it (the products
+// folder), plus the master doc. drive.file would NOT work here — it hides
+// user-created folders from the app, and finding existing product folders is
+// the whole point.
+const SCOPE = "https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 interface ServiceAccount {

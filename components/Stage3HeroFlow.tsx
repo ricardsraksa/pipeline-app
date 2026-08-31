@@ -5,6 +5,7 @@ import type { Run } from "@/lib/db";
 import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
 import Stage3SourcePicker from "@/components/Stage3SourcePicker";
 import ShopifyFill from "@/components/ShopifyFill";
+import SendToDrive from "@/components/SendToDrive";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
       pure client component without importing server code) ──────────────── */
@@ -639,6 +640,7 @@ export default function Stage3HeroFlow({
     const referenceImages = safeParse<string[]>(run.stage3_reference_images, []);
     return (
       <div className="space-y-4">
+        <SendToDrive runId={runId} />
         <ShopifyFill runId={runId} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
         <details>
           <summary className="cursor-pointer text-[11px] text-[var(--color-text-4)]">Create a brand-new draft product instead (old flow)</summary>
