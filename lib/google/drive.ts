@@ -77,16 +77,16 @@ export interface ProductFolders {
 
 /** Find the product folder by P-code prefix (or exact name); create the full
  *  structure ("P58 - Name" with Images + Videos) when missing. */
-export async function ensureProductFolders(productCode: string, productName: string): Promise<ProductFolders> {
+export async function ensureProductFolders(productCode: string, folderNameIfCreating: string): Promise<ProductFolders> {
   const code = productCode.trim();
   if (!code) throw new Error("Set a Product code on this run first (e.g. P58) — it names the Drive folder.");
 
   const children = await listChildren(parentFolderId(), ` and mimeType = '${FOLDER_MIME}'`);
   const codeNorm = code.toLowerCase();
-  let product = children.find((f) => {
+  const product = children.find((f) => {
     const n = f.name.trim().toLowerCase();
     return n === codeNorm || n.startsWith(codeNorm + " ") || n.startsWith(codeNorm + "-") || n.startsWith(codeNorm + "_")
-      || n === productName.trim().toLowerCase();
+      || n === folderNameIfCreating.trim().toLowerCase();
   });
 
   let createdProductFolder = false;
@@ -96,7 +96,9 @@ export async function ensureProductFolders(productCode: string, productName: str
     productFolderId = product.id;
     productFolderName = product.name;
   } else {
-    productFolderName = `${code} - ${productName}`.trim();
+    // Created with the doc tab's exact name ("P55 - Wall Lamp") so the Drive
+    // folder and the doc tab stay in lockstep.
+    productFolderName = folderNameIfCreating.trim();
     productFolderId = await createFolder(productFolderName, parentFolderId());
     createdProductFolder = true;
     // Match the operator's structure from the start.

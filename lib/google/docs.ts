@@ -100,6 +100,31 @@ function valuesForLabels(j: Stage2Json): Array<{ match: string; value: string }>
   ];
 }
 
+/** Fetch the master doc's tabs (flattened). Throws with operator-readable
+ *  messages on auth/id problems; returns [] when the doc has no tabs. */
+export async function fetchDocTabs(): Promise<Tab[]> {
+  const token = await googleAccessToken();
+  const docId = masterDocId();
+  const res = await fetch(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}?includeTabsContent=true`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Docs API ${res.status} while reading tabs.`);
+  const doc = (await res.json()) as { tabs?: Tab[] };
+  return flattenTabs(doc.tabs ?? []);
+}
+
+/** The doc tab title for a product code ("P55 - Wall Lamp"), or null. Never throws. */
+export async function docTabTitleForCode(code: string): Promise<string | null> {
+  if (!googleDocConfigured() || !code.trim()) return null;
+  try {
+    const tab = findProductTab(await fetchDocTabs(), code);
+    return tab?.tabProperties?.title ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** The tab whose title starts with the product code (case-insensitive). */
 export function findProductTab(tabs: Tab[], code: string): Tab | undefined {
   const codeNorm = code.trim().toLowerCase();

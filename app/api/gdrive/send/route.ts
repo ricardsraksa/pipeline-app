@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { getRun } from "@/lib/db";
 import { driveConfigured, ensureProductFolders, existingFileNames, uploadImageFromUrl } from "@/lib/google/drive";
+import { docTabTitleForCode } from "@/lib/google/docs";
 
 export const maxDuration = 300;
 
@@ -38,7 +39,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const folders = await ensureProductFolders(run.product_code ?? "", (run.brand_name ?? run.product_name ?? "product").trim());
+    // Folder name mirrors the master doc's tab name ("P55 - Wall Lamp");
+    // falls back to "<code> - <product name>" when the doc has no tab yet.
+    const code = run.product_code ?? "";
+    const tabTitle = await docTabTitleForCode(code);
+    const folderName = tabTitle ?? `${code} - ${(run.brand_name ?? run.product_name ?? "product").trim()}`;
+    const folders = await ensureProductFolders(code, folderName);
     const existing = await existingFileNames(folders.imagesFolderId);
 
     const results: Array<{ name: string; status: "uploaded" | "already-there" | "error"; detail?: string }> = [];
