@@ -43,6 +43,21 @@ export async function POST(req: Request) {
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* below */ }
   if (!json) return Response.json({ success: false, error: "No structured Stage 2 copy on this run yet" }, { status: 400 });
 
+  // Hard prerequisite: image auto-placement must have run. Without it the
+  // section photos can't be wired and every image would land in the gallery —
+  // the operator wants the full, correctly-split PDP or nothing.
+  let placementOk = false;
+  try {
+    const pl = JSON.parse(run.stage3_placement ?? "null") as { section_2?: unknown; section_3?: unknown } | null;
+    placementOk = !!(pl && typeof pl.section_2 === "number" && typeof pl.section_3 === "number");
+  } catch { /* not ok */ }
+  if (!placementOk) {
+    return Response.json(
+      { success: false, error: "Image auto-placement hasn't run for this run. Open Stage 3 and run “auto-placement” (it decides which images go to sections 2/3), then push again." },
+      { status: 409 },
+    );
+  }
+
   let pushState: PushState | null = null;
   try { pushState = run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as PushState) : null; } catch { /* fresh */ }
 
