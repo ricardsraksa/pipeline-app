@@ -141,6 +141,49 @@ export function planFills(tab: Tab, json: Stage2Json): { rows: FillRow[]; insert
   return { rows, inserts };
 }
 
+/** Overview lines the pipeline can fill: bare "Label:" paragraphs above the
+ *  tables. Only writes when nothing follows the colon — a typed value is
+ *  never touched. Exported for unit tests. */
+export function planOverviewFills(
+  tab: Tab,
+  info: { productName?: string; productUrl?: string; competitorUrl?: string },
+): { rows: FillRow[]; inserts: Array<{ index: number; text: string }> } {
+  const targets: Array<{ re: RegExp; label: string; value: string | undefined }> = [
+    { re: /^product name\s*:\s*$/i, label: "overview: product name", value: info.productName },
+    { re: /^alibaba link\s*:\s*$/i, label: "overview: alibaba link", value: info.productUrl },
+    { re: /^competitor\s*\/?\s*example link\s*:\s*$/i, label: "overview: competitor link", value: info.competitorUrl },
+  ];
+  const rows: FillRow[] = [];
+  const inserts: Array<{ index: number; text: string }> = [];
+  const seen = new Set<string>();
+
+  for (const el of tab.documentTab?.body?.content ?? []) {
+    if (!el.paragraph || typeof el.endIndex !== "number") continue;
+    const text = paragraphText(el.paragraph).replace(/\n/g, "").trim();
+    for (const t of targets) {
+      if (seen.has(t.label)) continue;
+      // Bare label line → fill. A line with content after the colon doesn't
+      // match the regex, so it's reported occupied below.
+      if (t.re.test(text)) {
+        seen.add(t.label);
+        if (!t.value?.trim()) { rows.push({ label: t.label, status: "empty-value" }); break; }
+        // endIndex is past the trailing newline — insert just before it.
+        inserts.push({ index: el.endIndex - 1, text: " " + t.value.trim() });
+        rows.push({ label: t.label, status: "filled" });
+        break;
+      }
+      // Same label but with a value already present.
+      const bare = t.re.source.replace("\\s*:\\s*$", "");
+      if (new RegExp("^" + bare + "\\s*:\\s*\\S", "i").test(text)) {
+        seen.add(t.label);
+        rows.push({ label: t.label, status: "already-filled" });
+        break;
+      }
+    }
+  }
+  return { rows, inserts };
+}
+
 // ── The fill ────────────────────────────────────────────────────────────────
 
 export interface FillRow {
@@ -160,6 +203,8 @@ export interface FillResult {
 export async function fillProductTab(params: {
   productCode: string;
   json: Stage2Json;
+  /** Overview block values (bare "Label:" lines above the tables). */
+  overview?: { productName?: string; productUrl?: string; competitorUrl?: string };
   dryRun?: boolean;
 }): Promise<FillResult> {
   if (!googleDocConfigured()) {
@@ -205,7 +250,10 @@ export async function fillProductTab(params: {
     const tabTitle = tab.tabProperties.title ?? code;
 
     // Pure planning step (unit-tested against a replica of the template).
-    const { rows, inserts } = planFills(tab, params.json);
+    const tablePlan = planFills(tab, params.json);
+    const overviewPlan = planOverviewFills(tab, params.overview ?? {});
+    const rows = [...overviewPlan.rows, ...tablePlan.rows];
+    const inserts = [...tablePlan.inserts, ...overviewPlan.inserts];
 
     if (params.dryRun) return { ok: true, dryRun: true, tabTitle, rows };
 

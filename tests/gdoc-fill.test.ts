@@ -4,7 +4,7 @@
 // and the Facebook table's pre-filled boilerplate row that must never be
 // touched. Run with: node tests/gdoc-fill.test.mjs (built via esbuild).
 
-import { flattenTabs, findProductTab, planFills } from "@/lib/google/docs";
+import { flattenTabs, findProductTab, planFills, planOverviewFills } from "@/lib/google/docs";
 import type { Stage2Json } from "@/lib/stage2/shape";
 
 let nextIndex = 100;
@@ -39,9 +39,21 @@ const facebookTable = table([
 ]);
 const adTable = table([row("ONE LINERS"), row("")]);
 
+function para(text: string) {
+  const startIndex = nextIndex;
+  nextIndex += text.length + 2;
+  return { startIndex, endIndex: nextIndex - 1, paragraph: { elements: [{ textRun: { content: text + "\n" } }] } };
+}
+const overviewParas = [
+  para("Product Name: "),
+  para("COGS: "),
+  para("Pricing: 24.99"),
+  para("Alibaba link: "),
+  para("Competitor / Example Link: https://example.com/existing"),
+];
 const productTab = {
   tabProperties: { tabId: "t.p58", title: "P58 - Anti Theft Backpack" },
-  documentTab: { body: { content: [shopifyTable, facebookTable, adTable] } },
+  documentTab: { body: { content: [...overviewParas, shopifyTable, facebookTable, adTable] } },
 };
 const doc = {
   tabs: [
@@ -127,6 +139,21 @@ const plan2 = planFills(productTab as never, sparse);
 const by2 = Object.fromEntries(plan2.rows.map((r) => [r.label, r.status]));
 check("empty badge skipped as empty-value", by2["badgetext"] === "empty-value");
 check("empty one-liners skipped as empty-value", by2["oneliners"] === "empty-value");
+
+// 6) Overview lines: bare labels fill, occupied ones skip, unknown values skip
+const ov = planOverviewFills(productTab as never, {
+  productName: "GuardPack Anti-Theft Backpack",
+  productUrl: "https://aliexpress.com/item/123.html",
+  competitorUrl: "https://competitor.com/products/bag",
+});
+const ovBy = Object.fromEntries(ov.rows.map((r) => [r.label, r.status]));
+check("overview product name fills", ovBy["overview: product name"] === "filled", String(ovBy["overview: product name"]));
+check("overview alibaba link fills", ovBy["overview: alibaba link"] === "filled", String(ovBy["overview: alibaba link"]));
+check("occupied competitor line skipped", ovBy["overview: competitor link"] === "already-filled", String(ovBy["overview: competitor link"]));
+check("overview inserts land before the newline", ov.inserts.every((i) => Number.isInteger(i.index)));
+check("2 overview inserts", ov.inserts.length === 2, String(ov.inserts.length));
+const ov2 = planOverviewFills(productTab as never, { productName: "X" });
+check("missing url values reported empty-value", ov2.rows.some((r) => r.label === "overview: alibaba link" && r.status === "empty-value"));
 
 console.log(failures === 0 ? "\nALL TESTS PASSED" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

@@ -712,7 +712,17 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
       if (googleDocConfigured()) {
         void (async () => {
           const fresh = await getRun(runId);
-          const r = await fillProductTab({ productCode: fresh?.product_code ?? "", json: structured });
+          let competitorUrl: string | undefined;
+          try { competitorUrl = (JSON.parse(fresh?.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
+          const r = await fillProductTab({
+            productCode: fresh?.product_code ?? "",
+            json: structured,
+            overview: {
+              productName: stage2Name ?? structured.product_name ?? undefined,
+              productUrl: fresh?.product_url ?? undefined,
+              competitorUrl,
+            },
+          });
           const ts = now();
           if (r.ok) await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts });
           else await updateRun(runId, { gdoc_append_error: r.error ?? "unknown", last_updated_at: ts });

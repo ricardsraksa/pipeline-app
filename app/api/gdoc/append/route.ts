@@ -30,7 +30,18 @@ export async function POST(req: Request) {
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* fall through */ }
   if (!json) return Response.json({ success: false, error: "No structured Stage 2 copy on this run yet" }, { status: 400 });
 
-  const result = await fillProductTab({ productCode: run.product_code ?? "", json, dryRun: dryRun === true });
+  let competitorUrl: string | undefined;
+  try { competitorUrl = (JSON.parse(run.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
+  const result = await fillProductTab({
+    productCode: run.product_code ?? "",
+    json,
+    overview: {
+      productName: run.brand_name ?? json.product_name ?? undefined,
+      productUrl: run.product_url ?? undefined,
+      competitorUrl,
+    },
+    dryRun: dryRun === true,
+  });
   const ts = new Date().toISOString();
   if (!result.ok) {
     await updateRun(runId, { gdoc_append_error: result.error ?? "unknown", last_updated_at: ts }).catch(() => {});
