@@ -21,6 +21,8 @@ function allowedHosts(): Set<string> {
   if (store) set.add(store);
   // admin.shopify.com hosts the new admin UI for every store.
   set.add("admin.shopify.com");
+  // The store's public storefront domain — so pasted product links work as-is.
+  set.add("saintport.com");
   return set;
 }
 
