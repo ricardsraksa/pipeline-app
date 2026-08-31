@@ -74,11 +74,25 @@ export async function POST(req: Request) {
         .forEach((im) => images.push({ url: im.image_url as string, category: im.category ?? "" }));
     } catch { /* no remaining images */ }
 
+    // Placement → Section 2/3 Photo metafields. Section 1 Photo is left for
+    // the operator's manual GIF, by explicit choice.
+    const sectionPhotos: Array<{ defName: string; category: string }> = [];
+    try {
+      const placement = JSON.parse(run.stage3_placement ?? "null") as { section_2?: number; section_3?: number } | null;
+      const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
+      for (const n of [2, 3] as const) {
+        const idx = placement?.[`section_${n}`];
+        const im = rem.find((x) => x?.index === idx && x.image_url && x.status === "done");
+        if (im?.category) sectionPhotos.push({ defName: `Section ${n} Photo`, category: im.category });
+      }
+    } catch { /* no placement — no section photos */ }
+
     const report = await applyToProduct({
       product,
       json,
       productName: (run.brand_name ?? json.product_name ?? "").trim(),
       images,
+      sectionPhotos,
       alreadyPushedUrls: pushState?.productId === product.numericId ? pushState.pushedImageUrls : [],
       includeTitle: body.includeTitle === true,
       dryRun: body.dryRun !== false, // dry run unless explicitly disabled

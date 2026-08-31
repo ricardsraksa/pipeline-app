@@ -9,6 +9,7 @@
 import { shopifyGraphQL, shopConfig } from "@/lib/shopify";
 import { SHOPIFY_FIELDS } from "./fields";
 import { fetchDefinitions, matchFields, orphanDefinitions, type MetafieldDef } from "./metafields";
+import { normalizeLabel as normalize } from "./fields";
 import type { ProductRef } from "./resolve";
 import type { Stage2Json } from "@/lib/stage2/shape";
 
@@ -50,20 +51,21 @@ export interface ResolvedProduct {
   adminUrl: string;
   mediaCount: number;
   existingAlts: string[];
+  existingMedia: Array<{ id: string; alt: string }>;
 }
 
 const PRODUCT_BY_ID = `
 query P($id: ID!) {
-  product(id: $id) { id title handle status media(first: 250) { nodes { alt } } }
+  product(id: $id) { id title handle status media(first: 250) { nodes { id alt } } }
 }`;
 const PRODUCT_BY_HANDLE = `
 query P($handle: String!) {
-  productByIdentifier(identifier: { handle: $handle }) { id title handle status media(first: 250) { nodes { alt } } }
+  productByIdentifier(identifier: { handle: $handle }) { id title handle status media(first: 250) { nodes { id alt } } }
 }`;
 
 export async function resolveProduct(ref: ProductRef): Promise<ResolvedProduct> {
   const { domain } = shopConfig();
-  type Node = { id: string; title: string; handle: string; status: string; media: { nodes: Array<{ alt: string | null }> } } | null;
+  type Node = { id: string; title: string; handle: string; status: string; media: { nodes: Array<{ id: string; alt: string | null }> } } | null;
   let node: Node;
   if (ref.kind === "id") {
     const d = await shopifyGraphQL<{ product: Node }>(PRODUCT_BY_ID, { id: `gid://shopify/Product/${ref.value}` });
@@ -83,6 +85,7 @@ export async function resolveProduct(ref: ProductRef): Promise<ResolvedProduct> 
     adminUrl: `https://${domain}/admin/products/${numericId}`,
     mediaCount: node.media.nodes.length,
     existingAlts: node.media.nodes.map((m) => m.alt ?? "").filter(Boolean),
+    existingMedia: node.media.nodes.map((m) => ({ id: m.id, alt: m.alt ?? "" })),
   };
 }
 
@@ -119,7 +122,7 @@ mutation Title($product: ProductUpdateInput!) {
 const CREATE_MEDIA = `
 mutation Media($productId: ID!, $media: [CreateMediaInput!]!) {
   productCreateMedia(productId: $productId, media: $media) {
-    media { alt }
+    media { id alt }
     mediaUserErrors { field message }
   }
 }`;
@@ -129,6 +132,9 @@ export async function applyToProduct(params: {
   json: Stage2Json;
   productName: string;
   images: Array<{ url: string; category: string }>;
+  /** Placement-driven image metafields, e.g. Section 2/3 Photo (file_reference
+   *  definitions matched by name). Section 1 stays manual (operator's GIF). */
+  sectionPhotos?: Array<{ defName: string; category: string }>;
   alreadyPushedUrls: string[];
   includeTitle: boolean;
   dryRun: boolean;
@@ -154,6 +160,7 @@ export async function applyToProduct(params: {
   // Image plan: append-only, deduped against both our push-state and the
   // product's existing alts (survives a DB restore).
   const mkAlt = (category: string, i: number) => `${params.productName} — ${category || `image ${i + 1}`}`;
+  const mkAltFor = (category: string) => `${params.productName} — ${category}`;
   const existingAlts = new Set(product.existingAlts);
   const pushed = new Set(params.alreadyPushedUrls);
   const toAdd: Array<{ url: string; alt: string }> = [];
@@ -181,7 +188,19 @@ export async function applyToProduct(params: {
   // Mark planned sets in the report up-front; flip to error below if Shopify rejects.
   for (const t of toSet) rows.push({ label: t.label, status: "set", value: t.value });
 
-  if (dryRun) return report;
+  if (dryRun) {
+    // Section photos in the preview: report what WOULD link where.
+    for (const sp of params.sectionPhotos ?? []) {
+      const def = defs.find((d) => normalize(d.name) === normalize(sp.defName));
+      if (!def) { rows.push({ label: sp.defName, status: "no-definition" }); continue; }
+      const wantAlt = mkAltFor(sp.category);
+      const inPlan = toAdd.some((m) => m.alt === wantAlt) || product.existingMedia.some((m) => m.alt === wantAlt);
+      rows.push(inPlan
+        ? { label: sp.defName, status: "set", value: sp.category }
+        : { label: sp.defName, status: "error", detail: `no image with alt "${wantAlt}" in plan` });
+    }
+    return report;
+  }
 
   // 1) Metafields — chunk at 25 (API cap).
   for (let i = 0; i < toSet.length; i += 25) {
@@ -218,15 +237,35 @@ export async function applyToProduct(params: {
   }
 
   // 3) Images — append only.
+  let createdMedia: Array<{ id: string; alt: string }> = [];
   if (toAdd.length) {
-    const data = await mutate<{ productCreateMedia: { media: Array<{ alt: string | null }> | null; mediaUserErrors: Array<{ message: string }> } }>(
+    const data = await mutate<{ productCreateMedia: { media: Array<{ id: string; alt: string | null }> | null; mediaUserErrors: Array<{ message: string }> } }>(
       CREATE_MEDIA,
       { productId: product.id, media: toAdd.map((m) => ({ originalSource: m.url, mediaContentType: "IMAGE", alt: m.alt })) },
     );
     if (data.productCreateMedia.mediaUserErrors?.length) {
       throw new Error("Shopify rejected media: " + data.productCreateMedia.mediaUserErrors.map((e) => e.message).join("; "));
     }
+    createdMedia = (data.productCreateMedia.media ?? []).map((m) => ({ id: m.id, alt: m.alt ?? "" }));
     report.images.added = toAdd.length;
+  }
+
+  // 4) Section photo metafields (file_reference → MediaImage GID), driven by
+  //    the run's placement. Matched to the product's media by the alt text we
+  //    set on upload, so re-pushes find previously-added images too.
+  for (const sp of params.sectionPhotos ?? []) {
+    const def = defs.find((d) => normalize(d.name) === normalize(sp.defName));
+    if (!def) { rows.push({ label: sp.defName, status: "no-definition" }); continue; }
+    const wantAlt = mkAltFor(sp.category);
+    const media = [...createdMedia, ...product.existingMedia].find((m) => m.alt === wantAlt);
+    if (!media) { rows.push({ label: sp.defName, status: "error", detail: `no product image with alt "${wantAlt}"` }); continue; }
+    if (dryRun) { rows.push({ label: sp.defName, status: "set", value: sp.category }); continue; }
+    const data = await mutate<{ metafieldsSet: { userErrors: Array<{ message: string }> } }>(METAFIELDS_SET, {
+      metafields: [{ ownerId: product.id, namespace: def.namespace, key: def.key, type: def.type, value: media.id }],
+    });
+    const errs = data.metafieldsSet.userErrors ?? [];
+    if (errs.length) rows.push({ label: sp.defName, status: "error", detail: errs.map((e) => e.message).join("; ") });
+    else rows.push({ label: sp.defName, status: "set", value: sp.category });
   }
 
   return report;
