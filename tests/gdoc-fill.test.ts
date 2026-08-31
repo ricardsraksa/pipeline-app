@@ -121,10 +121,10 @@ const textFor = (label: string) => {
   return w;
 };
 const texts = inserts.map((i) => i.text);
-check("benefits joined one per line", texts.includes("Hidden zippers stop pickpockets\nFits a 15-inch laptop\nWater-resistant shell"));
-check("FAQ 1 is question + answer", texts.includes("Will it fit under an airline seat?\nYes, it measures 45 x 30 cm."));
-check("section 1 is headline + paragraph", texts.includes("Safe in Crowds\nZippers sit against your back."));
-check("one-liners joined", texts.includes("Zippers thieves can't find\nRain rolls right off"));
+check("benefits joined one per line", texts.includes("Hidden zippers stop pickpockets\n\nFits a 15-inch laptop\n\nWater-resistant shell"));
+check("FAQ 1 is question + answer", texts.includes("Will it fit under an airline seat?\n\nYes, it measures 45 x 30 cm."));
+check("section 1 is headline + paragraph", texts.includes("Safe in Crowds\n\nZippers sit against your back."));
+check("one-liners joined", texts.includes("Zippers thieves can't find\n\nRain rolls right off"));
 check("facebook headline present", texts.includes("Steal-Proof Bag"));
 
 // 4) Descending-sort invariant the writer relies on

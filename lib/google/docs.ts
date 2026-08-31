@@ -78,7 +78,9 @@ export function flattenTabs(tabs: Tab[]): Tab[] {
 // ── Label → value mapping (labels as they appear in the template tables) ────
 
 function valuesForLabels(j: Stage2Json): Array<{ match: string; value: string }> {
-  const joined = (parts: Array<string | undefined>) => parts.filter((x) => x?.trim()).join("\n");
+  // Blank line between parts — benefits, Q↔A, headline↔paragraph, one-liners —
+  // matching how the operator formats these cells by hand.
+  const joined = (parts: Array<string | undefined>) => parts.filter((x) => x?.trim()).join("\n\n");
   const sec = (i: number) => j.sections[i] ?? { headline: "", paragraph: "" };
   const faqPair = (i: number) => joined([j.faqs[i]?.q, j.faqs[i]?.a]);
   return [
@@ -94,7 +96,7 @@ function valuesForLabels(j: Stage2Json): Array<{ match: string; value: string }>
     { match: "headline", value: j.facebook?.headline ?? "" },
     { match: "primarytext", value: j.facebook?.primary ?? "" },
     { match: "description", value: j.facebook?.description ?? "" },
-    { match: "oneliners", value: (j.one_liners ?? []).filter((o) => o?.trim()).join("\n") },
+    { match: "oneliners", value: (j.one_liners ?? []).filter((o) => o?.trim()).join("\n\n") },
   ];
 }
 
