@@ -126,7 +126,10 @@ export function planFills(tab: Tab, json: Stage2Json): { rows: FillRow[]; insert
       seen.add(target.match);
 
       if (!target.value.trim()) { rows.push({ label: target.match, status: "empty-value" }); continue; }
-      const valueCell = (tableRows[r + 1].tableCells ?? [])[0];
+      // The value's home is the RIGHT column of the row below the label
+      // (falling back to the only cell when the row has a single column).
+      const valueRowCells = tableRows[r + 1].tableCells ?? [];
+      const valueCell = valueRowCells[1] ?? valueRowCells[0];
       if (!valueCell) { rows.push({ label: target.match, status: "label-not-found" }); continue; }
       if (cellText(valueCell).trim()) { rows.push({ label: target.match, status: "already-filled" }); continue; }
       const idx = cellInsertIndex(valueCell);

@@ -22,22 +22,22 @@ function table(rows: Array<ReturnType<typeof row>>) {
 
 // The template, row for row as in the screenshot.
 const shopifyTable = table([
-  row("BADGE TEXT"), row(""),
-  row("SUPPORTING SENTENCE"), row(""),
-  row("BENEFIT SECTION"), row(""),
-  row("FAQ - What's Included (Answer)"), row(""),
-  row("FAQ - Custom Question 1"), row(""),
-  row("FAQ - Custom Question 2"), row(""),
-  row("SECTION 1"), row(""),
-  row("SECTION 2"), row(""),
-  row("SECTION 3"), row(""),
+  row("BADGE TEXT", ""), row("", ""),
+  row("SUPPORTING SENTENCE", ""), row("", ""),
+  row("BENEFIT SECTION", ""), row("", ""),
+  row("FAQ - What's Included (Answer)", ""), row("", ""),
+  row("FAQ - Custom Question 1", ""), row("", ""),
+  row("FAQ - Custom Question 2", ""), row("", ""),
+  row("SECTION 1", ""), row("", ""),
+  row("SECTION 2", ""), row("", ""),
+  row("SECTION 3", ""), row("", ""),
 ]);
 const facebookTable = table([
-  row("Headline"), row(""),
-  row("Primary Text"), row(""),
-  row("Description"), row("Winter Sale -> LINK", "Free Shipping"), // pre-filled boilerplate
+  row("Headline", ""), row("", ""),
+  row("Primary Text", ""), row("", ""),
+  row("Description", ""), row("Winter Sale -> LINK", "Free Shipping"), // pre-filled boilerplate
 ]);
-const adTable = table([row("ONE LINERS"), row("")]);
+const adTable = table([row("ONE LINERS", ""), row("", "")]);
 
 function para(text: string) {
   const startIndex = nextIndex;
@@ -130,6 +130,17 @@ check("facebook headline present", texts.includes("Steal-Proof Bag"));
 // 4) Descending-sort invariant the writer relies on
 const sorted = [...inserts].sort((a, b) => b.index - a.index);
 check("indices unique", new Set(inserts.map((i) => i.index)).size === inserts.length);
+// Right-column targeting: each insert index must equal the SECOND cell's start
+// index of its value row — collect all second-cell indices and require
+// membership.
+const secondCellIndices = new Set<number>();
+for (const t of [shopifyTable, facebookTable, adTable]) {
+  for (const rw of t.table.tableRows) {
+    const c2 = rw.tableCells[1];
+    if (c2) secondCellIndices.add(c2.content[0].startIndex);
+  }
+}
+check("every insert targets a right-column cell", inserts.every((i) => secondCellIndices.has(i.index)));
 check("descending sort leaves later inserts unaffected by earlier ones",
   sorted.every((v, i, a) => i === 0 || a[i - 1].index > v.index));
 
