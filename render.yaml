@@ -11,5 +11,11 @@ services:
         sync: false
       - key: PIPELINE_PASSWORD
         sync: false
+      - key: SHOPIFY_STORE_DOMAIN
+        sync: false
+      - key: SHOPIFY_CLIENT_ID
+        sync: false
+      - key: SHOPIFY_CLIENT_SECRET
+        sync: false
       - key: HIGGSFIELD_API_KEY
         sync: false
