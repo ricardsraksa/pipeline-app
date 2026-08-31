@@ -2,6 +2,8 @@
 // affluent English-speaking countries. Core buyer: middle-aged mother.
 export const IDENTIFY_PROMPT = `LANGUAGE RULE: Output in English.
 
+BRAND TEXT IN PHOTOS: Any brand name or logo visible in the supplier photos or listing identifies the MANUFACTURER or a competitor — it is not the name of the product we will sell. Note it as "supplier branding: X" if relevant, and never adopt it as the product's name.
+
 HALLUCINATION PREVENTION — ABSOLUTE RULES:
 - Do NOT invent material specifications (polycarbonate, TPU, UV400 ratings, certifications) unless stated in the scraped listing
 - Do NOT invent product configurations, age ranges, size specs, or accessory counts

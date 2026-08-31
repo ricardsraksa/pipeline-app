@@ -45,7 +45,7 @@ OUTPUT FORMAT — return exactly this markdown structure, no preamble, no closin
 - [Tertiary USP if it exists — only include if genuinely differentiating]
 
 RULES:
-- Product name should be the actual brand name or descriptive name from the research, not the AliExpress listing title. It must follow the format brand word plus plain category descriptor, ecommerce-friendly: simple, pronounceable, not technical, brandable or benefit-led
+- Product name: NEVER carry over a brand name from the supplier listing, supplier photos, or competitor links — text printed on supplier images is the manufacturer's brand and competitor names belong to competitors. Use a plain descriptive category name (e.g. "Anti-Theft Crossbody Chest Bag"); the final invented brand name is chosen later, in Stage 2
 - Positioning Angle must be ONE sentence reflecting the actual avatar (middle-aged mom) and offer brief — the sharpest single reason to buy, the argument Stage 2 copy and Stage 3 images should both build on
 - Key Competitor Gap must be grounded in competitors actually named in the research. If the research does not support a gap, say so rather than inventing one.
 - Benefits must be specific outcomes/feelings, not features. "Cat drinks more water" not "Has a faucet spout"
