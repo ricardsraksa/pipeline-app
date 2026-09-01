@@ -1,11 +1,12 @@
 import { getRun } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 
-// Download the Stage 1 foundational documents as one markdown file:
-// research, avatar, offer brief, necessary beliefs, the chief's review, and
-// the one-pager. Revised versions win over originals (the revised doc is what
-// the rest of the pipeline actually ran on); the original is kept below it
-// when both exist, so the download is a complete record.
+// Download the Stage 1 FOUNDATIONAL documents as one markdown file — the
+// material an ad writer works from: customer avatar, offer brief, necessary
+// beliefs, and the one-pager. Deliberately excludes the process artifacts
+// (the chief's internal review, the raw research dump, pre-revision
+// originals) — those are audit trail, not ad source material. Revised
+// versions win: they are what the rest of the pipeline ran on.
 export async function GET(
   req: Request,
   context: { params: Promise<unknown> },
@@ -38,7 +39,7 @@ export async function GET(
     parts.push("\n---\n", `## ${title}${note ? ` ${note}` : ""}`, "", text, "");
   };
 
-  // One-pager first — it's the document the later stages consume.
+  // One-pager first — the condensed brief later stages consume.
   section("One-pager", run.stage1_one_pager_edited ?? run.stage1_one_pager,
     run.stage1_one_pager_edited ? "(edited)" : undefined);
   section("Customer avatar", run.step_avatar_revised ?? run.step_avatar,
@@ -47,14 +48,6 @@ export async function GET(
     run.step_offer_brief_revised ? "(revised)" : undefined);
   section("Necessary beliefs", run.step_necessary_beliefs_revised ?? run.step_necessary_beliefs,
     run.step_necessary_beliefs_revised ? "(revised)" : undefined);
-  section("Chief marketing review", run.step_chief_final);
-  section("Product research", run.step_research_revised ?? run.step_research,
-    run.step_research_revised ? "(revised)" : undefined);
-
-  // Keep the pre-revision originals at the end when a revision replaced them.
-  if (run.step_avatar_revised) section("Appendix — original customer avatar", run.step_avatar);
-  if (run.step_offer_brief_revised) section("Appendix — original offer brief", run.step_offer_brief);
-  if (run.step_necessary_beliefs_revised) section("Appendix — original necessary beliefs", run.step_necessary_beliefs);
 
   const body = parts.filter((p) => p !== "").join("\n");
   const slug = `${code ? code + "-" : ""}${name}`
