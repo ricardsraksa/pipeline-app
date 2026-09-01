@@ -645,7 +645,18 @@ export default function RunPage() {
                         <FeedbackAppliedChip stage={1} />
                         <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
                       </div>
-                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
+                        {runId !== null && (
+                          <a
+                            href={`/api/runs/${runId}/stage1-docs`}
+                            download
+                            className="text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer no-underline"
+                          >
+                            ↓ Download foundational docs
+                          </a>
+                        )}
+                      </div>
                     </>
                   )}
                 </>
