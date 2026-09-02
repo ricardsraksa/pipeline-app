@@ -122,7 +122,11 @@ def run_once(app: App, scraper) -> int:
             last = i == len(pending) - 1
             log(f"run #{run_id}: scraping {u['role']} page {u['url'][:70]}")
             try:
-                folder = scraper.scrape(u["url"], refresh=False)
+                # Re-fetch storefront pages every time (cheap, and a fixed
+                # scraper should apply immediately); keep the 7-day cache for
+                # AliExpress, where every fetch counts against the rate limit.
+                fresh = "aliexpress." not in u["url"].lower()
+                folder = scraper.scrape(u["url"], refresh=fresh)
                 scraper.push_to_app(APP_URL, str(run_id), folder, describe=last, password=app.password)
                 state.pop(key, None)
                 done += 1
