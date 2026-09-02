@@ -6,24 +6,45 @@ Usage:
     scrapling-py ~/Desktop/supplier-scrape.py <url>
     scrapling-py ~/Desktop/supplier-scrape.py          (uses the URL on your clipboard)
 
+    # send the result straight into a pipeline run (when the app's own hosted
+    # scrape was rate-limited) — asks for the app password, stores nothing:
+    scrapling-py ~/Desktop/supplier-scrape.py --push https://pipeline-app-6icd.onrender.com --run 123 <url>
+
 Tries a fast text-only fetch first and only starts a browser if the page comes
 back empty (AliExpress needs the browser; Shopify stores don't).
 
 Puts the product text on your clipboard ready to paste into the pipeline app,
 and saves the product images to ~/Desktop/scraped/<product>/
+
+Server mode (used by the app itself, see lib/scrapling.ts):
+    python3 supplier-scrape.py --json --out DIR --state FILE <url>
+prints one JSON line to stdout (everything human goes to stderr), never
+touches the clipboard, and writes images under DIR.
 """
+import os
 import re
 import sys
 import time
 import json
+import getpass
+import mimetypes
 import subprocess
 import urllib.request
+import urllib.error
 from html import unescape
 from pathlib import Path
 
 from scrapling.fetchers import Fetcher, DynamicFetcher
 
 OUT_ROOT = Path.home() / "Desktop" / "scraped"
+JSON_MODE = False   # --json: structured stdout, human output to stderr
+
+
+def say(*a, **k) -> None:
+    """print() that stays out of stdout when the caller wants JSON there."""
+    if JSON_MODE:
+        k["file"] = sys.stderr
+    print(*a, **k)
 MIN_BYTES = 15_000          # smaller than this is an icon or swatch, not a photo
 WANT_IMAGES = 6
 WANT_DESC_IMAGES = 12
@@ -61,7 +82,7 @@ def slugify(s: str, fallback: str = "product") -> str:
 # AliExpress throttles per IP. Two habits keep us well clear of it: never fetch
 # the same product twice, and leave a gap between browser fetches.
 
-STATE_FILE = OUT_ROOT / ".scrape-state.json"
+STATE_FILE = OUT_ROOT / ".scrape-state.json"   # overridable with --state
 CACHE_DAYS = 7
 MIN_GAP_SECONDS = 45
 
@@ -93,8 +114,12 @@ def wait_for_gap(state: dict) -> None:
     elapsed = time.time() - (state.get("last_browser_fetch") or 0)
     if elapsed < MIN_GAP_SECONDS:
         pause = int(MIN_GAP_SECONDS - elapsed) + 1
-        print(f"   pausing {pause}s between browser fetches to stay under the rate limit...")
+        say(f"   pausing {pause}s between browser fetches to stay under the rate limit...")
         time.sleep(pause)
+
+
+class RateLimited(Exception):
+    pass
 
 
 def is_rate_limited(page) -> bool:
@@ -108,7 +133,7 @@ def fetch(url: str):
     page = Fetcher.get(url, timeout=30, stealthy_headers=True)
     if (page.css("title::text").get() or "").strip():
         return page, "text-only"
-    print("   page came back empty — starting browser (takes ~10s)...")
+    say("   page came back empty — starting browser (takes ~10s)...")
     state = load_state()
     wait_for_gap(state)
     state["last_browser_fetch"] = time.time()
@@ -127,13 +152,12 @@ def fetch(url: str):
         if (page.css("title::text").get() or "").strip():
             return page, "browser"
         if is_rate_limited(page):
-            sys.exit(
-                "\n   AliExpress is rate-limiting this computer's IP address.\n"
-                "   It serves an anti-bot page instead of the product. The IP is what\n"
-                "   is throttled, not the browser, so retrying immediately won't help.\n"
-                "   Wait an hour or two, or change IP (VPN / proxy / phone hotspot).\n")
+            raise RateLimited(
+                "AliExpress is rate-limiting this IP address. It serves an anti-bot "
+                "page instead of the product; the IP is what is throttled, so retrying "
+                "immediately won't help. Wait an hour or two, or change IP.")
         if attempt < BROWSER_ATTEMPTS:
-            print(f"   page didn't finish rendering — retry {attempt}/{BROWSER_ATTEMPTS - 1}")
+            say(f"   page didn't finish rendering — retry {attempt}/{BROWSER_ATTEMPTS - 1}")
     return last, "browser"
 
 
@@ -465,21 +489,128 @@ def extract_positioning(page, prod: dict | None) -> dict:
     return pos
 
 
+# --- pushing a local scrape into a pipeline run ------------------------------
+# Fallback for when the app's hosted scraper gets rate-limited: scrape here on
+# the Mac (a residential IP), then hand the result to the run. The password is
+# asked for interactively and only used to log in for this one request.
+
+def _multipart(fields: dict, files: list[tuple[str, Path]]) -> tuple[bytes, str]:
+    boundary = "----scrapling" + str(int(time.time() * 1000))
+    out = bytearray()
+    for name, value in fields.items():
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n").encode()
+        out += str(value).encode("utf-8") + b"\r\n"
+    for field, path in files:
+        ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; "
+                f"filename=\"{path.name}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
+        out += path.read_bytes() + b"\r\n"
+    out += f"--{boundary}--\r\n".encode()
+    return bytes(out), boundary
+
+
+def push_to_app(app_url: str, run_id: str, folder: Path) -> None:
+    app_url = app_url.rstrip("/")
+    data = json.loads((folder / "data.json").read_text())
+    # Interactive by default; PIPELINE_APP_PASSWORD lets a script drive it.
+    password = os.environ.get("PIPELINE_APP_PASSWORD") or getpass.getpass(f"   Password for {app_url}: ")
+    login = urllib.request.Request(
+        f"{app_url}/api/auth/login", method="POST",
+        data=json.dumps({"password": password}).encode(),
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(login, timeout=30) as r:
+            cookie = r.headers.get("Set-Cookie", "").split(";")[0]
+    except urllib.error.HTTPError as e:
+        sys.exit(f"   Login failed ({e.code}). Wrong password?")
+    if not cookie:
+        sys.exit("   Login gave no session cookie.")
+
+    images = sorted(p for p in folder.glob("*") if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
+    desc_images = sorted(p for p in (folder / "description").glob("*")
+                         if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
+    body, boundary = _multipart(
+        {"data": json.dumps(data, ensure_ascii=False)},
+        [("images", p) for p in images[:10]] + [("description_images", p) for p in desc_images[:12]])
+    req = urllib.request.Request(
+        f"{app_url}/api/runs/{run_id}/scrape-push", method="POST", data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Cookie": cookie})
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            res = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        sys.exit(f"   Push failed ({e.code}): {e.read().decode()[:300]}")
+    if not res.get("success"):
+        sys.exit(f"   Push failed: {res.get('error')}")
+    say(f"\n   Sent to run #{run_id}: {len(images)} photos + {len(desc_images)} description images.")
+    say(f"   Open {app_url}/runs/{run_id} — the description is being written now.\n")
+
+
 def main() -> None:
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    url = args[0] if args else clipboard_get()
+    global OUT_ROOT, STATE_FILE, JSON_MODE
+    argv = sys.argv[1:]
+    args: list[str] = []
+    opts: dict[str, str] = {}
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--out", "--state", "--push", "--run"):
+            if i + 1 >= len(argv):
+                sys.exit(f"{a} needs a value")
+            opts[a] = argv[i + 1]
+            i += 2
+            continue
+        if a.startswith("--"):
+            opts[a] = "1"
+        else:
+            args.append(a)
+        i += 1
+
+    JSON_MODE = "--json" in opts
+    if "--out" in opts:
+        OUT_ROOT = Path(opts["--out"])
+        STATE_FILE = OUT_ROOT / ".scrape-state.json"
+    if "--state" in opts:
+        STATE_FILE = Path(opts["--state"])
+
+    url = args[0] if args else ("" if JSON_MODE else clipboard_get())
     if not url.startswith("http"):
+        if JSON_MODE:
+            print(json.dumps({"error": "No URL given"}))
+            return
         sys.exit("No URL given. Pass one as an argument, or copy one to your clipboard first.")
 
-    state = load_state()
-    if "--refresh" not in sys.argv and (hit := cached_result(url, state)):
-        print(f"\nAlready scraped this product — reusing {hit}")
-        print("   (run again with --refresh to re-fetch)\n")
-        clipboard_set((json.loads((hit / "data.json").read_text())).get("scraped_text", ""))
-        print("   Clipboard: product text copied.\n")
-        return
+    push_target = (opts.get("--push"), opts.get("--run"))
+    if any(push_target) and not all(push_target):
+        sys.exit("--push needs --run too (and vice versa)")
 
-    print(f"\nScraping: {url[:90]}\n")
+    try:
+        folder = scrape(url, refresh="--refresh" in opts)
+    except RateLimited as e:
+        if JSON_MODE:
+            print(json.dumps({"url": url, "error": str(e), "rate_limited": True}))
+            return
+        sys.exit("\n   " + str(e) + "\n")
+
+    if all(push_target):
+        push_to_app(push_target[0], push_target[1], folder)
+
+
+def scrape(url: str, refresh: bool) -> Path:
+    """Scrape one page into OUT_ROOT/<product>/ and return that folder."""
+    state = load_state()
+    if not refresh and (hit := cached_result(url, state)):
+        say(f"\nAlready scraped this product — reusing {hit}")
+        say("   (run again with --refresh to re-fetch)\n")
+        data = json.loads((hit / "data.json").read_text())
+        if JSON_MODE:
+            print(json.dumps(data, ensure_ascii=False))
+        else:
+            clipboard_set(data.get("scraped_text", ""))
+            say("   Clipboard: product text copied.\n")
+        return hit
+
+    say(f"\nScraping: {url[:90]}\n")
     page, mode = fetch(url)
 
     title = (page.css("title::text").get() or "").strip()
@@ -522,44 +653,52 @@ def main() -> None:
         ("COPY FROM IMAGES\n" + ocr_text[:3000]) if ocr_text else "",
         pos_block,
     ] if x)
-    clipboard_set(scraped_text)
-    (folder / "data.json").write_text(json.dumps(
-        {"url": url, "mode": mode, "title": title, "description": desc,
-         "price": price, **details, "options": options,
-         "variants": variant_prices, "long_description": long_desc,
-         "image_text": ocr_text, "positioning": positioning,
-         "scraped_text": scraped_text,
-         "images": images, "description_images": desc_images},
-        indent=2, ensure_ascii=False))
+    image_files = sorted(str(p) for p in folder.glob("*") if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
+    desc_files = sorted(str(p) for p in (folder / "description").glob("*")
+                        if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
+    data = {"url": url, "mode": mode, "title": title, "description": desc,
+            "price": price, **details, "options": options,
+            "variants": variant_prices, "long_description": long_desc,
+            "image_text": ocr_text, "positioning": positioning,
+            "scraped_text": scraped_text,
+            "images": images, "description_images": desc_images,
+            "image_files": image_files, "description_image_files": desc_files}
+    (folder / "data.json").write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
     state = load_state()
     state.setdefault("seen", {})[url] = {"folder": str(folder), "at": time.time()}
     save_state(state)
 
-    print(f"   mode:   {mode}")
-    print(f"   title:  {title[:70]}")
-    print(f"   price:  {price}")
+    if JSON_MODE:
+        print(json.dumps(data, ensure_ascii=False))
+        return folder
+
+    clipboard_set(scraped_text)
+    say(f"   mode:   {mode}")
+    say(f"   title:  {title[:70]}")
+    say(f"   price:  {price}")
     for k, v in details.items():
-        print(f"   {k + ':':8}{v}")
+        say(f"   {k + ':':8}{v}")
     for name, vals in options.items():
-        print(f"   {name + ':':8}{', '.join(vals)}")
+        say(f"   {name + ':':8}{', '.join(vals)}")
     if variant_prices:
         for v in variant_prices:
-            print(f"     - {v['title']}: {v['price']}")
-    print(f"   long description: {len(long_desc):,} chars")
+            say(f"     - {v['title']}: {v['price']}")
+    say(f"   long description: {len(long_desc):,} chars")
     if ocr_text:
-        print(f"   copy read from images: {len(ocr_text):,} chars")
+        say(f"   copy read from images: {len(ocr_text):,} chars")
     for k, v in positioning.items():
         if isinstance(v, list):
-            print(f"   {k}: {len(v)} found")
+            say(f"   {k}: {len(v)} found")
             for item in v[:3]:
-                print(f"       {item[:76]}")
+                say(f"       {item[:76]}")
         else:
-            print(f"   {k}: {v}")
-    print(f"   images: {len(images)} product"
-          + (f" + {len(desc_saved)} description" if desc_images else "") + " saved")
-    print(f"\n   Folder:    {folder}")
-    print("   Clipboard: product text copied — paste it into the pipeline app.\n")
+            say(f"   {k}: {v}")
+    say(f"   images: {len(images)} product"
+        + (f" + {len(desc_saved)} description" if desc_images else "") + " saved")
+    say(f"\n   Folder:    {folder}")
+    say("   Clipboard: product text copied — paste it into the pipeline app.\n")
+    return folder
 
 
 if __name__ == "__main__":

@@ -124,6 +124,9 @@ export async function PATCH(
     stage3_source_blacklist?: string | null;
     stage3_ref_overrides?: string | null;
     product_code?: string | null;
+    // Stage 1 · Product gate
+    product_description_edited?: string | null;
+    product_selected_images?: string | null;
   };
 
   const existing = await db.execute({
@@ -149,6 +152,11 @@ export async function PATCH(
     if (typeof body.stage3_reference_images === "string") {
       const parsed = JSON.parse(body.stage3_reference_images);
       if (!Array.isArray(parsed)) throw new Error("stage3_reference_images must be an array");
+      await assertImageUrls(parsed);
+    }
+    if (typeof body.product_selected_images === "string") {
+      const parsed = JSON.parse(body.product_selected_images);
+      if (!Array.isArray(parsed)) throw new Error("product_selected_images must be an array");
       await assertImageUrls(parsed);
     }
     if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
@@ -327,6 +335,8 @@ export async function PATCH(
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
+  if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 5000) : null); }
+  if ("product_selected_images" in body)          { fields.push("product_selected_images = ?");          values.push(body.product_selected_images ?? null); }
 
   if (fields.length === 0) {
     return Response.json({ success: true });

@@ -6,15 +6,18 @@
 
 import type { RunSummary } from "@/lib/db";
 
-export const ACTIVE_STATUSES = new Set(["pending", "scraping", "stage1", "stage2", "generating_hero", "generating_remaining"]);
-export const WAITING_STATUSES = new Set(["awaiting_stage2_approval", "awaiting_user", "awaiting_qc", "awaiting_hero_qc"]);
+export const ACTIVE_STATUSES = new Set(["pending", "product", "scraping", "stage1", "stage2", "generating_hero", "generating_remaining"]);
+export const WAITING_STATUSES = new Set(["awaiting_product_approval", "awaiting_stage2_approval", "awaiting_user", "awaiting_qc", "awaiting_hero_qc"]);
 
+// Display numbering: Product = 1, Research = 2, Copy = 3, Images = 4. The
+// internal status/column names predate the product stage and stay as they are.
 export const STATUS_LABEL: Record<string, string> = {
-  pending: "Starting…", scraping: "Stage 1 · Research", stage1: "Stage 1 · Research",
-  awaiting_stage2_approval: "Awaiting your review", stage2: "Stage 2 · Copy",
+  pending: "Starting…", product: "Stage 2 · Product", awaiting_product_approval: "Awaiting your review",
+  scraping: "Stage 3 · Research", stage1: "Stage 3 · Research",
+  awaiting_stage2_approval: "Awaiting your review", stage2: "Stage 4 · Copy",
   awaiting_user: "Awaiting review", awaiting_qc: "Awaiting QC",
-  generating_hero: "Stage 3 · Hero", awaiting_hero_qc: "Stage 3 · Review hero",
-  generating_remaining: "Stage 3 · Prompts", completed: "Complete", failed: "Failed", cancelled: "Cancelled",
+  generating_hero: "Stage 4 · Hero", awaiting_hero_qc: "Stage 4 · Review hero",
+  generating_remaining: "Stage 4 · Prompts", completed: "Complete", failed: "Failed", cancelled: "Cancelled",
 };
 export const statusLabel = (s: string | null | undefined) => (s ? STATUS_LABEL[s] ?? s : "");
 
@@ -53,7 +56,7 @@ export function truncateUrl(url?: string | null, max = 52): string {
   catch { return url.slice(0, max); }
 }
 
-// Thumbnail source: the generated Stage 3 hero if there is one, else the first
+// Thumbnail source: the generated Stage 4 hero if there is one, else the first
 // uploaded source photo, else null (→ gradient mesh placeholder).
 export function thumbUrl(r: Pick<RunSummary, "stage3_hero_image_url" | "uploaded_source_images">): string | null {
   if (r.stage3_hero_image_url) return r.stage3_hero_image_url;

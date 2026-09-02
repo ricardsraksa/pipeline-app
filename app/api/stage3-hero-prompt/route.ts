@@ -5,7 +5,7 @@ import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 
 import { requireSession } from "@/lib/auth";
-// Phase 1 of hero-first Stage 3: generate ONE hero studio shot from the
+// Phase 1 of hero-first Stage 4: generate ONE hero studio shot from the
 // SOURCE product photos, then stop at the hero QC gate.
 // Submit + poll image gen can take ~40s, plus the prompt call — give it room.
 export const maxDuration = 600
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 3: Generating hero shot', last_updated_at: new Date().toISOString() })
+    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 4: Generating hero shot', last_updated_at: new Date().toISOString() })
 
     const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       stage3_hero_image_url: imageUrl,
       stage3_hero_approved: 0,
       status: 'awaiting_hero_qc',
-      current_step: 'Stage 3: Review the hero shot',
+      current_step: 'Stage 4: Review the hero shot',
       last_updated_at: new Date().toISOString(),
     })
 

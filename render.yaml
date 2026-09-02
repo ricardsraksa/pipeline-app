@@ -1,11 +1,12 @@
 services:
   - type: web
     name: pipeline-app
-    runtime: node
-    plan: starter
+    # Docker: Stage 1 runs a Python scraper with a real Chromium (see Dockerfile).
+    # The browser path needs ~1GB, so the plan must be Standard (2GB) or larger.
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard
     numInstances: 1
-    buildCommand: npm ci && npm run build
-    startCommand: node server.mjs
     healthCheckPath: /login
     envVars:
       - key: NODE_ENV

@@ -5,18 +5,24 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import ModelSettings from "@/components/ModelSettings";
 
-type Stage = "stage1" | "stage2" | "stage3";
+// Internal keys are one behind the displayed numbers (the product stage was
+// added in front): product = Stage 1, stage1 = Stage 2, and so on.
+type Stage = "product" | "stage1" | "stage2" | "stage3";
+
+const STAGE_ORDER: Stage[] = ["product", "stage1", "stage2", "stage3"];
 
 const STAGE_LABELS: Record<Stage, string> = {
-  stage1: "Stage 1 — Research Brief",
-  stage2: "Stage 2 — Copy",
-  stage3: "Stage 3 — Image Prompts",
+  product: "Stage 1 — Product Description",
+  stage1: "Stage 2 — Research Brief",
+  stage2: "Stage 3 — Copy",
+  stage3: "Stage 4 — Image Prompts",
 };
 
 const STAGE_NUMS: Record<Stage, string> = {
-  stage1: "01",
-  stage2: "02",
-  stage3: "03",
+  product: "01",
+  stage1: "02",
+  stage2: "03",
+  stage3: "04",
 };
 
 interface HistoryEntry {
@@ -46,7 +52,7 @@ export default function SettingsPage() {
     const data = await fetch("/api/prompts").then((r) => r.json());
     setPrompts((prev) => {
       const state: Record<Stage, PromptState> = {} as Record<Stage, PromptState>;
-      for (const stage of ["stage1", "stage2", "stage3"] as Stage[]) {
+      for (const stage of STAGE_ORDER) {
         const prevS = prev?.[stage];
         state[stage] = {
           current: data[stage],
@@ -168,7 +174,7 @@ export default function SettingsPage() {
       <ModelSettings />
 
       <div className="space-y-5">
-        {(["stage1", "stage2", "stage3"] as Stage[]).map((stage) => {
+        {STAGE_ORDER.map((stage) => {
           const s = prompts[stage];
           const isModified = s.editing !== s.default;
 

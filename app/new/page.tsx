@@ -1,7 +1,8 @@
 "use client";
 
-// v2 guided New Run (newrun2.jsx): numbered steps, one card, one CTA.
-// Real wiring: R2 uploads via /api/upload-source-images, start via /api/runs/start.
+// New Run: paste the product link (and any competitor / brand links), add your
+// own photos if you have them, go. Stage 1 scrapes the pages and writes the
+// product description; you review it before research starts.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,6 @@ import Link from "next/link";
 import { useDropzone } from "react-dropzone";
 import { Icon } from "@/components/ui/Icon";
 
-const MIN_DESC = 20;
 const MAX_IMG = 10;
 const inputCls = "w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[13px] py-[11px] text-sm transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] placeholder:text-[var(--color-text-4)]";
 
@@ -31,29 +31,25 @@ function StepNum({ n, done }: { n: number; done: boolean }) {
 
 export default function NewRunPage() {
   const router = useRouter();
-  const descRef = useRef<HTMLTextAreaElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
 
-  const [desc, setDesc] = useState("");
+  const [productUrl, setProductUrl] = useState("");
+  const [competitors, setCompetitors] = useState("");
   const [sourceImages, setSourceImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [productUrl, setProductUrl] = useState("");
-  const [competitors, setCompetitors] = useState("");
-  const [showUrls, setShowUrls] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  useEffect(() => { descRef.current?.focus(); }, []);
+  useEffect(() => { urlRef.current?.focus(); }, []);
 
   const competitorList = useMemo(
     () => competitors.split("\n").map((u) => u.trim()).filter(Boolean),
     [competitors]
   );
-  const urlValid = !productUrl.trim() || looksLikeUrl(productUrl.trim());
-  const competitorsValid = competitorList.every(looksLikeUrl);
-  const descOk = desc.trim().length >= MIN_DESC;
-  const imagesOk = sourceImages.length > 0;
-  const canStart = descOk && imagesOk && urlValid && competitorsValid && !submitting && !uploading;
+  const urlOk = looksLikeUrl(productUrl.trim());
+  const competitorsValid = competitorList.every(looksLikeUrl) && competitorList.length <= 5;
+  const canStart = urlOk && competitorsValid && !submitting && !uploading;
 
   async function uploadFiles(files: File[]) {
     if (!files.length) return;
@@ -91,10 +87,9 @@ export default function NewRunPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productDescription: desc.trim(),
-          sourceImages,
-          productUrl: productUrl.trim() || undefined,
+          productUrl: productUrl.trim(),
           competitorUrls: competitorList.length ? competitorList.slice(0, 5) : undefined,
+          sourceImages,
         }),
       });
       const data = await res.json();
@@ -111,7 +106,7 @@ export default function NewRunPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desc, sourceImages, productUrl, competitors, submitting, uploading]);
+  }, [productUrl, competitors, sourceImages, submitting, uploading]);
 
   return (
     <div className="px-6 py-8 max-w-[680px] mx-auto" data-screen-label="New Run">
@@ -120,31 +115,43 @@ export default function NewRunPage() {
       </Link>
       <div className="mb-5">
         <h1 className="text-[26px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">New run</h1>
-        <p className="text-[13px] text-[var(--color-text-2)] mt-1">Two things needed. We&rsquo;ll pause for your review between stages.</p>
+        <p className="text-[13px] text-[var(--color-text-2)] mt-1">Paste the product link. Stage 1 reads the page, writes the description and pauses for your review.</p>
       </div>
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] divide-y divide-[var(--color-border)] overflow-hidden">
-        {/* 1 — describe */}
+        {/* 1 — product link */}
         <div className="px-5 py-5">
           <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2.5"><StepNum n={1} done={descOk} /><label className="text-[13.5px] font-[650] text-[var(--color-text)]">Describe the product</label></div>
-            <span className="ff-mono text-[11px] text-[var(--color-text-4)]">{desc.trim().length}/{MIN_DESC}+</span>
+            <div className="flex items-center gap-2.5"><StepNum n={1} done={urlOk} /><label className="text-[13.5px] font-[650] text-[var(--color-text)]">Product link</label></div>
+            <span className="ff-mono text-[11px] text-[var(--color-text-4)]">AliExpress, Alibaba, Shopify…</span>
           </div>
-          <textarea ref={descRef} value={desc} onChange={(e) => setDesc(e.target.value)} rows={4}
-            placeholder="What it is, who it's for, key features, how it works…"
-            disabled={submitting}
-            className={cx(inputCls, "resize-y disabled:opacity-40", desc.length > 0 && !descOk && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
-          {desc.length > 0 && !descOk && <p className="mt-1.5 text-[11px] text-[var(--color-red)] ff-mono">Need at least {MIN_DESC} characters</p>}
+          <input ref={urlRef} value={productUrl} onChange={(e) => setProductUrl(e.target.value)} spellCheck={false} disabled={submitting}
+            placeholder="https://www.aliexpress.com/item/…"
+            className={cx(inputCls, "ff-mono text-[12.5px] disabled:opacity-40", productUrl.length > 0 && !urlOk && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
+          {productUrl.length > 0 && !urlOk && <p className="mt-1.5 text-[11px] text-[var(--color-red)] ff-mono">Needs a full https:// link</p>}
+          <p className="mt-2 text-[11.5px] text-[var(--color-text-3)]">The supplier listing is the source of truth for specs. Pages that only render in a browser take about a minute.</p>
         </div>
 
-        {/* 2 — photos */}
+        {/* 2 — competitors */}
         <div className="px-5 py-5">
           <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2.5"><StepNum n={2} done={imagesOk} /><label className="text-[13.5px] font-[650] text-[var(--color-text)]">Add product photos</label></div>
+            <div className="flex items-center gap-2.5"><StepNum n={2} done={competitorList.length > 0 && competitorsValid} /><label className="text-[13.5px] font-[650] text-[var(--color-text)]">Competitor / brand links <span className="text-[var(--color-text-4)] font-normal">optional</span></label></div>
+            <span className="ff-mono text-[11px] text-[var(--color-text-4)]">{competitorList.length}/5 · one per line</span>
+          </div>
+          <textarea value={competitors} onChange={(e) => setCompetitors(e.target.value)} rows={3} spellCheck={false} disabled={submitting}
+            placeholder="https://brand.com/products/…"
+            className={cx(inputCls, "ff-mono text-[12px] resize-y disabled:opacity-40", competitorList.length > 0 && !competitorsValid && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
+          <p className="mt-2 text-[11.5px] text-[var(--color-text-3)]">Brand pages are read for positioning only — never for specs, never for the name.</p>
+        </div>
+
+        {/* 3 — own photos */}
+        <div className="px-5 py-5">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2.5"><StepNum n={3} done={sourceImages.length > 0} /><label className="text-[13.5px] font-[650] text-[var(--color-text)]">Your own photos <span className="text-[var(--color-text-4)] font-normal">optional</span></label></div>
             <span className="ff-mono text-[11px] text-[var(--color-text-4)]">{sourceImages.length}/{MAX_IMG}</span>
           </div>
           <div {...getRootProps()}
-            className={cx("border-dashed border-2 rounded-[var(--radius-sm)] p-6 text-center tr",
+            className={cx("border-dashed border-2 rounded-[var(--radius-sm)] p-5 text-center tr",
               isDragActive ? "border-[var(--color-accent)] bg-[var(--color-accent-weak)]" : "border-[var(--color-border-strong)] bg-[var(--color-surface-2)] hover:border-[var(--color-accent)]",
               sourceImages.length >= MAX_IMG || submitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer")}>
             <input {...getInputProps()} />
@@ -152,7 +159,7 @@ export default function NewRunPage() {
             <p className="text-[13px] font-[550] text-[var(--color-text-2)]">
               {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : sourceImages.length >= MAX_IMG ? "Maximum reached" : "Drag photos here or click to add"}
             </p>
-            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-1">jpg, png, webp, heic · 8MB each</p>
+            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-1">The scraped listing photos are added automatically — this is for photos the page doesn&rsquo;t have.</p>
           </div>
           {uploadError && <p className="mt-2 text-[11px] text-[var(--color-red)] ff-mono">{uploadError}</p>}
           {sourceImages.length > 0 && (
@@ -168,30 +175,6 @@ export default function NewRunPage() {
                   </button>
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* optional urls */}
-        <div>
-          <button onClick={() => setShowUrls((v) => !v)} className="cursor-pointer w-full flex items-center gap-2 px-5 py-3 text-left hover:bg-[var(--color-surface-2)] tr">
-            <Icon.ChevronRight className={cx("w-3.5 h-3.5 text-[var(--color-text-3)] transition-transform", showUrls && "rotate-90")} />
-            <span className="text-[12.5px] font-[600] text-[var(--color-text-2)]">Optional: product &amp; competitor URLs</span>
-          </button>
-          {showUrls && (
-            <div className="px-5 pb-5 space-y-4 fade-in">
-              <div>
-                <label className="eyebrow block mb-2">Product URL</label>
-                <input value={productUrl} onChange={(e) => setProductUrl(e.target.value)} spellCheck={false}
-                  placeholder="https://www.aliexpress.com/item/…"
-                  className={cx(inputCls, productUrl.length > 0 && !urlValid && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
-              </div>
-              <div>
-                <label className="eyebrow block mb-2">Competitor URLs <span className="text-[var(--color-text-4)] normal-case font-normal tracking-normal ml-1.5">one per line, max 5</span></label>
-                <textarea value={competitors} onChange={(e) => setCompetitors(e.target.value)} rows={3} spellCheck={false}
-                  placeholder="https://example.com/product"
-                  className={cx(inputCls, "ff-mono text-[12px] resize-y", competitorList.length > 0 && !competitorsValid && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
-              </div>
             </div>
           )}
         </div>

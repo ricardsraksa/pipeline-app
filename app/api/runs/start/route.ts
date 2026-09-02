@@ -4,6 +4,7 @@ import { createRun } from "@/lib/db";
 import { runPipeline } from "@/lib/pipeline-runner";
 
 import { requireSession } from "@/lib/auth";
+import { assertPublicUrl } from "@/lib/ssrf";
 export const maxDuration = 10;
 
 export async function POST(req: NextRequest) {
@@ -19,13 +20,9 @@ export async function POST(req: NextRequest) {
     url?: string;
   };
 
+  // Stage 1 now writes the description from the pasted URL(s); a typed one is
+  // optional and, when present, is shown to the analyst as operator notes.
   const productDescription = body.productDescription?.trim() ?? "";
-  if (productDescription.length < 20) {
-    return NextResponse.json(
-      { error: "Product description required (minimum 20 characters)" },
-      { status: 400 }
-    );
-  }
   // Upper cap: anything past this is abuse, not a description — it would bloat
   // the DB row and the downstream LLM prompt (and its cost).
   if (productDescription.length > 20000) {
@@ -38,19 +35,21 @@ export async function POST(req: NextRequest) {
   const sourceImages = Array.isArray(body.sourceImages)
     ? body.sourceImages.filter((s): s is string => typeof s === "string" && !!s && s.length <= 2048)
     : [];
-  if (sourceImages.length === 0) {
-    return NextResponse.json(
-      { error: "At least one source image required" },
-      { status: 400 }
-    );
-  }
   if (sourceImages.length > 10) {
     return NextResponse.json({ error: "Max 10 source images" }, { status: 400 });
   }
 
   const productUrl = (body.productUrl ?? body.url ?? "").trim();
+  if (!/^https?:\/\//i.test(productUrl)) {
+    return NextResponse.json({ error: "Product URL required (https://…)" }, { status: 400 });
+  }
   if (productUrl.length > 2048) {
     return NextResponse.json({ error: "Product URL too long" }, { status: 400 });
+  }
+  try {
+    await assertPublicUrl(productUrl);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "Blocked URL" }, { status: 400 });
   }
   const competitorUrls = Array.isArray(body.competitorUrls)
     ? body.competitorUrls.map((u) => u.trim()).filter((u) => !!u && u.length <= 2048).slice(0, 5)

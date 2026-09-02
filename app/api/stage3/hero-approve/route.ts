@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     await updateRun(runId, {
       stage3_hero_approved: 1,
       status: 'generating_remaining',
-      current_step: 'Stage 3: Writing the 8 derivative prompts',
+      current_step: 'Stage 4: Writing the 8 derivative prompts',
       last_updated_at: new Date().toISOString(),
     })
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       stage3_remaining_prompts: JSON.stringify(prompts),
       stage3_remaining_validation: JSON.stringify(validation),
       status: 'awaiting_qc',
-      current_step: 'Stage 3: Review the 8 prompts before generating',
+      current_step: 'Stage 4: Review the 8 prompts before generating',
       last_updated_at: new Date().toISOString(),
     })
 

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { saveFeedback, type FeedbackStore } from "@/lib/stage3/learning";
 
-// This store is fed back into the legacy Stage 3 system prompt, so every
+// This store is fed back into the legacy Stage 4 system prompt, so every
 // string here is prompt-injection surface. Validate shape strictly, cap
 // lengths, and drop anything that isn't a plain string/boolean.
 const MAX_STR = 4_000;

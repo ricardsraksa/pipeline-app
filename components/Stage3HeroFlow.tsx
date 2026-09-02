@@ -62,7 +62,7 @@ function reasonsFor(im: RemImage): string[] {
   return Array.from(new Set(all));
 }
 
-// Human-readable label for each Stage 3 image template, so the operator knows
+// Human-readable label for each Stage 4 image template, so the operator knows
 // which part of the copy each image pairs with.
 const CATEGORY_LABELS: Record<string, string> = {
   hero: "Hero shot",
@@ -95,7 +95,7 @@ export default function Stage3HeroFlow({
   stage2Ready,
 }: {
   runId: number;
-  /** Stage 2 is done — Stage 3 is allowed to start. */
+  /** Stage 3 is done — Stage 4 is allowed to start. */
   stage2Ready: boolean;
 }) {
   const [run, setRun] = useState<Run | null>(null);
@@ -197,7 +197,7 @@ export default function Stage3HeroFlow({
   }
 
   if (!run) {
-    return <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Loading Stage 3…</p>;
+    return <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Loading Stage 4…</p>;
   }
 
   // Source-image picker data: all candidate photos (uploaded + scraped, deduped)
@@ -243,8 +243,8 @@ export default function Stage3HeroFlow({
       body: JSON.stringify({ stage3_ref_overrides: JSON.stringify(merged) }),
     }).catch(() => {});
   };
-  // Backward compat: a run completed under the OLD Stage 3 path stores its
-  // images in `generated_images`. Treat that as "already has Stage 3" so we
+  // Backward compat: a run completed under the OLD Stage 4 path stores its
+  // images in `generated_images`. Treat that as "already has Stage 4" so we
   // don't offer the hero entry on a finished old run.
   const hasOldImages = !!run.generated_images;
   const heroFlowStarted =
@@ -258,7 +258,7 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-3">
         <p className="text-[13px] text-[var(--color-text-2)]">
-          Stage 3 generates a <strong>hero shot first</strong> from your source product photos. You approve it, then the other 8 images are built using the approved hero as the reference — so the product stays consistent.
+          Stage 4 generates a <strong>hero shot first</strong> from your source product photos. You approve it, then the other 8 images are built using the approved hero as the reference — so the product stays consistent.
         </p>
         <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
         {err && <ErrBox msg={err} />}
@@ -268,7 +268,7 @@ export default function Stage3HeroFlow({
             onClick={() => trigger("/api/stage3-hero-prompt", { runId }, "hero")}
             className={btnPrimary}
           >
-            {busy === "hero" ? "Generating hero…" : "Generate Stage 3 — Hero first →"}
+            {busy === "hero" ? "Generating hero…" : "Generate Stage 4 — Hero first →"}
           </button>
           <button
             disabled={!stage2Ready || busy !== null}
@@ -281,7 +281,7 @@ export default function Stage3HeroFlow({
         <p className="text-[11px] text-[var(--color-text-3)] max-w-md">
           “Skip hero” builds the 8 images straight from your source product photos as the reference, instead of generating and approving a hero shot first.
         </p>
-        {!stage2Ready && <p className="text-[11px] text-[var(--color-text-3)]">Finish Stage 2 first.</p>}
+        {!stage2Ready && <p className="text-[11px] text-[var(--color-text-3)]">Finish Stage 3 first.</p>}
       </div>
     );
   }
@@ -671,8 +671,8 @@ export default function Stage3HeroFlow({
       .map((g, i) => ({ index: i + 1, category: g.category || "", image_url: g.image_url as string, status: "done" as const }));
     return (
       <div className="space-y-3">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Stage 3 images ({imgs.length})</h3>
-        <p className="text-[11px] text-[var(--color-text-3)]">Generated on the previous Stage 3 flow.</p>
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Stage 4 images ({imgs.length})</h3>
+        <p className="text-[11px] text-[var(--color-text-3)]">Generated on the previous Stage 4 flow.</p>
         <GenGrid heroUrl={null} images={imgs} />
       </div>
     );
@@ -693,10 +693,10 @@ export default function Stage3HeroFlow({
     };
     return (
       <div className="space-y-3">
-        <ErrBox msg={`${what} — the generation step was interrupted. Restart Stage 3 to try again from the start.`} />
+        <ErrBox msg={`${what} — the generation step was interrupted. Restart Stage 4 to try again from the start.`} />
         <div className="flex gap-3 flex-wrap">
           <button disabled={busy !== null} onClick={restart} className={btnPrimary}>
-            {busy === "recover" ? "Restarting…" : "Restart Stage 3"}
+            {busy === "recover" ? "Restarting…" : "Restart Stage 4"}
           </button>
           <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
         </div>
@@ -714,7 +714,7 @@ export default function Stage3HeroFlow({
           <img src={heroUrl} alt="Hero" className="rounded-lg max-w-xs border border-[var(--color-border)]" />
         </>
       )}
-      <p className="text-[12px] text-[var(--color-text-3)]">Stage 3 status: {status || "unknown"}.</p>
+      <p className="text-[12px] text-[var(--color-text-3)]">Stage 4 status: {status || "unknown"}.</p>
       <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
     </div>
   );
@@ -1259,7 +1259,7 @@ function CompletedReview({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 3 complete · hero + 8" : "Stage 3 images"}</h3>
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 4 complete · hero + 8" : "Stage 4 images"}</h3>
         <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
         {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
         {fixable.length > 0 && (
@@ -1792,7 +1792,7 @@ function ShopifyPush({ runId }: { runId: number }) {
   );
 }
 
-/* ── Fullscreen lightbox for Stage 3 images ──────────────────────────────
+/* ── Fullscreen lightbox for Stage 4 images ──────────────────────────────
    Opened from any image tile. Esc or backdrop click closes; ←/→ (keys or the
    on-screen arrows) cycle through every image in the current grid. */
 function Lightbox({

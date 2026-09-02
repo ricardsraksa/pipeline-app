@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   let json: Stage2Json | null = null;
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* fall through */ }
-  if (!json) return Response.json({ success: false, error: "No structured Stage 2 copy on this run yet" }, { status: 400 });
+  if (!json) return Response.json({ success: false, error: "No structured Stage 3 copy on this run yet" }, { status: 400 });
 
   let competitorUrl: string | undefined;
   try { competitorUrl = (JSON.parse(run.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }

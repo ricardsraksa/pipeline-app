@@ -18,6 +18,25 @@ on the Mac and pasted in. At ~10 products/week that trade is worth ~$300/year.
 The app detects this case and returns a message pointing here instead of
 handing the pipeline a blank description.
 
+## Where it runs now
+
+Since v2.46.0 this script is also **Stage 1 of the pipeline itself**: the app
+runs it on the server (Docker image with Python + Chromium, see the root
+`Dockerfile`) for every link pasted on New Run, then the analyst model writes
+the product description from what it read. You review that description and
+tick the photos before research starts.
+
+Running it on the Mac is the fallback for when the supplier site rate-limits
+the server's datacenter IP. The run page shows the exact command; it looks like:
+
+```bash
+scrapling-py ~/Desktop/supplier-scrape.py --push https://pipeline-app-6icd.onrender.com --run 123 <url>
+```
+
+It scrapes here (residential IP), asks for the app password once (never
+stored), and posts the text + photos straight onto that run, which then
+writes the description as usual.
+
 ## Usage
 
 ```bash

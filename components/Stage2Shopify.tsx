@@ -1,6 +1,6 @@
 "use client";
 
-// Shopify hand-off view: the Stage 2 copy kit as a flat list of rows matching
+// Shopify hand-off view: the Stage 3 copy kit as a flat list of rows matching
 // the Shopify product-metafields panel exactly — same labels, same order, one
 // copy button per field — so each value pastes straight into its field.
 // (Labels mirror the store's own definitions verbatim, including its

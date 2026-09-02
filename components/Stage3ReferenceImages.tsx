@@ -1,6 +1,6 @@
 "use client";
 
-// Extra Stage 3 reference images. The operator uploads scene/style references
+// Extra Stage 4 reference images. The operator uploads scene/style references
 // (same R2 upload flow as the New Run source photos); the prompt writer sees
 // them and decides per image which to attach to Higgsfield. Saved on the run;
 // they take effect the next time the prompts are (re)generated.

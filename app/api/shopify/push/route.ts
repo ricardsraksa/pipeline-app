@@ -4,8 +4,8 @@ import { getRun } from '@/lib/db'
 import { createDraftProduct } from '@/lib/shopify'
 import { whatsIncluded, type Stage2Json } from '@/lib/stage2/shape'
 
-// Push a finished run to Shopify as a DRAFT product: Stage 2 copy becomes the
-// product description, the hero + the 8 Stage 3 images become the product media.
+// Push a finished run to Shopify as a DRAFT product: Stage 3 copy becomes the
+// product description, the hero + the 8 Stage 4 images become the product media.
 // Draft on purpose — pricing/variants and publishing stay a human decision.
 export const maxDuration = 120
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
   }
   const descriptionHtml = buildDescriptionHtml(copy, canonicalText)
   if (!descriptionHtml.trim()) {
-    return Response.json({ success: false, error: 'This run has no Stage 2 copy to publish.' }, { status: 400 })
+    return Response.json({ success: false, error: 'This run has no Stage 3 copy to publish.' }, { status: 400 })
   }
 
   // Hero first, then the derivatives in prompt order — that's the sequence the

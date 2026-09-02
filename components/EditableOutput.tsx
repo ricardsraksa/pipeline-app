@@ -58,7 +58,7 @@ export default function EditableOutput({
 
   async function copyValue() {
     const text = editedValue ?? originalValue;
-    // Stage 2 is customer copy that gets pasted into a Google Doc — write an
+    // Stage 3 is customer copy that gets pasted into a Google Doc — write an
     // HTML clipboard flavor forcing black 11pt Arial so it lands at the right
     // size (Docs measures in points; px or plain text would inherit the doc's
     // current size). Other stages keep a plain-text copy.
@@ -250,7 +250,7 @@ export default function EditableOutput({
         ) : (
           <div>
             {stage === "stage2" ? (
-              // Stage 2 is customer copy bound for a Google Doc. Render it in a
+              // Stage 3 is customer copy bound for a Google Doc. Render it in a
               // white "document" box with black 11pt Arial so a manual
               // select-and-copy (Cmd+C) carries that formatting and lands at
               // size 11 Arial in the Doc — while staying readable in dark mode.

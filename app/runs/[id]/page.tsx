@@ -2,8 +2,8 @@
 
 // v2 run page (run2.jsx): header with thumb, live log while running, stepper +
 // accordion stage cards with progressive disclosure, sticky bottom action bar.
-// All real wiring preserved: polling, kill, resume, restart, Stage 2 approval,
-// editing, AI regenerate, feedback, Stage 3 hero flow, product code, downloads.
+// All real wiring preserved: polling, kill, resume, restart, Stage 3 approval,
+// editing, AI regenerate, feedback, Stage 4 hero flow, product code, downloads.
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -23,27 +23,40 @@ import RunProductCode from "@/components/RunProductCode";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
 import SendToDoc from "@/components/SendToDoc";
+import ProductGate from "@/components/ProductGate";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
 // ── Stage state ───────────────────────────────────────────────────────────────
 
-type StageKey = "stage1" | "stage2" | "stage3";
+// Internal keys are one behind the numbers on screen: product = Stage 1,
+// stage1 = Stage 2 (research), stage2 = Stage 3 (copy), stage3 = Stage 4 (images).
+type StageKey = "product" | "stage1" | "stage2" | "stage3";
 type StageState = "pending" | "running" | "complete" | "error" | "waiting";
+
+const PRODUCT_ACTIVE = ["product", "pending"];
+const PRODUCT_DONE = (run: RunStatus) => Boolean(run.product?.approvedAt);
 
 function getStageState(run: RunStatus, stage: StageKey): StageState {
   const isFailed = run.status === "failed";
   const failedAt: StageKey | null = !isFailed ? null
     : run.outputs.stage2Output ? "stage3"
     : run.outputs.onePager || run.outputs.research ? "stage2"
-    : "stage1";
+    : PRODUCT_DONE(run) ? "stage1"
+    : "product";
   if (failedAt === stage) return "error";
 
   switch (stage) {
+    case "product":
+      if (PRODUCT_DONE(run)) return "complete";
+      if (run.status === "awaiting_product_approval") return "waiting";
+      if (PRODUCT_ACTIVE.includes(run.status)) return "running";
+      // Runs from before the product stage existed: nothing to show.
+      return run.product?.scrape ? "waiting" : "complete";
     case "stage1":
       if (run.outputs.onePager) return "complete";
-      if (["stage1", "scraping", "pending"].includes(run.status)) return "running";
+      if (["stage1", "scraping"].includes(run.status)) return "running";
       if (run.outputs.research) return "running";
       return "pending";
     case "stage2":
@@ -64,7 +77,7 @@ function isStuck(run: RunStatus): boolean {
   const ageMs = Date.now() - new Date(run.timestamps.lastUpdatedAt).getTime();
   return (
     ageMs > 10 * 60 * 1000 &&
-    !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status)
+    !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_product_approval", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status)
   );
 }
 
@@ -122,7 +135,7 @@ function OnePagerMarkdown({ text }: { text: string }) {
 type LogLine = { k: string; t: string };
 
 function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
-  const active = !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status);
+  const active = !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_product_approval", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [log.length]);
   if (!active || !log.length) return null;
@@ -150,10 +163,12 @@ function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
 // ── Stage accordion card ──────────────────────────────────────────────────────
 
 const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
-  { key: "stage1", id: "v2-stage-1", n: 1, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
-  { key: "stage2", id: "v2-stage-2", n: 2, title: "Copy", what: "Full DTC copy kit from the approved research" },
-  { key: "stage3", id: "v2-stage-3", n: 3, title: "Images", what: "Hero shot first, then 8 derivatives" },
+  { key: "product", id: "v2-stage-product", n: 1, title: "Product", what: "Scrape the links, write the description, pick the photos" },
+  { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
+  { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Full DTC copy kit from the approved research" },
+  { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero shot first, then 8 derivatives" },
 ];
+const stageId = (key: StageKey) => STAGE_DEFS.find((d) => d.key === key)?.id ?? "";
 
 const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
 
@@ -212,12 +227,12 @@ function StartPrompt({ description, competitorUrls }: { description: string; com
         onClick={() => setOpen((v) => !v)}
         className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr"
       >
-        {open ? "Hide start prompt" : "View start prompt"}
+        {open ? "Hide product description" : "View product description"}
       </button>
       {open && (
         <div className="mt-2 border border-[var(--color-border)] rounded-[var(--radius-sm)] bg-[var(--color-surface)] overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
-            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">What you entered to start this run</span>
+            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">Product description used for research</span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(description).then(() => {
@@ -242,7 +257,7 @@ function StartPrompt({ description, competitorUrls }: { description: string; com
 
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
-type RestartStage = "stage1" | "stage2" | "stage3-prompts";
+type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts";
 
 function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
   stage: RestartStage;
@@ -252,7 +267,7 @@ function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
   restarting: boolean;
 }) {
   const btn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
-  const label = stage === "stage1" ? "Stage 1" : stage === "stage2" ? "Stage 2" : "Stage 3";
+  const label = stage === "product" ? "Stage 1" : stage === "stage1" ? "Stage 2" : stage === "stage2" ? "Stage 3" : "Stage 4";
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {prevId && (
@@ -353,9 +368,9 @@ export default function RunPage() {
     try {
       const res = await fetch(`/api/runs/${runId}/start-stage2`, { method: "POST" });
       const data = await res.json();
-      if (!data.success) push(`Failed to start Stage 2: ${data.error ?? "unknown error"}`);
+      if (!data.success) push(`Failed to start Stage 3: ${data.error ?? "unknown error"}`);
     } catch (err) {
-      push(`Failed to start Stage 2: ${err instanceof Error ? err.message : String(err)}`);
+      push(`Failed to start Stage 3: ${err instanceof Error ? err.message : String(err)}`);
     } finally { setTimeout(() => setStartingStage2(false), 1200); }
   }
 
@@ -363,8 +378,10 @@ export default function RunPage() {
     if (!runId || restarting) return;
     const isStage3 = stage === "stage3-prompts";
     if (!window.confirm(isStage3
-      ? "Restart Stage 3 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 3 start."
-      : `Restart ${stage === "stage1" ? "Stage 1" : "Stage 2"}? This clears that stage's output and re-runs it.`)) return;
+      ? "Restart Stage 4 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 4 start."
+      : stage === "product"
+      ? "Restart Stage 1? This re-scrapes the links, rewrites the description and clears the research, then pauses for your review again."
+      : `Restart ${stage === "stage1" ? "Stage 2" : "Stage 3"}? This clears that stage's output and re-runs it.`)) return;
     setRestarting(true);
     try {
       const res = await fetch(`/api/runs/${runId}/restart-stage`, {
@@ -400,6 +417,7 @@ export default function RunPage() {
     const zip = new JSZip();
     const { outputs } = run;
     const files: [string | null, string][] = [
+      [run.meta.productDescription, `${slug}_PRODUCT_DESCRIPTION.txt`],
       [outputs.onePagerEdited ?? outputs.onePager, `${slug}_STAGE1_ONE_PAGER.md`],
       [outputs.research, `${slug}_RESEARCH.txt`],
       [outputs.chiefMid, `${slug}_CHIEF_MID.txt`],
@@ -484,11 +502,12 @@ export default function RunPage() {
   const elapsed = elapsedTime(run.timestamps.startedAt, run.timestamps.completedAt);
 
   const states: Record<StageKey, StageState> = {
+    product: getStageState(run, "product"),
     stage1: getStageState(run, "stage1"),
     stage2: getStageState(run, "stage2"),
     stage3: getStageState(run, "stage3"),
   };
-  // The approval gate after research belongs on Stage 1 — that's what needs review.
+  // The approval gate after research belongs on Stage 2 — that's what needs review.
   if (run.status === "awaiting_stage2_approval") { states.stage1 = "waiting"; states.stage2 = "pending"; }
 
   const autoOpen = (key: StageKey) => stageActionable(states[key]) || (run.status === "completed" && key === "stage3");
@@ -496,10 +515,15 @@ export default function RunPage() {
   const toggle = (key: StageKey) => setOverrides((p) => ({ ...p, [key]: !isOpen(key) }));
   const openStage = (key: StageKey) => {
     setOverrides((p) => ({ ...p, [key]: true }));
-    setTimeout(() => document.getElementById("v2-stage-" + key.slice(-1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    setTimeout(() => document.getElementById(stageId(key))?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
 
   const summary = (key: StageKey): string | null => {
+    if (key === "product") {
+      const d = run.product?.descriptionEdited ?? run.product?.descriptionAi ?? run.meta.productDescription;
+      if (!d) return null;
+      return d.replace(/\s+/g, " ").slice(0, 90) + (d.length > 90 ? "…" : "") + (run.product?.descriptionEdited ? " · edited" : "");
+    }
     if (key === "stage1") {
       if (!outputs.onePager) return null;
       return (run.meta.brandName ? run.meta.brandName + " · " : "") + "research one-pager" + (outputs.onePagerEdited ? " · edited" : "");
@@ -513,7 +537,8 @@ export default function RunPage() {
   };
 
   const present: Record<StageKey, boolean> = {
-    stage1: Boolean(outputs.onePager) || ["stage1", "scraping", "pending"].includes(run.status),
+    product: Boolean(run.product?.scrape) || PRODUCT_DONE(run) || [...PRODUCT_ACTIVE, "awaiting_product_approval"].includes(run.status),
+    stage1: Boolean(outputs.onePager) || ["stage1", "scraping"].includes(run.status) || Boolean(outputs.research) || PRODUCT_DONE(run),
     stage2: Boolean(outputs.stage2Output) || run.status === "stage2" || Boolean(outputs.onePager),
     stage3: Boolean(outputs.stage2Output) ||
       ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status),
@@ -522,8 +547,9 @@ export default function RunPage() {
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
-    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the copy.", cta: startingStage2 ? "Starting…" : "Run Stage 2", onClick: handleStartStage2 };
-    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 3", onClick: () => openStage("stage3") };
+    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Product description ready for your review", sub: "Check the text, tick the photos, then start research.", cta: "Review product", onClick: () => openStage("product") };
+    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the copy.", cta: startingStage2 ? "Starting…" : "Run Stage 3", onClick: handleStartStage2 };
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 4", onClick: () => openStage("stage3") };
     if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => openStage("stage3") };
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => openStage("stage3") };
     if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Pick up from the last completed step — nothing is lost.", cta: resuming ? "Resuming…" : "Resume pipeline", onClick: handleResume };
@@ -600,6 +626,26 @@ export default function RunPage() {
           <StageAccordion key={def.key} def={def} state={states[def.key]} open={isOpen(def.key)} onToggle={() => toggle(def.key)}
             summary={summary(def.key)} isLast={i === arr.length - 1}>
 
+            {def.key === "product" && (
+              PRODUCT_ACTIVE.includes(run.status) ? (
+                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
+                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
+                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Reading the product page…"}</p>
+                  <p className="text-[11px] text-[var(--color-text-4)] mt-1.5">Pages that only render in a browser take about a minute.</p>
+                </div>
+              ) : (
+                <>
+                  {runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}
+                  {runId !== null && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <StageActions stage="product" onRestart={handleRestartStage} restarting={restarting} />
+                      <PromptUsed promptsUsed={run.promptsUsed} stage="product" />
+                    </div>
+                  )}
+                </>
+              )
+            )}
+
             {def.key === "stage1" && (
               outputs.onePager ? (
                 <>
@@ -638,7 +684,7 @@ export default function RunPage() {
                   {runId !== null && (
                     <>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <StageActions stage="stage1" onRestart={handleRestartStage} restarting={restarting} />
+                        <StageActions stage="stage1" prevLabel="Product" prevId="v2-stage-product" onRestart={handleRestartStage} restarting={restarting} />
                         <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
                       </div>
                       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -660,11 +706,13 @@ export default function RunPage() {
                     </>
                   )}
                 </>
-              ) : (
+              ) : ["stage1", "scraping"].includes(run.status) || outputs.research ? (
                 <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
                   <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
                   <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Researching the product…"}</p>
                 </div>
+              ) : (
+                <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the product description.</p>
               )
             )}
 

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     status: 'awaiting_hero_qc',
     stage3_hero_approved: 0,
     error_message: null,
-    current_step: 'Stage 3: Review the hero shot',
+    current_step: 'Stage 4: Review the hero shot',
     last_updated_at: new Date().toISOString(),
   })
 

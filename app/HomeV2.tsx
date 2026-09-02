@@ -10,8 +10,9 @@ import { useToast } from "@/components/Toasts";
 import { ACTIVE_STATUSES, WAITING_STATUSES, RunThumb, StatusBadge, relativeTime, truncateUrl } from "@/components/ui/run-ui";
 
 const NEED_COPY: Record<string, [string, string]> = {
+  awaiting_product_approval: ["Product description ready", "Check it, pick the photos, then start research"],
   awaiting_stage2_approval: ["Research ready for review", "Approve it to generate the copy"],
-  awaiting_user: ["Copy approved — images next", "Start Stage 3 to generate the hero shot"],
+  awaiting_user: ["Copy approved — images next", "Start Stage 4 to generate the hero shot"],
   awaiting_hero_qc: ["Hero shot needs approval", "It becomes the reference for all 8 images"],
   awaiting_qc: ["8 prompts ready to review", "Check them, then generate the images"],
   failed: ["Run failed", "Resume to pick up where it stopped"],

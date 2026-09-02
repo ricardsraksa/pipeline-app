@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       stage3_hero_image_url: null,
       stage3_hero_approved: 0,
       status: 'generating_remaining',
-      current_step: 'Stage 3: Writing the 8 prompts from source images',
+      current_step: 'Stage 4: Writing the 8 prompts from source images',
       error_message: null,
       last_updated_at: new Date().toISOString(),
     })
@@ -66,14 +66,14 @@ export async function POST(req: NextRequest) {
       stage3_remaining_prompts: JSON.stringify(prompts),
       stage3_remaining_validation: JSON.stringify(validation),
       status: 'awaiting_qc',
-      current_step: 'Stage 3: Review the 8 prompts before generating',
+      current_step: 'Stage 4: Review the 8 prompts before generating',
       last_updated_at: new Date().toISOString(),
     })
 
     return Response.json({ success: true, prompts })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    // Drop back to the Stage 3 entry gate so the operator can retry.
+    // Drop back to the Stage 4 entry gate so the operator can retry.
     await updateRun(runId, { status: 'awaiting_user', error_message: message, last_updated_at: new Date().toISOString() }).catch(() => {})
     return Response.json({ success: false, error: message }, { status: 500 })
   }

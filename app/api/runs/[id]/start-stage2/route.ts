@@ -25,21 +25,21 @@ export async function POST(
 
   if (run.status !== "awaiting_stage2_approval") {
     return NextResponse.json(
-      { error: "Run is not waiting for Stage 2 approval" },
+      { error: "Run is not waiting for Stage 3 approval" },
       { status: 400 }
     );
   }
 
   if (!run.stage1_one_pager) {
     return NextResponse.json(
-      { error: "Stage 1 must be complete before running Stage 2" },
+      { error: "Stage 2 must be complete before running Stage 3" },
       { status: 400 }
     );
   }
 
   // Fire-and-forget. Polling on the client will pick up the status change.
   runStage2Manually(runId).catch((err) => {
-    console.error(`Manual Stage 2 trigger for run ${runId} failed:`, err);
+    console.error(`Manual Stage 3 trigger for run ${runId} failed:`, err);
   });
 
   return NextResponse.json({ success: true });

@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // Rewrites/edits run on the cheaper stage3Edit role (Sonnet by default) —
-    // this is the most-clicked Stage 3 call (single rewrites + bulk fix).
+    // this is the most-clicked Stage 4 call (single rewrites + bulk fix).
     const model = await getModel("stage3Edit");
     const msg = await client.messages.create({
       model,

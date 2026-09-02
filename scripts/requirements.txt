@@ -1,0 +1,5 @@
+# Server-side scraper deps (Docker). The Mac venv has the same scrapling pin
+# plus pyobjc for OCR; on Linux the description images go to the model as
+# vision blocks instead, so no OCR package is needed here.
+scrapling[fetchers]==0.4.15
+playwright==1.62.0

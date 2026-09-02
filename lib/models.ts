@@ -9,7 +9,7 @@
 
 import { getKV, setKV } from "./db";
 
-export type ModelRole = "stage1" | "stage2" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "mechanical";
+export type ModelRole = "product" | "stage1" | "stage2" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "mechanical";
 
 export interface ModelOption {
   id: string;
@@ -37,32 +37,38 @@ export interface RoleMeta {
 
 // Order here is the order shown in Settings.
 export const ROLES: Record<ModelRole, RoleMeta> = {
+  product: {
+    label: "Stage 1 · Product",
+    description: "The analyst pass: reads the scraped pages (and their photos) and writes the 120-word product description.",
+    env: "PRODUCT_MODEL",
+    default: "claude-sonnet-4-6",
+  },
   stage1: {
-    label: "Stage 1 · Research",
+    label: "Stage 2 · Research",
     description: "The research & strategy documents (avatar, beliefs, competitive, etc.).",
     env: "STAGE1_MODEL",
     default: "claude-sonnet-4-6",
   },
   stage2: {
-    label: "Stage 2 · Copy",
+    label: "Stage 3 · Copy",
     description: "The sales copy — the quality-critical creative output.",
     env: "STAGE2_MODEL",
     default: "claude-opus-5",
   },
   stage3Prompt: {
-    label: "Stage 3 · Prompts",
+    label: "Stage 4 · Prompts",
     description: "Writing the hero + 8 image prompts and deciding image placement.",
     env: "STAGE3_PROMPT_MODEL",
     default: "claude-sonnet-4-6",
   },
   stage3Edit: {
-    label: "Stage 3 · Rewrites",
+    label: "Stage 4 · Rewrites",
     description: "Rewriting/editing an existing image prompt from an operator note.",
     env: "STAGE3_EDIT_MODEL",
     default: "claude-sonnet-4-6",
   },
   stage3Audit: {
-    label: "Stage 3 · Auditor",
+    label: "Stage 4 · Auditor",
     description: "The vision check that passes/fails each generated image.",
     env: "STAGE3_AUDIT_MODEL",
     default: "claude-sonnet-4-6",

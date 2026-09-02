@@ -5,12 +5,26 @@ import { resumePipeline, runStage2Manually } from "@/lib/pipeline-runner";
 import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
 
-type RestartStage = "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
 
 // Map a stage label to the DB columns that need to be cleared so the pipeline
 // runner picks the stage back up from scratch on the next resume.
 function fieldsToClear(stage: RestartStage): Partial<Run> {
   switch (stage) {
+    case "product":
+      // Re-scrape + re-describe. Research depends on the description and the
+      // photo selection, so it is cleared too (it re-runs after the gate).
+      return {
+        product_scrape: null,
+        product_description_ai: null,
+        product_description_edited: null,
+        product_selected_images: null,
+        product_approved_at: null,
+        product_description: null,
+        scraper_data: null,
+        scraped_image_urls: null,
+        ...fieldsToClear("stage1"),
+      };
     case "stage1":
       // Clear every Stage 1 sub-step AND the one-pager so runStage1 starts
       // from sub-step 1 instead of granular-skipping.
@@ -83,7 +97,7 @@ export async function POST(
 
   const body = (await req.json().catch(() => ({}))) as { stage?: string };
   const stage = body.stage as RestartStage | undefined;
-  const validStages: RestartStage[] = ["stage1", "stage2", "stage3-prompts", "stage3-images"];
+  const validStages: RestartStage[] = ["product", "stage1", "stage2", "stage3-prompts", "stage3-images"];
   if (!stage || !validStages.includes(stage)) {
     return NextResponse.json({ error: `stage must be one of ${validStages.join(", ")}` }, { status: 400 });
   }

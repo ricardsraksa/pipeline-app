@@ -15,7 +15,7 @@ import FeedbackAppliedChip from '@/components/FeedbackAppliedChip'
 const MAX_REFS = 4
 
 /**
- * Build the reference-image set for ONE Stage 3 generation.
+ * Build the reference-image set for ONE Stage 4 generation.
  *
  * Order matters — most image models weight the first refs more heavily.
  * Operator-uploaded source photos go first (they are the ground truth for
@@ -423,14 +423,14 @@ function ErrorState({ message, runId }: { message: string; runId: string | null 
           onClick={() => window.location.reload()}
           className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105"
         >
-          Retry Stage 3
+          Retry Stage 4
         </button>
         {runId && (
           <Link
             href={`/runs/${runId}#stage-2-section`}
             className="cursor-pointer inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-[550] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)]"
           >
-            Back to Stage 2
+            Back to Stage 3
           </Link>
         )}
         {runId && (
@@ -554,13 +554,13 @@ function PromptAiEditor({
 }
 
 /**
- * Floating Stage 2 copy panel — a small button anchored to the right edge of
- * the viewport that toggles a slide-in panel containing the Stage 2
+ * Floating Stage 3 copy panel — a small button anchored to the right edge of
+ * the viewport that toggles a slide-in panel containing the Stage 3
  * copy. The text is plain (not a textarea) so the user can select arbitrary
  * spans and copy them into their Google Doc while images are generating.
  *
- * Hidden entirely if the run has no Stage 2 output yet (description-only
- * runs, or before Stage 2 completes).
+ * Hidden entirely if the run has no Stage 3 output yet (description-only
+ * runs, or before Stage 3 completes).
  */
 // Copy text to the clipboard with an HTML flavor that forces 11pt Arial, so
 // pasting into Google Docs lands as 11pt Arial (Docs measures in points; the
@@ -597,12 +597,12 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
       {/* Toggle button — right edge, vertically centered */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Show Stage 2 copy — select + copy into your Google Doc"
-        aria-label="Toggle Stage 2 copy panel"
+        title="Show Stage 3 copy — select + copy into your Google Doc"
+        aria-label="Toggle Stage 3 copy panel"
         className="fixed right-0 top-1/2 -translate-y-1/2 z-40 cursor-pointer flex items-center gap-1.5 px-2.5 py-3 rounded-l-lg bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-[var(--color-border-strong)] border-r-0 shadow-[0_2px_6px_rgba(20,20,18,.10)] hover:brightness-105 transition-all"
       >
         <span className="font-[var(--font-ibm-plex-mono)] text-[11px] font-[700] [writing-mode:vertical-rl] rotate-180">
-          {open ? 'Close copy' : 'Stage 2 copy'}
+          {open ? 'Close copy' : 'Stage 3 copy'}
         </span>
       </button>
 
@@ -616,7 +616,7 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
           <div className="min-w-0">
-            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-3)]">Stage 2</p>
+            <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-3)]">Stage 3</p>
             <h3 className="text-[13px] font-[600] text-[var(--color-text)] truncate">
               Copy {run?.brand_name ? `— ${run.brand_name}` : run?.product_name ? `— ${run.product_name}` : ''}
             </h3>
@@ -624,7 +624,7 @@ function Stage2CopyPanel({ run }: { run: Run | null }) {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => copyRich(copy)}
-              title="Copy entire Stage 2 output as 11pt Arial"
+              title="Copy entire Stage 3 output as 11pt Arial"
               className="cursor-pointer text-[11px] font-[var(--font-ibm-plex-mono)] px-2 py-1 rounded border border-[var(--color-border-strong)] text-[var(--color-text-2)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] transition-colors"
             >
               Copy all
@@ -1119,7 +1119,7 @@ function CompletePhase({
             href={`/runs/${run.id}#stage-2-section`}
             className="inline-flex items-center gap-[7px] rounded-lg px-[15px] py-[9px] text-[13.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap"
           >
-            ← Back to Stage 2
+            ← Back to Stage 3
           </Link>
         )}
         {run?.id && (
@@ -1361,7 +1361,7 @@ function Stage3Page() {
   useEffect(() => {
     const runId = searchParams.get('runId')
     if (!runId) { setError('No run ID provided'); setPhase('error'); return }
-    // ?fresh=1 is an escape hatch that forces a clean Stage 3 run, ignoring
+    // ?fresh=1 is an escape hatch that forces a clean Stage 4 run, ignoring
     // any saved prompts/images. Default behavior: ALWAYS restore saved state
     // so refreshing the page never throws work away. (The legacy ?skipPrompts=1
     // is kept as a synonym for the default — no-op since restore is default now.)
@@ -1761,7 +1761,7 @@ function Stage3Page() {
     }
   }, [run, images, auditResults, regenCounts, prompts, regenerateImage])
 
-  // "Regenerate all" from the complete screen — re-runs Stage 3 prompt
+  // "Regenerate all" from the complete screen — re-runs Stage 4 prompt
   // generation (which picks up the operator's accumulated 👍/👎 notes and the
   // stage3 learning store), then auto-chains into a fresh image batch.
   //
@@ -1838,7 +1838,7 @@ function Stage3Page() {
       <div className="flex items-center gap-4 mb-6">
         <Link href="/" className="text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text-2)] transition-colors">← Pipeline</Link>
         <div className="w-px h-3.5 bg-[var(--color-border-strong)]" />
-        <span className="text-[11px] font-[650] uppercase tracking-[0.08em] text-[var(--color-accent)]">Stage 3</span>
+        <span className="text-[11px] font-[650] uppercase tracking-[0.08em] text-[var(--color-accent)]">Stage 4</span>
         <span className="text-[var(--color-text-4)]">·</span>
         <span className="text-[11px] font-[550] text-[var(--color-text-3)]">Image Generation</span>
         {run && (
@@ -1931,8 +1931,8 @@ function Stage3Page() {
         />
       )}
 
-      {/* Always-available Stage 2 copy reference (hidden on description-only
-          runs or before Stage 2 completes). */}
+      {/* Always-available Stage 3 copy reference (hidden on description-only
+          runs or before Stage 3 completes). */}
       <Stage2CopyPanel run={run} />
 
       {reprmptModalOpen && (

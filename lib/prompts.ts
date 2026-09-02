@@ -2,7 +2,10 @@ import { IMAGE_PROMPTS_SYSTEM } from "@/lib/prompts/image_prompts";
 import { ONE_PAGER_PROMPT } from "@/lib/prompts/one_pager";
 import { loadPromptsFile, getCurrentOverride, type PromptStage } from "@/lib/prompts-store";
 
-export type StageKey = "stage1" | "stage2" | "stage3";
+// Internal keys predate the Stage 1 · Product step, so they are off by one
+// from what the UI shows: product = Stage 1, stage1 = Stage 2 (research),
+// stage2 = Stage 3 (copy), stage3 = Stage 4 (images).
+export type StageKey = "product" | "stage1" | "stage2" | "stage3";
 
 export async function getPrompt(stage: StageKey): Promise<string> {
   try {
@@ -12,10 +15,31 @@ export async function getPrompt(stage: StageKey): Promise<string> {
   } catch {
     // fall through to defaults
   }
+  if (stage === "product") return PRODUCT_PROMPT;
   if (stage === "stage1") return STAGE1_PROMPT;
   if (stage === "stage2") return STAGE2_PROMPT;
   return STAGE3_PROMPT;
 }
+
+// Stage 1 · Product — the analyst pass. The pages are fetched by scrapling
+// before this runs; the model receives their text and photos, so "fetch" in
+// the prompt is satisfied by the pipeline rather than a tool call.
+export const PRODUCT_PROMPT = `You are a product analyst. I will give you one or more product page URLs from ecommerce stores. For each URL:
+
+1. Fetch the page. If the URL is a homepage or collection page and the product detail is thin, fetch the actual product page before writing.
+2. Write a short plain-prose description of what the product physically is and does. Nothing else. Rules:
+   * Hard cap: 120 words. Two paragraphs maximum.
+   * Do not name the brand, the store, or the registered company anywhere. Refer to the item by its product name or generic category only.
+   * Open with the product name and its category in one sentence.
+   * Explain the mechanism, not the marketing: how it attaches, works, what it's made of.
+   * Include only the specs a buyer needs: key dimensions, weight, material, sizes, what's in the box. Drop secondary numbers, lab figures, manufacturing origin, care instructions, and technical justifications unless they are the product's whole point.
+   * Use aliexpress listings as source of truth for any specs and details, while using brand examples as positioning examples
+   * Omit price and discount claims.
+   * No headers, no bullet lists, no bolding.
+   * Plain declarative prose. Do not reuse the store's adjectives ("premium," "elegant," "innovative," "effortless") or its emotional framing.
+   * Never use em dashes.
+
+Answer directly. No preamble, no closing summary, no offers to help further.`;
 
 // Settings exposes a single "Stage 1" prompt — it controls the one-pager
 // synthesis (the only Stage 1 output the user sees). Other Stage 1 calls

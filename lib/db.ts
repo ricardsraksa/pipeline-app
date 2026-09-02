@@ -166,6 +166,15 @@ async function migrateDB() {
     // Shopify fill bookkeeping: which product this run last pushed to and
     // which image URLs were already appended (re-push dedupe).
     "shopify_push_state TEXT",
+    // ── Stage 1 · Product (scrapling + analyst description) ──────────────
+    // JSON ProductScrape: { product, competitors[], errors[], scraped_at, source }
+    "product_scrape TEXT",
+    // The analyst model's 120-word description, and the operator's edit of it.
+    "product_description_ai TEXT",
+    "product_description_edited TEXT",
+    // JSON array of image URLs the operator ticked at the Stage 1 gate.
+    "product_selected_images TEXT",
+    "product_approved_at TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -307,7 +316,7 @@ export async function updateRun(id: number, fields: Partial<Run & { error_messag
  */
 export async function recordPromptUsed(
   id: number,
-  key: "stage1" | "stage2" | "stage3_hero" | "stage3_remaining",
+  key: "product" | "stage1" | "stage2" | "stage3_hero" | "stage3_remaining",
   prompt: string,
 ): Promise<void> {
   try {
@@ -568,4 +577,10 @@ export interface Run {
   // JSON: { stage1?, stage2?, stage3_hero?, stage3_remaining? } — the exact
   // system prompt text each stage ran with (see migration comment).
   prompts_used: string | null;
+  // Stage 1 · Product
+  product_scrape: string | null;
+  product_description_ai: string | null;
+  product_description_edited: string | null;
+  product_selected_images: string | null;
+  product_approved_at: string | null;
 }

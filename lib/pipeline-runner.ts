@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
-import { scrapeProduct } from "./scrape";
+import { scraplingScrape } from "./scrapling";
+import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
 import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
@@ -137,7 +138,7 @@ async function anthropicMessage(args: {
   // prompts). Pass an array of text blocks with cache_control to cache a large
   // static prefix that repeats within the 5-min TTL (e.g. Stage 2).
   system: string | Anthropic.TextBlockParam[];
-  user: string;
+  user: string | Anthropic.MessageParam["content"];
   maxTokens: number;
   label: string;
   model?: string;
@@ -264,7 +265,7 @@ async function reviseDoc(runId: number, original: string, docType: string, chang
 
 // ── Last completed stage detector ────────────────────────────────────────────
 
-export type LastStage = "none" | "scrape" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+export type LastStage = "none" | "product" | "scrape" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
 
 export function getLastCompletedStage(run: Run): LastStage {
   if (run.generated_images) return "stage3-images";
@@ -272,109 +273,139 @@ export function getLastCompletedStage(run: Run): LastStage {
   if (run.stage2_output) return "stage2";
   // Stage 1 is only "complete" once the one-pager exists (it's the final sub-step now)
   if (run.stage1_one_pager) return "stage1";
-  if (run.scraper_data) return "scrape";
+  // "scrape" = the product gate was passed (approval writes scraper_data) or a
+  // pre-Stage-1 run that already had research; both continue into research.
+  if (run.scraper_data || run.step_research) return "scrape";
+  if (run.product_scrape && !run.product_approved_at) return "product";
   return "none";
 }
 
 // ── Core stage runners ────────────────────────────────────────────────────────
 
-async function runScrape(runId: number, run: Run): Promise<void> {
-  const hasProductUrl = Boolean(run.product_url && run.product_url.trim());
-  const competitorUrls: string[] = safeJson<string[]>(run.competitor_urls, []);
-  const hasCompetitorUrls = competitorUrls.length > 0;
+// ── Stage 1 · Product ─────────────────────────────────────────────────────────
+// scrapling reads every pasted URL, the analyst model writes the 120-word
+// description, then the run parks at the product gate until the operator
+// approves the text and ticks the photos.
 
-  // If no URLs at all, skip the whole scrape step — the new description-first
-  // flow may legitimately have nothing to scrape.
-  if (!hasProductUrl && !hasCompetitorUrls) {
-    return;
-  }
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url.slice(0, 40); }
+}
 
-  // Scraping runs silently — no status/current_step updates so the UI never shows a scraping state.
+export async function runProductStage(runId: number): Promise<void> {
+  const run = await getRun(runId);
+  if (!run) throw new Error("Run not found");
+  await updateRun(runId, { status: "product", current_step: "Stage 1: Reading the product page", last_updated_at: now() });
 
+  const targets: { url: string; role: "product" | "competitor" }[] = [];
+  if (run.product_url?.trim()) targets.push({ url: run.product_url.trim(), role: "product" });
+  for (const u of safeJson<string[]>(run.competitor_urls, [])) targets.push({ url: u, role: "competitor" });
+  if (!targets.length) throw new Error("Stage 1: no product URL on this run");
 
-  // Scrape the product URL when provided. Failures are non-fatal in the new
-  // flow because the user description is the source of truth.
-  let productScrapedText = "";
-  let productImages: string[] = [];
-  if (hasProductUrl) {
-    try {
-      // Direct call — no HTTP hop, and immune to the app's auth gate.
-      const scrapeData = await scrapeProduct(run.product_url!);
-      if (scrapeData.success) {
-        const d = scrapeData.data ?? scrapeData;
-        productScrapedText = d.scraped_text ?? "";
-        productImages = Array.isArray(d.images) ? d.images : [];
-      } else {
-        console.warn(`Product scrape failed for run ${runId}:`, scrapeData.error);
-        const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
-        await updateRun(runId, {
-          notes: JSON.stringify({
-            ...existingNotes,
-            productScrapeError: scrapeData.error ?? "Scraper returned failure",
-          }),
-          last_updated_at: now(),
-        });
-      }
-    } catch (err) {
-      console.warn(`Product scrape exception for run ${runId}:`, err);
-      const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
-      await updateRun(runId, {
-        notes: JSON.stringify({
-          ...existingNotes,
-          productScrapeError: err instanceof Error ? err.message : "Network error",
-        }),
-        last_updated_at: now(),
-      });
+  const pages: ProductScrapePage[] = [];
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    await guardCancel(runId);
+    await updateRun(runId, {
+      current_step: `Stage 1: Reading ${t.role === "product" ? "product" : "competitor"} page ${i + 1}/${targets.length} — ${hostOf(t.url)}`,
+      last_updated_at: now(),
+    });
+    const r = await scraplingScrape(t.url);
+    if (r.ok) {
+      const { url: _u, ...rest } = r.data;
+      pages.push({ url: t.url, role: t.role, ok: true, ...rest });
+    } else {
+      console.warn(`[product] run ${runId} scrape failed for ${t.url}: ${r.error}`);
+      pages.push({ url: t.url, role: t.role, ok: false, error: r.error, rateLimited: r.rateLimited, image_urls: [], description_image_urls: [] });
     }
   }
 
-  let competitorScraped: { url: string; text: string }[] = [];
-  const competitorErrors: { url: string; error: string }[] = [];
-  if (competitorUrls.length > 0) {
-    const results = await Promise.allSettled(
-      competitorUrls.map((u) => scrapeProduct(u))
-    );
-    results.forEach((r, i) => {
-      const url = competitorUrls[i];
-      if (r.status !== "fulfilled") {
-        competitorErrors.push({ url, error: r.reason?.message ?? "Network error" });
-        return;
-      }
-      if (!r.value.success) {
-        competitorErrors.push({ url, error: r.value.error ?? "Scraper returned failure" });
-        return;
-      }
-      const cd = r.value.data ?? r.value;
-      if (cd.scraped_text) {
-        competitorScraped.push({ url, text: cd.scraped_text });
-      } else {
-        competitorErrors.push({ url, error: "No text scraped from page" });
-      }
-    });
-  }
-
+  const scrape: ProductScrape = { pages, scraped_at: now(), source: "hosted" };
+  const productPage = pages.find((p) => p.role === "product");
   await updateRun(runId, {
-    scraper_data: JSON.stringify({ scraped_text: productScrapedText, images: productImages }),
-    scraped_image_urls: JSON.stringify(productImages),
+    product_scrape: JSON.stringify(scrape),
+    scraped_image_urls: JSON.stringify(productPage?.image_urls ?? []),
+    // A fresh scrape invalidates any earlier description / selection.
+    product_description_ai: null,
+    product_description_edited: null,
+    product_selected_images: null,
     last_updated_at: now(),
   });
 
-  // Store competitor scraped data temporarily in scraper_data
-  if (competitorScraped.length > 0) {
-    const existing = safeJson<Record<string, unknown>>((await getRun(runId))?.scraper_data ?? null, {});
-    await updateRun(runId, {
-      scraper_data: JSON.stringify({ ...existing, competitor_scraped: competitorScraped }),
-      last_updated_at: now(),
-    });
-  }
+  await describeProduct(runId);
+  await parkAtProductGate(runId);
+}
 
-  // Surface competitor scrape errors in run notes so the UI can show them
-  if (competitorErrors.length > 0) {
-    const existingNotes = safeJson<Record<string, unknown>>((await getRun(runId))?.notes ?? null, {});
-    await updateRun(runId, {
-      notes: JSON.stringify({ ...existingNotes, scrapeErrors: competitorErrors }),
-      last_updated_at: now(),
-    });
+/** Park the run at the Stage 1 gate with a step line that says what's needed. */
+export async function parkAtProductGate(runId: number): Promise<void> {
+  const run = await getRun(runId);
+  const scrape = parseProductScrape(run?.product_scrape);
+  const productOk = Boolean(scrape?.pages.find((p) => p.role === "product")?.ok);
+  await updateRun(runId, {
+    status: "awaiting_product_approval",
+    current_step: productOk
+      ? "Stage 1 complete — review the description and pick the photos"
+      : "Stage 1: the product page couldn't be read — scrape it locally or describe it yourself",
+    last_updated_at: now(),
+  });
+}
+
+/**
+ * (Re)write the analyst description from the stored scrape. Returns null when
+ * no page could be read (the gate then asks the operator to describe it).
+ */
+export async function describeProduct(runId: number): Promise<string | null> {
+  const run = await getRun(runId);
+  if (!run) throw new Error("Run not found");
+  const scrape = parseProductScrape(run.product_scrape);
+  if (!scrape || !scrape.pages.some((p) => p.ok)) return null;
+
+  await updateRun(runId, { current_step: "Stage 1: Writing the product description", last_updated_at: now() });
+  const system = await getPrompt("product");
+  await recordPromptUsed(runId, "product", system);
+  const text = (await anthropicMessage({
+    system,
+    user: buildAnalystContent(scrape),
+    maxTokens: 700,
+    label: "product description",
+    runId,
+    model: await getModel("product"),
+  })).trim();
+  if (!text) throw new Error("Stage 1: the analyst returned an empty description");
+  await updateRun(runId, { product_description_ai: text, product_description_edited: null, last_updated_at: now() });
+  return text;
+}
+
+async function pauseAtResearchGate(runId: number): Promise<void> {
+  await updateRun(runId, {
+    status: "awaiting_stage2_approval",
+    current_step: "Stage 2 complete — awaiting your review before Stage 3",
+    last_updated_at: now(),
+  });
+}
+
+/**
+ * Called by the approve-product route after it has written the final
+ * description + photo selection onto the run: runs research, then pauses at
+ * the research gate exactly like the old top-of-pipeline path did.
+ */
+export async function continueAfterProductApproval(runId: number): Promise<void> {
+  if (RUNNING_PIPELINES.has(runId)) {
+    console.warn(`Pipeline ${runId} is already executing — skipping duplicate research start.`);
+    return;
+  }
+  RUNNING_PIPELINES.add(runId);
+  try {
+    const run = await getRun(runId);
+    if (!run) throw new Error("Run not found");
+    await updateRun(runId, { status: "stage1", error_message: null, last_updated_at: now() });
+    await runStage1(runId, run);
+    await pauseAtResearchGate(runId);
+  } catch (err) {
+    console.error(`Pipeline ${runId} stopped:`, err instanceof Error ? err.message : String(err));
+    await markStopped(runId, err);
+  } finally {
+    RUNNING_PIPELINES.delete(runId);
+    CANCELLED.delete(runId);
   }
 }
 
@@ -400,28 +431,28 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   let research = run.step_research ?? "";
   if (!research) {
     await guardCancel(runId);
-    await updateRun(runId, { current_step: "Stage 1: Identifying product (1/5)", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Identifying product (1/5)", last_updated_at: now() });
     const identify = await runIdentify(inputs);
 
     await guardCancel(runId);
-    await updateRun(runId, { current_step: "Stage 1: Market overview (2/5)", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Market overview (2/5)", last_updated_at: now() });
     const market = await runMarket(inputs, identify);
 
     await guardCancel(runId);
-    await updateRun(runId, { current_step: "Stage 1: Competitive landscape (3/5)", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Competitive landscape (3/5)", last_updated_at: now() });
     const competitive = await runCompetitive(inputs, identify, market);
 
     // Product analysis and visual strategy both depend only on identify +
     // market + competitive — neither consumes the other — so run them together.
     await guardCancel(runId);
-    await updateRun(runId, { current_step: "Stage 1: Product analysis + visual strategy (4/5)", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Product analysis + visual strategy (4/5)", last_updated_at: now() });
     const [productAnalysis, visual] = await Promise.all([
       runProductAnalysis(inputs, identify, market, competitive),
       runVisual(inputs, identify, market, competitive),
     ]);
 
     research = [identify, market, competitive, productAnalysis, visual].filter(Boolean).join("\n\n");
-    if (!research) throw new Error("Stage 1 produced no output");
+    if (!research) throw new Error("Stage 2 produced no research output");
 
     const productName = extractProductName(research);
     // Only persist a name we actually extracted. Don't fall back to product_url
@@ -461,7 +492,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
 
   if (needAvatar || needOfferBrief || needBeliefs) {
     await updateRun(runId, {
-      current_step: "Stage 1: Avatar, offer brief & necessary beliefs (parallel)",
+      current_step: "Stage 2: Avatar, offer brief & necessary beliefs (parallel)",
       last_updated_at: now(),
     });
 
@@ -539,7 +570,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     await updateRun(runId, updates);
 
     if (failures.length > 0) {
-      throw new Error(`Stage 1 parallel docs failed — ${failures.join("; ")}`);
+      throw new Error(`Stage 2 parallel docs failed — ${failures.join("; ")}`);
     }
   }
 
@@ -547,7 +578,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   let chiefFinal = run.step_chief_final ?? "";
   if (!chiefFinal) {
     await guardCancel(runId);
-    await updateRun(runId, { current_step: "Stage 1: Final chief review", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Final chief review", last_updated_at: now() });
     chiefFinal = await anthropicMessage({
       system: CHIEF_FINAL_PROMPT,
       user: [
@@ -567,7 +598,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   const hasRevisedDocs =
     run.step_avatar_revised || run.step_offer_brief_revised || run.step_necessary_beliefs_revised;
   if (!hasRevisedDocs) {
-    await updateRun(runId, { current_step: "Stage 1: Applying final revisions", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Applying final revisions", last_updated_at: now() });
     let avatarRevised = avatar;
     let offerBriefRevised = offerBrief;
     let necessaryBeliefsRevised = necessaryBeliefs;
@@ -596,7 +627,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
 
   // ── Sub-step 7: One-pager synthesis (the only Stage 1 output user sees) ──
   if (!run.stage1_one_pager) {
-    await updateRun(runId, { current_step: "Stage 1: Synthesizing one-pager summary", last_updated_at: now() });
+    await updateRun(runId, { current_step: "Stage 2: Synthesizing one-pager summary", last_updated_at: now() });
 
     // Refetch to get the just-written revisions
     const fresh = await getRun(runId);
@@ -638,17 +669,17 @@ async function runStage1(runId: number, run: Run): Promise<void> {
       // Pure summarization of finished docs — the cheap model.
       model: await getModel("mechanical"),
     });
-    if (!onePager) throw new Error("Stage 1: one-pager synthesis returned empty");
+    if (!onePager) throw new Error("Stage 2: one-pager synthesis returned empty");
     await updateRun(runId, { stage1_one_pager: onePager, last_updated_at: now() });
   }
 }
 
 export async function runStage2(runId: number, run: Run): Promise<void> {
   await guardCancel(runId);
-  await updateRun(runId, { status: "stage2", current_step: "Stage 2: Preparing prompt", last_updated_at: now() });
+  await updateRun(runId, { status: "stage2", current_step: "Stage 3: Preparing prompt", last_updated_at: now() });
 
   const stage1Output = run.step_research_revised ?? run.step_research ?? "";
-  if (!stage1Output) throw new Error("No Stage 1 output to run Stage 2");
+  if (!stage1Output) throw new Error("No research output to run the copy stage");
 
   // Split the system into a cached static prefix (the big ~230-line prompt,
   // re-sent verbatim on every Stage 2 run + every regeneration) and an uncached
@@ -669,7 +700,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const productName = run.brand_name ?? run.product_name ?? "";
 
   await guardCancel(runId);
-  await updateRun(runId, { current_step: "Stage 2: Generating copy (≈1–3 min)", last_updated_at: now() });
+  await updateRun(runId, { current_step: "Stage 3: Generating copy (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
     system: stage2System,
@@ -682,11 +713,11 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
     // give it 4 minutes before the client aborts.
     timeoutMs: 240_000,
   });
-  if (!output) throw new Error("Stage 2 produced no output");
+  if (!output) throw new Error("Stage 3 produced no output");
 
   await updateRun(runId, {
     stage2_output: output,
-    current_step: "Stage 2: Saving output",
+    current_step: "Stage 3: Saving output",
     last_updated_at: now(),
   });
 
@@ -744,7 +775,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
  */
 export async function runStage2Manually(runId: number): Promise<void> {
   if (RUNNING_PIPELINES.has(runId)) {
-    console.warn(`Stage 2 manual trigger ${runId} skipped — pipeline already running.`);
+    console.warn(`Stage 3 manual trigger ${runId} skipped — pipeline already running.`);
     return;
   }
   RUNNING_PIPELINES.add(runId);
@@ -752,7 +783,7 @@ export async function runStage2Manually(runId: number): Promise<void> {
     const run = await getRun(runId);
     if (!run) throw new Error("Run not found");
     if (!run.stage1_one_pager) {
-      throw new Error("Cannot start Stage 2 — Stage 1 one-pager is missing");
+      throw new Error("Cannot start Stage 3 — the research one-pager is missing");
     }
 
     await updateRun(runId, { error_message: null, last_updated_at: now() });
@@ -761,12 +792,12 @@ export async function runStage2Manually(runId: number): Promise<void> {
 
     await updateRun(runId, {
       status: "awaiting_user",
-      current_step: "Awaiting image approval for Stage 3",
+      current_step: "Awaiting image approval for Stage 4",
       last_updated_at: now(),
       completed_at: now(),
     });
   } catch (err) {
-    console.error(`Stage 2 manual trigger ${runId} stopped:`, err instanceof Error ? err.message : String(err));
+    console.error(`Stage 3 manual trigger ${runId} stopped:`, err instanceof Error ? err.message : String(err));
     await markStopped(runId, err);
   } finally {
     RUNNING_PIPELINES.delete(runId);
@@ -776,7 +807,7 @@ export async function runStage2Manually(runId: number): Promise<void> {
 
 // ── Main pipeline entry point ─────────────────────────────────────────────────
 
-const ACTIVE_DB_STATUSES = new Set(["scraping", "stage1", "stage2"]);
+const ACTIVE_DB_STATUSES = new Set(["product", "scraping", "stage1", "stage2"]);
 
 export async function runPipeline(runId: number): Promise<void> {
   if (RUNNING_PIPELINES.has(runId)) {
@@ -801,23 +832,9 @@ export async function runPipeline(runId: number): Promise<void> {
       }
     }
 
-    // Set stage1 status immediately so the UI never sees a "scraping" state.
-    await updateRun(runId, { status: "stage1", current_step: "Stage 1: Product Identification (1/6)", last_updated_at: now() });
-
-    await runScrape(runId, run);
-
-    const runAfterScrape = await getRun(runId);
-    if (!runAfterScrape) throw new Error("Run not found after scrape");
-    await runStage1(runId, runAfterScrape);
-
-    // Pause at the new QC gate between Stage 1 and Stage 2. The user reviews
-    // the one-pager, optionally edits or AI-regenerates it, then triggers
-    // Stage 2 via POST /api/runs/[id]/start-stage2.
-    await updateRun(runId, {
-      status: "awaiting_stage2_approval",
-      current_step: "Stage 1 complete — awaiting your review before Stage 2",
-      last_updated_at: now(),
-    });
+    // Stage 1 · Product: scrape + analyst description, then park at the
+    // product gate. Research starts from POST /api/runs/[id]/approve-product.
+    await runProductStage(runId);
   } catch (err) {
     console.error(`Pipeline ${runId} stopped:`, err instanceof Error ? err.message : String(err));
     await markStopped(runId, err);
@@ -845,34 +862,29 @@ export async function resumePipeline(runId: number): Promise<void> {
     const lastStage = getLastCompletedStage(run);
 
     if (lastStage === "none") {
-      // Run from the top — scrape, then Stage 1 — directly. Delegating to
+      // Run from the top — the product stage — directly. Delegating to
       // runPipeline does NOT work here: its anti-double-run guards (the
       // RUNNING_PIPELINES lock and the "last_updated_at < 60s" recency check)
       // both trip on resumePipeline's own lock and timestamp, so the call is
       // silently skipped and the resume does nothing.
-      await updateRun(runId, { status: "stage1", last_updated_at: now() });
-      await runScrape(runId, run);
-      const freshRun = await getRun(runId);
-      if (!freshRun) throw new Error("Run not found");
-      await runStage1(runId, freshRun);
-      await updateRun(runId, {
-        status: "awaiting_stage2_approval",
-        current_step: "Stage 1 complete — awaiting your review before Stage 2",
-        last_updated_at: now(),
-      });
+      await runProductStage(runId);
+      return;
+    }
+
+    if (lastStage === "product") {
+      // Scrape exists but the gate wasn't passed: make sure a description
+      // exists (the analyst call may have been what died), then park again.
+      if (!run.product_description_ai) await describeProduct(runId);
+      await parkAtProductGate(runId);
       return;
     }
 
     if (lastStage === "scrape") {
       const freshRun = await getRun(runId);
       if (!freshRun) throw new Error("Run not found");
+      await updateRun(runId, { status: "stage1", last_updated_at: now() });
       await runStage1(runId, freshRun);
-      // Pause at the Stage 1 → Stage 2 QC gate. User triggers Stage 2 manually.
-      await updateRun(runId, {
-        status: "awaiting_stage2_approval",
-        current_step: "Stage 1 complete — awaiting your review before Stage 2",
-        last_updated_at: now(),
-      });
+      await pauseAtResearchGate(runId);
       return;
     }
 
@@ -886,19 +898,14 @@ export async function resumePipeline(runId: number): Promise<void> {
         if (!freshRun) throw new Error("Run not found");
         await runStage1(runId, freshRun);
       }
-      // Pause at the Stage 1 → Stage 2 QC gate. User triggers Stage 2 manually.
-      await updateRun(runId, {
-        status: "awaiting_stage2_approval",
-        current_step: "Stage 1 complete — awaiting your review before Stage 2",
-        last_updated_at: now(),
-      });
+      await pauseAtResearchGate(runId);
       return;
     }
 
     if (lastStage === "stage2") {
       await updateRun(runId, {
         status: "awaiting_user",
-        current_step: "Awaiting image approval for Stage 3",
+        current_step: "Awaiting image approval for Stage 4",
         last_updated_at: now(),
       });
       return;
@@ -907,7 +914,7 @@ export async function resumePipeline(runId: number): Promise<void> {
     if (lastStage === "stage3-prompts") {
       await updateRun(runId, {
         status: "awaiting_qc",
-        current_step: "Awaiting prompt review for Stage 3",
+        current_step: "Awaiting prompt review for Stage 4",
         last_updated_at: now(),
       });
       return;
@@ -945,7 +952,7 @@ async function watchdogSweep(): Promise<void> {
     const result = await db.execute(
       `SELECT id, status, last_updated_at, stage3_hero_image_url, stage3_remaining_prompts
        FROM runs
-       WHERE status IN ('pending', 'scraping', 'stage1', 'stage2',
+       WHERE status IN ('pending', 'product', 'scraping', 'stage1', 'stage2',
                         'generating_hero', 'generating_remaining')`,
     );
     const cutoff = Date.now() - WATCHDOG_STALE_MS;
@@ -971,7 +978,7 @@ async function watchdogSweep(): Promise<void> {
         updateRun(row.id, {
           status: next,
           current_step: null,
-          error_message: "Stage 3 generation was interrupted (server restart) — pick up from here.",
+          error_message: "Stage 4 generation was interrupted (server restart) — pick up from here.",
           last_updated_at: new Date().toISOString(),
         }).catch((err) => console.error(`[watchdog] flip ${row.id} failed:`, err));
         continue;

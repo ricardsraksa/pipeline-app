@@ -33,6 +33,14 @@ export interface RunStatus {
     scrapedUrls: string[];
     approvedUrls: string[];
   };
+  /** Stage 1 · Product — scrape JSON (see lib/product.ts), analyst text, gate state. */
+  product: {
+    scrape: string | null;
+    descriptionAi: string | null;
+    descriptionEdited: string | null;
+    selectedImages: string[];
+    approvedAt: string | null;
+  };
   meta: {
     productUrl: string;
     productName: string | null;

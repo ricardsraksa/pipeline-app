@@ -23,7 +23,7 @@ export async function GET(
   // Scraping is an internal implementation detail — never expose it to the UI.
   const status = run.status === "scraping" ? "stage1" : run.status;
   const currentStep = run.status === "scraping"
-    ? "Stage 1: Product Identification (1/6)"
+    ? "Stage 2: Product Identification (1/6)"
     : run.current_step;
 
   return NextResponse.json({
@@ -58,6 +58,15 @@ export async function GET(
     images: {
       scrapedUrls: safeJson(run.scraped_image_urls) ?? [],
       approvedUrls: safeJson(run.approved_image_urls) ?? [],
+    },
+    // Stage 1 · Product: the scrape, the analyst text, the operator's edit
+    // and photo selection, and when the gate was passed.
+    product: {
+      scrape: run.product_scrape ?? null,
+      descriptionAi: run.product_description_ai ?? null,
+      descriptionEdited: run.product_description_edited ?? null,
+      selectedImages: safeJson(run.product_selected_images) ?? [],
+      approvedAt: run.product_approved_at ?? null,
     },
     meta: {
       productUrl: run.product_url,

@@ -3,7 +3,7 @@ import { getRun, updateRun } from '@/lib/db'
 import { listImageGenerations, type HiggsfieldGeneration } from '@/lib/higgsfield-mcp'
 
 import { requireSession } from "@/lib/auth";
-// Recover Stage 3 images that generated on Higgsfield but were never persisted
+// Recover Stage 4 images that generated on Higgsfield but were never persisted
 // to the pipeline (the old db.transaction persist path failed silently). The
 // pipeline sends each Higgsfield prompt as `<run prompt>.trim() + fidelity
 // guardrail`, so a generation's prompt always STARTS WITH the run's stored
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (Array.isArray(parsed)) prompts = parsed
   } catch { /* leave empty */ }
   if (!prompts.length) {
-    return Response.json({ success: false, error: 'This run has no Stage 3 prompts to match against.' }, { status: 400 })
+    return Response.json({ success: false, error: 'This run has no Stage 4 prompts to match against.' }, { status: 400 })
   }
 
   // Images already persisted (partial recovery / prior generation) — keep them.

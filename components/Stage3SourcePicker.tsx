@@ -1,6 +1,6 @@
 "use client";
 
-// Per-run picker for which source product photos Stage 3 may use as
+// Per-run picker for which source product photos Stage 4 may use as
 // references. All candidates (uploaded + scraped) default to included; a click
 // toggles a photo onto/off the run's blacklist (runs.stage3_source_blacklist).
 // Excluded photos are skipped by the hero prompt-writer, hero generation and
@@ -59,7 +59,7 @@ export default function Stage3SourcePicker({
         </h4>
       </div>
       <p className="text-[11px] text-[var(--color-text-3)]">
-        Click a photo to exclude it from Stage 3 (or bring it back). Excluded photos are never sent to the prompt writer or Higgsfield.
+        Click a photo to exclude it from Stage 4 (or bring it back). Excluded photos are never sent to the prompt writer or Higgsfield.
       </p>
       <div className="flex flex-wrap gap-2">
         {candidates.map((url) => {

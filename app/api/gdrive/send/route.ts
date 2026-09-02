@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       }));
   } catch { /* none */ }
   if (!images.length) {
-    return Response.json({ success: false, error: "No finished Stage 3 images on this run yet." }, { status: 400 });
+    return Response.json({ success: false, error: "No finished Stage 4 images on this run yet." }, { status: 400 });
   }
 
   try {

@@ -30,13 +30,13 @@ export async function POST(req: NextRequest) {
   const promptText = (editedPrompt && editedPrompt.trim()) || hero.prompt
   // Uploaded + scraped, minus any the operator excluded in the picker.
   const sourceImageUrls = stage3ActiveSourceImages(run)
-  // Operator-added Stage 3 reference images (scene/style) guide the regen too —
+  // Operator-added Stage 4 reference images (scene/style) guide the regen too —
   // sent to Higgsfield alongside the source product photos.
   const extraRefs = safeArr(run.stage3_reference_images)
   const referenceImages = [...sourceImageUrls, ...extraRefs].filter((u, i, a) => u && a.indexOf(u) === i).slice(0, 6)
 
   try {
-    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 3: Regenerating hero shot', last_updated_at: new Date().toISOString() })
+    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 4: Regenerating hero shot', last_updated_at: new Date().toISOString() })
 
     const imageUrl = await generateStage3Image({
       prompt: promptText,
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       stage3_remaining_images: null,
       stage3_ref_overrides: null,
       status: 'awaiting_hero_qc',
-      current_step: 'Stage 3: Review the hero shot',
+      current_step: 'Stage 4: Review the hero shot',
       last_updated_at: new Date().toISOString(),
     })
 

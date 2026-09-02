@@ -41,7 +41,7 @@ export async function POST(req: Request) {
 
   let json: Stage2Json | null = null;
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* below */ }
-  if (!json) return Response.json({ success: false, error: "No structured Stage 2 copy on this run yet" }, { status: 400 });
+  if (!json) return Response.json({ success: false, error: "No structured Stage 3 copy on this run yet" }, { status: 400 });
 
   // Hard prerequisite: image auto-placement must have run. Without it the
   // section photos can't be wired and every image would land in the gallery —
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   } catch { /* not ok */ }
   if (!placementOk) {
     return Response.json(
-      { success: false, error: "Image auto-placement hasn't run for this run. Open Stage 3 and run “auto-placement” (it decides which images go to sections 2/3), then push again." },
+      { success: false, error: "Image auto-placement hasn't run for this run. Open Stage 4 and run “auto-placement” (it decides which images go to sections 2/3), then push again." },
       { status: 409 },
     );
   }

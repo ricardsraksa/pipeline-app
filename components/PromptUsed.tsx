@@ -8,7 +8,8 @@
 
 import { useState } from "react";
 
-const STAGE_KEYS: Record<"stage1" | "stage2" | "stage3", Array<{ key: string; label: string }>> = {
+const STAGE_KEYS: Record<"product" | "stage1" | "stage2" | "stage3", Array<{ key: string; label: string }>> = {
+  product: [{ key: "product", label: "Product analyst system prompt" }],
   stage1: [{ key: "stage1", label: "Research one-pager system prompt" }],
   stage2: [{ key: "stage2", label: "Copy system prompt" }],
   stage3: [
@@ -39,7 +40,7 @@ export default function PromptUsed({
   stage,
 }: {
   promptsUsed: string | null;
-  stage: "stage1" | "stage2" | "stage3";
+  stage: "product" | "stage1" | "stage2" | "stage3";
 }) {
   const [open, setOpen] = useState(false);
 
