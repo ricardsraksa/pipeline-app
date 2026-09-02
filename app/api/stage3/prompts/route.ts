@@ -7,7 +7,9 @@ import { buildStage3FeedbackBlock } from '@/lib/feedback'
 import { IMAGE_CATEGORIES } from '@/lib/stage3/categories'
 import { jsonrepair } from 'jsonrepair'
 import { getModel } from '@/lib/models'
+import { assertPublicUrl } from '@/lib/ssrf'
 
+import { requireSession } from "@/lib/auth";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // Prompt generation streams ~15-20k output tokens — give the route room.
@@ -66,6 +68,12 @@ const PROMPTS_TOOL: Anthropic.Tool = {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
+  const rawBody = await req.text()
+  if (rawBody.length > 800_000) {
+    return Response.json({ success: false, error: 'Payload too large' }, { status: 413 })
+  }
   const {
     research,
     avatar,
@@ -76,7 +84,7 @@ export async function POST(req: NextRequest) {
     product_images,
     uploaded_images,
     operator_note,
-  } = await req.json()
+  } = JSON.parse(rawBody)
 
   if (!research || !copy) {
     return Response.json({ success: false, error: 'research and copy are required' }, { status: 400 })
@@ -100,8 +108,17 @@ export async function POST(req: NextRequest) {
     + stage3UserFeedback
     + operatorBlock
 
-  const scraped: string[] = Array.isArray(product_images) ? product_images : []
-  const uploaded: string[] = Array.isArray(uploaded_images) ? uploaded_images : []
+  // Image URLs are handed to the model as vision blocks — only public https
+  // URLs, capped, so this can't be used to point the pipeline at internal hosts.
+  const onlyUrls = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length < 2048).slice(0, 20) : []
+  const scraped: string[] = onlyUrls(product_images)
+  const uploaded: string[] = onlyUrls(uploaded_images)
+  try {
+    for (const u of [...scraped, ...uploaded]) await assertPublicUrl(u)
+  } catch (e) {
+    return Response.json({ success: false, error: e instanceof Error ? e.message : 'Blocked image URL' }, { status: 400 })
+  }
 
   const userText = buildImagePromptsUserMessage({
     research,

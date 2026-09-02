@@ -5,6 +5,7 @@ import { getModel } from '@/lib/models'
 import { recordUsage } from '@/lib/db'
 import { assertPublicUrl } from '@/lib/ssrf'
 
+import { requireSession } from "@/lib/auth";
 // timeout: a hung vision call (usually Anthropic struggling to download the
 // image URL) fails in 90s instead of the SDK's 10-min default.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 })
@@ -37,6 +38,8 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { image_url, category, prompt_used, product_description, overlay_text_used, run_id } = await req.json()
 
   if (!image_url || !category || !prompt_used) {

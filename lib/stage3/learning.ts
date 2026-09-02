@@ -3,7 +3,7 @@ import path from 'path'
 
 const FEEDBACK_PATH = path.join(process.cwd(), 'data', 'stage3_feedback.json')
 
-interface FeedbackStore {
+export interface FeedbackStore {
   prompt_edits: Array<{
     category: string
     original: string
@@ -59,6 +59,13 @@ export function saveFeedback(update: Partial<FeedbackStore>): void {
     regeneration_fixes: [...existing.regeneration_fixes, ...(update.regeneration_fixes ?? [])],
     image_feedback: [...(existing.image_feedback ?? []), ...(update.image_feedback ?? [])],
   }
+  // Bounded store: keep the most recent entries per list so the file (and the
+  // prompt context built from it) can't grow without limit.
+  const MAX = 300
+  merged.prompt_edits = merged.prompt_edits.slice(-MAX)
+  merged.audit_results = merged.audit_results.slice(-MAX)
+  merged.regeneration_fixes = merged.regeneration_fixes.slice(-MAX)
+  merged.image_feedback = (merged.image_feedback ?? []).slice(-MAX)
   fs.mkdirSync(path.dirname(FEEDBACK_PATH), { recursive: true })
   fs.writeFileSync(FEEDBACK_PATH, JSON.stringify(merged, null, 2))
 }

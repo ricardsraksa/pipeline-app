@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getRun, updateRun } from '@/lib/db'
 import { listImageGenerations, type HiggsfieldGeneration } from '@/lib/higgsfield-mcp'
 
+import { requireSession } from "@/lib/auth";
 // Recover Stage 3 images that generated on Higgsfield but were never persisted
 // to the pipeline (the old db.transaction persist path failed silently). The
 // pipeline sends each Higgsfield prompt as `<run prompt>.trim() + fidelity
@@ -19,6 +20,8 @@ function urlOf(g: HiggsfieldGeneration): string {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

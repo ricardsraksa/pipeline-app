@@ -21,9 +21,15 @@ function LoginForm() {
       });
       const data = await res.json();
       if (!data.success) { setErr(data.error ?? `Login failed (${res.status})`); return; }
-      // Open-redirect guard: same-app paths only.
-      const next = params.get("next") ?? "/";
-      window.location.href = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+      // Open-redirect guard: resolve against our origin with the REAL URL
+      // parser and require the result to stay on it. String-prefix checks
+      // miss backslash forms ("/\\evil.com") that browsers normalise to "//".
+      let dest = "/";
+      try {
+        const u = new URL(params.get("next") ?? "/", window.location.origin);
+        if (u.origin === window.location.origin) dest = u.pathname + u.search + u.hash;
+      } catch { /* keep "/" */ }
+      window.location.href = dest;
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : "Network error");
     } finally {

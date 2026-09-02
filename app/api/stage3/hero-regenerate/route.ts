@@ -4,6 +4,7 @@ import { generateStage3Image } from '@/lib/stage3/higgsfield'
 import type { HeroPrompt } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 
+import { requireSession } from "@/lib/auth";
 // Regenerate the hero image at the QC gate. Optionally accepts an edited
 // prompt (the operator tweaked it). Stays at awaiting_hero_qc.
 export const maxDuration = 300
@@ -14,6 +15,8 @@ function safeArr(json: string | null): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId, editedPrompt } = (await req.json()) as { runId?: number; editedPrompt?: string }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

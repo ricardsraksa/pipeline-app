@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 
+import { requireSession } from "@/lib/auth";
 /**
  * GET /api/feedback/recent?stage=1|2|3 — returns the last 5 rated entries for
  * the given stage, mirroring the rows lib/feedback.ts injects into the next
@@ -8,6 +9,8 @@ import { db } from "@/lib/db";
  * notes from deleted runs are still surfaced ("Applied N past feedback").
  */
 export async function GET(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const stage = req.nextUrl.searchParams.get("stage");
   if (!["1", "2", "3"].includes(stage ?? "")) {
     return Response.json({ error: "stage must be 1, 2 or 3" }, { status: 400 });

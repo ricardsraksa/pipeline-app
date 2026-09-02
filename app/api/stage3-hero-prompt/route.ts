@@ -4,6 +4,7 @@ import { generateHeroPrompt, HERO_SYSTEM } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 import { generateStage3Image } from '@/lib/stage3/higgsfield'
 
+import { requireSession } from "@/lib/auth";
 // Phase 1 of hero-first Stage 3: generate ONE hero studio shot from the
 // SOURCE product photos, then stop at the hero QC gate.
 // Submit + poll image gen can take ~40s, plus the prompt call — give it room.
@@ -15,6 +16,8 @@ function safeArr(json: string | null): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

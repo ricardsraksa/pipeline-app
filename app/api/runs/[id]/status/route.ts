@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRun } from "@/lib/db";
 
+import { requireSession } from "@/lib/auth";
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(_req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const run = await getRun(parseInt(id, 10));
 

@@ -4,6 +4,7 @@ import { getRun, updateRun } from "@/lib/db";
 import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
 
+import { requireSession } from "@/lib/auth";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
 
 export const maxDuration = 120;
@@ -23,6 +24,8 @@ Return ONLY this JSON, no prose, no markdown:
 {"section_2": <image index>, "section_3": <image index>, "reasons": {"2": "<short why>", "3": "<short why>"}}`;
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = await req.json();
   if (!runId) return Response.json({ success: false, error: "runId required" }, { status: 400 });
 

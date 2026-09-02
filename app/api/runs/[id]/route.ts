@@ -3,14 +3,29 @@ import { db, detachRunFeedback, upsertFeedbackNote, type FeedbackStage } from "@
 import type { Run } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 
+import { requireSession } from "@/lib/auth";
+import { assertPublicUrl } from "@/lib/ssrf";
 // A stage2_copy edit re-derives the structured JSON via a (small) model call,
 // so this route needs more than the default budget.
 export const maxDuration = 120;
+
+// Every stored image URL must be public https; reject anything else so a
+// poisoned row can't later steer a server-side fetch at an internal host.
+async function assertImageUrls(urls: unknown[]): Promise<void> {
+  if (urls.length > 200) throw new Error("Too many image URLs");
+  for (const u of urls) {
+    if (typeof u !== "string" || u.length > 2048) throw new Error("Image URLs must be strings");
+    if (!u.startsWith("https://")) throw new Error(`Image URL must be https: ${u.slice(0, 80)}`);
+    await assertPublicUrl(u);
+  }
+}
 
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(_req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
 
   const result = await db.execute({
@@ -30,6 +45,8 @@ export async function DELETE(
   _req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(_req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const runId = Number(id);
   if (!Number.isFinite(runId)) {
@@ -61,8 +78,12 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
-  const body = await req.json() as { type?: string } & {
+  const rawBody = await req.text();
+  if (rawBody.length > 2_000_000) return Response.json({ error: "Payload too large" }, { status: 413 });
+  const body = JSON.parse(rawBody) as { type?: string } & {
     feedback_stage1?: string | null;
     feedback_stage2?: string | null;
     feedback_stage3?: string | null;
@@ -111,6 +132,30 @@ export async function PATCH(
   });
   if (!existing.rows.length) {
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Image URL fields are later fed to the vision model, Higgsfield import,
+  // Shopify and Drive — everything stored here must be a public https URL.
+  try {
+    if (body.type === "stage3_image_upsert") {
+      const img = (body as { image?: { image_url?: unknown } }).image;
+      if (img && img.image_url != null) await assertImageUrls([img.image_url]);
+    }
+    if (typeof body.stage3_remaining_images === "string") {
+      const parsed = JSON.parse(body.stage3_remaining_images);
+      if (!Array.isArray(parsed)) throw new Error("stage3_remaining_images must be an array");
+      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => u != null));
+    }
+    if (typeof body.stage3_reference_images === "string") {
+      const parsed = JSON.parse(body.stage3_reference_images);
+      if (!Array.isArray(parsed)) throw new Error("stage3_reference_images must be an array");
+      await assertImageUrls(parsed);
+    }
+    if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
+    if (Array.isArray(body.approved_image_urls)) await assertImageUrls(body.approved_image_urls);
+    if (Array.isArray(body.scraped_image_urls)) await assertImageUrls(body.scraped_image_urls);
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? e.message : "Invalid image URL" }, { status: 400 });
   }
 
   // Merge a single Stage 3 image into stage3_remaining_images server-side.

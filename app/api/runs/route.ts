@@ -2,7 +2,10 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import type { Run } from "@/lib/db";
 
-export async function GET() {
+import { requireSession } from "@/lib/auth";
+export async function GET(req: Request) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const result = await db.execute(
     `SELECT id, created_at, product_url, product_name, brand_name, status,
             feedback_stage1, feedback_stage2, feedback_stage3, notes,
@@ -62,7 +65,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json() as {
+  const denied = requireSession(req);
+  if (denied) return denied;
+  const rawBody = await req.text();
+  if (rawBody.length > 500_000) return Response.json({ error: "Payload too large" }, { status: 413 });
+  const body = JSON.parse(rawBody) as {
     product_url: string;
     product_name: string;
     product_description?: string;
@@ -87,6 +94,10 @@ export async function POST(req: NextRequest) {
     stage3_prompts?: unknown;
     image_urls?: string[];
   };
+
+  if (typeof body.product_url !== "string" || body.product_url.length > 2048 || typeof body.product_name !== "string" || body.product_name.length > 500) {
+    return Response.json({ error: "product_url and product_name are required" }, { status: 400 });
+  }
 
   const result = await db.execute({
     sql: `INSERT INTO runs (

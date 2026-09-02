@@ -1,7 +1,10 @@
 import { db } from "@/lib/db";
 
+import { requireSession } from "@/lib/auth";
 // Lightweight counts for the TopBar needs-you badge.
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   try {
     const r = await db.execute(
       `SELECT COUNT(*) AS needs FROM runs

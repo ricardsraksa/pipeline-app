@@ -7,6 +7,7 @@ import {
   getCurrentOverride,
   type PromptStage,
 } from "@/lib/prompts-store";
+import { requireSession } from "@/lib/auth";
 
 const STAGES: PromptStage[] = ["stage1", "stage2", "stage3"];
 
@@ -14,6 +15,8 @@ const STAGES: PromptStage[] = ["stage1", "stage2", "stage3"];
 // Body: { stage, index } — index into the history list (0 = newest).
 // The current override (if any) is pushed onto history first so nothing is lost.
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { stage, index } = (await req.json()) as { stage: string; index: number };
 
   if (!STAGES.includes(stage as PromptStage)) {

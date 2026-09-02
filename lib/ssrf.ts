@@ -29,13 +29,49 @@ function isBlockedV4(ip: string): boolean {
   return false;
 }
 
+// Expand any textual IPv6 form ("::1", "0:0:0:0:0:0:0:1", "::ffff:7f00:1",
+// "::ffff:127.0.0.1", zone ids, brackets) into its 8 numeric groups so the
+// range checks below are done on VALUES, never on spellings. String matching
+// here is what previously let "0::1" or "::ffff:7f00:1" slip past.
+function expandV6(ip: string): number[] | null {
+  let s = ip.toLowerCase().replace(/^\[|\]$/g, "");
+  const zone = s.indexOf("%");
+  if (zone >= 0) s = s.slice(0, zone);
+  // Dotted-quad tail → two hex groups.
+  const lastColon = s.lastIndexOf(":");
+  const tail = s.slice(lastColon + 1);
+  if (tail.includes(".")) {
+    const q = tail.split(".").map(Number);
+    if (q.length !== 4 || q.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+    s = s.slice(0, lastColon + 1) + ((q[0] << 8) | q[1]).toString(16) + ":" + ((q[2] << 8) | q[3]).toString(16);
+  }
+  const halves = s.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const fill = 8 - head.length - rest.length;
+  if (halves.length === 2 ? fill < 0 : fill !== 0) return null;
+  const groups = [...head, ...(halves.length === 2 ? Array<string>(fill).fill("0") : []), ...rest];
+  if (groups.length !== 8) return null;
+  const nums = groups.map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN));
+  return nums.some(Number.isNaN) ? null : nums;
+}
+
 function isBlockedV6(ip: string): boolean {
-  const lower = ip.toLowerCase().replace(/^\[|\]$/g, "");
-  if (lower === "::1" || lower === "::") return true;                 // loopback / unspecified
-  if (lower.startsWith("fe80")) return true;                          // link-local
-  if (lower.startsWith("fc") || lower.startsWith("fd")) return true;  // unique-local fc00::/7
-  const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);        // IPv4-mapped
-  if (mapped) return isBlockedV4(mapped[1]);
+  const g = expandV6(ip);
+  if (!g) return true; // unparseable → fail closed
+  const zeros = (n: number) => g.slice(0, n).every((x) => x === 0);
+  const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  if (zeros(7) && (g[7] === 0 || g[7] === 1)) return true;              // :: and ::1
+  if ((g[0] & 0xffc0) === 0xfe80) return true;                            // link-local fe80::/10
+  if ((g[0] & 0xfe00) === 0xfc00) return true;                            // unique-local fc00::/7
+  if ((g[0] & 0xff00) === 0xff00) return true;                            // multicast ff00::/8
+  if (zeros(5) && g[5] === 0xffff) return isBlockedV4(v4(g[6], g[7]));  // IPv4-mapped ::ffff:0:0/96
+  if (zeros(6)) return isBlockedV4(v4(g[6], g[7]));                       // IPv4-compatible ::a.b.c.d
+  if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) {
+    return isBlockedV4(v4(g[6], g[7]));                                    // NAT64 64:ff9b::/96
+  }
+  if (g[0] === 0x2002) return isBlockedV4(v4(g[1], g[2]));                // 6to4 2002::/16
   return false;
 }
 

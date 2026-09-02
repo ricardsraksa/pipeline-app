@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun } from '@/lib/db'
 
+import { requireSession } from "@/lib/auth";
 // Step back from the 8-prompt review gate (awaiting_qc) to the hero QC gate.
 // Non-destructive on purpose: the stored prompts/images stay, so an operator
 // who just wants another look at the hero and re-approves it unchanged loses
@@ -8,6 +9,8 @@ import { getRun, updateRun } from '@/lib/db'
 // already generated). Only actually REGENERATING the hero clears the old
 // hero's derivatives — see hero-regenerate.
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

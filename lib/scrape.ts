@@ -26,23 +26,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function mapScraperError(raw: string): string {
-  const lower = raw.toLowerCase();
-  if (lower.includes("captcha could not be solved") || lower.includes("captcha / verification detected") || lower.includes("captcha")) {
-    return "AliExpress/Alibaba blocked the scrape with a captcha. Run this scrape locally with SCRAPER_HEADLESS=false to solve it manually, or try again later.";
-  }
-  if (lower.includes("missing required environment variables")) {
-    return "R2 storage is not configured. Add R2_* environment variables in Render settings.";
-  }
-  if (lower.includes("no images downloaded")) {
-    return "Scraper found no product images. Verify the URL is a valid product page.";
-  }
-  if (lower.includes("timed out") || lower.includes("timeout")) {
-    return "Scrape timed out. The page may be slow or blocked. Try again.";
-  }
-  return `Scraper failed: ${raw.slice(0, 200)}`;
-}
-
 export interface ScrapeData {
   scraped_text: string;
   images: string[];
@@ -66,43 +49,6 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
     await assertPublicUrl(url);
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Blocked URL" };
-  }
-
-  // Preferred path: dedicated Python scraper service (Playwright-based)
-  const scraperServiceUrl = process.env.SCRAPER_SERVICE_URL;
-  if (scraperServiceUrl) {
-    let rawError: string | null = null;
-    try {
-      const svcRes = await axios.post(
-        `${scraperServiceUrl.replace(/\/$/, "")}/scrape`,
-        { url },
-        { timeout: 300000, headers: { "Content-Type": "application/json" } },
-      );
-      const body = svcRes.data ?? {};
-      if (body.success) {
-        const images: string[] = body.images ?? [];
-        if (images.length === 0) {
-          return { success: false, error: "No images found" };
-        }
-        return {
-          success: true,
-          data: {
-            scraped_text: body.scraped_text ?? "",
-            images,
-            title: body.title ?? "",
-            description: body.description ?? "",
-            specs: body.specs ?? {},
-            platform: body.platform ?? "",
-          },
-        };
-      }
-      rawError = typeof body.error === "string" && body.error.length > 0
-        ? body.error
-        : "Scraper service returned failure";
-    } catch (err) {
-      rawError = err instanceof Error ? err.message : String(err);
-    }
-    return { success: false, error: mapScraperError(rawError ?? "Scraper service returned failure") };
   }
 
   try {

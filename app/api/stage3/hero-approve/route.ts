@@ -4,12 +4,15 @@ import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 import { probeImportUrl } from '@/lib/higgsfield-mcp'
 
+import { requireSession } from "@/lib/auth";
 // Approve the hero → trigger Phase 2 prompt generation. The approved hero
 // image becomes the reference for all 8 derivative prompts. Lands at the
 // existing prompt-review gate (awaiting_qc).
 export const maxDuration = 600
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRun, updateRun, type Run } from "@/lib/db";
 import { resumePipeline, runStage2Manually } from "@/lib/pipeline-runner";
 
+import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
 
 type RestartStage = "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
@@ -71,6 +72,8 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const runId = parseInt(id, 10);
 

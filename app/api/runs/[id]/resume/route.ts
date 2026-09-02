@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRun, updateRun } from "@/lib/db";
 import { resumePipeline } from "@/lib/pipeline-runner";
 
+import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
 
 export async function POST(
   _req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(_req);
+  if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const runId = parseInt(id, 10);
   const run = await getRun(runId);

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { randomUUID } from "node:crypto";
 
+import { requireSession } from "@/lib/auth";
 // Upload user-provided source images to Cloudflare R2.
 // Requires env vars: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 // R2_BUCKET_NAME, R2_PUBLIC_URL (the public bucket URL, e.g.
@@ -61,9 +63,29 @@ interface PreparedUpload {
   ext: string;
 }
 
+// sharp's detected container → the MIME we store. Anything not listed is not
+// an image we accept, whatever the client's Content-Type claimed.
+const SNIFFED_MIME: Record<string, string> = {
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  heif: "image/heic",
+};
+
 async function prepareForR2(file: File): Promise<PreparedUpload> {
   const buf = Buffer.from(await file.arrayBuffer());
-  const mime = file.type.toLowerCase();
+
+  // Never trust the client-declared type: the bucket is public, and a file
+  // served as image/svg+xml or text/html from our origin is an XSS/phishing
+  // surface. Decode the header with sharp and use what the BYTES say.
+  let format: string | undefined;
+  try {
+    format = (await sharp(buf, { failOn: "none", limitInputPixels: 80_000_000 }).metadata()).format;
+  } catch { format = undefined; }
+  const mime = format ? SNIFFED_MIME[format] : undefined;
+  if (!mime) throw new Error(`${file.name} is not a supported image (content does not match ${ACCEPTED_LABEL}).`);
 
   if (TRANSCODE_MIME.has(mime)) {
     // Transcode → JPEG. sharp auto-rotates based on EXIF orientation.
@@ -74,10 +96,12 @@ async function prepareForR2(file: File): Promise<PreparedUpload> {
     return { body: jpeg, contentType: "image/jpeg", ext: "jpg" };
   }
 
-  return { body: buf, contentType: file.type, ext: extFor(mime) };
+  return { body: buf, contentType: mime, ext: extFor(mime) };
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const bucket = process.env.R2_BUCKET_NAME;
   const publicUrl = process.env.R2_PUBLIC_URL;
   if (!bucket || !publicUrl) {
@@ -137,9 +161,16 @@ export async function POST(req: NextRequest) {
   const uploadedUrls: string[] = [];
   try {
     for (const file of files) {
-      const { body, contentType, ext } = await prepareForR2(file);
+      let prepared: PreparedUpload;
+      try {
+        prepared = await prepareForR2(file);
+      } catch (err) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unsupported image" }, { status: 400 });
+      }
+      const { body, contentType, ext } = prepared;
       const base = sanitizeName(file.name.replace(/\.[^.]+$/, ""));
-      const key = `source/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${base}.${ext}`;
+      // The bucket is public: keys must be unguessable, not timestamp-ordered.
+      const key = `source/${randomUUID()}-${base}.${ext}`;
       await s3.send(
         new PutObjectCommand({
           Bucket: bucket,

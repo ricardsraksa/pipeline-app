@@ -4,6 +4,7 @@ import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
 import { assertPublicUrl } from "@/lib/ssrf";
 
+import { requireSession } from "@/lib/auth";
 // POST { prompt, instructions, category? }  →  { success, prompt }
 //
 // Takes one Stage-3 image prompt + a short natural-language instruction
@@ -25,6 +26,8 @@ Your job is to rewrite the prompt incorporating the operator's note. Hard rules:
 - Output ONLY the new prompt text. No preamble, no markdown headers, no quotes around it.`;
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const body = (await req.json()) as {
     prompt?: string;
     instructions?: string;

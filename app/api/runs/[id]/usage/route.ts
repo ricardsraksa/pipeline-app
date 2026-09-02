@@ -1,6 +1,7 @@
 import { getUsageForRun } from "@/lib/db";
 import { costOfUsage } from "@/lib/models";
 
+import { requireSession } from "@/lib/auth";
 // Cost tracker readout: every Anthropic call recorded for a run, plus a
 // per-label rollup and the total dollar cost. Usage numbers are captured from
 // API responses we already receive — this endpoint only reads the DB.
@@ -8,6 +9,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const denied = requireSession(_req);
+  if (denied) return denied;
   const { id } = await params;
   const runId = Number(id);
   if (!Number.isFinite(runId)) {

@@ -3,9 +3,12 @@ import { revalidatePath } from "next/cache";
 import { createRun } from "@/lib/db";
 import { runPipeline } from "@/lib/pipeline-runner";
 
+import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const body = (await req.json()) as {
     productDescription?: string;
     sourceImages?: string[];

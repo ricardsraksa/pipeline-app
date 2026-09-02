@@ -4,6 +4,7 @@ import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
 
+import { requireSession } from "@/lib/auth";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
@@ -24,6 +25,8 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<unknown> }
 ) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { stage } = (await context.params) as { stage: string };
 
   const body = (await req.json()) as { runId?: number; instructions?: string };

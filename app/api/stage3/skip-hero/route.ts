@@ -3,6 +3,7 @@ import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 
+import { requireSession } from "@/lib/auth";
 // Skip the hero step: generate the 8 derivative prompts directly from the
 // SOURCE product photos (no separate hero shot). Lands at the same prompt
 // review gate (awaiting_qc); the source images become the reference for every
@@ -15,6 +16,8 @@ function safeArr(json: string | null): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
   const { runId } = (await req.json()) as { runId?: number }
   if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
 

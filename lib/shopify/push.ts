@@ -22,6 +22,13 @@ const FORBIDDEN_TOKENS = [
   "productPublish",
   "productVariantsBulkUpdate",
   "priceUpdate",
+  "productSet",              // full-replace upsert — could wipe fields we don't manage
+  "publishableUnpublish",
+  "productDeleteImages",
+  "productUpdateMedia",
+  "productReorderMedia",
+  "productChangeStatus",
+  "inventory",
 ];
 
 function assertStrict(mutation: string): void {

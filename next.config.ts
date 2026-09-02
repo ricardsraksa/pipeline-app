@@ -12,7 +12,10 @@ const nextConfig: NextConfig = {
     // build, so it also tells you whether the latest push has gone live.
     NEXT_PUBLIC_APP_VERSION: version,
   },
-  allowedDevOrigins: ["69ecf3a7-58a1-44a4-a48e-742271ac8325-00-yzp2pmyafi9k.worf.replit.dev"],
+  // next/image is unused; disabling the optimizer removes the /_next/image
+  // endpoint (an anonymous sharp-resize amplifier) entirely.
+  images: { unoptimized: true },
+  poweredByHeader: false,
   typescript: {
     // Next.js 16 generates .next/types/validator.ts which imports ./routes.js;
     // TypeScript resolves this correctly in isolation but the build worker
