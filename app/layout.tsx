@@ -1,31 +1,31 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Libre_Franklin, Space_Mono } from "next/font/google";
 import "./globals.css";
 import TopBar from "@/components/TopBar";
 import { ToastProvider } from "@/components/Toasts";
 import AuthWatch from "@/components/AuthWatch";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const libreFranklin = Libre_Franklin({
+  variable: "--font-libre-franklin",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const jetBrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const spaceMono = Space_Mono({
+  variable: "--font-space-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Pipeline v2 — DTC Research",
+  title: "Pipeline",
   description: "Product research and copy pipeline for DTC brands",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="light" className={`${spaceGrotesk.variable} ${jetBrainsMono.variable}`}>
-      <body className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-space-grotesk), system-ui, sans-serif", fontSize: 14, lineHeight: 1.5, WebkitFontSmoothing: "antialiased", fontVariantNumeric: "tabular-nums" }}>
+    <html lang="en" data-theme="dark" className={`${libreFranklin.variable} ${spaceMono.variable}`}>
+      <body className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-libre-franklin), system-ui, sans-serif", fontSize: 14, lineHeight: 1.5, WebkitFontSmoothing: "antialiased", fontVariantNumeric: "tabular-nums" }}>
         <ToastProvider>
           <AuthWatch />
           <TopBar />

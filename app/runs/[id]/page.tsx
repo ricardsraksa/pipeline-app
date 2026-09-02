@@ -10,7 +10,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
-import { MeshThumb, StatusBadge, elapsedTime, statusLabel, truncateUrl } from "@/components/ui/run-ui";
+import { elapsedTime, statusLabel } from "@/components/ui/run-ui";
 import { useToast } from "@/components/Toasts";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
@@ -19,7 +19,6 @@ import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Shopify from "@/components/Stage2Shopify";
 import type { Stage2Json } from "@/lib/stage2/shape";
-import RunProductCode from "@/components/RunProductCode";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
 import SendToDoc from "@/components/SendToDoc";
@@ -438,233 +437,207 @@ export default function RunPage() {
   const activeKey: StageKey = activeOverride && present[activeOverride] ? activeOverride : autoKey;
   const active = STAGE_DEFS.find((d) => d.key === activeKey)!;
 
-  const railBtn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
-  const stateDot: Record<StageState, string> = {
-    complete: "bg-[var(--color-green)]", running: "bg-[var(--color-accent)] pulse-dot", waiting: "bg-[var(--color-amber)]",
-    error: "bg-[var(--color-red)]", pending: "bg-[var(--color-border-strong)]",
+  const stateTone: Record<StageState, string> = {
+    complete: "var(--color-text-3)", running: "var(--color-accent)", waiting: "var(--color-amber)",
+    error: "var(--color-red)", pending: "var(--color-text-4)",
   };
-  const stateWord: Record<StageState, string> = { complete: "Done", running: "Running", waiting: "Needs you", error: "Failed", pending: "" };
-
-  const pane = "min-h-0 overflow-y-auto rounded-[var(--radius)] border border-[var(--color-border)] bg-[var(--color-surface)]";
-  const spinner = (text: string) => (
-    <div className="h-full grid place-items-center">
-      <div className="text-center">
-        <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
-        <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{text}</p>
-      </div>
+  const stateWord: Record<StageState, string> = { complete: "done", running: "running", waiting: "needs you", error: "failed", pending: "—" };
+  const textBtn = "cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr";
+  const label = "eyebrow";
+  const card = "border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]";
+  const waiting = (text: string) => (
+    <div className={cx(card, "px-5 py-10 grid place-items-center")}>
+      <p className="ff-mono text-[12px] text-[var(--color-text-2)]">{text}</p>
     </div>
   );
 
   return (
-    <div className="h-[calc(100vh-54px)] grid grid-cols-[264px_minmax(0,1fr)]" data-screen-label="Run">
-      {/* ── left rail: run, stages, actions ── */}
-      <aside className="border-r border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col min-h-0">
-        <div className="px-4 pt-4 pb-3 border-b border-[var(--color-border)]">
-          <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-3">
-            <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
-          </Link>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-[var(--radius-sm)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
-              {run.meta.uploadedSourceImages[0]
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
-                : <MeshThumb id={runId ?? 0} className="w-full h-full" />}
-            </div>
-            <div className="min-w-0 group/name">
-              {renaming ? (
-                <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onBlur={saveName}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveName(); } else if (e.key === "Escape") { e.preventDefault(); setRenaming(false); } }}
-                  className="w-full text-[14px] font-bold ff-display text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded-[var(--radius-sm)] px-2 py-0.5 focus:outline-none focus:border-[var(--color-accent)]"
-                  aria-label="Run name" />
-              ) : (
-                <button onClick={() => { setNameDraft(displayName); setRenaming(true); }} title="Rename" className="cursor-pointer text-left w-full">
-                  <p className="text-[14px] font-bold ff-display text-[var(--color-text)] truncate leading-tight">{displayName}</p>
-                </button>
-              )}
-              <p className="ff-mono text-[10.5px] text-[var(--color-text-4)] truncate">#{runId}{elapsed ? ` · ${elapsed}` : ""}</p>
+    <div className="grid items-start" style={{ gridTemplateColumns: "268px minmax(0,1fr)", minHeight: "calc(100vh - 50px)" }} data-screen-label="Run">
+      {/* ── rail ── */}
+      <aside className="sticky border-r border-[var(--color-border)] px-4 py-5 flex flex-col gap-[18px] overflow-auto"
+        style={{ top: 50, height: "calc(100vh - 50px)" }}>
+        <div className="flex gap-[11px] items-start">
+          <div className="w-[42px] h-[42px] shrink-0 rounded-[6px] border border-[var(--color-border)] grid place-items-center ff-mono text-[9px] text-[var(--color-text-3)] overflow-hidden"
+            style={{ background: "repeating-linear-gradient(135deg,var(--color-surface-2) 0 4px,var(--color-bg) 4px 8px)" }}>
+            {run.meta.uploadedSourceImages[0]
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
+              : (run.meta.productCode || `#${runId}`)}
+          </div>
+          <div className="min-w-0">
+            {renaming ? (
+              <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onBlur={saveName}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveName(); } else if (e.key === "Escape") { e.preventDefault(); setRenaming(false); } }}
+                className="w-full text-[14px] font-[500] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[5px] px-2 py-0.5 outline-none focus:border-[var(--color-accent)]"
+                aria-label="Run name" />
+            ) : (
+              <button onClick={() => { setNameDraft(displayName); setRenaming(true); }} title="Rename" className="cursor-pointer text-left">
+                <div className="text-[14px] font-[500] leading-[1.25] text-[var(--color-text)]">{displayName}</div>
+              </button>
+            )}
+            <div className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-[3px]">
+              run {runId}{run.meta.productCode ? ` · ${run.meta.productCode}` : ""}{elapsed ? ` · ${elapsed}` : ""}
             </div>
           </div>
-          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-            <StatusBadge status={run.status} stuck={isStuck(run)} />
-            {runId !== null && <RunProductCode runId={Number(runId)} />}
-          </div>
-          {run.meta.productUrl && (
-            <a href={run.meta.productUrl} target="_blank" rel="noopener noreferrer" className="block mt-2 text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr truncate">
-              {truncateUrl(run.meta.productUrl, 40)}
-            </a>
-          )}
         </div>
 
-        {/* stages */}
-        <nav className="px-2 py-2">
+        <div className="flex flex-col gap-px">
           {STAGE_DEFS.map((def) => {
             const st = states[def.key];
             const on = def.key === activeKey;
-            const can = present[def.key];
             return (
-              <button key={def.key} disabled={!can} onClick={() => openStage(def.key)}
-                className={cx("w-full flex items-center gap-3 px-2.5 py-2.5 rounded-[var(--radius-sm)] text-left tr",
-                  can ? "cursor-pointer" : "cursor-default opacity-50",
-                  on ? "bg-[var(--color-accent-weak)]" : "hover:bg-[var(--color-surface-2)]")}>
-                <span className="w-6 h-6 rounded-full grid place-items-center shrink-0 border border-[var(--color-border-strong)] text-[11px] font-bold text-[var(--color-text-2)] bg-[var(--color-surface)]">
-                  {st === "complete" ? <Icon.Check className="w-3 h-3" strokeWidth={3} /> : def.n}
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className={cx("block text-[13px] font-[650] truncate", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
-                  <span className="block text-[10.5px] text-[var(--color-text-4)] truncate">{stateWord[st] || def.what}</span>
-                </span>
-                <span className={cx("w-2 h-2 rounded-full shrink-0", stateDot[st])} />
+              <button key={def.key} disabled={!present[def.key]} onClick={() => openStage(def.key)}
+                className={cx("grid items-center gap-2.5 px-2.5 py-[9px] rounded-[6px] text-left tr",
+                  present[def.key] ? "cursor-pointer hover:bg-[var(--color-surface-2)]" : "cursor-default opacity-45",
+                  on && "bg-[var(--color-surface-2)]")}
+                style={{ gridTemplateColumns: "16px 1fr auto" }}>
+                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{def.n}</span>
+                <span className={cx("text-[13px] font-[500]", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
+                <span className="ff-mono text-[11px]" style={{ color: stateTone[st] }}>{stateWord[st]}</span>
               </button>
             );
           })}
-        </nav>
+        </div>
 
-        {/* what's happening */}
-        {(a.running || run.currentStep) && !isTerminal && (
-          <div className="mx-3 mb-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--color-bg)] border border-[var(--color-border)]">
-            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] leading-snug break-words">{run.currentStep || statusLabel(run.status)}</p>
-          </div>
-        )}
+        <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-[9px]">
+          <span className={label}>Next</span>
+          <p className="text-[13px] leading-[1.4] text-[var(--color-text)]">{a.title}{a.sub ? <span className="text-[var(--color-text-2)]"> — {a.sub}</span> : null}</p>
+          {showPrimary && a.cta && (
+            <button onClick={a.onClick} disabled={startingStage2 || resuming}
+              className="cursor-pointer h-[34px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-60 tr">
+              {a.cta}
+            </button>
+          )}
+          {run.currentStep && a.running && <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] leading-snug">{run.currentStep}</p>}
+        </div>
 
-        <div className="mt-auto px-3 pb-3 pt-2 border-t border-[var(--color-border)] space-y-2">
-          {runId !== null && <RunCost runId={runId} />}
-          <div className="flex items-center gap-2 flex-wrap">
-            {hasDocs && <button onClick={handleDownloadDocs} className={railBtn}><Icon.Download className="w-3.5 h-3.5" /> Docs</button>}
-            <button onClick={handleDownloadImages} disabled={zippingImages} className={railBtn}><Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "…" : "Images"}</button>
-            {a.running && !isTerminal && (
-              <button onClick={handleKill} disabled={killing}
-                className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12px] font-[620] border bg-[var(--color-red-bg)] text-[var(--color-red)] tr hover:brightness-95 disabled:opacity-50"
-                style={{ borderColor: "color-mix(in srgb, var(--color-red) 50%, transparent)" }}>
-                <Icon.Stop className="w-3 h-3" /> {killing ? "Killing…" : "Kill"}
-              </button>
-            )}
-          </div>
+        <div className="flex-1" />
+
+        {runId !== null && <RunCost runId={runId} />}
+
+        <div className="flex gap-3.5 text-[11.5px] text-[var(--color-text-3)] flex-wrap">
+          {hasDocs && <button onClick={handleDownloadDocs} className={textBtn}>Docs</button>}
+          <button onClick={handleDownloadImages} disabled={zippingImages} className={textBtn}>{zippingImages ? "Downloading…" : "Images"}</button>
+          <button onClick={() => handleRestartStage(activeKey === "stage3" ? "stage3-prompts" : activeKey)} disabled={restarting} className={textBtn}>Restart stage</button>
+          {a.running && !isTerminal && (
+            <button onClick={handleKill} disabled={killing} className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-red)] tr">{killing ? "Killing…" : "Kill"}</button>
+          )}
         </div>
       </aside>
 
-      {/* ── main: the active stage, full height ── */}
-      <section className="min-h-0 flex flex-col bg-[var(--color-bg)]">
-        <header className="flex items-center justify-between gap-4 px-6 h-12 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0">
-          <div className="flex items-baseline gap-2.5 min-w-0">
-            <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">STAGE {active.n}</span>
-            <h2 className="text-[15px] font-[700] ff-display text-[var(--color-text)]">{active.title}</h2>
-            <span className="text-[12px] text-[var(--color-text-3)] truncate">{summary(active.key) ?? active.what}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {activeKey === "product" && runId !== null && <><PromptUsed promptsUsed={run.promptsUsed} stage="product" /><StageActions stage="product" onRestart={handleRestartStage} restarting={restarting} /></>}
-            {activeKey === "stage1" && runId !== null && outputs.onePager && (
-              <>
-                <a href={`/api/runs/${runId}/stage1-docs`} download className={railBtn}><Icon.Download className="w-3.5 h-3.5" /> Docs</a>
-                <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
-                <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
-                <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
-                <StageActions stage="stage1" onRestart={handleRestartStage} restarting={restarting} />
-              </>
-            )}
-            {activeKey === "stage2" && runId !== null && outputs.stage2Output && (
-              <>
-                <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
-                <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
-                <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
-                <StageActions stage="stage2" onRestart={handleRestartStage} restarting={restarting} />
-              </>
-            )}
-            {activeKey === "stage3" && runId !== null && <><PromptUsed promptsUsed={run.promptsUsed} stage="stage3" /><StageActions stage="stage3-prompts" onRestart={handleRestartStage} restarting={restarting} /></>}
-          </div>
-        </header>
+      {/* ── main ── */}
+      <div style={{ padding: "26px 30px 100px", maxWidth: 1000 }}>
 
-        <div className="flex-1 min-h-0 p-4">
-          {/* Stage 1 · Product */}
-          {activeKey === "product" && (
-            PRODUCT_ACTIVE.includes(run.status)
-              ? <div className={cx(pane, "h-full")}>{spinner(run.currentStep ?? "Reading the product page…")}</div>
-              : <div className={cx(pane, "h-full px-5 py-4")}>{runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}</div>
-          )}
+        {/* Stage 1 · Product */}
+        {activeKey === "product" && (
+          <>
+            <div className="flex items-baseline gap-2.5 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Product</h1>
+              <span className="text-[12.5px] text-[var(--color-text-2)]">Check the description and pick the photos.</span>
+              <div className="flex-1" />
+              {runId !== null && <PromptUsed promptsUsed={run.promptsUsed} stage="product" />}
+            </div>
+            {PRODUCT_ACTIVE.includes(run.status)
+              ? waiting(run.currentStep ?? "Reading the product page…")
+              : runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}
+          </>
+        )}
 
-          {/* Stage 2 · Research: one-pager left, angles right */}
-          {activeKey === "stage1" && (
-            outputs.onePager ? (
-              <div className="h-full grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-4">
-                <div className={cx(pane, "px-5 py-4")}>
-                  <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+        {/* Stage 2 · Research */}
+        {activeKey === "stage1" && (
+          <>
+            <div className="flex items-baseline gap-2.5 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Research</h1>
+              <span className="text-[12.5px] text-[var(--color-text-2)]">Tick the angle to build on. First tick is primary.</span>
+            </div>
+            {outputs.onePager ? (
+              <>
+                {runId !== null && <div className="mb-[30px]"><AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} /></div>}
+                <div>
+                  <div className="flex items-center gap-2.5 mb-2.5">
+                    <span className={label}>One-pager</span>
+                    <div className="flex-1" />
+                    {runId !== null && (
+                      <div className="flex gap-3.5 items-center">
+                        <a href={`/api/runs/${runId}/stage1-docs`} download className={textBtn}>Documents</a>
+                        <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
+                        <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
+                        <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
+                      </div>
+                    )}
+                  </div>
+                  <div className={cx(card, "px-[22px] py-5")}>
+                    <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+                  </div>
                   {run.scrapeErrors && run.scrapeErrors.length > 0 && (
-                    <p className="mt-4 text-[11px] text-[var(--color-amber)]">{run.scrapeErrors.length} competitor link{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be read.</p>
+                    <p className="mt-3 text-[11.5px] text-[var(--color-amber)]">{run.scrapeErrors.length} competitor link{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be read.</p>
                   )}
-                  <div className="mt-4"><FeedbackAppliedChip stage={1} /></div>
+                  <div className="mt-3"><FeedbackAppliedChip stage={1} /></div>
                 </div>
-                <div className={cx(pane, "px-5 py-4")}>
-                  {runId !== null && <AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} />}
-                </div>
-              </div>
+              </>
             ) : ["stage1", "scraping"].includes(run.status) || outputs.research
-              ? <div className={cx(pane, "h-full")}>{spinner(run.currentStep ?? "Researching…")}</div>
-              : <div className={cx(pane, "h-full grid place-items-center")}><p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you approve the product.</p></div>
-          )}
+              ? waiting(run.currentStep ?? "Researching…")
+              : waiting("Starts after you approve the product.")}
+          </>
+        )}
 
-          {/* Stage 3 · Copy */}
-          {activeKey === "stage2" && (
-            outputs.stage2Output ? (
-              <div className="h-full flex flex-col gap-3 min-h-0">
-                <div className="flex items-center justify-between gap-3 shrink-0">
-                  <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
-                    {((stage2Json ? ["text", "copy"] : ["text"]) as Array<"text" | "copy">).map((v) => (
-                      <button key={v} onClick={() => setStage2View(v)}
-                        className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-                        {v === "text" ? "Full text" : "Fields"}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <FeedbackAppliedChip stage={2} />
-                    {runId !== null && stage2View === "copy" && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
-                  </div>
+        {/* Stage 3 · Copy */}
+        {activeKey === "stage2" && (
+          <>
+            <div className="flex items-center gap-3 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Copy</h1>
+              <div className="flex-1" />
+              {outputs.stage2Output && (
+                <div className="flex gap-px p-0.5 rounded-[7px] bg-[var(--color-surface-2)]">
+                  {((stage2Json ? ["text", "copy"] : ["text"]) as Array<"text" | "copy">).map((v) => (
+                    <button key={v} onClick={() => setStage2View(v)}
+                      className={cx("cursor-pointer px-[11px] py-[5px] rounded-[5px] text-[12.5px] tr",
+                        stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)]" : "text-[var(--color-text-2)] hover:text-[var(--color-text)]")}>
+                      {v === "text" ? "Full text" : "Fields"}
+                    </button>
+                  ))}
                 </div>
-                <div className={cx(pane, "flex-1 px-5 py-4")}>
-                  {stage2View === "copy" && stage2Json ? (
-                    <Stage2Shopify json={stage2Json} />
-                  ) : (
-                    <EditableOutput runId={Number(runId)} field="stage2_copy" stage="stage2" originalValue={outputs.stage2Output}
-                      editedValue={outputs.stage2OutputEdited} editedAt={outputs.stage2EditedAt} label="Copy Kit" monospace={false} downloadFilename="STAGE2_COPY.txt" />
+              )}
+            </div>
+            {outputs.stage2Output ? (
+              <>
+                <div className="flex items-center gap-3.5 mb-2.5">
+                  <span className={label}>{stage2View === "copy" ? "Store fields" : "Copy kit"}</span>
+                  <div className="flex-1" />
+                  {runId !== null && (
+                    <div className="flex gap-3.5 items-center">
+                      {stage2View === "copy" && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
+                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
+                      <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
+                      <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
+                    </div>
                   )}
                 </div>
-              </div>
-            ) : run.status === "stage2"
-              ? <div className={cx(pane, "h-full")}>{spinner("Generating copy…")}</div>
-              : <div className={cx(pane, "h-full grid place-items-center")}><p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you pick an angle.</p></div>
-          )}
+                {stage2View === "copy" && stage2Json ? (
+                  <Stage2Shopify json={stage2Json} />
+                ) : (
+                  <EditableOutput runId={Number(runId)} field="stage2_copy" stage="stage2" originalValue={outputs.stage2Output}
+                    editedValue={outputs.stage2OutputEdited} editedAt={outputs.stage2EditedAt} label="Copy kit" monospace={false} downloadFilename="STAGE2_COPY.txt" />
+                )}
+                <div className="mt-3"><FeedbackAppliedChip stage={2} /></div>
+              </>
+            ) : run.status === "stage2" ? waiting("Writing the copy…") : waiting("Starts after you pick an angle.")}
+          </>
+        )}
 
-          {/* Stage 4 · Images */}
-          {activeKey === "stage3" && (
-            <div className={cx(pane, "h-full px-5 py-4")}>
-              <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
+        {/* Stage 4 · Images */}
+        {activeKey === "stage3" && (
+          <>
+            <div className="flex items-baseline gap-2.5 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Images</h1>
+              <span className="text-[12.5px] text-[var(--color-text-2)]">Hero first, then the eight.</span>
+              <div className="flex-1" />
+              {runId !== null && <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />}
             </div>
-          )}
-        </div>
-
-        {/* next action */}
-        <footer className="shrink-0 px-4 pb-4">
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-lg)] border bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
-            style={{ borderColor: `color-mix(in srgb, ${toneBar} 35%, var(--color-border))` }}>
-            <span className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-white" style={{ background: toneBar }}>
-              {a.running ? <Icon.Loader className="w-3.5 h-3.5" />
-                : a.icon === "alert" ? <Icon.Alert className="w-3.5 h-3.5" />
-                : a.icon === "check" ? <Icon.Check className="w-3.5 h-3.5" strokeWidth={3} />
-                : a.icon === "image" ? <Icon.Image className="w-3.5 h-3.5" />
-                : <Icon.Spark className="w-3.5 h-3.5" />}
-            </span>
-            <div className="flex-1 min-w-0 flex items-baseline gap-2">
-              <p className="text-[13px] font-[650] text-[var(--color-text)] truncate">{a.title}</p>
-              {a.sub && <p className="text-[11.5px] text-[var(--color-text-3)] truncate">{a.sub}</p>}
-            </div>
-            {showPrimary && a.cta && (
-              <button onClick={a.onClick} disabled={startingStage2 || resuming}
-                className="cursor-pointer shrink-0 inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[8px] text-[13px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent tr hover:brightness-110 disabled:opacity-60 whitespace-nowrap">
-                {a.cta}<Icon.ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </footer>
-      </section>
+            <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
+          </>
+        )}
+      </div>
     </div>
   );
 }

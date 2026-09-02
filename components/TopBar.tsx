@@ -1,80 +1,83 @@
 "use client";
 
-// v2 TopBar — sticky 54px header: logo, Home / New run / Settings tabs,
-// theme toggle. Home tab shows a needs-you count badge when away from home.
+// Sticky 50px header: wordmark and version, the three destinations with an
+// underline on the current one, a count of runs that need the operator, the
+// theme toggle and sign out.
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Icon } from "@/components/ui/Icon";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
-export default function TopBar() {
-  const pathname = usePathname();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [needsCount, setNeedsCount] = useState(0);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("pl2_theme") as "light" | "dark" | null;
-    const initial = saved || "light";
-    setTheme(initial);
-    document.documentElement.dataset.theme = initial;
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("pl2_theme", next);
-  };
-
-  // Needs-you badge: refresh on navigation and every 30s.
-  useEffect(() => {
-    let alive = true;
-    const load = () =>
-      fetch("/api/runs/counts")
-        .then((r) => r.json())
-        .then((d) => { if (alive && typeof d.needs === "number") setNeedsCount(d.needs); })
-        .catch(() => {});
-    load();
-    const id = setInterval(load, 30_000);
-    return () => { alive = false; clearInterval(id); };
-  }, [pathname]);
-
-  const route = pathname === "/" || pathname.startsWith("/runs") || pathname.startsWith("/history") ? "home"
-    : pathname.startsWith("/new") ? "new"
-    : pathname.startsWith("/settings") ? "settings" : "";
-
-  const tab = (id: string, href: string, label: string) => (
-    <Link href={href} className={cx(
-      "relative px-3 py-1.5 rounded-[var(--radius-sm)] text-[13px] font-[600] tr cursor-pointer whitespace-nowrap",
-      route === id ? "bg-[var(--color-accent-weak)] text-[var(--color-accent-text)]" : "text-[var(--color-text-2)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]")}>
-      {label}
-      {id === "home" && needsCount > 0 && route !== "home" && (
-        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--color-amber)] text-white text-[9.5px] font-bold grid place-items-center">{needsCount}</span>
-      )}
+function Tab({ href, label, active, badge }: { href: string; label: string; active: boolean; badge?: number }) {
+  return (
+    <Link href={href}
+      className={cx("relative cursor-pointer flex items-center gap-[7px] px-[10px] py-[7px] rounded-[6px] text-[13px] tr",
+        active ? "text-[var(--color-text)]" : "text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]")}>
+      <span>{label}</span>
+      {badge ? (
+        <span className="ff-mono text-[10px] px-[5px] py-px rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)]">{badge}</span>
+      ) : null}
+      {active && <span className="absolute left-[10px] right-[10px] -bottom-px h-[2px] rounded-[2px] bg-[var(--color-accent)]" />}
     </Link>
   );
+}
 
+export default function TopBar() {
+  const path = usePathname() ?? "/";
+  const router = useRouter();
+  const [needs, setNeeds] = useState(0);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const saved = (localStorage.getItem("pipeline-theme") as "dark" | "light" | null) ?? "dark";
+    setTheme(saved);
+    document.documentElement.setAttribute("data-theme", saved);
+  }, []);
+
+  useEffect(() => {
+    if (path === "/login") return;
+    let live = true;
+    const load = () => fetch("/api/runs/counts").then((r) => r.json()).then((d) => { if (live) setNeeds(Number(d?.needs ?? 0)); }).catch(() => undefined);
+    load();
+    const t = setInterval(load, 30_000);
+    return () => { live = false; clearInterval(t); };
+  }, [path]);
+
+  if (path === "/login") return null;
+
+  const toggle = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("pipeline-theme", next); } catch { /* private mode */ }
+  };
+
+  async function signOut() {
+    try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* ignore */ }
+    router.push("/login");
+  }
+
+  const isRun = path.startsWith("/runs") || path === "/";
   return (
-    <header className="sticky top-0 z-40 h-[54px] border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)] backdrop-blur-md">
-      <div className="h-full px-5 flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2.5 cursor-pointer">
-          <span className="w-[28px] h-[28px] rounded-[var(--radius-sm)] bg-[var(--color-primary)] text-[var(--color-on-primary)] grid place-items-center shrink-0"><Icon.Logo className="w-4 h-4" /></span>
-          <span className="font-bold tracking-tight text-[15px] ff-display text-[var(--color-text)]">Pipeline <span title="App version (of this deployed build)" className="ff-mono text-[10px] text-[var(--color-text-4)] font-medium align-top">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "2"}</span></span>
-        </Link>
-        <nav className="flex items-center gap-1">
-          {tab("home", "/", "Home")}
-          {tab("new", "/new", "New run")}
-          {tab("settings", "/settings", "Settings")}
-          <div className="w-px h-5 bg-[var(--color-border)] mx-2" />
-          <button onClick={toggleTheme} title="Toggle theme"
-            className="w-8 h-8 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-2)] grid place-items-center tr hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] cursor-pointer">
-            {theme === "light" ? <Icon.Moon className="w-4 h-4" /> : <Icon.Sun className="w-4 h-4" />}
-          </button>
-        </nav>
-      </div>
+    <header className="sticky top-0 z-30 h-[50px] flex items-center gap-6 px-[22px] border-b border-[var(--color-border)]"
+      style={{ background: "color-mix(in srgb, var(--color-bg) 78%, transparent)", backdropFilter: "blur(14px) saturate(160%)" }}>
+      <Link href="/" className="cursor-pointer flex items-baseline gap-[7px]">
+        <span className="text-[15px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Pipeline</span>
+        <span className="ff-mono text-[10px] text-[var(--color-text-3)]">v{process.env.NEXT_PUBLIC_APP_VERSION ?? ""}</span>
+      </Link>
+      <nav className="flex items-center gap-[2px]">
+        <Tab href="/" label="Home" active={isRun} badge={needs} />
+        <Tab href="/new" label="New run" active={path === "/new"} />
+        <Tab href="/settings" label="Settings" active={path === "/settings"} />
+      </nav>
+      <div className="flex-1" />
+      <button onClick={toggle} title="Light / dark" aria-label="Toggle theme"
+        className="cursor-pointer h-7 px-[9px] rounded-[6px] grid place-items-center text-[12px] text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] tr">
+        {theme === "dark" ? "☾" : "☀"}
+      </button>
+      <button onClick={signOut} className="cursor-pointer text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr">Sign out</button>
     </header>
   );
 }

@@ -38,36 +38,38 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-6">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-6">
-        <div>
-          <h1 className="text-[16px] font-[640] text-[var(--color-text)]">Pipeline</h1>
-          <p className="text-[12px] text-[var(--color-text-3)] mt-0.5">Enter the password to continue.</p>
+    <div className="min-h-screen grid place-items-center" style={{ background: "var(--color-bg)" }}>
+      <div className="w-[320px] flex flex-col gap-[18px]">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-[22px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Pipeline</h1>
+          <span className="ff-mono text-[11px] text-[var(--color-text-3)]">v{process.env.NEXT_PUBLIC_APP_VERSION ?? ""}</span>
         </div>
-        <input
-          type="password"
-          autoFocus
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
-        />
-        {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
-        <button
-          type="submit"
-          disabled={busy || password.length === 0}
-          className="cursor-pointer w-full rounded-md px-3 py-2 text-[13px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+        <form onSubmit={submit} className="flex flex-col gap-2.5">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoFocus
+            className="h-[38px] px-[11px] rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border-strong)] text-[var(--color-text)] outline-none focus:border-[var(--color-accent)] placeholder:text-[var(--color-text-3)] tr"
+          />
+          <button
+            type="submit"
+            disabled={busy || !password}
+            className="cursor-pointer h-[38px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] font-[500] hover:opacity-90 disabled:opacity-50 tr"
+          >
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+          {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
+        </form>
+      </div>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <LoginForm />
     </Suspense>
   );

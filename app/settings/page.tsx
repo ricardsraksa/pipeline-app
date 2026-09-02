@@ -165,7 +165,7 @@ export default function SettingsPage() {
       </Link>
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-[26px] font-bold tracking-tight ff-display text-[var(--color-text)] mb-1">
+        <h1 className="text-[19px] font-[600] tracking-[-0.02em] text-[var(--color-text)] mb-1">
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
@@ -183,7 +183,7 @@ export default function SettingsPage() {
           return (
             <section
               key={stage}
-              className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden"
+              className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]  overflow-hidden"
             >
               {/* Section header */}
               <div className="flex items-center justify-between px-5 py-3 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">

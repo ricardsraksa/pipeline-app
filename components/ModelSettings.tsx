@@ -66,7 +66,7 @@ export default function ModelSettings() {
   }
 
   return (
-    <section className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden mb-5">
+    <section className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden mb-5">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2.5">

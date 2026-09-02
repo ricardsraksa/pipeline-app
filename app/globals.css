@@ -1,110 +1,109 @@
 @import "tailwindcss";
 
 /*
- * Design system — "Signal" direction (Command-center)
- * Space Grotesk + JetBrains Mono, cool slate neutrals, slate accent.
- * Dark is the default theme (set on <html data-theme="dark">); light values
- * live in @theme inline and apply when data-theme="light".
+ * Design system — the Claude Design "Pipeline" direction.
+ * Libre Franklin + Space Mono, near-monochrome warm-neutral greys, a
+ * near-white accent that inverts on press. DARK IS THE DEFAULT; the light
+ * palette applies when data-theme="light".
+ *
+ * Component code addresses colours through --color-* names, so the whole app
+ * follows this file. Names are kept; only their values changed.
  */
 
 @theme inline {
-  /* Surfaces (Signal · light) */
-  --color-bg:           #f4f5f7;
-  --color-surface:      #ffffff;
-  --color-surface-2:    #f2f3f6;
-  --color-surface-3:    #e9ebf0;
+  /* Dark — the default palette */
+  --color-bg:           #131415;
+  --color-surface:      #1a1b1d;
+  --color-surface-2:    #212325;
+  --color-surface-3:    #26282a;
 
-  /* Borders */
-  --color-border:       #e3e5ea;
-  --color-border-hover: #ccd0d9;
-  --color-border-strong:#ccd0d9;
+  --color-border:       #26282a;
+  --color-border-hover: #35373a;
+  --color-border-strong:#35373a;
 
-  /* Text */
-  --color-text:         #12141b;
-  --color-text-2:       #565d6a;
-  --color-text-3:       #868d99;
-  --color-text-4:       #b5b9c4;
+  --color-text:         #e8e8e6;
+  --color-text-2:       #8d8d8a;
+  --color-text-3:       #66665f;
+  --color-text-4:       #55554f;
 
-  /* Accent + semantic */
-  --color-accent:       #33363d;
-  --color-accent-dim:   #202228;
-  --color-success:      #1f9d57;
-  --color-warn:         #9a6b0f;
-  --color-error:        #c0524a;
+  --color-accent:       oklch(0.88 0.006 250);
+  --color-accent-dim:   oklch(0.78 0.006 250);
+  --color-success:      oklch(0.72 0.04 150);
+  --color-warn:         oklch(0.78 0.07 75);
+  --color-error:        oklch(0.66 0.10 25);
 
-  /* v4 tokens */
-  --color-primary:      #1d1f25;
-  --color-on-primary:   #ffffff;
-  --color-accent-weak:  #eef0f2;
-  --color-accent-text:  #1d1f25;
-  --color-green:        #1f9d57;
-  --color-green-bg:     #e4f3ea;
-  --color-amber:        #9a6b0f;
-  --color-amber-bg:     #f6eed8;
-  --color-red:          #c0524a;
-  --color-red-bg:       #f8e7e5;
-  --color-gray:         #717682;
-  --color-gray-bg:      #edeef1;
-  --color-soft:         #f0f1f3;
-  --color-ring:         rgba(40,43,50,.18);
+  --color-primary:      oklch(0.88 0.006 250);
+  --color-on-primary:   #131415;
+  --color-accent-weak:  oklch(0.28 0.01 250);
+  --color-accent-text:  #e8e8e6;
+  --color-green:        oklch(0.72 0.04 150);
+  --color-green-bg:     oklch(0.28 0.02 150);
+  --color-amber:        oklch(0.78 0.07 75);
+  --color-amber-bg:     oklch(0.28 0.03 75);
+  --color-red:          oklch(0.66 0.10 25);
+  --color-red-bg:       oklch(0.28 0.03 25);
+  --color-gray:         #8d8d8a;
+  --color-gray-bg:      #212325;
+  --color-soft:         #212325;
+  --color-ring:         oklch(0.88 0.006 250 / 0.25);
 
-  /* Shape / density (Signal) */
+  /* Shape / density */
   --radius:             8px;
   --radius-sm:          6px;
-  --radius-lg:          12px;
-  --pad:                17px;
-  --tracking-label:     0.14em;
-  --shadow-card:        0 1px 2px rgba(15,18,16,.05);
-  --shadow-pop:         0 8px 30px -6px rgba(15,18,16,.18), 0 2px 6px rgba(15,18,16,.06);
+  --radius-lg:          10px;
+  --pad:                16px;
+  --tracking-label:     0.08em;
+  --shadow-card:        none;
+  --shadow-pop:         0 10px 34px -8px rgba(0,0,0,.6);
 
-  /* Fonts — Signal: Space Grotesk UI/display, JetBrains Mono.
-     Old variable names are aliased so existing component classes
-     (font-[var(--font-ibm-plex-mono)] etc.) keep resolving. */
-  --font-sans:          var(--font-space-grotesk);
-  --font-display:       var(--font-space-grotesk);
-  --font-mono:          var(--font-jetbrains-mono);
-  --font-ibm-plex-mono: var(--font-jetbrains-mono);
-  --font-dm-sans:       var(--font-space-grotesk);
+  /* Fonts. Old variable names stay aliased so existing classes resolve. */
+  --font-sans:          var(--font-libre-franklin);
+  --font-display:       var(--font-libre-franklin);
+  --font-mono:          var(--font-space-mono);
+  --font-ibm-plex-mono: var(--font-space-mono);
+  --font-jetbrains-mono:var(--font-space-mono);
+  --font-space-grotesk: var(--font-libre-franklin);
+  --font-dm-sans:       var(--font-libre-franklin);
 }
 
-/* Dark mode (default) — Signal · dark */
-[data-theme="dark"] {
-  --color-bg:           #0a0c10;
-  --color-surface:      #12151b;
-  --color-surface-2:    #171b22;
-  --color-surface-3:    #20252e;
-  --color-border:       #20242c;
-  --color-border-hover: #2e333d;
-  --color-border-strong:#2e333d;
-  --color-text:         #e8eaf1;
-  --color-text-2:       #949ba7;
-  --color-text-3:       #646b78;
-  --color-text-4:       #3f444f;
-  --color-accent:       #e7e9ed;
-  --color-accent-dim:   #c4c7cd;
-  --color-success:      #43c98a;
-  --color-warn:         #d6a84f;
-  --color-error:        #df8079;
-  --color-primary:      #f1f2f4;
-  --color-on-primary:   #15171c;
-  --color-accent-weak:  #23262e;
-  --color-accent-text:  #f1f2f4;
-  --color-green:        #43c98a;
-  --color-green-bg:     #0f2a1d;
-  --color-amber:        #d6a84f;
-  --color-amber-bg:     #271f0f;
-  --color-red:          #df8079;
-  --color-red-bg:       #271513;
-  --color-gray:         #8a8f9b;
-  --color-gray-bg:      #1a1e26;
-  --color-soft:         #20232b;
-  --color-ring:         rgba(231,233,237,.22);
+/* Light */
+[data-theme="light"] {
+  --color-bg:           #f2f2f1;
+  --color-surface:      #fbfbfa;
+  --color-surface-2:    #e9e9e7;
+  --color-surface-3:    #e0e0de;
+  --color-border:       #e0e0de;
+  --color-border-hover: #cfd0cd;
+  --color-border-strong:#cfd0cd;
+  --color-text:         #1a1b1c;
+  --color-text-2:       #6d6e6c;
+  --color-text-3:       #969794;
+  --color-text-4:       #a9aaa6;
+  --color-accent:       oklch(0.32 0.008 250);
+  --color-accent-dim:   oklch(0.42 0.008 250);
+  --color-success:      oklch(0.50 0.05 150);
+  --color-warn:         oklch(0.55 0.09 75);
+  --color-error:        oklch(0.50 0.12 25);
+  --color-primary:      oklch(0.32 0.008 250);
+  --color-on-primary:   #fbfbfa;
+  --color-accent-weak:  oklch(0.93 0.005 250);
+  --color-accent-text:  #1a1b1c;
+  --color-green:        oklch(0.50 0.05 150);
+  --color-green-bg:     oklch(0.93 0.02 150);
+  --color-amber:        oklch(0.55 0.09 75);
+  --color-amber-bg:     oklch(0.94 0.04 75);
+  --color-red:          oklch(0.50 0.12 25);
+  --color-red-bg:       oklch(0.94 0.02 25);
+  --color-gray:         #6d6e6c;
+  --color-gray-bg:      #e9e9e7;
+  --color-soft:         #e9e9e7;
+  --color-ring:         oklch(0.32 0.008 250 / 0.22);
 }
 
 html, body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-space-grotesk), "Space Grotesk", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-libre-franklin), "Libre Franklin", system-ui, -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -112,8 +111,8 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
-.ff-display { font-family: var(--font-space-grotesk), "Space Grotesk", system-ui, sans-serif; }
-.ff-mono    { font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace; }
+.ff-display { font-family: var(--font-libre-franklin), "Libre Franklin", system-ui, sans-serif; }
+.ff-mono    { font-family: var(--font-space-mono), "Space Mono", ui-monospace, monospace; }
 
 /* Eyebrow label helper */
 .eyebrow {

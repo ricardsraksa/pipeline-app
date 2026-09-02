@@ -41,13 +41,13 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 1 · Product",
     description: "Product description from the scraped pages.",
     env: "PRODUCT_MODEL",
-    default: "claude-sonnet-4-6",
+    default: "claude-sonnet-5",
   },
   stage1: {
     label: "Stage 2 · Research",
     description: "Research documents, one-pager and angles.",
     env: "STAGE1_MODEL",
-    default: "claude-sonnet-4-6",
+    default: "claude-sonnet-5",
   },
   stage2: {
     label: "Stage 3 · Copy",
@@ -59,19 +59,19 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 4 · Prompts",
     description: "Hero and image prompts, placement.",
     env: "STAGE3_PROMPT_MODEL",
-    default: "claude-sonnet-4-6",
+    default: "claude-opus-5",
   },
   stage3Edit: {
     label: "Stage 4 · Rewrites",
     description: "Prompt rewrites.",
     env: "STAGE3_EDIT_MODEL",
-    default: "claude-sonnet-4-6",
+    default: "claude-sonnet-5",
   },
   stage3Audit: {
     label: "Stage 4 · Auditor",
     description: "Pass/fail check on each image.",
     env: "STAGE3_AUDIT_MODEL",
-    default: "claude-sonnet-4-6",
+    default: "claude-sonnet-5",
   },
   mechanical: {
     label: "Mechanical",
