@@ -29,8 +29,26 @@ It tries a fast text-only fetch first and only starts a browser if the page
 comes back empty, so Shopify pages stay sub-second and AliExpress escalates
 automatically.
 
+## What it captures
+
+| Field | Notes |
+|---|---|
+| title | |
+| description | the listing's meta description (short — 100-300 chars) |
+| price | prefers `og:price` meta, falls back to the first currency amount |
+| rating | sits directly above the review count on AliExpress |
+| reviews | review count |
+| sold | units sold — handles both `50 sold` and `Total sales: 342` |
+| store | supplier/seller name |
+| shipping, delivery | e.g. `Free shipping`, `Delivery: Sep 11 - 18` |
+| specs | `Label: value` pairs — the selected variant on AliExpress, the spec table on Shopify |
+| images | 6 product photos, full size |
+
+Sales figures are read only from the section above the recommendation
+carousels — the `4,000+ sold` further down the page belongs to other products.
+
 Output:
-- product text copied to the clipboard, ready to paste into the app
+- title + description + the facts above, copied to the clipboard ready to paste
 - images + `data.json` saved to `~/Desktop/scraped/<product>/`
 
 ## Requirements

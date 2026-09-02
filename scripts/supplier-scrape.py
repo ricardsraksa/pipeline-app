@@ -128,6 +128,64 @@ def download(urls: list[str], folder: Path) -> list[str]:
     return kept
 
 
+def visible_lines(page) -> list[str]:
+    txt = re.sub(r"[ \t]+", " ", page.get_all_text(ignore_tags=("script", "style")))
+    return [l.strip() for l in txt.split("\n") if l.strip()]
+
+
+def extract_details(page) -> dict:
+    """Sales signals worth having for product research: demand, proof, options."""
+    lines = visible_lines(page)
+    if not lines:
+        return {}
+
+    # The listing's OWN numbers sit above the recommendation carousels; anything
+    # below them ("4,000+ sold") belongs to a different product entirely.
+    cut = len(lines)
+    for marker in ("More to love", "Related items", "You May Also Like"):
+        for i, l in enumerate(lines):
+            if l.strip().lower() == marker.lower():
+                cut = min(cut, i)
+                break
+    head = lines[:cut]
+
+    d: dict[str, str] = {}
+    for l in head:
+        if "sold" not in d:
+            # two AliExpress formats: "50 sold" and
+            # "This seller: 317 sales | Total sales: 342"
+            if m := re.fullmatch(r"([\d,.]+\+?)\s*sold", l, re.I):
+                d["sold"] = m.group(1)
+            elif m := re.search(r"Total sales:\s*([\d,]+)", l, re.I):
+                d["sold"] = m.group(1)
+            elif m := re.search(r"This seller:\s*([\d,]+)\s*sales", l, re.I):
+                d["sold"] = m.group(1)
+        if "reviews" not in d and (m := re.fullmatch(r"([\d,]+)\s*reviews?", l, re.I)):
+            d["reviews"] = m.group(1)
+        if "rating" not in d and re.fullmatch(r"[0-5]\.\d", l):
+            d["rating"] = l
+
+    whole = "\n".join(lines)
+    if m := re.search(r"Sold by (.+?)\.\s*Logistics", whole):
+        d["store"] = m.group(1).strip()
+    if re.search(r"^Free shipping$", whole, re.M):
+        d["shipping"] = "Free shipping"
+    if m := re.search(r"^(Delivery:.*)$", whole, re.M):
+        d["delivery"] = m.group(1).strip()
+
+    # "Label:" followed by its value — the chosen variant on AliExpress,
+    # the spec table on a Shopify storefront. Both are useful copy material.
+    specs: dict[str, str] = {}
+    for i, l in enumerate(head[:-1]):
+        if re.fullmatch(r"[A-Z][A-Za-z ]{2,22}:", l):
+            val = head[i + 1].strip()
+            if val and len(val) <= 60 and not val.endswith(":"):
+                specs.setdefault(l.rstrip(":"), val)
+    if specs:
+        d["specs"] = "; ".join(f"{k}: {v}" for k, v in list(specs.items())[:12])
+    return d
+
+
 def find_price(page) -> str | None:
     for sel in ("meta[property='og:price:amount']::attr(content)",
                 "meta[property='product:price:amount']::attr(content)",
@@ -153,19 +211,26 @@ def main() -> None:
     desc = (page.css("meta[name='description']::attr(content)").get()
             or page.css("meta[property='og:description']::attr(content)").get() or "").strip()
     price = find_price(page)
+    details = extract_details(page)
 
     folder = OUT_ROOT / slugify(title)
     images = download(candidates(page), folder)
 
-    scraped_text = "\n\n".join(x for x in [title, desc] if x)[:4000]
+    facts = [f"{k.capitalize()}: {v}" for k, v in details.items()]
+    if price:
+        facts.insert(0, f"Price: {price}")
+    scraped_text = "\n\n".join(
+        x for x in [title, desc, "\n".join(facts)] if x)[:4000]
     clipboard_set(scraped_text)
     (folder / "data.json").write_text(json.dumps(
         {"url": url, "mode": mode, "title": title, "description": desc,
-         "price": price, "images": images}, indent=2, ensure_ascii=False))
+         "price": price, **details, "images": images}, indent=2, ensure_ascii=False))
 
     print(f"   mode:   {mode}")
     print(f"   title:  {title[:70]}")
     print(f"   price:  {price}")
+    for k, v in details.items():
+        print(f"   {k + ':':8}{v}")
     print(f"   images: {len(images)} saved")
     print(f"\n   Folder:    {folder}")
     print("   Clipboard: product text copied — paste it into the pipeline app.\n")
