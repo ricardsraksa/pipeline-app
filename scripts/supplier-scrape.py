@@ -26,6 +26,7 @@ OUT_ROOT = Path.home() / "Desktop" / "scraped"
 MIN_BYTES = 15_000          # smaller than this is an icon or swatch, not a photo
 WANT_IMAGES = 6
 WANT_DESC_IMAGES = 12
+BROWSER_ATTEMPTS = 3
 
 # Gallery images often sit in a JSON blob rather than an <img> tag. They're
 # recognisable by a descriptive, hyphenated filename (Wall-Lights-With-Remote.jpg)
@@ -55,17 +56,40 @@ def slugify(s: str, fallback: str = "product") -> str:
     return (re.sub(r"[\s_-]+", "-", s)[:50].strip("-") or fallback)
 
 
+def is_rate_limited(page) -> bool:
+    """AliExpress serves a "punish" interstitial once an IP has fetched too often."""
+    h = page.html_content.lower()
+    return ("punish" in h or "captcha" in h) and not (page.css("title::text").get() or "").strip()
+
+
 def fetch(url: str):
     """Text-only first; escalate to a real browser only if the page is empty."""
     page = Fetcher.get(url, timeout=30, stealthy_headers=True)
     if (page.css("title::text").get() or "").strip():
         return page, "text-only"
     print("   page came back empty — starting browser (takes ~10s)...")
-    # AliExpress serves the seller's long description from a separate module;
-    # capture it as it loads rather than trying to scrape it out of the DOM.
-    page = DynamicFetcher.fetch(url, headless=True, network_idle=True, timeout=90000,
-                                capture_xhr="desc.htm")
-    return page, "browser"
+    # AliExpress renders inconsistently: sometimes the browser gets the product,
+    # sometimes only the shell. Verify the content actually arrived and retry.
+    last = None
+    for attempt in range(1, BROWSER_ATTEMPTS + 1):
+        # capture_xhr grabs the seller's long description, which AliExpress
+        # serves from a separate desc.htm module rather than the page itself.
+        page = DynamicFetcher.fetch(
+            url, headless=True, network_idle=True, timeout=120000,
+            wait_selector='[class*="sku-item"], [data-pl="product-title"], h1',
+            wait=2000, capture_xhr="desc.htm")
+        last = page
+        if (page.css("title::text").get() or "").strip():
+            return page, "browser"
+        if is_rate_limited(page):
+            sys.exit(
+                "\n   AliExpress is rate-limiting this computer's IP address.\n"
+                "   It serves an anti-bot page instead of the product. The IP is what\n"
+                "   is throttled, not the browser, so retrying immediately won't help.\n"
+                "   Wait an hour or two, or change IP (VPN / proxy / phone hotspot).\n")
+        if attempt < BROWSER_ATTEMPTS:
+            print(f"   page didn't finish rendering — retry {attempt}/{BROWSER_ATTEMPTS - 1}")
+    return last, "browser"
 
 
 def fullsize(u: str) -> str:
@@ -142,7 +166,9 @@ UI_NOISE = re.compile(
     r"|skip to|ir directamente|saltar al"
     r"|add to cart|a\u00f1adir al carrito|buy it now|comprar ahora|choose options"
     r"|subscribe|newsletter|cookie|privacy policy|terms of service|pol\u00edtica de"
-    r"|log in|iniciar sesi\u00f3n|create account|shopping cart|carrito de",
+    r"|log in|iniciar sesi\u00f3n|create account|shopping cart|carrito de"
+    r"|pickup availability|disponibilidad de retiro|no se pudo cargar"
+    r"|view full details|ver detalles|regular price|precio habitual",
     re.I,
 )
 
@@ -288,6 +314,112 @@ def extract_long_description(page, url: str) -> tuple[str, list]:
     return "\n".join(dict.fromkeys(body))[:6000], []
 
 
+# --- OCR -------------------------------------------------------------------
+# Many AliExpress sellers put their entire pitch inside the description images
+# and leave the text nearly empty. macOS ships a text recogniser, so read them.
+
+def ocr_images(paths: list[Path]) -> str:
+    try:
+        import Vision
+        from Foundation import NSURL
+    except ImportError:
+        return ""
+    chunks: list[str] = []
+    for path in paths:
+        try:
+            url = NSURL.fileURLWithPath_(str(path.resolve()))
+            handler = Vision.VNImageRequestHandler.alloc().initWithURL_options_(url, None)
+            req = Vision.VNRecognizeTextRequest.alloc().init()
+            req.setRecognitionLevel_(0)          # accurate
+            req.setUsesLanguageCorrection_(True)
+            ok, _ = handler.performRequests_error_([req], None)
+            if not ok:
+                continue
+            lines = []
+            for obs in (req.results() or []):
+                cand = obs.topCandidates_(1)
+                if cand:
+                    lines.append(cand[0].string())
+            if lines:
+                chunks.append("\n".join(lines))
+        except Exception:
+            continue
+    # the same slogan often repeats across banners
+    seen, out = set(), []
+    for line in "\n".join(chunks).split("\n"):
+        key = line.strip().lower()
+        if len(key) < 4 or key in seen:
+            continue
+        seen.add(key)
+        out.append(line.strip())
+    return "\n".join(out)
+
+
+# --- competitor positioning -------------------------------------------------
+
+OFFER_RE = re.compile(
+    r"free shipping|free delivery|money.?back|satisfaction guarantee|guarantee"
+    r"|\d+[- ]day (?:returns?|trial|guarantee)|warranty|risk.?free"
+    r"|buy \d+ get \d+|\d+% off|save \d+|bundle|free returns|env[ií]o gratis"
+    r"|garant[ií]a|devoluci[oó]n", re.I)
+PROOF_RE = re.compile(
+    r"\d[\d,.]*\+?\s*(?:happy\s+)?(?:customers|clientes|reviews|rese[nñ]as|sold|families|users)"
+    r"|as seen (?:in|on)|featured in|rated \d|trusted by|\b\d\.\d\s*/\s*5", re.I)
+CLAIM_HINT_RE = re.compile(
+    r"\b(no|without|never|instantly|in \d+ (?:seconds|minutes|nights|days)|clinically"
+    r"|designed|engineered|patented|award|#1|only|unlike)\b", re.I)
+
+
+def extract_positioning(page, prod: dict | None) -> dict:
+    """How the competitor sells it: offer, proof, claims, price framing."""
+    lines = [l for l in visible_lines(page) if not UI_NOISE.search(l)]
+    pos: dict = {}
+
+    if prod:
+        if prod.get("vendor"):
+            pos["brand"] = prod["vendor"]
+        if prod.get("published_at"):
+            pos["listed_since"] = prod["published_at"][:10]
+        v = (prod.get("variants") or [{}])[0]
+        price, was = v.get("price"), v.get("compare_at_price")
+        if price and was and str(was) not in ("", "None") and float(was) > float(price):
+            pct = round((1 - float(price) / float(was)) * 100)
+            pos["discount"] = f"{was} -> {price} ({pct}% off)"
+
+    # skip the title itself — the hero line is the pitch, not the product name
+    tname = re.sub(r"[^a-z0-9]", "", (prod or {}).get("title", "").lower())
+    for l in lines[:80]:
+        if not (25 < len(l) < 160):
+            continue
+        if tname and re.sub(r"[^a-z0-9]", "", l.lower())[:40] in tname:
+            continue
+        pos["hero"] = l.strip()
+        break
+
+    def gather(rx, limit, lo=12, hi=170):
+        out = []
+        for l in lines:
+            if lo < len(l) < hi and rx.search(l):
+                t = l.strip()
+                if t not in out:
+                    out.append(t)
+            if len(out) >= limit:
+                break
+        return out
+
+    if v := gather(OFFER_RE, 6):
+        pos["offers"] = v
+    if v := gather(PROOF_RE, 6):
+        pos["social_proof"] = v
+    if v := gather(CLAIM_HINT_RE, 8, 20, 180):
+        pos["claims"] = v
+    quotes = [l.strip() for l in lines
+              if 40 < len(l) < 300 and re.match(r'^["“”\u201c]', l.strip())]
+    if quotes:
+        pos["testimonials"] = list(dict.fromkeys(quotes))[:4]
+    return pos
+
+
 def main() -> None:
     url = sys.argv[1] if len(sys.argv) > 1 else clipboard_get()
     if not url.startswith("http"):
@@ -303,11 +435,15 @@ def main() -> None:
     details = extract_details(page)
     options, variant_prices = extract_variants(page, url)
     long_desc, desc_images = extract_long_description(page, url)
+    positioning = extract_positioning(page, shopify_json(url))
 
     folder = OUT_ROOT / slugify(title)
     images = download(candidates(page), folder)
     # The seller's description images are the best ad source material on the page.
     desc_saved = download(desc_images, folder / "description", WANT_DESC_IMAGES) if desc_images else []
+    ocr_text = ocr_images(sorted((folder / "description").glob("*"))) if desc_saved else ""
+    if not ocr_text:
+        ocr_text = ocr_images(sorted(p for p in folder.glob("*") if p.suffix != ".json"))
 
     facts = [f"{k.capitalize()}: {v}" for k, v in details.items()]
     if price:
@@ -317,15 +453,27 @@ def main() -> None:
     for v in variant_prices:
         facts.append(f"  - {v['title']}: {v['price']}"
                      + ("" if v.get("available", True) else " (sold out)"))
+    pos_block = ""
+    if positioning:
+        rows = []
+        for k, v in positioning.items():
+            rows.append(f"{k.replace('_', ' ').title()}:")
+            for item in (v if isinstance(v, list) else [v]):
+                rows.append(f"  - {item}")
+        pos_block = "COMPETITOR POSITIONING\n" + "\n".join(rows)
+
     scraped_text = "\n\n".join(x for x in [
         title, desc, "\n".join(facts),
         ("FULL DESCRIPTION\n" + long_desc[:3000]) if long_desc else "",
+        ("COPY FROM IMAGES\n" + ocr_text[:3000]) if ocr_text else "",
+        pos_block,
     ] if x)
     clipboard_set(scraped_text)
     (folder / "data.json").write_text(json.dumps(
         {"url": url, "mode": mode, "title": title, "description": desc,
          "price": price, **details, "options": options,
          "variants": variant_prices, "long_description": long_desc,
+         "image_text": ocr_text, "positioning": positioning,
          "images": images, "description_images": desc_images},
         indent=2, ensure_ascii=False))
 
@@ -340,6 +488,15 @@ def main() -> None:
         for v in variant_prices:
             print(f"     - {v['title']}: {v['price']}")
     print(f"   long description: {len(long_desc):,} chars")
+    if ocr_text:
+        print(f"   copy read from images: {len(ocr_text):,} chars")
+    for k, v in positioning.items():
+        if isinstance(v, list):
+            print(f"   {k}: {len(v)} found")
+            for item in v[:3]:
+                print(f"       {item[:76]}")
+        else:
+            print(f"   {k}: {v}")
     print(f"   images: {len(images)} product"
           + (f" + {len(desc_saved)} description" if desc_images else "") + " saved")
     print(f"\n   Folder:    {folder}")

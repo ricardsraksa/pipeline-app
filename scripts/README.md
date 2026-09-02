@@ -59,6 +59,50 @@ Some AliExpress sellers put all their copy *inside* the description images and
 leave the text nearly empty. That is why `description_images` are downloaded —
 for those listings they are the description.
 
+### Copy read from images (`image_text`)
+
+Those image-only listings are handled by running OCR over the downloaded
+images. It uses the text recogniser built into macOS (`pyobjc-framework-Vision`),
+so it is free, local and offline — no API key, no per-image cost. If the
+framework isn't installed the field is simply empty and nothing else breaks.
+
+### Competitor positioning (`positioning`)
+
+For a competitor storefront, the interesting part isn't the spec sheet — it's
+how they *sell* it:
+
+| Key | What it captures |
+|---|---|
+| brand | the store's vendor name |
+| listed_since | when the product was published — how long they've been running it |
+| discount | `compare_at_price -> price` with the percentage |
+| hero | the first marketing line that isn't the product name |
+| offers | bundles, guarantees, free shipping, returns windows |
+| social_proof | customer counts, review counts, "as seen in" |
+| claims | benefit and differentiation lines |
+| testimonials | quoted customer copy |
+
+Real output from the current competitor set:
+
+```
+Glodco      offers   SUMMER SALE: BUY 2 GET 1 FREE + GIFTS
+                     30 Day Money Back Guarantee
+            claims   "NO MORE BULKY AND UGLY LAMPS"
+                     Effortless setup, no tools or wiring needed
+
+Flexoriom   discount 89.99 -> 53.99 (40% off)
+            offers   Garantía de devolución de 60 días
+            claims   O ves una diferencia real. O no asumes ningún riesgo.
+```
+
+## AliExpress rate limiting
+
+AliExpress throttles by IP. After roughly 15-20 browser fetches in an hour it
+stops serving product pages and returns an anti-bot interstitial instead. The
+script detects this and says so rather than returning an empty result. Stealth
+mode and a different browser do not help — only time or a different IP does.
+At normal usage (a handful of products a week) you will not hit it.
+
 Sales figures are read only from the section above the recommendation
 carousels — the `4,000+ sold` further down the page belongs to other products.
 
