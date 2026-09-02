@@ -52,50 +52,31 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   }
 
   try {
-    const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+    // Random delay 2-5s to avoid bot-detection rate limits
+    await sleep(Math.random() * 3000 + 2000);
 
-    let html: string;
-
-    if (firecrawlKey) {
-      const fcRes = await axios.post(
-        "https://api.firecrawl.dev/v1/scrape",
-        { url, formats: ["html"] },
-        {
-          timeout: 60000,
-          headers: {
-            Authorization: `Bearer ${firecrawlKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      html = fcRes.data?.data?.html ?? "";
-    } else {
-      // Random delay 2-5s to avoid bot-detection rate limits
-      await sleep(Math.random() * 3000 + 2000);
-
-      const res = await axios.get(url, {
-        timeout: 20000,
-        headers: {
-          "User-Agent": randomUA(),
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-          "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Sec-Fetch-User": "?1",
-          "Upgrade-Insecure-Requests": "1",
-        },
-        maxRedirects: 5,
-        // Validate the resolved IP at connect time so a 3xx redirect to an
-        // internal address can't bypass the up-front assertPublicUrl check.
-        httpAgent: new http.Agent(ssrfAgentOptions),
-        httpsAgent: new https.Agent(ssrfAgentOptions),
-      });
-      html = res.data;
-    }
+    const res = await axios.get(url, {
+      timeout: 20000,
+      headers: {
+        "User-Agent": randomUA(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+      },
+      maxRedirects: 5,
+      // Validate the resolved IP at connect time so a 3xx redirect to an
+      // internal address can't bypass the up-front assertPublicUrl check.
+      httpAgent: new http.Agent(ssrfAgentOptions),
+      httpsAgent: new https.Agent(ssrfAgentOptions),
+    });
+    const html: string = res.data;
 
     const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? "";
 
@@ -126,6 +107,18 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
         if (!imageUrls.includes(normalised)) imageUrls.push(normalised);
       }
       if (imageUrls.length >= 8) break;
+    }
+
+    // Some listings (AliExpress especially) return a 200 with an empty shell and
+    // fill the page in with JavaScript afterwards — nothing to read server-side.
+    // Say so instead of handing the pipeline a blank description.
+    if (!title && !description) {
+      return {
+        success: false,
+        error:
+          "This page loads its content with JavaScript, so there is nothing to read here. " +
+          "Scrape it locally with ~/Desktop/supplier-scrape.py and paste the result in.",
+      };
     }
 
     const scraped_text = [title, description]
