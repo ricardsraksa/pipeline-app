@@ -3,7 +3,7 @@ import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import { scraplingScrape } from "./scrapling";
 import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
 import { generateAngles } from "./angles-generate";
-import { angleBlock, parseAngle } from "./angles";
+import { anglesBlock, parseSelectedAngles } from "./angles";
 import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
@@ -712,9 +712,9 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const productName = run.brand_name ?? run.product_name ?? "";
   // The angle the operator chose at the gate. Everything in the kit is built
   // around this one problem, not a generic best-X pitch.
-  const angle = angleBlock(parseAngle(run.product_angle_selected));
+  const angle = anglesBlock(parseSelectedAngles(run.product_angle_selected));
   const angleSection = angle
-    ? `\n\nPOSITIONING ANGLE (chosen by the operator — build the ENTIRE copy kit around this one problem and this mechanism; the headline, benefits, sections, FAQs and objections all serve it; do not drift back to a generic "best X" or "only Y" pitch):\n${angle}`
+    ? `\n\nPOSITIONING ANGLE(S) (chosen by the operator — build the ENTIRE copy kit around the PRIMARY angle's problem and mechanism; the headline, hero benefit and first section serve it; supporting angles, if any, appear in later benefits, sections, FAQs and objections; never drift back to a generic "best X" or "only Y" pitch):\n${angle}`
     : "";
 
   await guardCancel(runId);

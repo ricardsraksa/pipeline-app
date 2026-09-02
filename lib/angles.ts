@@ -47,9 +47,20 @@ export function parseAngle(json: string | null | undefined): Angle | null {
   }
 }
 
-/** The angle as a text block for the Copy and Image prompt writers. */
-export function angleBlock(angle: Angle | null): string {
-  if (!angle) return "";
+/** The operator's selection: one or more angles, first = primary. Accepts the
+ *  older single-object form too. */
+export function parseSelectedAngles(json: string | null | undefined): Angle[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json);
+    const list = Array.isArray(v) ? v : [v];
+    return list.filter((a) => a && typeof a === "object" && typeof a.title === "string") as Angle[];
+  } catch {
+    return [];
+  }
+}
+
+function oneAngle(angle: Angle): string {
   return [
     `ANGLE: ${angle.title}`,
     `PROBLEM: ${angle.problem}`,
@@ -58,4 +69,25 @@ export function angleBlock(angle: Angle | null): string {
     `WHO FEELS IT MOST: ${angle.who}`,
     `OPENING HOOK: ${angle.hook}`,
   ].join("\n");
+}
+
+/** The chosen angle(s) as a text block for the Copy and Image prompt writers.
+ *  The first is the PRIMARY angle everything leads with; any others are
+ *  supporting angles to weave in without competing with the primary. */
+export function anglesBlock(angles: Angle[]): string {
+  if (!angles.length) return "";
+  const [primary, ...rest] = angles;
+  const parts = [`PRIMARY ANGLE (lead with this everywhere):\n${oneAngle(primary)}`];
+  if (rest.length) {
+    parts.push(
+      `SUPPORTING ANGLE${rest.length > 1 ? "S" : ""} (secondary — woven into benefits, sections and objections; never the headline, never competing with the primary):\n` +
+        rest.map(oneAngle).join("\n\n"),
+    );
+  }
+  return parts.join("\n\n");
+}
+
+/** @deprecated single-angle form kept for older call sites. */
+export function angleBlock(angle: Angle | null): string {
+  return angle ? anglesBlock([angle]) : "";
 }

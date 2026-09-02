@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { angleBlock, parseAngle } from '@/lib/angles'
+import { anglesBlock, parseSelectedAngles } from '@/lib/angles'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateHeroPrompt, HERO_SYSTEM } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const extraReferenceUrls = safeArr(run.stage3_reference_images)
     // Audit trail: the system prompt the hero prompt-writer ran with.
     await recordPromptUsed(runId, 'stage3_hero', HERO_SYSTEM)
-    const { hero, validation } = await generateHeroPrompt({ onePager, copy, angle: angleBlock(parseAngle(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls, runId })
+    const { hero, validation } = await generateHeroPrompt({ onePager, copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls, runId })
 
     await updateRun(runId, {
       stage3_hero_prompt: JSON.stringify(hero),

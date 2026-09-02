@@ -3,6 +3,7 @@ import { getRun } from "@/lib/db";
 import { runStage2Manually } from "@/lib/pipeline-runner";
 
 import { requireSession } from "@/lib/auth";
+import { parseSelectedAngles } from "@/lib/angles";
 export const maxDuration = 10;
 
 export async function POST(
@@ -38,7 +39,7 @@ export async function POST(
   }
 
   // The copy is built around the chosen angle — refuse to start without one.
-  if (!run.product_angle_selected) {
+  if (!parseSelectedAngles(run.product_angle_selected).length) {
     return NextResponse.json({ error: "Pick a positioning angle first" }, { status: 400 });
   }
 
