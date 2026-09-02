@@ -127,6 +127,11 @@ FORBIDDEN AI TELLS:
 PRICING IS OUT OF SCOPE — NEVER mention it:
 - No price, no currency figure, no "$", no "from $X", no discount/sale percentages, no price comparisons or anchors. Pricing lives outside this pipeline and is added later by a human. Even if the product description contains a price, do NOT put it in the copy. Sell on outcome, mechanism, and trust — never on price.
 
+CLAIM SAFETY — HARD RULES:
+Never state these claims unless the research brief explicitly verifies them: "clinically proven", "certified", "100% effective", "kills all bacteria", "kills 99.9% of germs", "safe for children", "safe for pets", "waterproof", "dentist approved", "vet approved", "doctor recommended", "FDA approved", "medical grade", "hypoallergenic", or any specific health outcome (prevents acne, prevents infection, improves kidney health, and similar). This includes indirect versions — attributing the claim to unnamed experts ("some vets recommend...") is still the claim.
+For any sensitive territory (health, hygiene, bacteria, safety, cleaning performance, durability promises), use softening vocabulary instead of absolute claims: "helps", "designed to", "supports", "intended to", "may help", "cleaner-feeling", "more comfortable". "Helps reduce buildup" is safe; "eliminates bacteria" is not.
+Never invent customer reviews, star ratings, statistics, studies, user counts, or endorsements. If the research brief contains a real number, use it; otherwise use a non-numeric trust signal.
+
 SPECIFICITY ENFORCEMENT:
 Every adjective must be replaceable with a specific number, material, or outcome. If you write "comfortable" you must replace with "no red pressure marks, even after 30 minutes". If you write "high quality" you must replace with a specific material or certification. If the spec isn't in the research brief, do not invent one — find a different angle.
 
@@ -241,6 +246,7 @@ CHARACTER LIMITS — HARD RULES:
 - Every other text field (each paragraph, the What's Included answer, each FAQ answer, the Facebook primary text, the Facebook description): maximum 397 characters including spaces
 - Count characters before outputting each field. If a field exceeds its limit, cut it down before moving on. These are template field limits — output that exceeds them gets truncated in the store, so going over breaks the page
 
+
 1. Product Name — a brand name followed by what the product is. The brand name is a short, pronounceable, invented brand word; the product descriptor is the plain English category. Format: "[BrandName] [Product Category]". Examples: "AquaBuddy Kids Swim Goggles", "FlowVet Stainless Steel Fountain", "PureNest Makeup Bag". Do not output just a brand word alone, and do not output just a category alone — always brand name plus product descriptor. The full name must be ecommerce-friendly: simple, instantly understandable, easy to pronounce and remember, not technical, not long, and either brandable or benefit-led. THE BRAND WORD MUST BE FRESHLY INVENTED: never reuse a brand that appears anywhere in the research, the supplier listing or its photos, or the competitor links — those are other companies' brands (the supplier's or a competitor's), and printing them on our product is a legal problem. If the research's suggested name matches any brand mentioned in the brief, discard it and invent a new one.
 2. Badge Text (for example "Popular" or "New" etc.):
 3. Product supporting sentence — ONE short positioning tagline in light grey under the product name. It names the category and the SINGLE most important thing about the product: usually its core purpose or the one defining feature the whole product is built around. ONE idea only. NOT a list of specs. NOT materials unless the material IS the core story. NOT a pain point. NOT a benefit claim with numbers.
@@ -272,7 +278,7 @@ CHARACTER LIMITS — HARD RULES:
    Paragraph 2
    Headline 3
    Paragraph 3
-6. What's Included? — the answer MUST be exactly ONE sentence. Tight, specific, no list, no filler:
+6. What's Included? — one to two tight sentences, maximum 397 characters. Sentence one lists the box contents. Sentence two states the key product specifications from the research brief (dimensions, capacity, material, power) in plain prose. No bullet list, no filler, no invented specs:
    Answer
 7. FAQs (2) — each question is a single short question, nothing before it:
    Question 1
@@ -295,6 +301,7 @@ PER-SECTION SLOP CHECK
 ========================================================================
 
 After writing each section, before moving to the next, scan for:
+- Any banned or unsoftened claim from the CLAIM SAFETY rules (including expert-attribution versions)
 - Character limit breaches: supporting sentence over 56 characters, Facebook ad headline over 25 characters, any other text field over 397 characters
 - Any forbidden phrase from the hard constraints list above
 - Any price or currency figure (pricing is out of scope)
