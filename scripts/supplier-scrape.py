@@ -177,9 +177,20 @@ def fullsize(u: str) -> str:
     return u
 
 
-def candidates(page) -> list[str]:
-    """Product images, best first: og:image, then gallery blob, then <img> tags."""
+def candidates(page, url: str = "") -> list[str]:
+    """Product images, best first: the store's own gallery (Shopify JSON), then
+    og:image, then the AliExpress gallery blob, then <img> tags as a last resort."""
     found: list[str] = []
+
+    # Shopify lists the real product gallery at <product-url>.json — use it
+    # before touching the page's <img> tags (which include logos, trust
+    # badges, banners and every other picture on the storefront).
+    prod = shopify_json(url) if url else None
+    if prod:
+        for im in prod.get("images") or []:
+            src = im.get("src") if isinstance(im, dict) else None
+            if src:
+                found.append("https:" + src if src.startswith("//") else src)
 
     og = page.css("meta[property='og:image']::attr(content)").get()
     if og:
@@ -187,9 +198,12 @@ def candidates(page) -> list[str]:
 
     found += GALLERY_RE.findall(page.html_content)
 
-    for src in page.css("img::attr(src)").getall() + page.css("img::attr(data-src)").getall():
-        if src and not src.startswith("data:"):
-            found.append("https:" + src if src.startswith("//") else src)
+    # Page <img> tags only when nothing better exists — that's where the
+    # logos, badges and banners come from.
+    if len(found) < 3:
+        for src in page.css("img::attr(src)").getall() + page.css("img::attr(data-src)").getall():
+            if src and not src.startswith("data:"):
+                found.append("https:" + src if src.startswith("//") else src)
 
     out, seen = [], set()
     for u in found:
@@ -198,7 +212,7 @@ def candidates(page) -> list[str]:
         u = fullsize(u)
         if not re.search(r"\.(jpe?g|png|webp)$", u, re.I):
             continue
-        if re.search(r"(sprite|icon|logo|avatar|placeholder|loading|payment|flag|banner)", u, re.I):
+        if re.search(r"(sprite|icon|logo|avatar|placeholder|loading|payment|flag|banner|badge|trust|guarantee|shield|favicon|star|rating|review)", u, re.I):
             continue
         # icons live under a dimension-named segment: /kf/<id>/27x27.png
         if re.search(r"/\d{1,3}x\d{1,4}\.(?:jpe?g|png|webp)$", u, re.I):
@@ -210,6 +224,49 @@ def candidates(page) -> list[str]:
         seen.add(key)
         out.append(u)
     return out
+
+
+def image_size(blob: bytes) -> tuple[int, int] | None:
+    """Width/height from the file header (PNG, JPEG, WebP) without decoding."""
+    try:
+        if blob[:8] == b"\x89PNG\r\n\x1a\n":
+            return int.from_bytes(blob[16:20], "big"), int.from_bytes(blob[20:24], "big")
+        if blob[:2] == b"\xff\xd8":
+            i = 2
+            while i < len(blob) - 9:
+                if blob[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = blob[i + 1]
+                if marker in (0xC0, 0xC1, 0xC2):
+                    return int.from_bytes(blob[i + 7:i + 9], "big"), int.from_bytes(blob[i + 5:i + 7], "big")
+                i += 2 + int.from_bytes(blob[i + 2:i + 4], "big")
+        if blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+            tag = blob[12:16]
+            if tag == b"VP8X":
+                return 1 + int.from_bytes(blob[24:27], "little"), 1 + int.from_bytes(blob[27:30], "little")
+            if tag == b"VP8L":
+                b = blob[21:25]
+                return 1 + (b[0] | (b[1] & 0x3F) << 8), 1 + (b[1] >> 6 | b[2] << 2 | (b[3] & 0x0F) << 10)
+            if tag == b"VP8 ":
+                return int.from_bytes(blob[26:28], "little") & 0x3FFF, int.from_bytes(blob[28:30], "little") & 0x3FFF
+    except Exception:
+        return None
+    return None
+
+
+MIN_SIDE = 300          # anything smaller is an icon, swatch or thumbnail
+MAX_ASPECT = 2.6        # wider/taller than this is a banner, not a product photo
+
+
+def looks_like_photo(blob: bytes) -> bool:
+    dims = image_size(blob)
+    if not dims:
+        return True     # unknown format — let the byte-size rule decide
+    w, h = dims
+    if w < MIN_SIDE or h < MIN_SIDE:
+        return False
+    return max(w, h) / max(1, min(w, h)) <= MAX_ASPECT
 
 
 def download(urls: list[str], folder: Path, want: int = WANT_IMAGES) -> list[str]:
@@ -226,7 +283,7 @@ def download(urls: list[str], folder: Path, want: int = WANT_IMAGES) -> list[str
                 blob = r.read()
         except Exception:
             continue
-        if len(blob) < MIN_BYTES or blob in blobs:
+        if len(blob) < MIN_BYTES or blob in blobs or not looks_like_photo(blob):
             continue
         blobs.add(blob)
         m = re.search(r"\.(jpe?g|png|webp)(?:$|[?_])", u, re.I)
@@ -633,7 +690,7 @@ def scrape(url: str, refresh: bool) -> Path:
     positioning = extract_positioning(page, shopify_json(url))
 
     folder = OUT_ROOT / slugify(title)
-    images = download(candidates(page), folder)
+    images = download(candidates(page, url), folder)
     # The seller's description images are the best ad source material on the page.
     desc_saved = download(desc_images, folder / "description", WANT_DESC_IMAGES) if desc_images else []
     ocr_text = ocr_images(sorted((folder / "description").glob("*"))) if desc_saved else ""
