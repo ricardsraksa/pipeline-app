@@ -731,6 +731,7 @@ export default function Stage3HeroFlow({
           initialReferenceImages={referenceImages}
           refCandidates={refCandidates}
           initialRefOverrides={effRefOverrides}
+          productDescription={run.product_description ?? run.product_name ?? ""}
         />
       </div>
     );
@@ -935,6 +936,7 @@ function CompletedReview({
   initialReferenceImages,
   refCandidates,
   initialRefOverrides,
+  productDescription,
 }: {
   runId: number;
   heroUrl: string | null;
@@ -943,6 +945,8 @@ function CompletedReview({
   initialPlacement: Placement | null;
   initialReferenceImages: string[];
   refCandidates: RefCandidate[];
+  /** What the product actually is — the auditor checks the image against it. */
+  productDescription: string;
   initialRefOverrides: Record<string, string[]>;
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
@@ -1085,6 +1089,36 @@ function CompletedReview({
     });
   }, [runId]);
 
+  // Audit one image against the prompt that is on screen for it. Used after a
+  // regeneration, after restoring an older version, after a relink, and from
+  // the tile's own "Re-audit" — so a verdict always describes the image the
+  // operator is actually looking at.
+  const [auditIdxs, setAuditIdxs] = useState<Set<number>>(new Set());
+  const overlayFor = (imageIndex: number) => prompts.find((p) => p.index === imageIndex)?.overlay_text || null;
+  const auditImage = useCallback(async (i: number, imageUrl: string, promptText: string, category: string, imageIndex: number) => {
+    setAuditIdxs((prev) => new Set(prev).add(i));
+    try {
+      const audit = await fetch("/api/stage3/audit", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_url: imageUrl, category, prompt_used: promptText, product_description: productDescription, overlay_text_used: overlayFor(imageIndex), run_id: runId }),
+      }).then((r) => r.json());
+      setImages((prev) => prev.map((x, j) => {
+        if (j !== i) return x;
+        const updated: RemImage = audit.success
+          ? { ...x, verdict: audit.result?.verdict === "pass" ? "pass" : "fail", issues: audit.result?.issues ?? [], user_override: null }
+          : { ...x, verdict: undefined, issues: ["Audit unavailable — review manually."], user_override: null };
+        persistImage(updated);
+        return updated;
+      }));
+    } catch {
+      setImages((prev) => prev.map((x, j) => (j === i ? { ...x, issues: ["Audit failed — review manually."] } : x)));
+    } finally {
+      setAuditIdxs((prev) => { const n = new Set(prev); n.delete(i); return n; });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId, productDescription]);
+
   // Bring back a previous version of an image. The current image moves into
   // history (nothing is ever lost), the restored one becomes current, and its
   // prompt becomes the "last used" prompt so an edit builds on what actually
@@ -1098,10 +1132,11 @@ function CompletedReview({
         ...(cur.image_url ? [{ image_url: cur.image_url, prompt: curPrompt }] : []),
         ...(cur.history ?? []).filter((h) => h.image_url !== entry.image_url),
       ].slice(0, 5);
-      // Restored version predates the current audit — no verdict badge until
-      // it's regenerated or manually overridden.
+      // The restored image is a different picture, so the old verdict cannot
+      // stand: clear it and re-audit against the prompt that produced it.
       const updated: RemImage = { index: cur.index, category: cur.category, image_url: entry.image_url, status: "done", history };
       persistImage(updated);
+      void auditImage(i, entry.image_url, entry.prompt ?? curPrompt ?? "", cur.category, cur.index);
       return prev.map((x, j) => (j === i ? updated : x));
     });
     if (entry.prompt?.trim()) {
@@ -1299,18 +1334,27 @@ function CompletedReview({
     const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
     const overridden = im.user_override != null;
     const regenerating = busyIdxs.has(i);
+    const auditing = auditIdxs.has(i);
+    const promptText = prompts.find((p) => p.index === im.index)?.prompt ?? "";
     return (
       <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
-        {regenerating && (
+        {(regenerating || auditing) && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
             <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
-            <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">Generating…</span>
+            <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">{regenerating ? "Generating…" : "Auditing…"}</span>
           </div>
         )}
         {im.image_url ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className={`w-full h-full object-cover cursor-zoom-in ${v === "fail" ? "opacity-80" : ""}`} />
+            {!v && !auditing && (
+              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)}
+                title="This image has not been audited"
+                className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full cursor-pointer bg-[var(--color-surface-3)] text-[var(--color-text-2)]">
+                not audited
+              </button>
+            )}
             {v && (
               <button
                 onClick={() => toggleVerdict(i)}
@@ -1322,6 +1366,7 @@ function CompletedReview({
             )}
             <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
               <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
+              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} title="Run the audit again on this image" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer disabled:opacity-50">Re-audit</button>
               <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
               <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
             </div>
