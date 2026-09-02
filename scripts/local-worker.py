@@ -147,7 +147,21 @@ def main() -> None:
     scraper.JSON_MODE = True    # keep the scraper's chatter off stdout formatting; we log ourselves
 
     app = App()
-    app.login()
+    while True:
+        try:
+            app.login()
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                log("the app rejected the password stored in the Keychain — re-add it with:\n"
+                    "         security add-generic-password -s pipeline-app -a worker -U -w")
+            else:
+                log(f"login failed (HTTP {e.code}) — retrying in 60s")
+        except Exception as e:
+            log(f"can't reach {APP_URL} ({e}) — retrying in 60s")
+        if once:
+            sys.exit(1)
+        time.sleep(60)
     log(f"worker up — polling {APP_URL} every {POLL_SECONDS}s")
     while True:
         try:
