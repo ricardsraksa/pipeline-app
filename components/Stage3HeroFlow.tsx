@@ -41,6 +41,13 @@ interface RemImage {
   history?: Array<{ image_url: string; prompt?: string }>;
 }
 
+/** One saved version of a card's prompt. */
+interface PromptVersion {
+  prompt: string;
+  at: string;
+  source: "written" | "edited" | "ai";
+}
+
 interface Placement {
   /** Legacy — old runs auto-placed section 1 too; it is now always manual (GIF). */
   section_1?: number;
@@ -100,6 +107,7 @@ export default function Stage3HeroFlow({
   stage2Ready: boolean;
 }) {
   const [run, setRun] = useState<Run | null>(null);
+  const [historyIdx, setHistoryIdx] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -366,9 +374,40 @@ export default function Stage3HeroFlow({
       run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts,
       [],
     );
+    // Prompt history per card, newest first. The version the writer produced
+    // is always the last entry, so "restore" can always get back to it.
+    const history = safeParse<Record<string, PromptVersion[]>>(run.stage3_prompt_history, {});
+    const original = safeParse<RemainingPrompt[]>(run.stage3_remaining_prompts, []);
+    const versionsFor = (p: RemainingPrompt): PromptVersion[] => {
+      const kept = history[String(p.index)] ?? [];
+      const orig = original.find((o) => o.index === p.index)?.prompt;
+      const hasOrig = orig && kept.some((v) => v.prompt === orig);
+      return orig && !hasOrig ? [...kept, { prompt: orig, at: "", source: "written" as const }] : kept;
+    };
+    /** Push the current text into history before replacing it. */
+    const pushHistory = (p: RemainingPrompt, source: PromptVersion["source"]) => {
+      const key = String(p.index);
+      const prev = (history[key] ?? []);
+      if (prev[0]?.prompt === p.prompt) return history;
+      const next = { ...history, [key]: [{ prompt: p.prompt, at: new Date().toISOString(), source }, ...prev].slice(0, 20) };
+      void fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage3_prompt_history: JSON.stringify(next) }),
+      }).catch((e) => console.error("persist prompt history failed:", e));
+      return next;
+    };
     const setDraft = (i: number, prompt: string) => {
       const next = saved.map((p, j) => (j === i ? { ...p, prompt } : p));
       setPromptDrafts(next);
+    };
+    const restoreVersion = (i: number, v: PromptVersion) => {
+      pushHistory(saved[i], "edited");
+      setDraft(i, v.prompt);
+      setHistoryIdx(null);
+      void fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage3_remaining_prompts_edited: JSON.stringify(saved.map((p, j) => (j === i ? { ...p, prompt: v.prompt } : p))) }),
+      }).catch(() => undefined);
     };
 
     // Images already generated in a previous (interrupted) pass — the loop
@@ -390,6 +429,7 @@ export default function Stage3HeroFlow({
         });
         const data = await res.json();
         if (!data.success || !data.prompt) { setAiCardErr(data.error ?? `HTTP ${res.status}`); return; }
+        pushHistory(saved[i], "ai");
         setDraft(i, data.prompt as string);
         setAiCardIdx(null);
         setAiCardText("");
@@ -593,6 +633,39 @@ export default function Stage3HeroFlow({
                   <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
                   <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} collapsible />
                 </div>
+
+                {/* previous versions of this prompt, and images already made for this slot */}
+                {(versionsFor(p).length > 0 || doneByIndex.get(p.index)) && (
+                  <div className="pt-1 space-y-1.5">
+                    <div className="flex items-center gap-3.5">
+                      {versionsFor(p).length > 0 && (
+                        <button onClick={() => setHistoryIdx(historyIdx === i ? null : i)}
+                          className="cursor-pointer text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr">
+                          {historyIdx === i ? "Hide previous versions" : `Previous versions (${versionsFor(p).length})`}
+                        </button>
+                      )}
+                      {doneByIndex.get(p.index) && (
+                        <span className="text-[11px] text-[var(--color-text-3)]">
+                          An image already exists for this slot — generating replaces it.
+                        </span>
+                      )}
+                    </div>
+                    {historyIdx === i && (
+                      <div className="space-y-1.5">
+                        {versionsFor(p).map((v, k) => (
+                          <div key={k} className="flex items-start gap-2.5 rounded-[7px] border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-2">
+                            <span className="ff-mono text-[9.5px] uppercase tracking-wider text-[var(--color-text-3)] shrink-0 pt-0.5">
+                              {v.source === "written" ? "written" : v.source === "ai" ? "ai" : "edited"}
+                            </span>
+                            <p className="flex-1 min-w-0 text-[11.5px] leading-snug text-[var(--color-text-2)] line-clamp-3">{v.prompt}</p>
+                            <button onClick={() => restoreVersion(i, v)}
+                              className="cursor-pointer text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] shrink-0 tr">Use this</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

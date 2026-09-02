@@ -442,7 +442,12 @@ export default function RunPage() {
     error: "var(--color-red)", pending: "var(--color-text-4)",
   };
   const stateWord: Record<StageState, string> = { complete: "done", running: "running", waiting: "needs you", error: "failed", pending: "—" };
-  const textBtn = "cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr";
+  const textBtn = "cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr disabled:opacity-50";
+  const RestartStage = ({ stage }: { stage: RestartStage }) => (
+    <button onClick={() => handleRestartStage(stage)} disabled={restarting} className={textBtn}>
+      {restarting ? "Restarting…" : "Restart stage"}
+    </button>
+  );
   const label = "eyebrow";
   const card = "border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]";
   const waiting = (text: string) => (
@@ -518,7 +523,6 @@ export default function RunPage() {
         <div className="flex gap-3.5 text-[11.5px] text-[var(--color-text-3)] flex-wrap">
           {hasDocs && <button onClick={handleDownloadDocs} className={textBtn}>Docs</button>}
           <button onClick={handleDownloadImages} disabled={zippingImages} className={textBtn}>{zippingImages ? "Downloading…" : "Images"}</button>
-          <button onClick={() => handleRestartStage(activeKey === "stage3" ? "stage3-prompts" : activeKey)} disabled={restarting} className={textBtn}>Restart stage</button>
           {a.running && !isTerminal && (
             <button onClick={handleKill} disabled={killing} className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-red)] tr">{killing ? "Killing…" : "Kill"}</button>
           )}
@@ -535,7 +539,12 @@ export default function RunPage() {
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Product</h1>
               <span className="text-[12.5px] text-[var(--color-text-2)]">Check the description and pick the photos.</span>
               <div className="flex-1" />
-              {runId !== null && <PromptUsed promptsUsed={run.promptsUsed} stage="product" />}
+              {runId !== null && (
+                <div className="flex items-center gap-3.5">
+                  <PromptUsed promptsUsed={run.promptsUsed} stage="product" />
+                  <RestartStage stage="product" />
+                </div>
+              )}
             </div>
             {PRODUCT_ACTIVE.includes(run.status)
               ? waiting(run.currentStep ?? "Reading the product page…")
@@ -563,6 +572,7 @@ export default function RunPage() {
                         <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
                         <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
                         <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
+                        <RestartStage stage="stage1" />
                       </div>
                     )}
                   </div>
@@ -610,6 +620,7 @@ export default function RunPage() {
                       <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
                       <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
                       <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
+                      <RestartStage stage="stage2" />
                     </div>
                   )}
                 </div>
@@ -632,7 +643,12 @@ export default function RunPage() {
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Images</h1>
               <span className="text-[12.5px] text-[var(--color-text-2)]">Hero first, then the eight.</span>
               <div className="flex-1" />
-              {runId !== null && <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />}
+              {runId !== null && (
+                <div className="flex items-center gap-3.5">
+                  <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
+                  <RestartStage stage="stage3-prompts" />
+                </div>
+              )}
             </div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
           </>

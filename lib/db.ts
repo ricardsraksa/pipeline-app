@@ -180,6 +180,10 @@ async function migrateDB() {
     // Angle, possibly edited). Copy + Images build around the pick.
     "product_angles TEXT",
     "product_angle_selected TEXT",
+    // Stage 4 prompt history: JSON { "<image index>": [{ prompt, at, source }] },
+    // newest first. Every edit and AI rewrite pushes the PREVIOUS text here, so
+    // an operator can always get back to what the writer produced.
+    "stage3_prompt_history TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -591,4 +595,5 @@ export interface Run {
   // Angles gate
   product_angles: string | null;
   product_angle_selected: string | null;
+  stage3_prompt_history: string | null;
 }
