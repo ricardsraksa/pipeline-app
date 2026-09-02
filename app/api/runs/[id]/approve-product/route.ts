@@ -28,7 +28,9 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
   try { body = await req.json(); } catch { /* validated below */ }
   const description = typeof body.description === "string" ? body.description.trim() : "";
   if (description.length < 20) return NextResponse.json({ success: false, error: "Description needs at least 20 characters" }, { status: 400 });
-  if (description.length > 5000) return NextResponse.json({ success: false, error: "Description too long (max 5,000 characters)" }, { status: 400 });
+  // Deliberately generous — a fully specced product description is welcome;
+  // this only stops a runaway paste.
+  if (description.length > 100_000) return NextResponse.json({ success: false, error: "Description too long (max 100,000 characters)" }, { status: 400 });
 
   const selected = Array.isArray(body.selectedImages)
     ? body.selectedImages.filter((u): u is string => typeof u === "string" && u.startsWith("https://") && u.length <= 2048)

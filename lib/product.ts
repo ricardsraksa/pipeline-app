@@ -80,7 +80,9 @@ export function productCandidateImages(scrape: ProductScrape | null, uploaded: s
   return out;
 }
 
-const TEXT_CAP_PER_PAGE = 14_000;
+// Per-page text handed to the analyst. Generous: the specs it must not miss
+// often sit deep in the seller's description.
+const TEXT_CAP_PER_PAGE = 40_000;
 
 /** Default selection at the gate: the product's own gallery photos. */
 export function defaultSelectedImages(scrape: ProductScrape | null, uploaded: string[]): string[] {

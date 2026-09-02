@@ -370,7 +370,8 @@ export async function describeProduct(runId: number): Promise<string | null> {
   const text = (await anthropicMessage({
     system,
     user: buildAnalystContent(scrape),
-    maxTokens: 700,
+    // No word cap on the description — give it room for a fully specced product.
+    maxTokens: 4000,
     label: "product description",
     runId,
     model: await getModel("product"),
