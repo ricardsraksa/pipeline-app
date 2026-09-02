@@ -10,7 +10,7 @@
 // the same card explains the local fallback (the Mac script with --push) and
 // still lets the operator describe the product by hand.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/Toasts";
 import {
@@ -76,7 +76,17 @@ export default function ProductGate({
   const { push } = useToast();
   const product = run.product;
   const scrape = useMemo(() => parseProductScrape(product?.scrape), [product?.scrape]);
-  const uploaded = run.meta.uploadedSourceImages ?? [];
+  // Own photos: what the run has, plus anything added here (persisted at once
+  // so approve-product recognises them as belonging to the run).
+  const [uploaded, setUploaded] = useState<string[]>(run.meta.uploadedSourceImages ?? []);
+  useEffect(() => {
+    setUploaded((prev) => {
+      const fromRun = run.meta.uploadedSourceImages ?? [];
+      return fromRun.length >= prev.length ? fromRun : prev;
+    });
+  }, [run.meta.uploadedSourceImages]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const candidates = useMemo(() => productCandidateImages(scrape, uploaded), [scrape, uploaded]);
   const productPage = productPageOf(scrape);
   const waiting = run.status === "awaiting_product_approval";
@@ -110,6 +120,35 @@ export default function ProductGate({
     if (selSet.has(url)) setSelected((p) => p.filter((u) => u !== url));
     else if (selected.length >= 10) setErr("Max 10 photos — untick one first.");
     else setSelected((p) => [...p, url]);
+  }
+
+  async function addPhotos(files: FileList | null) {
+    if (!files || !files.length || !waiting) return;
+    setErr(null);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      Array.from(files).slice(0, 10).forEach((f) => fd.append("images", f));
+      const up = await fetch("/api/upload-source-images", { method: "POST", body: fd });
+      const data = await up.json();
+      if (!up.ok || !Array.isArray(data.urls)) throw new Error(data.error ?? `Upload failed (HTTP ${up.status})`);
+      const next = [...uploaded, ...(data.urls as string[])].filter((u, i, a) => a.indexOf(u) === i).slice(0, 20);
+      const save = await fetch(`/api/runs/${runId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploaded_source_images: next }),
+      });
+      if (!save.ok) throw new Error(`Couldn't save the photos (HTTP ${save.status})`);
+      setUploaded(next);
+      // New photos are what you meant to use — tick them (up to the cap).
+      setSelected((p) => [...p, ...(data.urls as string[]).filter((u) => !p.includes(u))].slice(0, 10));
+      push(`${(data.urls as string[]).length} photo${data.urls.length === 1 ? "" : "s"} added`, "success");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   async function regenerate() {
@@ -237,10 +276,21 @@ export default function ProductGate({
       <div>
         <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
           <p className="eyebrow">Photos for this run · {selected.length} of {candidates.length} selected</p>
-          {waiting && <p className="text-[11px] text-[var(--color-text-3)]">Tick the photos research and image generation may use (max 10).</p>}
+          <div className="flex items-center gap-3">
+            {waiting && <p className="text-[11px] text-[var(--color-text-3)]">Tick the photos research and image generation may use (max 10).</p>}
+            {waiting && (
+              <>
+                <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
+                <button onClick={() => fileRef.current?.click()} disabled={uploading || approving}
+                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap">
+                  {uploading ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Image className="w-3.5 h-3.5" />} {uploading ? "Uploading…" : "Add my photos"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
         {candidates.length === 0 ? (
-          <p className="text-[12.5px] text-[var(--color-text-3)]">No photos on this run yet.</p>
+          <p className="text-[12.5px] text-[var(--color-text-3)]">No photos on this run yet — add your own above, or wait for the scrape.</p>
         ) : (
           <div className="space-y-3">
             {grouped.map(({ g, items }) => (

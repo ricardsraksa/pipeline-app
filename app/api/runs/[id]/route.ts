@@ -127,6 +127,7 @@ export async function PATCH(
     // Stage 1 · Product gate
     product_description_edited?: string | null;
     product_selected_images?: string | null;
+    uploaded_source_images?: string[] | null;
   };
 
   const existing = await db.execute({
@@ -159,6 +160,7 @@ export async function PATCH(
       if (!Array.isArray(parsed)) throw new Error("product_selected_images must be an array");
       await assertImageUrls(parsed);
     }
+    if (Array.isArray(body.uploaded_source_images)) await assertImageUrls(body.uploaded_source_images);
     if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
     if (Array.isArray(body.approved_image_urls)) await assertImageUrls(body.approved_image_urls);
     if (Array.isArray(body.scraped_image_urls)) await assertImageUrls(body.scraped_image_urls);
@@ -337,6 +339,7 @@ export async function PATCH(
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
   if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 5000) : null); }
   if ("product_selected_images" in body)          { fields.push("product_selected_images = ?");          values.push(body.product_selected_images ?? null); }
+  if ("uploaded_source_images" in body)           { fields.push("uploaded_source_images = ?");           values.push(body.uploaded_source_images ? JSON.stringify(body.uploaded_source_images.slice(0, 20)) : null); }
 
   if (fields.length === 0) {
     return Response.json({ success: true });
