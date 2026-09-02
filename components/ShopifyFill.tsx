@@ -73,7 +73,7 @@ export default function ShopifyFill({ runId, initialAdminUrl }: { runId: number;
       <div>
         <h3 className="text-[14px] font-[640] text-[var(--color-text)]">Fill Shopify PDP</h3>
         <p className="text-[11.5px] text-[var(--color-text-3)] mt-0.5">
-          Writes the copy into your existing product&apos;s metafields and appends the images. Never publishes, never deletes — always preview first.
+          Fills the metafields and appends the images. Never publishes or deletes.
         </p>
       </div>
       <div className="flex gap-2 flex-wrap items-center">

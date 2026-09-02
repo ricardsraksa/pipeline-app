@@ -82,7 +82,7 @@ export default function ModelSettings() {
 
       <div className="px-5 py-4">
         <p className="text-[12.5px] text-[var(--color-text-2)] mb-3.5">
-          Which Claude model handles each part of the pipeline. Changes take effect on the next run.
+          Model per stage.
         </p>
 
         {loading ? (

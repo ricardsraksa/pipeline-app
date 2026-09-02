@@ -12,17 +12,17 @@ type Stage = "product" | "stage1" | "angles" | "stage2" | "stage3";
 const STAGE_ORDER: Stage[] = ["product", "stage1", "angles", "stage2", "stage3"];
 
 const STAGE_LABELS: Record<Stage, string> = {
-  product: "Stage 1 — Product Description",
-  stage1: "Stage 2 — Research Brief",
-  angles: "Stage 2 — Positioning Angles (after research)",
+  product: "Stage 1 — Product",
+  stage1: "Stage 2 — Research",
+  angles: "Stage 2 — Angles",
   stage2: "Stage 3 — Copy",
-  stage3: "Stage 4 — Image Prompts",
+  stage3: "Stage 4 — Images",
 };
 
 const STAGE_NUMS: Record<Stage, string> = {
   product: "01",
   stage1: "02",
-  angles: "02b",
+  angles: "02",
   stage2: "03",
   stage3: "04",
 };
@@ -169,7 +169,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
-          The models and system prompts that drive each stage. Changes take effect on the next pipeline run. Old prompt versions are kept in history — nothing is lost on reset.
+          Models and prompts per stage. Changes apply to the next run.
         </p>
       </div>
 

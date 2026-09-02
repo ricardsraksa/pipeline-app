@@ -29,10 +29,10 @@ function hostOf(url: string): string {
 }
 
 const GROUP_LABEL: Record<string, string> = {
-  uploaded: "Your uploads",
-  product: "Product listing photos",
-  description: "Seller description images",
-  competitor: "Competitor / brand photos",
+  uploaded: "Your photos",
+  product: "Listing photos",
+  description: "Description images",
+  competitor: "Competitor photos",
 };
 
 function PageRow({ p }: { p: ProductScrapePage }) {
@@ -217,17 +217,17 @@ export default function ProductGate({
               <p className="text-[12.5px] font-[620] text-[var(--color-text)] flex items-center gap-2">
                 {workerOnline && !gaveUp ? <Icon.Loader className="w-3.5 h-3.5" /> : null}
                 {gaveUp
-                  ? "Your Mac tried this page a few times and couldn't get it — scrape it by hand:"
+                  ? "Your Mac couldn't get this page. Scrape it by hand:"
                   : workerOnline
-                    ? "Your Mac is scraping this page — the description appears here automatically (usually under a minute)."
-                    : "Waiting for your Mac. The pipeline worker isn't running there right now."}
+                    ? "Your Mac is scraping this page."
+                    : "Mac worker offline."}
               </p>
               <p className="text-[12px] text-[var(--color-text-2)]">
                 {gaveUp
-                  ? "The supplier site is blocking the automated fetch. Running it yourself usually works, and Restart Stage 1 makes the worker try again."
+                  ? "Restart Stage 1 to have the worker try again."
                   : workerOnline
-                    ? `Worker last checked in ${workerAgo}.`
-                    : "Wake the Mac (the worker starts on login), or run the command below to scrape this page by hand:"}
+                    ? `Checked in ${workerAgo}.`
+                    : "Wake the Mac, or run this to scrape by hand:"}
               </p>
             </>
           ) : (
@@ -235,9 +235,7 @@ export default function ProductGate({
               <p className="text-[12.5px] font-[620] text-[var(--color-text)]">
                 {productPage.rateLimited ? "The supplier site is rate-limiting the app's server." : "The app couldn't read the product page."}
               </p>
-              <p className="text-[12px] text-[var(--color-text-2)]">
-                Scrape it from your Mac instead — it lands straight on this run and the description is written automatically:
-              </p>
+              <p className="text-[12px] text-[var(--color-text-2)]">Scrape it from your Mac:</p>
             </>
           )}
           <div className="flex items-center gap-2">
@@ -247,7 +245,7 @@ export default function ProductGate({
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <p className="text-[11.5px] text-[var(--color-text-3)]">Or write the description yourself below and upload photos — that works too.</p>
+          <p className="text-[11.5px] text-[var(--color-text-3)]">Or write the description yourself and add photos.</p>
         </div>
       )}
 
@@ -262,7 +260,7 @@ export default function ProductGate({
           onChange={(e) => setText(e.target.value)}
           disabled={!waiting || regenerating || approving}
           rows={9}
-          placeholder={waiting ? "What the product physically is and does — every spec and mechanism detail the listing gives…" : ""}
+          placeholder={waiting ? "What the product is and does…" : ""}
           className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[13px] py-[11px] text-[13px] leading-relaxed resize-y transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:opacity-70"
         />
         {waiting && (
@@ -273,7 +271,7 @@ export default function ProductGate({
             </button>
             {product?.descriptionAi && text.trim() !== product.descriptionAi.trim() && (
               <button onClick={() => setText(product.descriptionAi ?? "")} className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr">
-                Restore the analyst's version
+                Restore original
               </button>
             )}
           </div>
@@ -285,7 +283,7 @@ export default function ProductGate({
         <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
           <p className="eyebrow">Photos for this run · {selected.length} of {candidates.length} selected</p>
           <div className="flex items-center gap-3">
-            {waiting && <p className="text-[11px] text-[var(--color-text-3)]">Tick the photos research and image generation may use (max 10).</p>}
+            {waiting && <p className="text-[11px] text-[var(--color-text-3)]">Max 10.</p>}
             {waiting && (
               <>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
@@ -298,7 +296,7 @@ export default function ProductGate({
           </div>
         </div>
         {candidates.length === 0 ? (
-          <p className="text-[12.5px] text-[var(--color-text-3)]">No photos on this run yet — add your own above, or wait for the scrape.</p>
+          <p className="text-[12.5px] text-[var(--color-text-3)]">No photos yet.</p>
         ) : (
           <div className="space-y-3">
             {grouped.map(({ g, items }) => (
@@ -334,7 +332,7 @@ export default function ProductGate({
 
       {waiting && (
         <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-          <p className="text-[12px] text-[var(--color-text-3)]">The description and the ticked photos are what research and every later stage use.</p>
+          <span />
           <button onClick={approve} disabled={!canApprove}
             className={cx("cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[9px] text-[13.5px] font-[620] border border-transparent tr whitespace-nowrap",
               canApprove ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:brightness-110" : "bg-[var(--color-surface-3)] text-[var(--color-text-4)] cursor-not-allowed")}>

@@ -10,13 +10,13 @@ import { useToast } from "@/components/Toasts";
 import { ACTIVE_STATUSES, WAITING_STATUSES, RunThumb, StatusBadge, relativeTime, truncateUrl } from "@/components/ui/run-ui";
 
 const NEED_COPY: Record<string, [string, string]> = {
-  awaiting_product_approval: ["Product description ready", "Check it, pick the photos, then start research"],
-  awaiting_stage2_approval: ["Research ready for review", "Approve it to generate the copy"],
-  awaiting_user: ["Copy approved — images next", "Start Stage 4 to generate the hero shot"],
-  awaiting_hero_qc: ["Hero shot needs approval", "It becomes the reference for all 8 images"],
-  awaiting_qc: ["8 prompts ready to review", "Check them, then generate the images"],
-  failed: ["Run failed", "Resume to pick up where it stopped"],
-  cancelled_stuck: ["Run cancelled", "Resume to continue where it stopped"],
+  awaiting_product_approval: ["Review the product", "Description and photos"],
+  awaiting_stage2_approval: ["Pick an angle", "Research is done"],
+  awaiting_user: ["Ready for images", "Hero first, then the 8"],
+  awaiting_hero_qc: ["Review the hero", "Reference for the other 8"],
+  awaiting_qc: ["Review the 8 prompts", "Then generate"],
+  failed: ["Run failed", "Resume to continue"],
+  cancelled_stuck: ["Run cancelled", "Resume to continue"],
 };
 
 export default function HomeV2({ runs }: { runs: RunSummary[] }) {

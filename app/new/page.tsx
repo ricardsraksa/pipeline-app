@@ -115,7 +115,7 @@ export default function NewRunPage() {
       </Link>
       <div className="mb-5">
         <h1 className="text-[26px] leading-tight font-bold tracking-tight ff-display text-[var(--color-text)]">New run</h1>
-        <p className="text-[13px] text-[var(--color-text-2)] mt-1">Paste the product link. Stage 1 reads the page, writes the description and pauses for your review.</p>
+        <p className="text-[13px] text-[var(--color-text-2)] mt-1">Paste the product link. You review the description before research starts.</p>
       </div>
 
       <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] divide-y divide-[var(--color-border)] overflow-hidden">
@@ -129,7 +129,6 @@ export default function NewRunPage() {
             placeholder="https://www.aliexpress.com/item/…"
             className={cx(inputCls, "ff-mono text-[12.5px] disabled:opacity-40", productUrl.length > 0 && !urlOk && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
           {productUrl.length > 0 && !urlOk && <p className="mt-1.5 text-[11px] text-[var(--color-red)] ff-mono">Needs a full https:// link</p>}
-          <p className="mt-2 text-[11.5px] text-[var(--color-text-3)]">The supplier listing is the source of truth for specs. Pages that only render in a browser take about a minute.</p>
         </div>
 
         {/* 2 — competitors */}
@@ -141,7 +140,7 @@ export default function NewRunPage() {
           <textarea value={competitors} onChange={(e) => setCompetitors(e.target.value)} rows={3} spellCheck={false} disabled={submitting}
             placeholder="https://brand.com/products/…"
             className={cx(inputCls, "ff-mono text-[12px] resize-y disabled:opacity-40", competitorList.length > 0 && !competitorsValid && "border-[var(--color-red)] focus:border-[var(--color-red)]")} />
-          <p className="mt-2 text-[11.5px] text-[var(--color-text-3)]">Brand pages are read for positioning only — never for specs, never for the name.</p>
+          <p className="mt-2 text-[11.5px] text-[var(--color-text-3)]">Read for positioning only.</p>
         </div>
 
         {/* 3 — own photos */}
@@ -159,7 +158,7 @@ export default function NewRunPage() {
             <p className="text-[13px] font-[550] text-[var(--color-text-2)]">
               {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : sourceImages.length >= MAX_IMG ? "Maximum reached" : "Drag photos here or click to add"}
             </p>
-            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-1">The scraped listing photos are added automatically — this is for photos the page doesn&rsquo;t have.</p>
+            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-1">Listing photos are added automatically.</p>
           </div>
           {uploadError && <p className="mt-2 text-[11px] text-[var(--color-red)] ff-mono">{uploadError}</p>}
           {sourceImages.length > 0 && (
@@ -181,7 +180,7 @@ export default function NewRunPage() {
 
         {/* CTA */}
         <div className="px-5 py-4 flex items-center justify-between gap-3 bg-[var(--color-surface-2)]">
-          <p className="text-[12px] text-[var(--color-text-3)] hidden sm:block">Runs in background — leave anytime.</p>
+          <span />
           <button onClick={start} disabled={!canStart}
             className={cx("cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[9px] text-[13.5px] font-[620] border border-transparent tr whitespace-nowrap",
               canStart ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:brightness-110" : "bg-[var(--color-surface-3)] text-[var(--color-text-4)] cursor-not-allowed")}>

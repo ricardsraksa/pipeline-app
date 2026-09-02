@@ -12,11 +12,11 @@ export const WAITING_STATUSES = new Set(["awaiting_product_approval", "awaiting_
 // Display numbering: Product = 1, Research = 2, Copy = 3, Images = 4. The
 // internal status/column names predate the product stage and stay as they are.
 export const STATUS_LABEL: Record<string, string> = {
-  pending: "Starting…", product: "Stage 2 · Product", awaiting_product_approval: "Awaiting your review",
-  scraping: "Stage 3 · Research", stage1: "Stage 3 · Research",
-  awaiting_stage2_approval: "Awaiting your review", stage2: "Stage 4 · Copy",
-  awaiting_user: "Awaiting review", awaiting_qc: "Awaiting QC",
-  generating_hero: "Stage 4 · Hero", awaiting_hero_qc: "Stage 4 · Review hero",
+  pending: "Starting…", product: "Stage 1 · Product", awaiting_product_approval: "Review product",
+  scraping: "Stage 2 · Research", stage1: "Stage 2 · Research",
+  awaiting_stage2_approval: "Pick an angle", stage2: "Stage 3 · Copy",
+  awaiting_user: "Ready for images", awaiting_qc: "Review prompts",
+  generating_hero: "Stage 4 · Hero", awaiting_hero_qc: "Review hero",
   generating_remaining: "Stage 4 · Prompts", completed: "Complete", failed: "Failed", cancelled: "Cancelled",
 };
 export const statusLabel = (s: string | null | undefined) => (s ? STATUS_LABEL[s] ?? s : "");

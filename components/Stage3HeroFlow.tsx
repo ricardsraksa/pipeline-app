@@ -257,9 +257,7 @@ export default function Stage3HeroFlow({
   if (!heroFlowStarted) {
     return (
       <div className="space-y-3">
-        <p className="text-[13px] text-[var(--color-text-2)]">
-          Stage 4 generates a <strong>hero shot first</strong> from your source product photos. You approve it, then the other 8 images are built using the approved hero as the reference — so the product stays consistent.
-        </p>
+        <p className="text-[13px] text-[var(--color-text-2)]">Hero shot first; the other 8 are built from it.</p>
         <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap items-center">
@@ -268,7 +266,7 @@ export default function Stage3HeroFlow({
             onClick={() => trigger("/api/stage3-hero-prompt", { runId }, "hero")}
             className={btnPrimary}
           >
-            {busy === "hero" ? "Generating hero…" : "Generate Stage 4 — Hero first →"}
+            {busy === "hero" ? "Generating hero…" : "Generate hero →"}
           </button>
           <button
             disabled={!stage2Ready || busy !== null}
@@ -278,9 +276,6 @@ export default function Stage3HeroFlow({
             {busy === "skip" ? "Writing prompts…" : "Skip hero — use source images"}
           </button>
         </div>
-        <p className="text-[11px] text-[var(--color-text-3)] max-w-md">
-          “Skip hero” builds the 8 images straight from your source product photos as the reference, instead of generating and approving a hero shot first.
-        </p>
         {!stage2Ready && <p className="text-[11px] text-[var(--color-text-3)]">Finish Stage 3 first.</p>}
       </div>
     );
@@ -509,7 +504,7 @@ export default function Stage3HeroFlow({
       <div className="space-y-4">
         <div>
           <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the 8 prompts</h3>
-          <p className="text-[12px] text-[var(--color-text-3)]">What each image will show. Open “Edit full prompt” on a card to change the wording; each image references the approved hero unless you pick different references.</p>
+          <p className="text-[12px] text-[var(--color-text-3)]">What each image will show.</p>
         </div>
         <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
@@ -613,10 +608,7 @@ export default function Stage3HeroFlow({
             {busy === "recover-hf" ? "Recovering…" : "Recover from Higgsfield"}
           </button>
         </div>
-        <p className="text-[11px] text-[var(--color-text-3)]">
-          {heroUrl ? "“Back to hero” returns to the hero review — re-approving the same hero rewrites these prompts (images already generated are kept); regenerating a new hero clears them. " : ""}
-          Already generated these on a previous try? &ldquo;Recover from Higgsfield&rdquo; pulls the finished images from your Higgsfield history instead of re-generating.
-        </p>
+        <p className="text-[11px] text-[var(--color-text-3)]">&ldquo;Recover from Higgsfield&rdquo; pulls images already generated in your Higgsfield history.</p>
       </div>
     );
   }
@@ -1290,7 +1282,7 @@ function CompletedReview({
       {relinkErr && <ErrBox msg={relinkErr} />}
       {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
-        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">The AI looked at the images and placed one lifestyle/benefit shot into each of the 3 body sections (hook → solution → reassurance). Everything else is a product shot for the top of the page.</p>
+        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">Sections 2 and 3 get one image each; the rest go to the gallery. Section 1 is your GIF.</p>
         <button
           onClick={runPlacement}
           disabled={placing}
@@ -1501,7 +1493,7 @@ function BulkFixModal({
       <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-3xl w-full space-y-4 max-h-[90vh] overflow-y-auto">
         <div>
           <h3 className="text-[15px] font-[640] text-[var(--color-text)]">Fix {failed.length} failed image{failed.length > 1 ? "s" : ""}</h3>
-          <p className="text-[11px] text-[var(--color-text-3)] mt-0.5">Apply one instruction to every failed prompt, edit any individually, then regenerate them all.</p>
+          <p className="text-[11px] text-[var(--color-text-3)] mt-0.5">One instruction for all, or edit each, then regenerate.</p>
         </div>
 
         {/* Shared AI instruction */}
@@ -1770,9 +1762,7 @@ function ShopifyPush({ runId }: { runId: number }) {
         >
           Open in Shopify admin →
         </a>
-        <p className="text-[11px] text-[var(--color-text-3)]">
-          It&apos;s a draft — set pricing and publish in Shopify when you&apos;re happy with it.
-        </p>
+        <p className="text-[11px] text-[var(--color-text-3)]">Draft — set the price and publish in Shopify.</p>
       </div>
     );
   }

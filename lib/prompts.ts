@@ -226,7 +226,7 @@ NO COMPETITOR NAMES:
 The research names competitor brands and products — that is internal material only. Customer-facing copy must NEVER name a competitor brand, product, or store. Refer to alternatives generically: "standard organizers", "typical bed rails", "ordinary compression socks". Before outputting, scan every field for brand names that are not this product's own and replace them.
 
 VOICE-OF-CUSTOMER FAQs:
-The two FAQs must each tackle one of the TWO MOST COMMON OBJECTIONS to buying this product, ranked by how often they show up in the research (pain points, competitor complaints, belief gaps). Phrase each as the question a hesitant buyer would actually ask, in their own words, and answer it head-on so the objection is neutralized — concrete facts from the research, not reassurance fluff. Do not invent objections the research does not show; if it surfaces fewer than two, use the strongest doubt a first-time buyer of this product category would have.
+The two FAQs must each tackle one of the TWO MOST COMMON OBJECTIONS to buying this product, ranked by how often they show up in the research (pain points, competitor complaints, belief gaps). Phrase each as the question a hesitant buyer would actually ask, in their own words. The question field is ONE plain question and nothing else: no lead-in, no problem statement, no story before the question mark. WRONG: "Every mask I've tried either leaks at the nose or ends up on my forehead by 3am. What actually holds this one in place?" RIGHT: "What keeps it in place all night?" Keep the question under 15 words. The objection lives in the ANSWER: answer it head-on so the objection is neutralized — concrete facts from the research, not reassurance fluff. Do not invent objections the research does not show; if it surfaces fewer than two, use the strongest doubt a first-time buyer of this product category would have.
 
 PAIN POINT VOCABULARY:
 The research brief lists the specific pain points and the language customers use to describe them. Use that exact language in the copy. "Stings my kid's eyes" is what customers actually type into Google. "Causes ocular irritation" is what nobody says.
@@ -274,7 +274,7 @@ CHARACTER LIMITS — HARD RULES:
    Paragraph 3
 6. What's Included? — the answer MUST be exactly ONE sentence. Tight, specific, no list, no filler:
    Answer
-7. FAQs (2):
+7. FAQs (2) — each question is a single short question, nothing before it:
    Question 1
    Answer 1
    Question 2

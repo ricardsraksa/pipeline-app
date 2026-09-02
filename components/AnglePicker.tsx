@@ -144,7 +144,7 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
     <div className="space-y-3">
       <div>
         <p className="eyebrow">Positioning angles · {selected.length ? `${selected.length} chosen` : "pick one or more"}</p>
-        <p className="text-[12px] text-[var(--color-text-3)] mt-0.5">Each angle is one specific problem, its stakes, and why this product's mechanism fixes it. The first one you tick is the <strong className="text-[var(--color-text-2)]">primary</strong> angle the copy and images lead with; any others are woven in as supporting.</p>
+        <p className="text-[12px] text-[var(--color-text-3)] mt-0.5">First tick is the primary angle; the rest are supporting.</p>
       </div>
 
       {proposed.length === 0 && !custom ? (
@@ -227,7 +227,6 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
               {editable && editingId === a.id && (
                 <div onBlur={persistEdits}>
                   <AngleForm value={a} onChange={(next) => updateSelected(a.id, next)} />
-                  <p className="text-[11px] text-[var(--color-text-4)] mt-1">Saved when you leave a field.</p>
                 </div>
               )}
             </div>
@@ -237,10 +236,10 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
 
       {editable && proposed.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Steer the next set (optional): e.g. “more health-focused”, “angles for first-time owners”"
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Steer the next set (optional)"
             className="flex-1 min-w-[240px] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] focus:outline-none focus:border-[var(--color-accent)] placeholder:text-[var(--color-text-4)]" />
           <button onClick={generate} disabled={busy !== null} className={btn}>
-            {busy === "generate" ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />} {busy === "generate" ? "Thinking…" : "Propose new angles"}
+            {busy === "generate" ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />} {busy === "generate" ? "Thinking…" : "New angles"}
           </button>
           {!custom && <button onClick={() => setCustom({ ...EMPTY })} className={btn}>Write my own</button>}
         </div>

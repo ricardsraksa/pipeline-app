@@ -72,9 +72,7 @@ export default function Stage3ReferenceImages({ runId, initial }: { runId: numbe
         <p className="text-[13px] font-[600] text-[var(--color-text)]">
           Reference images <span className="font-normal text-[var(--color-text-4)]">· optional</span>
         </p>
-        <p className="text-[11.5px] text-[var(--color-text-3)] leading-snug">
-          Scene, setting, or style references. The prompt writer sees them and picks which fit each image to send to Higgsfield. Applied when the prompts are (re)generated.
-        </p>
+        <p className="text-[11.5px] text-[var(--color-text-3)] leading-snug">Scene or style references, used when prompts are generated.</p>
       </div>
 
       {urls.length > 0 && (

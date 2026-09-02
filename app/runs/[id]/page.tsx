@@ -164,10 +164,10 @@ function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
 // ── Stage accordion card ──────────────────────────────────────────────────────
 
 const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
-  { key: "product", id: "v2-stage-product", n: 1, title: "Product", what: "Scrape the links, write the description, pick the photos" },
-  { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Product ID, market, avatar, offer one-pager" },
-  { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Full DTC copy kit from the approved research" },
-  { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero shot first, then 8 derivatives" },
+  { key: "product", id: "v2-stage-product", n: 1, title: "Product", what: "Description and photos from the links" },
+  { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Market, avatar, offer, angles" },
+  { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Copy kit around the chosen angle" },
+  { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero, then 8 images" },
 ];
 const stageId = (key: StageKey) => STAGE_DEFS.find((d) => d.key === key)?.id ?? "";
 
@@ -233,7 +233,7 @@ function StartPrompt({ description, competitorUrls }: { description: string; com
       {open && (
         <div className="mt-2 border border-[var(--color-border)] rounded-[var(--radius-sm)] bg-[var(--color-surface)] overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
-            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">Product description used for research</span>
+            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">Product description</span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(description).then(() => {
@@ -369,9 +369,9 @@ export default function RunPage() {
     try {
       const res = await fetch(`/api/runs/${runId}/start-stage2`, { method: "POST" });
       const data = await res.json();
-      if (!data.success) push(`Failed to start Stage 3: ${data.error ?? "unknown error"}`);
+      if (!data.success) push(`Couldn't start copy: ${data.error ?? "unknown error"}`);
     } catch (err) {
-      push(`Failed to start Stage 3: ${err instanceof Error ? err.message : String(err)}`);
+      push(`Couldn't start copy: ${err instanceof Error ? err.message : String(err)}`);
     } finally { setTimeout(() => setStartingStage2(false), 1200); }
   }
 
@@ -379,10 +379,10 @@ export default function RunPage() {
     if (!runId || restarting) return;
     const isStage3 = stage === "stage3-prompts";
     if (!window.confirm(isStage3
-      ? "Restart Stage 4 from scratch? This deletes the hero, all 8 images, and the section placement, and returns to the Stage 4 start."
+      ? "Restart Stage 4? Deletes the hero, the 8 images and the placement."
       : stage === "product"
-      ? "Restart Stage 1? This re-scrapes the links, rewrites the description and clears the research, then pauses for your review again."
-      : `Restart ${stage === "stage1" ? "Stage 2" : "Stage 3"}? This clears that stage's output and re-runs it.`)) return;
+      ? "Restart Stage 1? Re-scrapes the links and clears the research."
+      : `Restart ${stage === "stage1" ? "Stage 2" : "Stage 3"}? Clears its output and runs it again.`)) return;
     setRestarting(true);
     try {
       const res = await fetch(`/api/runs/${runId}/restart-stage`, {
@@ -548,19 +548,19 @@ export default function RunPage() {
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
-    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Product description ready for your review", sub: "Check the text, tick the photos, then start research.", cta: "Review product", onClick: () => openStage("product") };
+    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Review the product", sub: "Check the description, tick the photos.", cta: "Review", onClick: () => openStage("product") };
     if (s === "awaiting_stage2_approval") {
       const hasAngle = Boolean(run.angles?.selected);
       return hasAngle
-        ? { tone: "amber", icon: "review", title: "Angle chosen — ready for copy", sub: "Everything from here is built around it.", cta: startingStage2 ? "Starting…" : "Run Stage 3", onClick: handleStartStage2 }
-        : { tone: "amber", icon: "review", title: "Research ready — pick a positioning angle", sub: "Choose the problem this product will be sold on, then run the copy.", cta: "Pick an angle", onClick: () => openStage("stage1") };
+        ? { tone: "amber", icon: "review", title: "Ready for copy", sub: "Built around the angle you picked.", cta: startingStage2 ? "Starting…" : "Run copy", onClick: handleStartStage2 }
+        : { tone: "amber", icon: "review", title: "Pick an angle", sub: "Research is done.", cta: "Pick an angle", onClick: () => openStage("stage1") };
     }
-    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 4", onClick: () => openStage("stage3") };
-    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => openStage("stage3") };
-    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => openStage("stage3") };
-    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Pick up from the last completed step — nothing is lost.", cta: resuming ? "Resuming…" : "Resume pipeline", onClick: handleResume };
-    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue where it stopped.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete", sub: "All research, copy, and images are ready." };
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Ready for images", sub: "Hero first, then the 8.", cta: "Go to images", onClick: () => openStage("stage3") };
+    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Review the hero", sub: "It becomes the reference for the other 8.", cta: "Review hero", onClick: () => openStage("stage3") };
+    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", sub: "Then generate.", cta: "Review prompts", onClick: () => openStage("stage3") };
+    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete" };
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
   const a = nextAction();
@@ -637,7 +637,6 @@ export default function RunPage() {
                 <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
                   <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
                   <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Reading the product page…"}</p>
-                  <p className="text-[11px] text-[var(--color-text-4)] mt-1.5">Pages that only render in a browser take about a minute.</p>
                 </div>
               ) : (
                 <>
@@ -723,7 +722,7 @@ export default function RunPage() {
                   <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Researching the product…"}</p>
                 </div>
               ) : (
-                <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the product description.</p>
+                <p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you approve the product.</p>
               )
             )}
 
@@ -776,7 +775,7 @@ export default function RunPage() {
                   <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">Generating copy…</p>
                 </div>
               ) : (
-                <p className="text-[12.5px] text-[var(--color-text-3)]">Runs automatically after you approve the research.</p>
+                <p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you pick an angle.</p>
               )
             )}
 
