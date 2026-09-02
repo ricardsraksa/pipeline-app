@@ -21,6 +21,14 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
   if (run.status !== "awaiting_product_approval") {
     return NextResponse.json({ success: false, error: "Run is not waiting at the product gate" }, { status: 400 });
   }
+  // A later page arriving (worker) must not clobber text the operator already
+  // edited; the gate's own Regenerate button passes force=1.
+  let force = false;
+  try { force = Boolean(((await req.json()) as { force?: boolean }).force); } catch { /* empty body */ }
+  if (run.product_description_edited && !force) {
+    await parkAtProductGate(runId);
+    return NextResponse.json({ success: true, description: run.product_description_edited, kept: true });
+  }
   try {
     const text = await describeProduct(runId);
     await parkAtProductGate(runId);

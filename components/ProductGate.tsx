@@ -116,7 +116,7 @@ export default function ProductGate({
     if (!waiting || regenerating) return;
     setRegenerating(true); setErr(null);
     try {
-      const res = await fetch(`/api/runs/${runId}/product-describe`, { method: "POST" });
+      const res = await fetch(`/api/runs/${runId}/product-describe`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ force: true }) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
       setText(data.description);

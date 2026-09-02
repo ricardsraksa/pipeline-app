@@ -69,6 +69,14 @@ class App:
         if not self.cookie:
             raise RuntimeError("login returned no session cookie")
 
+    def post(self, path: str) -> dict:
+        if not self.cookie:
+            self.login()
+        req = urllib.request.Request(f"{APP_URL}{path}", method="POST", data=b"{}",
+                                     headers={"Cookie": self.cookie, "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            return json.loads(r.read().decode())
+
     def get(self, path: str) -> dict:
         if not self.cookie:
             self.login()
@@ -117,9 +125,9 @@ def run_once(app: App, scraper) -> int:
         pending = [u for u in urls if due(state, f"{run_id}:{u['url']}")]
         if not pending:
             continue
-        for i, u in enumerate(pending):
+        pushed_any = False
+        for u in pending:
             key = f"{run_id}:{u['url']}"
-            last = i == len(pending) - 1
             log(f"run #{run_id}: scraping {u['role']} page {u['url'][:70]}")
             try:
                 # Re-fetch storefront pages every time (cheap, and a fixed
@@ -127,10 +135,12 @@ def run_once(app: App, scraper) -> int:
                 # AliExpress, where every fetch counts against the rate limit.
                 fresh = "aliexpress." not in u["url"].lower()
                 folder = scraper.scrape(u["url"], refresh=fresh)
-                scraper.push_to_app(APP_URL, str(run_id), folder, describe=last, password=app.password)
+                # describe=0 on every push; one analyst call per run comes after the loop
+                scraper.push_to_app(APP_URL, str(run_id), folder, describe=False, password=app.password)
                 state.pop(key, None)
                 done += 1
-                log(f"run #{run_id}: pushed{' + description requested' if last else ''}")
+                pushed_any = True
+                log(f"run #{run_id}: pushed")
             except SystemExit as e:      # the scraper reports hard failures via sys.exit
                 msg = str(e).strip() or f"exit {e.code!r}"
                 log(f"run #{run_id}: failed — {msg[:160]}")
@@ -141,6 +151,16 @@ def run_once(app: App, scraper) -> int:
                 st = state.get(key, {"attempts": 0})
                 state[key] = {"attempts": st["attempts"] + 1, "at": time.time(), "error": str(e)[:300]}
             save_state(state)
+        # Write the description from whatever pages the run now has — even if
+        # the supplier page failed this round, the brand pages are enough for a
+        # first draft. When the supplier page lands on a later pass, this runs
+        # again and the analyst rewrites with it as the source of truth.
+        if pushed_any:
+            try:
+                app.post(f"/api/runs/{run_id}/product-describe")
+                log(f"run #{run_id}: description written")
+            except Exception as e:
+                log(f"run #{run_id}: description failed — {type(e).__name__}: {e}")
     return done
 
 

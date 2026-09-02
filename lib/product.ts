@@ -111,7 +111,13 @@ export function buildAnalystContent(scrape: ProductScrape): Array<
     parts.push(`URL ${i + 1} (${label}): ${p.url}\n\n${text}`);
   });
   const blocks: Array<{ type: "text"; text: string } | { type: "image"; source: { type: "url"; url: string } }> = [
-    { type: "text", text: `Here are the fetched pages.\n\n${parts.join("\n\n" + "=".repeat(60) + "\n\n")}` },
+    {
+      type: "text",
+      text:
+        "Here are the fetched pages. Use all of them. Where a supplier listing and a brand page disagree on specs or details, the supplier listing is the source of truth; " +
+        "if no supplier listing is present, write from the brand page(s) you have.\n\n" +
+        parts.join("\n\n" + "=".repeat(60) + "\n\n"),
+    },
   ];
   const prod = productPageOf(scrape);
   const photos = [...(prod?.image_urls ?? []).slice(0, 3), ...(prod?.description_image_urls ?? []).slice(0, 6)];
