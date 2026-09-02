@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Run } from "@/lib/db";
 import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
 import Stage3SourcePicker from "@/components/Stage3SourcePicker";
+import { parseProductScrape, productCandidateImages } from "@/lib/product";
 import ShopifyFill from "@/components/ShopifyFill";
 import SendToDrive from "@/components/SendToDrive";
 
@@ -211,6 +212,13 @@ export default function Stage3HeroFlow({
   })();
   const sourceCandidates = [...srcUploaded, ...srcScraped].filter((u, i, a) => u && a.indexOf(u) === i);
   const sourceBlacklist = safeParse<string[]>(run.stage3_source_blacklist, []);
+  // EVERY photo the run has — the whole Stage 1 scrape (listing gallery,
+  // seller description images, competitor photos) plus the operator's own
+  // uploads. The Stage 1 gate ticks a subset for research and for the prompt
+  // writer; the per-image reference pickers below deliberately offer all of
+  // them, because a shot often needs a photo that wasn't the ticked hero set.
+  const allRunPhotos = productCandidateImages(parseProductScrape(run.product_scrape), srcUploaded);
+  const GROUP_TAG: Record<string, string> = { uploaded: "YOURS", product: "LISTING", description: "DESC", competitor: "COMP" };
 
   const heroPrompt = safeParse<HeroPrompt | null>(run.stage3_hero_prompt, null);
   const heroPromptText = (run.stage3_hero_prompt_edited?.trim() || heroPrompt?.prompt || "");
@@ -218,9 +226,12 @@ export default function Stage3HeroFlow({
   // Candidates offered by the per-image reference pickers: the approved hero,
   // the active source photos, and any operator scene references.
   const extraRefUrls = safeParse<string[]>(run.stage3_reference_images, []);
+  const tickedSet = new Set(sourceCandidates.filter((u) => !sourceBlacklist.includes(u)));
   const refCandidates: RefCandidate[] = [
     ...(heroUrl ? [{ url: heroUrl, label: "HERO" }] : []),
-    ...sourceCandidates.filter((u) => !sourceBlacklist.includes(u)).map((u) => ({ url: u, label: "SOURCE" })),
+    // ticked source photos first, then the rest of the run's photos
+    ...sourceCandidates.filter((u) => tickedSet.has(u)).map((u) => ({ url: u, label: "SOURCE" })),
+    ...allRunPhotos.filter((c) => !tickedSet.has(c.url)).map((c) => ({ url: c.url, label: GROUP_TAG[c.group] ?? "PHOTO" })),
     ...extraRefUrls.map((u) => ({ url: u, label: "REF" })),
   ].filter((c, i, a) => a.findIndex((x) => x.url === c.url) === i);
   const effRefOverrides = refOverrides ?? safeParse<Record<string, string[]>>(run.stage3_ref_overrides, {});
@@ -580,7 +591,7 @@ export default function Stage3HeroFlow({
                 )}
                 <div className="pt-0.5 space-y-1">
                   <p className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">Reference images for this shot</p>
-                  <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} />
+                  <RefPicker candidates={candidatesFor(p)} selected={refsFor(p, effRefOverrides, heroUrl)} onToggle={(u) => toggleRefOverride(p, u)} collapsible />
                 </div>
               </div>
             );
@@ -800,16 +811,21 @@ function refsFor(p: RemainingPrompt, overrides: Record<string, string[]>, heroUr
 
 // Compact multi-select of candidate reference images. Selected = full color +
 // accent border; unselected = dimmed. Min-1 is enforced by the callers.
-function RefPicker({ candidates, selected, onToggle, disabled }: {
+function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
   candidates: RefCandidate[];
   selected: string[];
   onToggle: (url: string) => void;
   disabled?: boolean;
+  /** Long pools (every photo on the run) start folded to the chosen ones. */
+  collapsible?: boolean;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (!candidates.length) return null;
+  const folded = collapsible && !showAll && candidates.length > 6;
+  const shown = folded ? candidates.filter((c) => selected.includes(c.url)) : candidates;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {candidates.map((c) => {
+    <div className="flex flex-wrap items-center gap-1.5">
+      {shown.map((c) => {
         const on = selected.includes(c.url);
         return (
           <button
@@ -826,6 +842,12 @@ function RefPicker({ candidates, selected, onToggle, disabled }: {
           </button>
         );
       })}
+      {collapsible && candidates.length > 6 && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} disabled={disabled}
+          className="cursor-pointer text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr">
+          {folded ? `Choose from all ${candidates.length} photos` : "Show fewer"}
+        </button>
+      )}
     </div>
   );
 }
