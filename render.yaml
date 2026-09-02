@@ -1,12 +1,15 @@
 services:
   - type: web
     name: pipeline-app
-    # Docker: Stage 1 runs a Python scraper with a real Chromium (see Dockerfile).
-    # The browser path needs ~1GB, so the plan must be Standard (2GB) or larger.
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: standard
+    # Stays on the existing free-tier-priced Node service. The Dockerfile in the
+    # repo can run the Stage 1 scraper server-side, but that needs a Docker
+    # runtime on a 2GB plan — a paid change the operator makes deliberately,
+    # never from this file. Until then the Mac script's --push mode feeds Stage 1.
+    runtime: node
+    plan: starter
     numInstances: 1
+    buildCommand: npm ci && npm run build
+    startCommand: node server.mjs
     healthCheckPath: /login
     envVars:
       - key: NODE_ENV
