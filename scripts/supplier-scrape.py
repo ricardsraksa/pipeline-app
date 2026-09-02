@@ -509,7 +509,7 @@ def _multipart(fields: dict, files: list[tuple[str, Path]]) -> tuple[bytes, str]
     return bytes(out), boundary
 
 
-def push_to_app(app_url: str, run_id: str, folder: Path) -> None:
+def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True) -> None:
     app_url = app_url.rstrip("/")
     data = json.loads((folder / "data.json").read_text())
     # Interactive by default; PIPELINE_APP_PASSWORD lets a script drive it.
@@ -530,7 +530,7 @@ def push_to_app(app_url: str, run_id: str, folder: Path) -> None:
     desc_images = sorted(p for p in (folder / "description").glob("*")
                          if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
     body, boundary = _multipart(
-        {"data": json.dumps(data, ensure_ascii=False)},
+        {"data": json.dumps(data, ensure_ascii=False), "describe": "1" if describe else "0"},
         [("images", p) for p in images[:10]] + [("description_images", p) for p in desc_images[:12]])
     req = urllib.request.Request(
         f"{app_url}/api/runs/{run_id}/scrape-push", method="POST", data=body,

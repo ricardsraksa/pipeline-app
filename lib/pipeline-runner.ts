@@ -315,7 +315,7 @@ export async function runProductStage(runId: number): Promise<void> {
       pages.push({ url: t.url, role: t.role, ok: true, ...rest });
     } else {
       console.warn(`[product] run ${runId} scrape failed for ${t.url}: ${r.error}`);
-      pages.push({ url: t.url, role: t.role, ok: false, error: r.error, rateLimited: r.rateLimited, image_urls: [], description_image_urls: [] });
+      pages.push({ url: t.url, role: t.role, ok: false, error: r.error, rateLimited: r.rateLimited, deferred: r.deferred, image_urls: [], description_image_urls: [] });
     }
   }
 
@@ -339,12 +339,15 @@ export async function runProductStage(runId: number): Promise<void> {
 export async function parkAtProductGate(runId: number): Promise<void> {
   const run = await getRun(runId);
   const scrape = parseProductScrape(run?.product_scrape);
-  const productOk = Boolean(scrape?.pages.find((p) => p.role === "product")?.ok);
+  const productPage = scrape?.pages.find((p) => p.role === "product");
+  const productOk = Boolean(productPage?.ok);
   await updateRun(runId, {
     status: "awaiting_product_approval",
     current_step: productOk
       ? "Stage 1 complete — review the description and pick the photos"
-      : "Stage 1: the product page couldn't be read — scrape it locally or describe it yourself",
+      : productPage?.deferred
+        ? "Stage 1: waiting for your Mac to scrape the page"
+        : "Stage 1: the product page couldn't be read — scrape it locally or describe it yourself",
     last_updated_at: now(),
   });
 }

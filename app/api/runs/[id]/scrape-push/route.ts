@@ -99,10 +99,15 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
     last_updated_at: new Date().toISOString(),
   });
 
-  try {
-    await describeProduct(runId);
-  } catch (err) {
-    console.error(`[scrape-push] describe failed for run ${runId}:`, err);
+  // The worker pushes competitor pages first and the product page last, with
+  // describe=0 on all but the final push, so the analyst runs once per run.
+  const describe = form.get("describe") !== "0";
+  if (describe) {
+    try {
+      await describeProduct(runId);
+    } catch (err) {
+      console.error(`[scrape-push] describe failed for run ${runId}:`, err);
+    }
   }
   await parkAtProductGate(runId);
   return NextResponse.json({ success: true, images: image_urls.length, description_images: description_image_urls.length });

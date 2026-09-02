@@ -146,6 +146,11 @@ export default function ProductGate({
     }
   }
 
+  // The Mac worker polls every ~20s; anything older than 2 minutes means it
+  // isn't running (Mac asleep, agent not installed).
+  const lastSeenMs = product?.workerLastSeen ? Date.now() - new Date(product.workerLastSeen).getTime() : Infinity;
+  const workerOnline = lastSeenMs < 2 * 60 * 1000;
+  const workerAgo = lastSeenMs < 60_000 ? "just now" : `${Math.round(lastSeenMs / 60_000)} min ago`;
   const pushCmd = `scrapling-py ~/Desktop/supplier-scrape.py --push ${typeof window !== "undefined" ? window.location.origin : ""} --run ${runId} ${run.meta.productUrl || "<product url>"}`;
 
   const grouped = (["uploaded", "product", "description", "competitor"] as const)
@@ -161,15 +166,33 @@ export default function ProductGate({
         </div>
       )}
 
-      {/* local fallback when the product page couldn't be read */}
+      {/* the page is being handled by the Mac worker, or needs a manual scrape */}
       {waiting && productPage && !productPage.ok && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--color-amber-bg)] px-4 py-3 space-y-2">
-          <p className="text-[12.5px] font-[620] text-[var(--color-text)]">
-            {productPage.rateLimited ? "The supplier site is rate-limiting the app's server." : "The app couldn't read the product page."}
-          </p>
-          <p className="text-[12px] text-[var(--color-text-2)]">
-            Scrape it from your Mac instead — it lands straight on this run and the description is written automatically:
-          </p>
+          {productPage.deferred ? (
+            <>
+              <p className="text-[12.5px] font-[620] text-[var(--color-text)] flex items-center gap-2">
+                {workerOnline ? <Icon.Loader className="w-3.5 h-3.5" /> : null}
+                {workerOnline
+                  ? "Your Mac is scraping this page — the description appears here automatically (usually under a minute)."
+                  : "Waiting for your Mac. The pipeline worker isn't running there right now."}
+              </p>
+              <p className="text-[12px] text-[var(--color-text-2)]">
+                {workerOnline
+                  ? `Worker last checked in ${workerAgo}.`
+                  : "Wake the Mac (the worker starts on login), or run the command below to scrape this page by hand:"}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[12.5px] font-[620] text-[var(--color-text)]">
+                {productPage.rateLimited ? "The supplier site is rate-limiting the app's server." : "The app couldn't read the product page."}
+              </p>
+              <p className="text-[12px] text-[var(--color-text-2)]">
+                Scrape it from your Mac instead — it lands straight on this run and the description is written automatically:
+              </p>
+            </>
+          )}
           <div className="flex items-center gap-2">
             <code className="ff-mono text-[11px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded px-2 py-1.5 flex-1 min-w-0 overflow-x-auto whitespace-nowrap">{pushCmd}</code>
             <button onClick={() => { navigator.clipboard.writeText(pushCmd).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}

@@ -18,6 +18,22 @@ on the Mac and pasted in. At ~10 products/week that trade is worth ~$300/year.
 The app detects this case and returns a message pointing here instead of
 handing the pipeline a blank description.
 
+## The Mac worker (automatic)
+
+`scripts/local-worker.py` (symlink `~/Desktop/pipeline-worker.py`) makes the
+fallback below automatic: it polls the app every 20s, scrapes any page a run
+is waiting on, and pushes it back. Installed as a LaunchAgent it starts at
+login and keeps running; the run page shows whether it is online.
+
+One-time setup:
+
+```bash
+security add-generic-password -s pipeline-app -a worker -w      # app password → Keychain
+cp ~/Desktop/claude/pipeline-app/scripts/launchd/com.pipeline.worker.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.pipeline.worker.plist
+tail -f ~/Library/Logs/pipeline-worker.log
+```
+
 ## Where it runs now
 
 Since v2.46.0 this script is also **Stage 1 of the pipeline itself**: the app

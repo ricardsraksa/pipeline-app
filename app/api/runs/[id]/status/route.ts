@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRun } from "@/lib/db";
+import { getRun, getKV } from "@/lib/db";
 
 import { requireSession } from "@/lib/auth";
 export async function GET(
@@ -10,6 +10,8 @@ export async function GET(
   if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const run = await getRun(parseInt(id, 10));
+  let workerLastSeen: string | null = null;
+  try { workerLastSeen = await getKV("worker_last_seen"); } catch { /* optional */ }
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -67,6 +69,9 @@ export async function GET(
       descriptionEdited: run.product_description_edited ?? null,
       selectedImages: safeJson(run.product_selected_images) ?? [],
       approvedAt: run.product_approved_at ?? null,
+      // Last time the Mac worker polled the queue (ISO) — the gate shows
+      // whether it is online while a page is waiting on it.
+      workerLastSeen,
     },
     meta: {
       productUrl: run.product_url,

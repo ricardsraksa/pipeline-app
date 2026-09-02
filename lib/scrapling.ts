@@ -48,7 +48,27 @@ export interface ScraplingData {
 
 export type ScraplingOutcome =
   | { ok: true; data: ScraplingData }
-  | { ok: false; error: string; rateLimited: boolean };
+  | { ok: false; error: string; rateLimited: boolean; deferred?: boolean };
+
+// Is scrapling importable by the server's python? On the plain Node service it
+// isn't (no Docker), so every page is deferred to the Mac worker instead of
+// failing. Probed once per process.
+let availability: Promise<boolean> | null = null;
+export function scraplingAvailable(): Promise<boolean> {
+  if (!availability) {
+    availability = new Promise((resolve) => {
+      try {
+        const child = spawn(PYTHON, ["-c", "import scrapling.fetchers"], { stdio: "ignore" });
+        const t = setTimeout(() => { child.kill("SIGKILL"); resolve(false); }, 20_000);
+        child.on("error", () => { clearTimeout(t); resolve(false); });
+        child.on("close", (code) => { clearTimeout(t); resolve(code === 0); });
+      } catch { resolve(false); }
+    });
+  }
+  return availability;
+}
+
+export const DEFERRED_MESSAGE = "Waiting for your Mac to scrape this page";
 
 const SCRIPT = path.join(process.cwd(), "scripts", "supplier-scrape.py");
 const PYTHON = process.env.SCRAPLING_PYTHON?.trim() || "python3";
@@ -133,6 +153,9 @@ export function scraplingScrape(url: string, opts: { timeoutMs?: number } = {}):
     }
     if (!r2Configured()) {
       return { ok: false, error: "R2 is not configured — scraped photos have nowhere to go.", rateLimited: false };
+    }
+    if (!(await scraplingAvailable())) {
+      return { ok: false, error: DEFERRED_MESSAGE, rateLimited: false, deferred: true };
     }
 
     const outDir = await mkdtemp(path.join(os.tmpdir(), "scrape-"));

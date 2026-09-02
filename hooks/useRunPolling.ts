@@ -40,6 +40,7 @@ export interface RunStatus {
     descriptionEdited: string | null;
     selectedImages: string[];
     approvedAt: string | null;
+    workerLastSeen: string | null;
   };
   meta: {
     productUrl: string;

@@ -13,6 +13,8 @@ export interface ProductScrapePage {
   ok: boolean;
   error?: string;
   rateLimited?: boolean;
+  /** The server has no scraper; the Mac worker is expected to fill this page in. */
+  deferred?: boolean;
   /** "text-only" or "browser" — which fetch path the scraper needed. */
   mode?: string;
   title?: string;
