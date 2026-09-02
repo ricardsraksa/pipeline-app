@@ -247,13 +247,13 @@ export default function ProductGate({
       <div>
         <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
           <p className="eyebrow">Product description{product?.descriptionEdited ? " · edited" : ""}</p>
-          <span className="ff-mono text-[11px] text-[var(--color-text-4)]">{words} word{words === 1 ? "" : "s"}</span>
+          <span className={cx("ff-mono text-[11px]", words > 200 ? "text-[var(--color-amber)]" : "text-[var(--color-text-4)]")}>{words} / 200 words</span>
         </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={!waiting || regenerating || approving}
-          rows={12}
+          rows={9}
           placeholder={waiting ? "What the product physically is and does — every spec and mechanism detail the listing gives…" : ""}
           className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[13px] py-[11px] text-[13px] leading-relaxed resize-y transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:opacity-70"
         />
