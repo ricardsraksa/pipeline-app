@@ -9,7 +9,7 @@ import {
 } from "@/lib/prompts-store";
 import { requireSession } from "@/lib/auth";
 
-const STAGES: PromptStage[] = ["product", "stage1", "stage2", "stage3"];
+const STAGES: PromptStage[] = ["product", "stage1", "angles", "stage2", "stage3"];
 
 // Restore a history entry as the current prompt.
 // Body: { stage, index } — index into the history list (0 = newest).

@@ -26,7 +26,7 @@ const KV_KEY = "prompts_store";
 const LEGACY_PATH = path.join(process.cwd(), "data", "prompts.json");
 const HISTORY_LIMIT = 20;
 
-export type PromptStage = "product" | "stage1" | "stage2" | "stage3";
+export type PromptStage = "product" | "stage1" | "angles" | "stage2" | "stage3";
 
 export interface PromptHistoryEntry {
   prompt: string;

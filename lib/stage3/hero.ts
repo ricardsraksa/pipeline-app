@@ -333,6 +333,8 @@ export async function generateHeroPrompt(params: {
   onePager: string
   /** Stage 2 English copy — the overlay suggestion language. */
   copy: string
+  /** The positioning angle the operator chose (lib/angles.ts angleBlock). */
+  angle?: string
   sourceImageUrls: string[]
   /** Optional extra reference images the operator added — scene/background/style
    *  references. The product still comes only from the source photos. */
@@ -342,6 +344,7 @@ export async function generateHeroPrompt(params: {
 }): Promise<{ hero: HeroPrompt; validation: Stage3Validation }> {
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
   const userText = [
+    ...(params.angle ? ['POSITIONING ANGLE (chosen by the operator — the hero must communicate THIS problem and its solution, not a generic product shot):', params.angle, ''] : []),
     'STAGE 1 ONE-PAGER (product name, category, positioning angle, benefits, USPs, dimensions where present):',
     params.onePager || '(none)',
     '',
@@ -441,6 +444,8 @@ export function extractVisualSection(researchDoc: string): string {
 export async function generateRemainingPrompts(params: {
   onePager: string
   copy: string
+  /** The positioning angle the operator chose (lib/angles.ts angleBlock). */
+  angle?: string
   avatar: string
   visual: string
   /** The image(s) every derivative prompt references for product appearance:
@@ -471,6 +476,7 @@ export async function generateRemainingPrompts(params: {
     ? 'Generate the 8 prompts JSON array now. The source product photos are attached below — every prompt references them so the real product stays consistent (there is no separate hero shot).'
     : 'Generate the 8 prompts JSON array now. The approved hero image is attached below — every prompt references it.'
   const userText = [
+    ...(params.angle ? ['POSITIONING ANGLE (chosen by the operator — the set of images tells THIS problem → consequence → mechanism story; the problem/comparison/lifestyle images show this specific problem, not a generic one):', params.angle, ''] : []),
     'STAGE 1 ONE-PAGER:',
     params.onePager || '(none)',
     '',

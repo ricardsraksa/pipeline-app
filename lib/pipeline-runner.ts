@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import { scraplingScrape } from "./scrapling";
 import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
+import { generateAngles } from "./angles-generate";
+import { angleBlock, parseAngle } from "./angles";
 import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
@@ -381,7 +383,7 @@ export async function describeProduct(runId: number): Promise<string | null> {
 async function pauseAtResearchGate(runId: number): Promise<void> {
   await updateRun(runId, {
     status: "awaiting_stage2_approval",
-    current_step: "Stage 2 complete — awaiting your review before Stage 3",
+    current_step: "Stage 2 complete — review the research and pick an angle",
     last_updated_at: now(),
   });
 }
@@ -675,6 +677,13 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     if (!onePager) throw new Error("Stage 2: one-pager synthesis returned empty");
     await updateRun(runId, { stage1_one_pager: onePager, last_updated_at: now() });
   }
+
+  // ── Sub-step 8: Positioning angles (the operator picks one at the gate) ──
+  if (!run.product_angles) {
+    await guardCancel(runId);
+    await updateRun(runId, { current_step: "Stage 2: Proposing positioning angles", last_updated_at: now() });
+    await generateAngles(runId);
+  }
 }
 
 export async function runStage2(runId: number, run: Run): Promise<void> {
@@ -701,13 +710,19 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
     ...(stage2Feedback.trim() ? [{ type: "text" as const, text: stage2Feedback }] : []),
   ];
   const productName = run.brand_name ?? run.product_name ?? "";
+  // The angle the operator chose at the gate. Everything in the kit is built
+  // around this one problem, not a generic best-X pitch.
+  const angle = angleBlock(parseAngle(run.product_angle_selected));
+  const angleSection = angle
+    ? `\n\nPOSITIONING ANGLE (chosen by the operator — build the ENTIRE copy kit around this one problem and this mechanism; the headline, benefits, sections, FAQs and objections all serve it; do not drift back to a generic "best X" or "only Y" pitch):\n${angle}`
+    : "";
 
   await guardCancel(runId);
   await updateRun(runId, { current_step: "Stage 3: Generating copy (≈1–3 min)", last_updated_at: now() });
 
   const output = await anthropicMessage({
     system: stage2System,
-    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}\n\nProduce the complete copy kit now.`,
+    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${angleSection}\n\nProduce the complete copy kit now.`,
     maxTokens: 8192,
     label: "stage 2 copy",
       runId,
@@ -895,7 +910,7 @@ export async function resumePipeline(runId: number): Promise<void> {
       // Check if stage1 is actually complete (one-pager is the final sub-step now)
       if (!run.step_research_revised || !run.step_avatar || !run.step_offer_brief ||
           !run.step_necessary_beliefs || !run.step_chief_final ||
-          !run.step_avatar_revised || !run.stage1_one_pager) {
+          !run.step_avatar_revised || !run.stage1_one_pager || !run.product_angles) {
         // Stage 1 was partially done — re-run (granular skipping inside runStage1)
         const freshRun = await getRun(runId);
         if (!freshRun) throw new Error("Run not found");

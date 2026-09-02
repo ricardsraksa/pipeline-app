@@ -37,6 +37,11 @@ export async function POST(
     );
   }
 
+  // The copy is built around the chosen angle — refuse to start without one.
+  if (!run.product_angle_selected) {
+    return NextResponse.json({ error: "Pick a positioning angle first" }, { status: 400 });
+  }
+
   // Fire-and-forget. Polling on the client will pick up the status change.
   runStage2Manually(runId).catch((err) => {
     console.error(`Manual Stage 3 trigger for run ${runId} failed:`, err);

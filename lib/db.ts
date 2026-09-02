@@ -175,6 +175,11 @@ async function migrateDB() {
     // JSON array of image URLs the operator ticked at the Stage 1 gate.
     "product_selected_images TEXT",
     "product_approved_at TEXT",
+    // ── Angles gate (after Research, before Copy) ──────────────────────────
+    // JSON Angle[] proposed by the strategist, and the operator's pick (JSON
+    // Angle, possibly edited). Copy + Images build around the pick.
+    "product_angles TEXT",
+    "product_angle_selected TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -316,7 +321,7 @@ export async function updateRun(id: number, fields: Partial<Run & { error_messag
  */
 export async function recordPromptUsed(
   id: number,
-  key: "product" | "stage1" | "stage2" | "stage3_hero" | "stage3_remaining",
+  key: "product" | "stage1" | "angles" | "stage2" | "stage3_hero" | "stage3_remaining",
   prompt: string,
 ): Promise<void> {
   try {
@@ -583,4 +588,7 @@ export interface Run {
   product_description_edited: string | null;
   product_selected_images: string | null;
   product_approved_at: string | null;
+  // Angles gate
+  product_angles: string | null;
+  product_angle_selected: string | null;
 }

@@ -42,6 +42,11 @@ export interface RunStatus {
     approvedAt: string | null;
     workerLastSeen: string | null;
   };
+  /** Angles gate — JSON strings (Angle[] / Angle), see lib/angles.ts. */
+  angles: {
+    proposed: string | null;
+    selected: string | null;
+  };
   meta: {
     productUrl: string;
     productName: string | null;

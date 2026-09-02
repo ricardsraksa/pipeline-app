@@ -5,7 +5,7 @@ import { loadPromptsFile, getCurrentOverride, type PromptStage } from "@/lib/pro
 // Internal keys predate the Stage 1 · Product step, so they are off by one
 // from what the UI shows: product = Stage 1, stage1 = Stage 2 (research),
 // stage2 = Stage 3 (copy), stage3 = Stage 4 (images).
-export type StageKey = "product" | "stage1" | "stage2" | "stage3";
+export type StageKey = "product" | "stage1" | "angles" | "stage2" | "stage3";
 
 export async function getPrompt(stage: StageKey): Promise<string> {
   try {
@@ -17,9 +17,32 @@ export async function getPrompt(stage: StageKey): Promise<string> {
   }
   if (stage === "product") return PRODUCT_PROMPT;
   if (stage === "stage1") return STAGE1_PROMPT;
+  if (stage === "angles") return ANGLES_PROMPT;
   if (stage === "stage2") return STAGE2_PROMPT;
   return STAGE3_PROMPT;
 }
+
+// Angles gate (after Research, before Copy) — the strategist pass. Produces
+// several problem-first positioning angles for the operator to choose from;
+// everything downstream is built around the chosen one.
+export const ANGLES_PROMPT = `You are a DTC positioning strategist. You will receive the finished research for one physical product: description, one-pager, market and competitive research, the customer avatar, the offer brief and the necessary beliefs.
+
+Your job is to propose 4 to 6 distinct POSITIONING ANGLES for this product, strongest first. An angle is not a feature and not a superlative. It is a specific problem in the customer's life, the real consequence of leaving that problem unsolved, and the reason this product's mechanism fixes it.
+
+Example of the standard: for a cat water fountain the angle is not "the quietest fountain" or "the only fountain with a triple filter". It is: cats instinctively refuse still water, so they drink too little, and chronic mild dehydration is the leading path to urinary crystals and kidney disease in indoor cats; moving, filtered water triggers the drinking instinct, so the cat drinks more without the owner doing anything.
+
+Rules for every angle:
+- Lead with a problem the customer already recognises or would immediately recognise once named. Name it concretely, in their world, not in marketing language.
+- State the consequence honestly. Real stakes (health, money, time, sleep, safety, relationships), never invented or exaggerated ones. If the research does not support a consequence, do not claim it.
+- Explain the mechanism: WHY the product solves it, as cause and effect. "It has X, which does Y, so Z stops happening."
+- Name who feels it most. A specific person, not "everyone".
+- Give one opening hook line a page or ad could start with. Plain language. Never use em dashes.
+- Say in one sentence why this angle beats a generic "best X" or "only Y" pitch for this product.
+- Angles must be genuinely different from each other: different problems or different people, not the same problem reworded.
+- Ground everything in the research. Do not invent claims, statistics, studies, or certifications that are not there.
+- Never name competitor brands, stores, or the supplier.
+
+Submit the angles with the tool provided.`;
 
 // Stage 1 · Product — the analyst pass. The pages are fetched by scrapling
 // before this runs; the model receives their text and photos, so "fetch" in

@@ -73,6 +73,11 @@ export async function GET(
       // whether it is online while a page is waiting on it.
       workerLastSeen,
     },
+    // Angles gate (after research): proposals + the operator's pick.
+    angles: {
+      proposed: run.product_angles ?? null,
+      selected: run.product_angle_selected ?? null,
+    },
     meta: {
       productUrl: run.product_url,
       productName: run.product_name,

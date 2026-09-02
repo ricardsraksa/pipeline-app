@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { angleBlock, parseAngle } from '@/lib/angles'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
     // Audit trail: the system prompt the 8 prompts ran with (hero skipped).
     await recordPromptUsed(runId, 'stage3_remaining', REMAINING_SYSTEM)
     const { prompts, validation } = await generateRemainingPrompts({
+      angle: angleBlock(parseAngle(run.product_angle_selected)),
       onePager, copy, avatar, visual,
       referenceImageUrls: sourceImageUrls,
       extraReferenceUrls: safeArr(run.stage3_reference_images),

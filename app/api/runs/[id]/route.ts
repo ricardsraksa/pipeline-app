@@ -128,6 +128,8 @@ export async function PATCH(
     product_description_edited?: string | null;
     product_selected_images?: string | null;
     uploaded_source_images?: string[] | null;
+    // Angles gate: the operator's pick (JSON Angle), possibly edited
+    product_angle_selected?: string | null;
   };
 
   const existing = await db.execute({
@@ -339,6 +341,7 @@ export async function PATCH(
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
   if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 5000) : null); }
   if ("product_selected_images" in body)          { fields.push("product_selected_images = ?");          values.push(body.product_selected_images ?? null); }
+  if ("product_angle_selected" in body)           { fields.push("product_angle_selected = ?");           values.push(typeof body.product_angle_selected === "string" ? body.product_angle_selected.slice(0, 8000) : null); }
   if ("uploaded_source_images" in body)           { fields.push("uploaded_source_images = ?");           values.push(body.uploaded_source_images ? JSON.stringify(body.uploaded_source_images.slice(0, 20)) : null); }
 
   if (fields.length === 0) {

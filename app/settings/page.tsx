@@ -7,13 +7,14 @@ import ModelSettings from "@/components/ModelSettings";
 
 // Internal keys are one behind the displayed numbers (the product stage was
 // added in front): product = Stage 1, stage1 = Stage 2, and so on.
-type Stage = "product" | "stage1" | "stage2" | "stage3";
+type Stage = "product" | "stage1" | "angles" | "stage2" | "stage3";
 
-const STAGE_ORDER: Stage[] = ["product", "stage1", "stage2", "stage3"];
+const STAGE_ORDER: Stage[] = ["product", "stage1", "angles", "stage2", "stage3"];
 
 const STAGE_LABELS: Record<Stage, string> = {
   product: "Stage 1 — Product Description",
   stage1: "Stage 2 — Research Brief",
+  angles: "Stage 2 — Positioning Angles (after research)",
   stage2: "Stage 3 — Copy",
   stage3: "Stage 4 — Image Prompts",
 };
@@ -21,6 +22,7 @@ const STAGE_LABELS: Record<Stage, string> = {
 const STAGE_NUMS: Record<Stage, string> = {
   product: "01",
   stage1: "02",
+  angles: "02b",
   stage2: "03",
   stage3: "04",
 };

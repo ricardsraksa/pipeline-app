@@ -24,6 +24,7 @@ import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
 import SendToDoc from "@/components/SendToDoc";
 import ProductGate from "@/components/ProductGate";
+import AnglePicker from "@/components/AnglePicker";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -548,7 +549,12 @@ export default function RunPage() {
   const nextAction = (): NextAction => {
     const s = run.status;
     if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Product description ready for your review", sub: "Check the text, tick the photos, then start research.", cta: "Review product", onClick: () => openStage("product") };
-    if (s === "awaiting_stage2_approval") return { tone: "amber", icon: "review", title: "Research ready for your review", sub: "Edit it if needed, then generate the copy.", cta: startingStage2 ? "Starting…" : "Run Stage 3", onClick: handleStartStage2 };
+    if (s === "awaiting_stage2_approval") {
+      const hasAngle = Boolean(run.angles?.selected);
+      return hasAngle
+        ? { tone: "amber", icon: "review", title: "Angle chosen — ready for copy", sub: "Everything from here is built around it.", cta: startingStage2 ? "Starting…" : "Run Stage 3", onClick: handleStartStage2 }
+        : { tone: "amber", icon: "review", title: "Research ready — pick a positioning angle", sub: "Choose the problem this product will be sold on, then run the copy.", cta: "Pick an angle", onClick: () => openStage("stage1") };
+    }
     if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Copy approved — ready for images", sub: "Generate a hero shot, then the 8 derivatives.", cta: "Go to Stage 4", onClick: () => openStage("stage3") };
     if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Hero shot needs your approval", sub: "It becomes the reference for every other image.", cta: "Review hero", onClick: () => openStage("stage3") };
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "8 prompts ready to review", sub: "Tweak any prompt, then generate the images.", cta: "Review prompts", onClick: () => openStage("stage3") };
@@ -652,6 +658,11 @@ export default function RunPage() {
                   <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface-2)] px-5 py-4">
                     <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
                   </div>
+                  {runId !== null && (
+                    <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] px-5 py-4">
+                      <AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} />
+                    </div>
+                  )}
                   {run.scrapeErrors && run.scrapeErrors.length > 0 && (
                     <div className="rounded-[var(--radius-sm)] bg-[var(--color-amber-bg)] px-3.5 py-2.5">
                       <p className="text-[11.5px] text-[var(--color-text)] font-[600] mb-1">

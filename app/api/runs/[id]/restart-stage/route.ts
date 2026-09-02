@@ -42,6 +42,8 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage1_one_pager: null,
         stage1_one_pager_edited: null,
         stage1_one_pager_edited_at: null,
+        product_angles: null,
+        product_angle_selected: null,
         // product_name and brand_name will be overwritten when Stage 1 re-runs;
         // leave them in place so they show in the UI while the rerun is in flight.
         brand_name: null,
