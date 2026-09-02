@@ -25,6 +25,12 @@ export interface Angle {
   hook: string;
   /** Why this beats "best X" / "only Y" framing for this product. */
   why_this_angle: string;
+  /** What the competitors in the research currently lead with on this ground. */
+  competitor_angle?: string;
+  /** The gap: why this angle is unclaimed or under-served by them. */
+  gap?: string;
+  /** How contested this ground is — drives the badge on the card. */
+  crowding?: "open" | "partly-claimed" | "crowded";
 }
 
 export function parseAngles(json: string | null | undefined): Angle[] {
@@ -68,6 +74,8 @@ function oneAngle(angle: Angle): string {
     `WHY THIS PRODUCT SOLVES IT (MECHANISM): ${angle.mechanism}`,
     `WHO FEELS IT MOST: ${angle.who}`,
     `OPENING HOOK: ${angle.hook}`,
+    ...(angle.competitor_angle ? [`WHAT COMPETITORS LEAD WITH (do not echo this — it is what everyone already says): ${angle.competitor_angle}`] : []),
+    ...(angle.gap ? [`THE GAP WE TAKE: ${angle.gap}`] : []),
   ].join("\n");
 }
 

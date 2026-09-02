@@ -6,6 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "./db";
 import { getModel } from "./models";
 import { getPrompt } from "./prompts";
+import { parseProductScrape } from "./product";
 import type { Angle } from "./angles";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
@@ -29,8 +30,11 @@ const ANGLES_TOOL: Anthropic.Tool = {
             who: { type: "string", description: "Who exactly feels this most. One sentence." },
             hook: { type: "string", description: "One line a page or ad could open with. No em dashes." },
             why_this_angle: { type: "string", description: "Why this beats generic 'best X / only Y' framing for this product. One sentence." },
+            competitor_angle: { type: "string", description: "What the competitors in the research currently lead with on this same ground. Say 'not visible in the research' if it isn't there. One or two sentences." },
+            gap: { type: "string", description: "The gap being taken: why this angle is unclaimed, under-served or said badly by them. One or two sentences." },
+            crowding: { type: "string", enum: ["open", "partly-claimed", "crowded"], description: "How contested this ground is among the competitors in the research." },
           },
-          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle"],
+          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle", "competitor_angle", "gap", "crowding"],
         },
       },
     },
@@ -39,6 +43,36 @@ const ANGLES_TOOL: Anthropic.Tool = {
 };
 
 const DOC_CAP = 18_000;
+
+/** What each scraped competitor page is actually selling on — the hero line,
+ *  offers, proof and claims the scraper pulled. First-hand evidence of their
+ *  positioning, which the research documents only summarise. */
+function competitorPositioning(scrapeJson: string | null): string {
+  const scrape = parseProductScrape(scrapeJson);
+  const pages = (scrape?.pages ?? []).filter((p) => p.role === "competitor" && p.ok);
+  if (!pages.length) return "(no competitor pages were scraped for this run)";
+  return pages
+    .map((p) => {
+      const pos = p.positioning ?? {};
+      const line = (k: string, label: string) => {
+        const v = pos[k];
+        if (!v || (Array.isArray(v) && !v.length)) return null;
+        return `  ${label}: ${Array.isArray(v) ? v.slice(0, 5).join(" | ") : v}`;
+      };
+      return [
+        p.title || p.url,
+        line("hero", "Hero line"),
+        line("claims", "Claims"),
+        line("offers", "Offers"),
+        line("social_proof", "Proof"),
+        line("testimonials", "Testimonials"),
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n")
+    .slice(0, 12_000);
+}
 
 export async function generateAngles(runId: number, note?: string): Promise<Angle[]> {
   const run = await getRun(runId);
@@ -62,6 +96,9 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     "",
     "RESEARCH (identification, market, competitive, product analysis):",
     research.slice(0, DOC_CAP),
+    "",
+    "WHAT THE SCRAPED COMPETITOR PAGES ACTUALLY SAY (their own hero lines, claims, offers and proof — first-hand evidence of the positioning they lead with):",
+    competitorPositioning(run.product_scrape),
     "",
     "CUSTOMER AVATAR:",
     (run.step_avatar_revised ?? run.step_avatar ?? "(none)").slice(0, DOC_CAP),
@@ -100,6 +137,9 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
       who: str(o.who, 400),
       hook: str(o.hook, 300),
       why_this_angle: str(o.why_this_angle, 600),
+      competitor_angle: str(o.competitor_angle, 800),
+      gap: str(o.gap, 800),
+      crowding: o.crowding === "crowded" || o.crowding === "partly-claimed" ? o.crowding : "open",
     };
   });
 
