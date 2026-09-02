@@ -57,10 +57,12 @@ def keychain_password() -> str:
 class App:
     def __init__(self) -> None:
         self.cookie = ""
+        self.password = ""
 
     def login(self) -> None:
+        self.password = keychain_password()
         req = urllib.request.Request(f"{APP_URL}/api/auth/login", method="POST",
-                                     data=json.dumps({"password": keychain_password()}).encode(),
+                                     data=json.dumps({"password": self.password}).encode(),
                                      headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as r:
             self.cookie = r.headers.get("Set-Cookie", "").split(";")[0]
@@ -121,17 +123,17 @@ def run_once(app: App, scraper) -> int:
             log(f"run #{run_id}: scraping {u['role']} page {u['url'][:70]}")
             try:
                 folder = scraper.scrape(u["url"], refresh=False)
-                scraper.push_to_app(APP_URL, str(run_id), folder, describe=last)
+                scraper.push_to_app(APP_URL, str(run_id), folder, describe=last, password=app.password)
                 state.pop(key, None)
                 done += 1
                 log(f"run #{run_id}: pushed{' + description requested' if last else ''}")
             except SystemExit as e:      # the scraper reports hard failures via sys.exit
-                msg = str(e).strip()
+                msg = str(e).strip() or f"exit {e.code!r}"
                 log(f"run #{run_id}: failed — {msg[:160]}")
                 st = state.get(key, {"attempts": 0})
                 state[key] = {"attempts": st["attempts"] + 1, "at": time.time(), "error": msg[:300]}
             except Exception as e:
-                log(f"run #{run_id}: failed — {e}")
+                log(f"run #{run_id}: failed — {type(e).__name__}: {e}")
                 st = state.get(key, {"attempts": 0})
                 state[key] = {"attempts": st["attempts"] + 1, "at": time.time(), "error": str(e)[:300]}
             save_state(state)
@@ -145,6 +147,10 @@ def main() -> None:
     scraper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(scraper)
     scraper.JSON_MODE = True    # keep the scraper's chatter off stdout formatting; we log ourselves
+
+    here = Path(__file__).resolve().parent
+    watched = [here / "local-worker.py", here / "supplier-scrape.py"]
+    stamp = [p.stat().st_mtime for p in watched]
 
     app = App()
     while True:
@@ -172,6 +178,9 @@ def main() -> None:
             log(f"poll failed — {e}")
         if once:
             return
+        if [p.stat().st_mtime for p in watched] != stamp:
+            log("source changed — restarting")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
         time.sleep(POLL_SECONDS)
 
 

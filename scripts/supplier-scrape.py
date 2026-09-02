@@ -128,6 +128,14 @@ def is_rate_limited(page) -> bool:
     return ("punish" in h or "captcha" in h) and not (page.css("title::text").get() or "").strip()
 
 
+def fetch_url(url: str) -> str:
+    """What to actually request. AliExpress item links come with long tracking
+    queries (spm=, algo_pvid=, ...); the bare item URL renders the same and
+    trips fewer anti-bot heuristics. Other URLs are left alone."""
+    m = re.match(r"^(https?://(?:[a-z]+\.)?aliexpress\.[a-z.]+/item/\d+\.html)", url, re.I)
+    return m.group(1) if m else url
+
+
 def fetch(url: str):
     """Text-only first; escalate to a real browser only if the page is empty."""
     page = Fetcher.get(url, timeout=30, stealthy_headers=True)
@@ -509,11 +517,13 @@ def _multipart(fields: dict, files: list[tuple[str, Path]]) -> tuple[bytes, str]
     return bytes(out), boundary
 
 
-def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True) -> None:
+def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True,
+                password: str | None = None) -> None:
     app_url = app_url.rstrip("/")
     data = json.loads((folder / "data.json").read_text())
-    # Interactive by default; PIPELINE_APP_PASSWORD lets a script drive it.
-    password = os.environ.get("PIPELINE_APP_PASSWORD") or getpass.getpass(f"   Password for {app_url}: ")
+    # Callers (the worker) pass the password in; PIPELINE_APP_PASSWORD lets a
+    # script drive it; interactive prompt otherwise.
+    password = password or os.environ.get("PIPELINE_APP_PASSWORD") or getpass.getpass(f"   Password for {app_url}: ")
     login = urllib.request.Request(
         f"{app_url}/api/auth/login", method="POST",
         data=json.dumps({"password": password}).encode(),
@@ -611,7 +621,7 @@ def scrape(url: str, refresh: bool) -> Path:
         return hit
 
     say(f"\nScraping: {url[:90]}\n")
-    page, mode = fetch(url)
+    page, mode = fetch(fetch_url(url))
 
     title = (page.css("title::text").get() or "").strip()
     desc = (page.css("meta[name='description']::attr(content)").get()
