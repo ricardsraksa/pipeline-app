@@ -190,6 +190,10 @@ export default function ProductGate({
   const lastSeenMs = product?.workerLastSeen ? Date.now() - new Date(product.workerLastSeen).getTime() : Infinity;
   const workerOnline = lastSeenMs < 2 * 60 * 1000;
   const workerAgo = lastSeenMs < 60_000 ? "just now" : `${Math.round(lastSeenMs / 60_000)} min ago`;
+  // The worker stops after ~3 minutes of failures. If the page has been sitting
+  // unread longer than that with the worker alive, it has given up.
+  const scrapedAgoMs = scrape?.scraped_at ? Date.now() - new Date(scrape.scraped_at).getTime() : 0;
+  const gaveUp = workerOnline && scrapedAgoMs > 5 * 60 * 1000;
   const pushCmd = `scrapling-py ~/Desktop/supplier-scrape.py --push ${typeof window !== "undefined" ? window.location.origin : ""} --run ${runId} ${run.meta.productUrl || "<product url>"}`;
 
   const grouped = (["uploaded", "product", "description", "competitor"] as const)
@@ -211,15 +215,19 @@ export default function ProductGate({
           {productPage.deferred ? (
             <>
               <p className="text-[12.5px] font-[620] text-[var(--color-text)] flex items-center gap-2">
-                {workerOnline ? <Icon.Loader className="w-3.5 h-3.5" /> : null}
-                {workerOnline
-                  ? "Your Mac is scraping this page — the description appears here automatically (usually under a minute)."
-                  : "Waiting for your Mac. The pipeline worker isn't running there right now."}
+                {workerOnline && !gaveUp ? <Icon.Loader className="w-3.5 h-3.5" /> : null}
+                {gaveUp
+                  ? "Your Mac tried this page a few times and couldn't get it — scrape it by hand:"
+                  : workerOnline
+                    ? "Your Mac is scraping this page — the description appears here automatically (usually under a minute)."
+                    : "Waiting for your Mac. The pipeline worker isn't running there right now."}
               </p>
               <p className="text-[12px] text-[var(--color-text-2)]">
-                {workerOnline
-                  ? `Worker last checked in ${workerAgo}.`
-                  : "Wake the Mac (the worker starts on login), or run the command below to scrape this page by hand:"}
+                {gaveUp
+                  ? "The supplier site is blocking the automated fetch. Running it yourself usually works, and Restart Stage 1 makes the worker try again."
+                  : workerOnline
+                    ? `Worker last checked in ${workerAgo}.`
+                    : "Wake the Mac (the worker starts on login), or run the command below to scrape this page by hand:"}
               </p>
             </>
           ) : (

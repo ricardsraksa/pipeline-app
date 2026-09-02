@@ -35,8 +35,11 @@ import importlib.util
 APP_URL = os.environ.get("PIPELINE_APP_URL", "https://pipeline-app-6icd.onrender.com").rstrip("/")
 POLL_SECONDS = 20
 STATE_FILE = Path.home() / "Desktop" / "scraped" / ".worker-state.json"
-RETRY_AFTER = 30 * 60      # a failed URL is retried after 30 min
-MAX_ATTEMPTS = 6           # then left alone (the gate still offers the manual command)
+# Fail fast: the operator would rather scrape it by hand than have the worker
+# grind for hours. A page gets a couple of quick retries over ~3 minutes and is
+# then left alone, with the manual command already on the run page.
+RETRY_AFTER = 90           # seconds between attempts on the same URL
+MAX_ATTEMPTS = 3           # ~3 minutes total, then stop
 
 
 def log(msg: str) -> None:
@@ -113,6 +116,16 @@ def due(state: dict, key: str) -> bool:
     return time.time() - e.get("at", 0) >= RETRY_AFTER
 
 
+def note_failure(state: dict, key: str, run_id: int, msg: str) -> None:
+    st = state.get(key, {"attempts": 0})
+    attempts = st["attempts"] + 1
+    state[key] = {"attempts": attempts, "at": time.time(), "error": msg[:300]}
+    left = MAX_ATTEMPTS - attempts
+    tail = (f"retrying in {RETRY_AFTER}s ({left} attempt{'s' if left != 1 else ''} left)"
+            if left > 0 else "giving up on this URL — scrape it manually from the run page")
+    log(f"run #{run_id}: failed — {msg[:140]} | {tail}")
+
+
 def run_once(app: App, scraper) -> int:
     data = app.get("/api/worker/queue")
     jobs = data.get("jobs", [])
@@ -142,14 +155,9 @@ def run_once(app: App, scraper) -> int:
                 pushed_any = True
                 log(f"run #{run_id}: pushed")
             except SystemExit as e:      # the scraper reports hard failures via sys.exit
-                msg = str(e).strip() or f"exit {e.code!r}"
-                log(f"run #{run_id}: failed — {msg[:160]}")
-                st = state.get(key, {"attempts": 0})
-                state[key] = {"attempts": st["attempts"] + 1, "at": time.time(), "error": msg[:300]}
+                note_failure(state, key, run_id, str(e).strip() or f"exit {e.code!r}")
             except Exception as e:
-                log(f"run #{run_id}: failed — {type(e).__name__}: {e}")
-                st = state.get(key, {"attempts": 0})
-                state[key] = {"attempts": st["attempts"] + 1, "at": time.time(), "error": str(e)[:300]}
+                note_failure(state, key, run_id, f"{type(e).__name__}: {e}")
             save_state(state)
         # Write the description from whatever pages the run now has — even if
         # the supplier page failed this round, the brand pages are enough for a
