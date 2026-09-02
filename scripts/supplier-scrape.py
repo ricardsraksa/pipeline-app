@@ -14,6 +14,7 @@ and saves the product images to ~/Desktop/scraped/<product>/
 """
 import re
 import sys
+import time
 import json
 import subprocess
 import urllib.request
@@ -56,6 +57,46 @@ def slugify(s: str, fallback: str = "product") -> str:
     return (re.sub(r"[\s_-]+", "-", s)[:50].strip("-") or fallback)
 
 
+# --- staying under the rate limit -------------------------------------------
+# AliExpress throttles per IP. Two habits keep us well clear of it: never fetch
+# the same product twice, and leave a gap between browser fetches.
+
+STATE_FILE = OUT_ROOT / ".scrape-state.json"
+CACHE_DAYS = 7
+MIN_GAP_SECONDS = 45
+
+
+def load_state() -> dict:
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except Exception:
+        return {"seen": {}, "last_browser_fetch": 0}
+
+
+def save_state(state: dict) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(json.dumps(state, indent=2))
+
+
+def cached_result(url: str, state: dict) -> Path | None:
+    entry = (state.get("seen") or {}).get(url)
+    if not entry:
+        return None
+    folder = Path(entry["folder"])
+    age_days = (time.time() - entry["at"]) / 86400
+    if folder.exists() and (folder / "data.json").exists() and age_days < CACHE_DAYS:
+        return folder
+    return None
+
+
+def wait_for_gap(state: dict) -> None:
+    elapsed = time.time() - (state.get("last_browser_fetch") or 0)
+    if elapsed < MIN_GAP_SECONDS:
+        pause = int(MIN_GAP_SECONDS - elapsed) + 1
+        print(f"   pausing {pause}s between browser fetches to stay under the rate limit...")
+        time.sleep(pause)
+
+
 def is_rate_limited(page) -> bool:
     """AliExpress serves a "punish" interstitial once an IP has fetched too often."""
     h = page.html_content.lower()
@@ -68,6 +109,10 @@ def fetch(url: str):
     if (page.css("title::text").get() or "").strip():
         return page, "text-only"
     print("   page came back empty — starting browser (takes ~10s)...")
+    state = load_state()
+    wait_for_gap(state)
+    state["last_browser_fetch"] = time.time()
+    save_state(state)
     # AliExpress renders inconsistently: sometimes the browser gets the product,
     # sometimes only the shell. Verify the content actually arrived and retry.
     last = None
@@ -421,9 +466,18 @@ def extract_positioning(page, prod: dict | None) -> dict:
 
 
 def main() -> None:
-    url = sys.argv[1] if len(sys.argv) > 1 else clipboard_get()
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    url = args[0] if args else clipboard_get()
     if not url.startswith("http"):
         sys.exit("No URL given. Pass one as an argument, or copy one to your clipboard first.")
+
+    state = load_state()
+    if "--refresh" not in sys.argv and (hit := cached_result(url, state)):
+        print(f"\nAlready scraped this product — reusing {hit}")
+        print("   (run again with --refresh to re-fetch)\n")
+        clipboard_set((json.loads((hit / "data.json").read_text())).get("scraped_text", ""))
+        print("   Clipboard: product text copied.\n")
+        return
 
     print(f"\nScraping: {url[:90]}\n")
     page, mode = fetch(url)
@@ -474,8 +528,13 @@ def main() -> None:
          "price": price, **details, "options": options,
          "variants": variant_prices, "long_description": long_desc,
          "image_text": ocr_text, "positioning": positioning,
+         "scraped_text": scraped_text,
          "images": images, "description_images": desc_images},
         indent=2, ensure_ascii=False))
+
+    state = load_state()
+    state.setdefault("seen", {})[url] = {"folder": str(folder), "at": time.time()}
+    save_state(state)
 
     print(f"   mode:   {mode}")
     print(f"   title:  {title[:70]}")

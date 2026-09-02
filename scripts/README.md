@@ -103,6 +103,18 @@ script detects this and says so rather than returning an empty result. Stealth
 mode and a different browser do not help — only time or a different IP does.
 At normal usage (a handful of products a week) you will not hit it.
 
+Two habits keep it that way, both automatic:
+
+- **Results are cached for 7 days.** Re-running the same URL replays the saved
+  result and copies the text to the clipboard without touching the network.
+  Pass `--refresh` to force a re-fetch.
+- **Browser fetches are spaced 45s apart.** If you run several in a row the
+  script pauses between them rather than firing them back to back.
+
+If you ever genuinely need volume, the right answer is AliExpress's own
+dropshipping/affiliate API rather than heavier scraping — it is built for this
+and doesn't get throttled.
+
 Sales figures are read only from the section above the recommendation
 carousels — the `4,000+ sold` further down the page belongs to other products.
 
