@@ -578,7 +578,7 @@ export default function Stage3HeroFlow({
                     {aiCardIdx === i ? "Cancel AI edit" : "✦ Edit with AI"}
                   </button>
                   <button
-                    onClick={() => setEditingPromptIdxs((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; })}
+                    onClick={() => { if (!editing) pushHistory(p, "edited"); setEditingPromptIdxs((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; }); }}
                     className="cursor-pointer text-[10.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline"
                   >
                     {editing ? "Hide full prompt" : "Edit full prompt"}
