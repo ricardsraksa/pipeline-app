@@ -17,6 +17,7 @@ import sys
 import json
 import subprocess
 import urllib.request
+from html import unescape
 from pathlib import Path
 
 from scrapling.fetchers import Fetcher, DynamicFetcher
@@ -24,6 +25,7 @@ from scrapling.fetchers import Fetcher, DynamicFetcher
 OUT_ROOT = Path.home() / "Desktop" / "scraped"
 MIN_BYTES = 15_000          # smaller than this is an icon or swatch, not a photo
 WANT_IMAGES = 6
+WANT_DESC_IMAGES = 12
 
 # Gallery images often sit in a JSON blob rather than an <img> tag. They're
 # recognisable by a descriptive, hyphenated filename (Wall-Lights-With-Remote.jpg)
@@ -59,7 +61,11 @@ def fetch(url: str):
     if (page.css("title::text").get() or "").strip():
         return page, "text-only"
     print("   page came back empty — starting browser (takes ~10s)...")
-    return DynamicFetcher.fetch(url, headless=True, network_idle=True, timeout=90000), "browser"
+    # AliExpress serves the seller's long description from a separate module;
+    # capture it as it loads rather than trying to scrape it out of the DOM.
+    page = DynamicFetcher.fetch(url, headless=True, network_idle=True, timeout=90000,
+                                capture_xhr="desc.htm")
+    return page, "browser"
 
 
 def fullsize(u: str) -> str:
@@ -105,13 +111,13 @@ def candidates(page) -> list[str]:
     return out
 
 
-def download(urls: list[str], folder: Path) -> list[str]:
+def download(urls: list[str], folder: Path, want: int = WANT_IMAGES) -> list[str]:
     """Fetch candidates in order, keeping only files big enough to be real photos."""
     folder.mkdir(parents=True, exist_ok=True)
     kept: list[str] = []
     blobs: set[bytes] = set()
     for u in urls:
-        if len(kept) >= WANT_IMAGES:
+        if len(kept) >= want:
             break
         try:
             req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
@@ -122,10 +128,23 @@ def download(urls: list[str], folder: Path) -> list[str]:
         if len(blob) < MIN_BYTES or blob in blobs:
             continue
         blobs.add(blob)
-        ext = re.search(r"\.(jpe?g|png|webp)$", u, re.I).group(1).lower()
+        m = re.search(r"\.(jpe?g|png|webp)(?:$|[?_])", u, re.I)
+        ext = m.group(1).lower() if m else "jpg"
         (folder / f"{len(kept) + 1:02d}.{ext}").write_bytes(blob)
         kept.append(u)
     return kept
+
+
+# Accessibility labels, nav and checkout chrome — present on every page of a
+# storefront and worthless as product copy.
+UI_NOISE = re.compile(
+    r"open media|abrir elemento|ventana modal|in a modal"
+    r"|skip to|ir directamente|saltar al"
+    r"|add to cart|a\u00f1adir al carrito|buy it now|comprar ahora|choose options"
+    r"|subscribe|newsletter|cookie|privacy policy|terms of service|pol\u00edtica de"
+    r"|log in|iniciar sesi\u00f3n|create account|shopping cart|carrito de",
+    re.I,
+)
 
 
 def visible_lines(page) -> list[str]:
@@ -199,6 +218,76 @@ def find_price(page) -> str | None:
     return m.group(0) if m else None
 
 
+def html_to_text(html: str) -> str:
+    txt = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html, flags=re.S | re.I)
+    txt = re.sub(r"<[^>]+>", " ", txt)
+    txt = unescape(txt).replace("\xa0", " ")
+    return re.sub(r"[ \t]+", " ", re.sub(r"\n{3,}", "\n\n", txt)).strip()
+
+
+def shopify_json(url: str) -> dict | None:
+    """Shopify exposes every variant and price at <product-url>.json."""
+    if "/products/" not in url:
+        return None
+    base = url.split("?")[0].rstrip("/")
+    try:
+        r = Fetcher.get(base + ".json", timeout=20, stealthy_headers=True)
+        raw = re.sub(r"^<html><body>|</body></html>$", "", r.html_content.strip())
+        return json.loads(raw).get("product")
+    except Exception:
+        return None
+
+
+def extract_variants(page, url: str) -> tuple[dict, list]:
+    """Every option and value. Shopify via its JSON API, AliExpress from the DOM."""
+    prod = shopify_json(url)
+    if prod:
+        options = {o["name"]: o["values"] for o in prod.get("options", []) if o.get("values")}
+        priced = [
+            {"title": v.get("title"), "price": v.get("price"), "available": v.get("available")}
+            for v in prod.get("variants", [])
+        ]
+        return options, priced
+
+    # AliExpress: each option group is a "sku-item--property" block. Image
+    # swatches carry their name in the img alt, text swatches in a title attr.
+    options: dict[str, list[str]] = {}
+    for el in page.css('[class*="sku-item"]'):
+        if not (el.attrib.get("class") or "").startswith("sku-item--property"):
+            continue
+        label = " ".join(el.get_all_text().split())
+        name = label.split(":")[0].strip() if ":" in label else label[:24]
+        vals = [a.strip() for a in el.css("img::attr(alt)").getall() if a and a.strip()]
+        vals += [t.strip() for t in el.css("[title]::attr(title)").getall() if t and t.strip()]
+        vals = list(dict.fromkeys(vals))
+        if name and vals:
+            options[name] = vals
+    return options, []
+
+
+def extract_long_description(page, url: str) -> tuple[str, list]:
+    """The seller's full description — the real feature claims live here."""
+    # AliExpress: served as its own module, captured while the page loaded.
+    for r in getattr(page, "captured_xhr", []) or []:
+        if "desc.htm" not in str(r.url):
+            continue
+        body = r.body if isinstance(r.body, str) else (r.body or b"").decode("utf-8", "ignore")
+        imgs = [fullsize(u) for u in re.findall(r'src="([^"]+)"', body)
+                if u.startswith("http")]
+        return html_to_text(body), list(dict.fromkeys(imgs))
+
+    prod = shopify_json(url)
+    if prod and (prod.get("body_html") or "").strip():
+        html = prod["body_html"]
+        imgs = [u for u in re.findall(r'src="([^"]+)"', html) if u.startswith("http")]
+        return html_to_text(html), imgs
+
+    # Page-builder storefronts keep the copy in the page itself. Take the visible
+    # text, minus the nav/chrome that repeats on every page.
+    body = [l for l in visible_lines(page) if len(l) > 40 and not UI_NOISE.search(l)]
+    return "\n".join(dict.fromkeys(body))[:6000], []
+
+
 def main() -> None:
     url = sys.argv[1] if len(sys.argv) > 1 else clipboard_get()
     if not url.startswith("http"):
@@ -212,26 +301,47 @@ def main() -> None:
             or page.css("meta[property='og:description']::attr(content)").get() or "").strip()
     price = find_price(page)
     details = extract_details(page)
+    options, variant_prices = extract_variants(page, url)
+    long_desc, desc_images = extract_long_description(page, url)
 
     folder = OUT_ROOT / slugify(title)
     images = download(candidates(page), folder)
+    # The seller's description images are the best ad source material on the page.
+    desc_saved = download(desc_images, folder / "description", WANT_DESC_IMAGES) if desc_images else []
 
     facts = [f"{k.capitalize()}: {v}" for k, v in details.items()]
     if price:
         facts.insert(0, f"Price: {price}")
-    scraped_text = "\n\n".join(
-        x for x in [title, desc, "\n".join(facts)] if x)[:4000]
+    for name, vals in options.items():
+        facts.append(f"{name}: {', '.join(vals)}")
+    for v in variant_prices:
+        facts.append(f"  - {v['title']}: {v['price']}"
+                     + ("" if v.get("available", True) else " (sold out)"))
+    scraped_text = "\n\n".join(x for x in [
+        title, desc, "\n".join(facts),
+        ("FULL DESCRIPTION\n" + long_desc[:3000]) if long_desc else "",
+    ] if x)
     clipboard_set(scraped_text)
     (folder / "data.json").write_text(json.dumps(
         {"url": url, "mode": mode, "title": title, "description": desc,
-         "price": price, **details, "images": images}, indent=2, ensure_ascii=False))
+         "price": price, **details, "options": options,
+         "variants": variant_prices, "long_description": long_desc,
+         "images": images, "description_images": desc_images},
+        indent=2, ensure_ascii=False))
 
     print(f"   mode:   {mode}")
     print(f"   title:  {title[:70]}")
     print(f"   price:  {price}")
     for k, v in details.items():
         print(f"   {k + ':':8}{v}")
-    print(f"   images: {len(images)} saved")
+    for name, vals in options.items():
+        print(f"   {name + ':':8}{', '.join(vals)}")
+    if variant_prices:
+        for v in variant_prices:
+            print(f"     - {v['title']}: {v['price']}")
+    print(f"   long description: {len(long_desc):,} chars")
+    print(f"   images: {len(images)} product"
+          + (f" + {len(desc_saved)} description" if desc_images else "") + " saved")
     print(f"\n   Folder:    {folder}")
     print("   Clipboard: product text copied — paste it into the pipeline app.\n")
 

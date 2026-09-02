@@ -42,7 +42,22 @@ automatically.
 | store | supplier/seller name |
 | shipping, delivery | e.g. `Free shipping`, `Delivery: Sep 11 - 18` |
 | specs | `Label: value` pairs — the selected variant on AliExpress, the spec table on Shopify |
+| options | **every** value of every variant group (all colours, sizes, packs) |
+| variants | per-variant price and availability (Shopify only) |
+| long_description | the seller's full description |
 | images | 6 product photos, full size |
+| description_images | up to 12 images from the description block |
+
+### Where each source comes from
+
+| | Variants | Long description |
+|---|---|---|
+| AliExpress | `sku-item--property` blocks — image swatches carry the value in `img alt`, text swatches in `title` | the `desc.htm` module, captured via `capture_xhr` as the page loads |
+| Shopify | `<product-url>.json` — every option, variant, price and stock state | `body_html` if the theme uses it, else the page's visible text minus nav/checkout chrome |
+
+Some AliExpress sellers put all their copy *inside* the description images and
+leave the text nearly empty. That is why `description_images` are downloaded —
+for those listings they are the description.
 
 Sales figures are read only from the section above the recommendation
 carousels — the `4,000+ sold` further down the page belongs to other products.
