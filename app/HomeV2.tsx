@@ -55,7 +55,7 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
   );
 
   return (
-    <div className="px-6 py-8 max-w-[880px] mx-auto" data-screen-label="Home">
+    <div className="px-8 py-7 max-w-[1400px] mx-auto" data-screen-label="Home">
       {/* header row */}
       <div className="flex items-center justify-between gap-4 mb-7 flex-wrap">
         <div>

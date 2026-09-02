@@ -201,10 +201,10 @@ export default function ProductGate({
     .filter((x) => x.items.length);
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col gap-3 min-h-0">
       {/* what was read */}
       {scrape && (
-        <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface-2)] px-4 py-1.5 divide-y divide-[var(--color-border)]">
+        <div className="shrink-0 border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface-2)] px-4 py-0.5 divide-y divide-[var(--color-border)]">
           {scrape.pages.map((p) => <PageRow key={p.url} p={p} />)}
         </div>
       )}
@@ -249,8 +249,9 @@ export default function ProductGate({
         </div>
       )}
 
+      <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
       {/* description */}
-      <div>
+      <div className="min-h-0 flex flex-col">
         <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
           <p className="eyebrow">Product description{product?.descriptionEdited ? " · edited" : ""}</p>
           <span className={cx("ff-mono text-[11px]", words > 200 ? "text-[var(--color-amber)]" : "text-[var(--color-text-4)]")}>{words} / 200 words</span>
@@ -259,9 +260,8 @@ export default function ProductGate({
           value={text}
           onChange={(e) => setText(e.target.value)}
           disabled={!waiting || regenerating || approving}
-          rows={9}
           placeholder={waiting ? "What the product is and does…" : ""}
-          className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[13px] py-[11px] text-[13px] leading-relaxed resize-y transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:opacity-70"
+          className="flex-1 min-h-[160px] w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-[var(--radius-sm)] px-[13px] py-[11px] text-[13px] leading-relaxed resize-none transition-all focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:opacity-70"
         />
         {waiting && (
           <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -279,8 +279,8 @@ export default function ProductGate({
       </div>
 
       {/* photos */}
-      <div>
-        <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+      <div className="min-h-0 flex flex-col">
+        <div className="flex items-center justify-between mb-2 gap-3 flex-wrap shrink-0">
           <p className="eyebrow">Photos for this run · {selected.length} of {candidates.length} selected</p>
           <div className="flex items-center gap-3">
             {waiting && <p className="text-[11px] text-[var(--color-text-3)]">Max 10.</p>}
@@ -298,7 +298,7 @@ export default function ProductGate({
         {candidates.length === 0 ? (
           <p className="text-[12.5px] text-[var(--color-text-3)]">No photos yet.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-y-auto min-h-0 pr-1">
             {grouped.map(({ g, items }) => (
               <div key={g}>
                 <p className="ff-mono text-[10px] uppercase tracking-widest text-[var(--color-text-4)] mb-1.5">{GROUP_LABEL[g]} · {items.length}</p>
@@ -328,10 +328,12 @@ export default function ProductGate({
         )}
       </div>
 
+      </div>
+
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
       {waiting && (
-        <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+        <div className="shrink-0 flex items-center justify-between gap-3 flex-wrap pt-1">
           <span />
           <button onClick={approve} disabled={!canApprove}
             className={cx("cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[9px] text-[13.5px] font-[620] border border-transparent tr whitespace-nowrap",

@@ -59,7 +59,7 @@ export default function TopBar() {
 
   return (
     <header className="sticky top-0 z-40 h-[54px] border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-surface)_90%,transparent)] backdrop-blur-md">
-      <div className="max-w-[880px] mx-auto h-full px-6 flex items-center justify-between gap-4">
+      <div className="h-full px-5 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2.5 cursor-pointer">
           <span className="w-[28px] h-[28px] rounded-[var(--radius-sm)] bg-[var(--color-primary)] text-[var(--color-on-primary)] grid place-items-center shrink-0"><Icon.Logo className="w-4 h-4" /></span>
           <span className="font-bold tracking-tight text-[15px] ff-display text-[var(--color-text)]">Pipeline <span title="App version (of this deployed build)" className="ff-mono text-[10px] text-[var(--color-text-4)] font-medium align-top">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "2"}</span></span>

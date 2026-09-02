@@ -131,36 +131,6 @@ function OnePagerMarkdown({ text }: { text: string }) {
   return <div className="space-y-1">{blocks}</div>;
 }
 
-// ── Live log (console feel during active runs) ────────────────────────────────
-
-type LogLine = { k: string; t: string };
-
-function LiveLog({ run, log }: { run: RunStatus; log: LogLine[] }) {
-  const active = !["completed", "failed", "cancelled", "awaiting_user", "awaiting_qc", "awaiting_product_approval", "awaiting_stage2_approval", "awaiting_hero_qc"].includes(run.status);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [log.length]);
-  if (!active || !log.length) return null;
-  return (
-    <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] overflow-hidden fade-in">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] pulse-dot" />
-        <span className="eyebrow text-[var(--color-text-2)]">Live · {statusLabel(run.status)}</span>
-      </div>
-      <div ref={ref} className="bg-[var(--color-bg)] px-4 py-3 max-h-[150px] overflow-y-auto ff-mono text-[11.5px] leading-[1.8]">
-        {log.slice(-8).map((l, i, arr) => {
-          const last = i === arr.length - 1;
-          return (
-            <div key={l.k} className={cx("log-line flex gap-2", last ? "text-[var(--color-text)]" : "text-[var(--color-text-3)]")}>
-              <span className="text-[var(--color-accent)] shrink-0">{last ? "›" : "·"}</span>
-              <span className={last ? "caret" : ""}>{l.t}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── Stage accordion card ──────────────────────────────────────────────────────
 
 const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
@@ -169,92 +139,8 @@ const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: s
   { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Copy kit around the chosen angle" },
   { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero, then 8 images" },
 ];
-const stageId = (key: StageKey) => STAGE_DEFS.find((d) => d.key === key)?.id ?? "";
 
 const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
-
-function StageAccordion({ def, state, open, onToggle, summary, children, isLast }: {
-  def: typeof STAGE_DEFS[number];
-  state: StageState;
-  open: boolean;
-  onToggle: () => void;
-  summary: string | null;
-  children: React.ReactNode;
-  isLast: boolean;
-}) {
-  const stateIcon = {
-    complete: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-green)] text-[var(--color-on-primary)] border-2 border-[var(--color-green)]"><Icon.Check className="w-3.5 h-3.5" strokeWidth={3} /></span>,
-    running: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-primary)] text-[var(--color-on-primary)] border-2 border-[var(--color-primary)] ring-pulse"><Icon.Loader className="w-3.5 h-3.5" /></span>,
-    waiting: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-amber)] text-white border-2 border-[var(--color-amber)] text-[12px] font-bold">!</span>,
-    error: <span className="w-7 h-7 rounded-full grid place-items-center bg-[var(--color-red)] text-white border-2 border-[var(--color-red)]"><Icon.X className="w-3.5 h-3.5" strokeWidth={3} /></span>,
-    pending: <span className="w-7 h-7 rounded-full grid place-items-center border-2 border-[var(--color-border-strong)] text-[var(--color-text-3)] text-[12px] font-bold bg-[var(--color-surface)]">{def.n}</span>,
-  }[state];
-  const stateLabel = { complete: "Done", running: "Running…", waiting: "Needs you", error: "Failed", pending: "Waiting" }[state];
-  const stateColor = {
-    complete: "text-[var(--color-green)]", running: "text-[var(--color-accent-text)]",
-    waiting: "text-[var(--color-amber)]", error: "text-[var(--color-red)]", pending: "text-[var(--color-text-4)]",
-  }[state];
-  const canOpen = state !== "pending";
-  return (
-    <div id={def.id} className="relative scroll-mt-24">
-      {!isLast && <div className="absolute left-[29px] top-[52px] bottom-[-14px] w-0.5 bg-[var(--color-border)]" aria-hidden="true" />}
-      <div className={cx("border rounded-[var(--radius)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] overflow-visible", open ? "border-[var(--color-border-strong)]" : "border-[var(--color-border)]")}>
-        <button onClick={() => canOpen && onToggle()} disabled={!canOpen}
-          className={cx("w-full flex items-center gap-3.5 px-4 py-3.5 text-left tr rounded-[var(--radius)]", canOpen ? "cursor-pointer hover:bg-[var(--color-surface-2)]" : "cursor-default opacity-70")}>
-          {stateIcon}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2.5 flex-wrap">
-              <p className="text-[14.5px] font-[680] text-[var(--color-text)] whitespace-nowrap">{def.title}</p>
-              <span className={cx("text-[11.5px] font-[620] whitespace-nowrap", stateColor)}>{stateLabel}</span>
-            </div>
-            <p className="text-[12px] text-[var(--color-text-3)] truncate mt-0.5">{summary || def.what}</p>
-          </div>
-          {canOpen && <Icon.ChevronRight className={cx("w-4 h-4 text-[var(--color-text-3)] transition-transform shrink-0", open && "rotate-90")} />}
-        </button>
-        {open && <div className="px-4 pb-5 pt-1 border-t border-[var(--color-border)] fade-in"><div className="pt-4 space-y-4">{children}</div></div>}
-      </div>
-    </div>
-  );
-}
-
-// ── Start prompt (the input the operator typed to create the run) ─────────────
-
-function StartPrompt({ description, competitorUrls }: { description: string; competitorUrls: string[] }) {
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="mb-4">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr"
-      >
-        {open ? "Hide product description" : "View product description"}
-      </button>
-      {open && (
-        <div className="mt-2 border border-[var(--color-border)] rounded-[var(--radius-sm)] bg-[var(--color-surface)] overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-3 py-1.5 bg-[var(--color-surface-2)] border-b border-[var(--color-border)]">
-            <span className="ff-mono text-[10.5px] uppercase tracking-widest text-[var(--color-text-3)]">Product description</span>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(description).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                });
-              }}
-              className="cursor-pointer text-[10.5px] px-2 py-0.5 rounded border border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] tr"
-            >
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <p className="px-3 py-2.5 text-[12.5px] leading-relaxed text-[var(--color-text-2)] whitespace-pre-wrap break-words max-h-72 overflow-y-auto">{description}</p>
-          {competitorUrls.length > 0 && (
-            <div className="px-3 pb-2.5 text-[11px] text-[var(--color-text-3)] break-all">Competitor URLs: {competitorUrls.join(", ")}</div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
@@ -307,33 +193,15 @@ export default function RunPage() {
   const [restarting, setRestarting] = useState(false);
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
-  const [overrides, setOverrides] = useState<Partial<Record<StageKey, boolean>>>({});
+  const [activeOverride, setActiveOverride] = useState<StageKey | null>(null);
   const [stage2View, setStage2View] = useState<"text" | "copy">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameOverride, setNameOverride] = useState<string | null>(null);
 
-  // Live log: accumulate status/step transitions from polling.
-  const [log, setLog] = useState<LogLine[]>([]);
-  const lastStepRef = useRef<string | null>(null);
-  const lastStatusRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!run) return;
-    const entries: LogLine[] = [];
-    if (run.status !== lastStatusRef.current) {
-      lastStatusRef.current = run.status;
-      entries.push({ k: Math.random().toString(36).slice(2), t: `→ ${statusLabel(run.status)}` });
-    }
-    if (run.currentStep && run.currentStep !== lastStepRef.current) {
-      lastStepRef.current = run.currentStep;
-      entries.push({ k: Math.random().toString(36).slice(2), t: run.currentStep });
-    }
-    if (entries.length) setLog((prev) => [...prev, ...entries].slice(-40));
-  }, [run]);
-
-  // Reset manual accordion overrides when the pipeline state changes.
-  useEffect(() => { setOverrides({}); }, [run?.status]);
+  // When the pipeline moves on, follow it to the stage that needs attention.
+  useEffect(() => { setActiveOverride(null); }, [run?.status]);
 
   async function handleKill() {
     if (!runId || killing) return;
@@ -511,13 +379,7 @@ export default function RunPage() {
   // The approval gate after research belongs on Stage 2 — that's what needs review.
   if (run.status === "awaiting_stage2_approval") { states.stage1 = "waiting"; states.stage2 = "pending"; }
 
-  const autoOpen = (key: StageKey) => stageActionable(states[key]) || (run.status === "completed" && key === "stage3");
-  const isOpen = (key: StageKey) => overrides[key] !== undefined ? Boolean(overrides[key]) : autoOpen(key);
-  const toggle = (key: StageKey) => setOverrides((p) => ({ ...p, [key]: !isOpen(key) }));
-  const openStage = (key: StageKey) => {
-    setOverrides((p) => ({ ...p, [key]: true }));
-    setTimeout(() => document.getElementById(stageId(key))?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
-  };
+  const openStage = (key: StageKey) => setActiveOverride(key);
 
   const summary = (key: StageKey): string | null => {
     if (key === "product") {
@@ -568,275 +430,241 @@ export default function RunPage() {
   const hasDocs = Boolean(outputs.onePager || outputs.stage2Output);
   const showPrimary = !a.running && run.status !== "completed";
 
+  // The stage on screen: the operator's pick, else the one that needs them,
+  // else the furthest one that exists.
+  const presentKeys = STAGE_DEFS.map((d) => d.key).filter((k) => present[k]);
+  const autoKey: StageKey =
+    (presentKeys.find((k) => stageActionable(states[k])) ?? (run.status === "completed" ? "stage3" : presentKeys[presentKeys.length - 1])) ?? "product";
+  const activeKey: StageKey = activeOverride && present[activeOverride] ? activeOverride : autoKey;
+  const active = STAGE_DEFS.find((d) => d.key === activeKey)!;
+
+  const railBtn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
+  const stateDot: Record<StageState, string> = {
+    complete: "bg-[var(--color-green)]", running: "bg-[var(--color-accent)] pulse-dot", waiting: "bg-[var(--color-amber)]",
+    error: "bg-[var(--color-red)]", pending: "bg-[var(--color-border-strong)]",
+  };
+  const stateWord: Record<StageState, string> = { complete: "Done", running: "Running", waiting: "Needs you", error: "Failed", pending: "" };
+
+  const pane = "min-h-0 overflow-y-auto rounded-[var(--radius)] border border-[var(--color-border)] bg-[var(--color-surface)]";
+  const spinner = (text: string) => (
+    <div className="h-full grid place-items-center">
+      <div className="text-center">
+        <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
+        <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{text}</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="px-6 py-8 pb-32 max-w-[880px] mx-auto" data-screen-label="Run">
-      {/* header */}
-      <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-4">
-        <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
-      </Link>
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div className="min-w-0 flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-[var(--radius)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
-            {run.meta.uploadedSourceImages[0]
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
-              : <MeshThumb id={runId ?? 0} className="w-full h-full" />}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-2.5 group/name">
+    <div className="h-[calc(100vh-54px)] grid grid-cols-[264px_minmax(0,1fr)]" data-screen-label="Run">
+      {/* ── left rail: run, stages, actions ── */}
+      <aside className="border-r border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col min-h-0">
+        <div className="px-4 pt-4 pb-3 border-b border-[var(--color-border)]">
+          <Link href="/" className="cursor-pointer inline-flex items-center gap-1 text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr mb-3">
+            <Icon.ArrowLeft className="w-3.5 h-3.5" /> Home
+          </Link>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-[var(--radius-sm)] overflow-hidden shrink-0 border border-[var(--color-border)] bg-[var(--color-surface-3)]">
+              {run.meta.uploadedSourceImages[0]
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
+                : <MeshThumb id={runId ?? 0} className="w-full h-full" />}
+            </div>
+            <div className="min-w-0 group/name">
               {renaming ? (
-                <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
-                  onBlur={saveName}
+                <input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} onBlur={saveName}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); saveName(); } else if (e.key === "Escape") { e.preventDefault(); setRenaming(false); } }}
-                  className="text-[22px] font-bold tracking-tight ff-display text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded-[var(--radius-sm)] px-2 py-0.5 min-w-0 focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+                  className="w-full text-[14px] font-bold ff-display text-[var(--color-text)] bg-[var(--color-surface-2)] border border-[var(--color-border-strong)] rounded-[var(--radius-sm)] px-2 py-0.5 focus:outline-none focus:border-[var(--color-accent)]"
                   aria-label="Run name" />
               ) : (
-                <>
-                  <h1 className="text-[22px] font-bold tracking-tight ff-display text-[var(--color-text)] truncate">{displayName}</h1>
-                  <button onClick={() => { setNameDraft(displayName); setRenaming(true); }} title="Rename run" aria-label="Rename run"
-                    className="opacity-0 group-hover/name:opacity-100 focus:opacity-100 text-[var(--color-text-3)] hover:text-[var(--color-text)] tr p-0.5 cursor-pointer shrink-0">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
-                  </button>
-                </>
+                <button onClick={() => { setNameDraft(displayName); setRenaming(true); }} title="Rename" className="cursor-pointer text-left w-full">
+                  <p className="text-[14px] font-bold ff-display text-[var(--color-text)] truncate leading-tight">{displayName}</p>
+                </button>
               )}
-              <span className="ff-mono text-[11.5px] text-[var(--color-text-4)]">#{runId}</span>
-              {runId !== null && <RunProductCode runId={Number(runId)} />}
+              <p className="ff-mono text-[10.5px] text-[var(--color-text-4)] truncate">#{runId}{elapsed ? ` · ${elapsed}` : ""}</p>
             </div>
-            <p className="text-[12px] text-[var(--color-text-3)] truncate mt-0.5">
-              {run.meta.productUrl ? (
-                <a href={run.meta.productUrl} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--color-accent-text)] tr">
-                  {truncateUrl(run.meta.productUrl, 56)}
-                </a>
-              ) : "Description-only run"}
-              {elapsed ? ` · ${elapsed}` : ""}
-            </p>
           </div>
+          <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+            <StatusBadge status={run.status} stuck={isStuck(run)} />
+            {runId !== null && <RunProductCode runId={Number(runId)} />}
+          </div>
+          {run.meta.productUrl && (
+            <a href={run.meta.productUrl} target="_blank" rel="noopener noreferrer" className="block mt-2 text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr truncate">
+              {truncateUrl(run.meta.productUrl, 40)}
+            </a>
+          )}
         </div>
-        <StatusBadge status={run.status} stuck={isStuck(run)} />
-      </div>
 
-      {/* the original input the operator typed to start this run */}
-      {run.meta.productDescription?.trim() && (
-        <StartPrompt description={run.meta.productDescription} competitorUrls={run.meta.competitorUrls ?? []} />
-      )}
+        {/* stages */}
+        <nav className="px-2 py-2">
+          {STAGE_DEFS.map((def) => {
+            const st = states[def.key];
+            const on = def.key === activeKey;
+            const can = present[def.key];
+            return (
+              <button key={def.key} disabled={!can} onClick={() => openStage(def.key)}
+                className={cx("w-full flex items-center gap-3 px-2.5 py-2.5 rounded-[var(--radius-sm)] text-left tr",
+                  can ? "cursor-pointer" : "cursor-default opacity-50",
+                  on ? "bg-[var(--color-accent-weak)]" : "hover:bg-[var(--color-surface-2)]")}>
+                <span className="w-6 h-6 rounded-full grid place-items-center shrink-0 border border-[var(--color-border-strong)] text-[11px] font-bold text-[var(--color-text-2)] bg-[var(--color-surface)]">
+                  {st === "complete" ? <Icon.Check className="w-3 h-3" strokeWidth={3} /> : def.n}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className={cx("block text-[13px] font-[650] truncate", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
+                  <span className="block text-[10.5px] text-[var(--color-text-4)] truncate">{stateWord[st] || def.what}</span>
+                </span>
+                <span className={cx("w-2 h-2 rounded-full shrink-0", stateDot[st])} />
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* per-run Anthropic API cost (token usage captured from every call) */}
-      {runId !== null && <div className="mb-5"><RunCost runId={runId} /></div>}
+        {/* what's happening */}
+        {(a.running || run.currentStep) && !isTerminal && (
+          <div className="mx-3 mb-2 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--color-bg)] border border-[var(--color-border)]">
+            <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] leading-snug break-words">{run.currentStep || statusLabel(run.status)}</p>
+          </div>
+        )}
 
-      {/* live log while running */}
-      <div className="mb-5"><LiveLog run={run} log={log} /></div>
-
-      {/* stage accordion */}
-      <div className="space-y-3.5">
-        {STAGE_DEFS.filter((d) => present[d.key]).map((def, i, arr) => (
-          <StageAccordion key={def.key} def={def} state={states[def.key]} open={isOpen(def.key)} onToggle={() => toggle(def.key)}
-            summary={summary(def.key)} isLast={i === arr.length - 1}>
-
-            {def.key === "product" && (
-              PRODUCT_ACTIVE.includes(run.status) ? (
-                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
-                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
-                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Reading the product page…"}</p>
-                </div>
-              ) : (
-                <>
-                  {runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}
-                  {runId !== null && (
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <StageActions stage="product" onRestart={handleRestartStage} restarting={restarting} />
-                      <PromptUsed promptsUsed={run.promptsUsed} stage="product" />
-                    </div>
-                  )}
-                </>
-              )
-            )}
-
-            {def.key === "stage1" && (
-              outputs.onePager ? (
-                <>
-                  <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface-2)] px-5 py-4">
-                    <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
-                  </div>
-                  {runId !== null && (
-                    <div className="border border-[var(--color-border)] rounded-[var(--radius)] bg-[var(--color-surface)] px-5 py-4">
-                      <AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} />
-                    </div>
-                  )}
-                  {run.scrapeErrors && run.scrapeErrors.length > 0 && (
-                    <div className="rounded-[var(--radius-sm)] bg-[var(--color-amber-bg)] px-3.5 py-2.5">
-                      <p className="text-[11.5px] text-[var(--color-text)] font-[600] mb-1">
-                        {run.scrapeErrors.length} competitor URL{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be scraped
-                      </p>
-                      <ul className="space-y-0.5">
-                        {run.scrapeErrors.map((e, i) => (
-                          <li key={i} className="ff-mono text-[10px] text-[var(--color-text-3)] truncate">
-                            <span className="text-[var(--color-text-2)]">{e.url}</span>
-                            <span className="mx-1.5 text-[var(--color-text-4)]">·</span>{e.error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {run.meta.uploadedSourceImages.length > 0 && (
-                    <div>
-                      <p className="eyebrow mb-2">Source images · {run.meta.uploadedSourceImages.length}</p>
-                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                        {run.meta.uploadedSourceImages.map((url, i) => (
-                          <a key={url + i} href={url} target="_blank" rel="noopener noreferrer"
-                            className="aspect-square rounded-[8px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-border-strong)] tr">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={`Source ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {runId !== null && (
-                    <>
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <StageActions stage="stage1" prevLabel="Product" prevId="v2-stage-product" onRestart={handleRestartStage} restarting={restarting} />
-                        <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
-                      </div>
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <FeedbackAppliedChip stage={1} />
-                        <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
-                      </div>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
-                        {runId !== null && (
-                          <a
-                            href={`/api/runs/${runId}/stage1-docs`}
-                            download
-                            className="text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer no-underline"
-                          >
-                            ↓ Download foundational docs
-                          </a>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </>
-              ) : ["stage1", "scraping"].includes(run.status) || outputs.research ? (
-                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
-                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
-                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">{run.currentStep ?? "Researching the product…"}</p>
-                </div>
-              ) : (
-                <p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you approve the product.</p>
-              )
-            )}
-
-            {def.key === "stage2" && (
-              outputs.stage2Output ? (
-                <>
-                  <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
-                    {((stage2Json ? ["text", "copy"] : ["text"]) as Array<"text" | "copy">).map((v) => (
-                      <button key={v} onClick={() => setStage2View(v)}
-                        className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
-                        {v === "text" ? "Full text" : "Copy"}
-                      </button>
-                    ))}
-                  </div>
-                  {stage2View === "copy" && stage2Json ? (
-                    <div className="space-y-3">
-                      {runId !== null && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
-                      <Stage2Shopify json={stage2Json} />
-                    </div>
-                  ) : (
-                  <EditableOutput
-                    runId={Number(runId)}
-                    field="stage2_copy"
-                    stage="stage2"
-                    originalValue={outputs.stage2Output}
-                    editedValue={outputs.stage2OutputEdited}
-                    editedAt={outputs.stage2EditedAt}
-                    label="Copy Kit"
-                    monospace={false}
-                    downloadFilename="STAGE2_COPY.txt"
-                  />
-                  )}
-                  {runId !== null && (
-                    <>
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
-                        <div className="flex items-start gap-3">
-                          <FeedbackAppliedChip stage={2} />
-                          <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
-                        </div>
-                      </div>
-                      <StageActions stage="stage2" prevLabel="Research" prevId="v2-stage-1" onRestart={handleRestartStage} restarting={restarting} />
-                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
-                    </>
-                  )}
-                </>
-              ) : run.status === "stage2" ? (
-                <div className="border border-dashed border-[var(--color-border)] rounded-[var(--radius)] px-4 py-9 text-center bg-[var(--color-surface)] fade-in">
-                  <Icon.Loader className="w-4 h-4 text-[var(--color-accent)] mx-auto mb-2.5" />
-                  <p className="text-[12.5px] text-[var(--color-text-2)] ff-mono">Generating copy…</p>
-                </div>
-              ) : (
-                <p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you pick an angle.</p>
-              )
-            )}
-
-            {def.key === "stage3" && (
-              <>
-                <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
-                <StageActions stage="stage3-prompts" prevLabel="Copy" prevId="v2-stage-2" onRestart={handleRestartStage} restarting={restarting} />
-                <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
-              </>
-            )}
-          </StageAccordion>
-        ))}
-      </div>
-
-      {/* sticky bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 pointer-events-none">
-        <div className="max-w-[880px] mx-auto pointer-events-auto">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-[var(--radius-lg)] border bg-[color-mix(in_srgb,var(--color-surface)_94%,transparent)] backdrop-blur-md shadow-[var(--shadow-pop)]"
-            style={{ borderColor: `color-mix(in srgb, ${toneBar} 30%, var(--color-border))` }}>
-            <span className="grid place-items-center w-8 h-8 rounded-full shrink-0 text-white" style={{ background: toneBar }}>
-              {a.running ? <Icon.Loader className="w-4 h-4" />
-                : a.icon === "alert" ? <Icon.Alert className="w-4 h-4" />
-                : a.icon === "check" ? <Icon.Check className="w-4 h-4" strokeWidth={3} />
-                : a.icon === "image" ? <Icon.Image className="w-4 h-4" />
-                : <Icon.Spark className="w-4 h-4" />}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-[650] text-[var(--color-text)] truncate">{a.title}</p>
-              {a.sub && <p className="text-[11.5px] text-[var(--color-text-2)] truncate">{a.sub}</p>}
-            </div>
-            {(hasDocs || run.status === "completed") && (
-              <div className="flex items-center gap-2 shrink-0">
-                {hasDocs && (
-                  <button onClick={handleDownloadDocs}
-                    className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] whitespace-nowrap">
-                    <Icon.Download className="w-3.5 h-3.5" /> Docs
-                  </button>
-                )}
-                <button onClick={handleDownloadImages} disabled={zippingImages}
-                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap">
-                  <Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "Downloading…" : "Images"}
-                </button>
-              </div>
-            )}
-            {a.running ? (
-              !isTerminal && (
-                <button onClick={handleKill} disabled={killing}
-                  className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border bg-[var(--color-red-bg)] text-[var(--color-red)] tr hover:brightness-95 disabled:opacity-50 whitespace-nowrap"
-                  style={{ borderColor: "color-mix(in srgb, var(--color-red) 50%, transparent)" }}>
-                  <Icon.Stop className="w-3 h-3" /> {killing ? "Killing…" : "Kill"}
-                </button>
-              )
-            ) : showPrimary && a.cta && (
-              <button onClick={a.onClick} disabled={startingStage2 || resuming}
-                className="cursor-pointer shrink-0 inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[9px] text-[13.5px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent tr hover:brightness-110 disabled:opacity-60 whitespace-nowrap">
-                {a.cta}<Icon.ArrowRight className="w-3.5 h-3.5" />
+        <div className="mt-auto px-3 pb-3 pt-2 border-t border-[var(--color-border)] space-y-2">
+          {runId !== null && <RunCost runId={runId} />}
+          <div className="flex items-center gap-2 flex-wrap">
+            {hasDocs && <button onClick={handleDownloadDocs} className={railBtn}><Icon.Download className="w-3.5 h-3.5" /> Docs</button>}
+            <button onClick={handleDownloadImages} disabled={zippingImages} className={railBtn}><Icon.Image className="w-3.5 h-3.5" /> {zippingImages ? "…" : "Images"}</button>
+            {a.running && !isTerminal && (
+              <button onClick={handleKill} disabled={killing}
+                className="cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12px] font-[620] border bg-[var(--color-red-bg)] text-[var(--color-red)] tr hover:brightness-95 disabled:opacity-50"
+                style={{ borderColor: "color-mix(in srgb, var(--color-red) 50%, transparent)" }}>
+                <Icon.Stop className="w-3 h-3" /> {killing ? "Killing…" : "Kill"}
               </button>
             )}
           </div>
         </div>
-      </div>
+      </aside>
+
+      {/* ── main: the active stage, full height ── */}
+      <section className="min-h-0 flex flex-col bg-[var(--color-bg)]">
+        <header className="flex items-center justify-between gap-4 px-6 h-12 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0">
+          <div className="flex items-baseline gap-2.5 min-w-0">
+            <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">STAGE {active.n}</span>
+            <h2 className="text-[15px] font-[700] ff-display text-[var(--color-text)]">{active.title}</h2>
+            <span className="text-[12px] text-[var(--color-text-3)] truncate">{summary(active.key) ?? active.what}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {activeKey === "product" && runId !== null && <><PromptUsed promptsUsed={run.promptsUsed} stage="product" /><StageActions stage="product" onRestart={handleRestartStage} restarting={restarting} /></>}
+            {activeKey === "stage1" && runId !== null && outputs.onePager && (
+              <>
+                <a href={`/api/runs/${runId}/stage1-docs`} download className={railBtn}><Icon.Download className="w-3.5 h-3.5" /> Docs</a>
+                <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
+                <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
+                <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
+                <StageActions stage="stage1" onRestart={handleRestartStage} restarting={restarting} />
+              </>
+            )}
+            {activeKey === "stage2" && runId !== null && outputs.stage2Output && (
+              <>
+                <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
+                <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
+                <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
+                <StageActions stage="stage2" onRestart={handleRestartStage} restarting={restarting} />
+              </>
+            )}
+            {activeKey === "stage3" && runId !== null && <><PromptUsed promptsUsed={run.promptsUsed} stage="stage3" /><StageActions stage="stage3-prompts" onRestart={handleRestartStage} restarting={restarting} /></>}
+          </div>
+        </header>
+
+        <div className="flex-1 min-h-0 p-4">
+          {/* Stage 1 · Product */}
+          {activeKey === "product" && (
+            PRODUCT_ACTIVE.includes(run.status)
+              ? <div className={cx(pane, "h-full")}>{spinner(run.currentStep ?? "Reading the product page…")}</div>
+              : <div className={cx(pane, "h-full px-5 py-4")}>{runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}</div>
+          )}
+
+          {/* Stage 2 · Research: one-pager left, angles right */}
+          {activeKey === "stage1" && (
+            outputs.onePager ? (
+              <div className="h-full grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-4">
+                <div className={cx(pane, "px-5 py-4")}>
+                  <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+                  {run.scrapeErrors && run.scrapeErrors.length > 0 && (
+                    <p className="mt-4 text-[11px] text-[var(--color-amber)]">{run.scrapeErrors.length} competitor link{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be read.</p>
+                  )}
+                  <div className="mt-4"><FeedbackAppliedChip stage={1} /></div>
+                </div>
+                <div className={cx(pane, "px-5 py-4")}>
+                  {runId !== null && <AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} />}
+                </div>
+              </div>
+            ) : ["stage1", "scraping"].includes(run.status) || outputs.research
+              ? <div className={cx(pane, "h-full")}>{spinner(run.currentStep ?? "Researching…")}</div>
+              : <div className={cx(pane, "h-full grid place-items-center")}><p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you approve the product.</p></div>
+          )}
+
+          {/* Stage 3 · Copy */}
+          {activeKey === "stage2" && (
+            outputs.stage2Output ? (
+              <div className="h-full flex flex-col gap-3 min-h-0">
+                <div className="flex items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-1 p-0.5 rounded-[var(--radius-sm)] bg-[var(--color-surface-2)] border border-[var(--color-border)] w-fit">
+                    {((stage2Json ? ["text", "copy"] : ["text"]) as Array<"text" | "copy">).map((v) => (
+                      <button key={v} onClick={() => setStage2View(v)}
+                        className={`px-3 py-1 rounded-[calc(var(--radius-sm)-2px)] text-[12px] font-[620] tr cursor-pointer ${stage2View === v ? "bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-card)]" : "text-[var(--color-text-3)] hover:text-[var(--color-text)]"}`}>
+                        {v === "text" ? "Full text" : "Fields"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <FeedbackAppliedChip stage={2} />
+                    {runId !== null && stage2View === "copy" && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
+                  </div>
+                </div>
+                <div className={cx(pane, "flex-1 px-5 py-4")}>
+                  {stage2View === "copy" && stage2Json ? (
+                    <Stage2Shopify json={stage2Json} />
+                  ) : (
+                    <EditableOutput runId={Number(runId)} field="stage2_copy" stage="stage2" originalValue={outputs.stage2Output}
+                      editedValue={outputs.stage2OutputEdited} editedAt={outputs.stage2EditedAt} label="Copy Kit" monospace={false} downloadFilename="STAGE2_COPY.txt" />
+                  )}
+                </div>
+              </div>
+            ) : run.status === "stage2"
+              ? <div className={cx(pane, "h-full")}>{spinner("Generating copy…")}</div>
+              : <div className={cx(pane, "h-full grid place-items-center")}><p className="text-[12.5px] text-[var(--color-text-3)]">Starts after you pick an angle.</p></div>
+          )}
+
+          {/* Stage 4 · Images */}
+          {activeKey === "stage3" && (
+            <div className={cx(pane, "h-full px-5 py-4")}>
+              <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
+            </div>
+          )}
+        </div>
+
+        {/* next action */}
+        <footer className="shrink-0 px-4 pb-4">
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-lg)] border bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
+            style={{ borderColor: `color-mix(in srgb, ${toneBar} 35%, var(--color-border))` }}>
+            <span className="grid place-items-center w-7 h-7 rounded-full shrink-0 text-white" style={{ background: toneBar }}>
+              {a.running ? <Icon.Loader className="w-3.5 h-3.5" />
+                : a.icon === "alert" ? <Icon.Alert className="w-3.5 h-3.5" />
+                : a.icon === "check" ? <Icon.Check className="w-3.5 h-3.5" strokeWidth={3} />
+                : a.icon === "image" ? <Icon.Image className="w-3.5 h-3.5" />
+                : <Icon.Spark className="w-3.5 h-3.5" />}
+            </span>
+            <div className="flex-1 min-w-0 flex items-baseline gap-2">
+              <p className="text-[13px] font-[650] text-[var(--color-text)] truncate">{a.title}</p>
+              {a.sub && <p className="text-[11.5px] text-[var(--color-text-3)] truncate">{a.sub}</p>}
+            </div>
+            {showPrimary && a.cta && (
+              <button onClick={a.onClick} disabled={startingStage2 || resuming}
+                className="cursor-pointer shrink-0 inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-[15px] py-[8px] text-[13px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent tr hover:brightness-110 disabled:opacity-60 whitespace-nowrap">
+                {a.cta}<Icon.ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </footer>
+      </section>
     </div>
   );
 }
