@@ -169,7 +169,8 @@ export default function Stage3HeroFlow({
   const [promptDrafts, setPromptDrafts] = useState<RemainingPrompt[] | null>(null);
   // Generation progress for the 8
   const [genImages, setGenImages] = useState<(RemImage | null)[]>([]);
-  const [heroZoom, setHeroZoom] = useState(false);
+  // Fullscreen index into [hero, ...active source photos] on the hero review.
+  const [heroZoom, setHeroZoom] = useState<number | null>(null);
   // Prompt-review gate: which cards have their full prompt expanded for editing.
   const [editingPromptIdxs, setEditingPromptIdxs] = useState<Set<number>>(new Set());
   // Prompt-review gate: per-card "Edit with AI" (rewrite the prompt from a
@@ -344,12 +345,33 @@ export default function Stage3HeroFlow({
 
   /* ── HERO QC GATE ────────────────────────────────────────────────────── */
   if (status === "awaiting_hero_qc" && heroUrl) {
+    // The photos the hero was built from, so they can be compared side by side.
+    const activeSources = sourceCandidates.filter((u) => !sourceBlacklist.includes(u));
+    const compareItems = [{ url: heroUrl, label: "Hero" }, ...activeSources.map((u, i) => ({ url: u, label: `Source ${i + 1}` }))];
     return (
       <div className="space-y-4">
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the hero shot</h3>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(true)} title="Click to view fullscreen" className="rounded-lg max-w-md w-full border border-[var(--color-border)] cursor-zoom-in" />
-        {heroZoom && <Lightbox items={[{ url: heroUrl, label: "Hero" }]} index={0} onClose={() => setHeroZoom(false)} onIndex={() => {}} />}
+        <div className="flex gap-4 items-start flex-wrap">
+          <div className="space-y-1.5">
+            <p className="eyebrow">Hero</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(0)} title="Click to view fullscreen" className="rounded-lg w-[420px] max-w-full border border-[var(--color-border)] cursor-zoom-in" />
+          </div>
+          {activeSources.length > 0 && (
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <p className="eyebrow">Source photos <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {activeSources.length}</span></p>
+              <div className="grid grid-cols-3 gap-2 max-w-[420px]">
+                {activeSources.map((u, i) => (
+                  <button key={u} onClick={() => setHeroZoom(i + 1)} title="Click to view fullscreen" className="aspect-square rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-hidden cursor-zoom-in">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt={`Source ${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        {heroZoom !== null && <Lightbox items={compareItems} index={heroZoom} onClose={() => setHeroZoom(null)} onIndex={setHeroZoom} />}
         <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
           This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
         </p>
