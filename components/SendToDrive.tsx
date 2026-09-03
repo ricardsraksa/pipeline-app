@@ -39,7 +39,7 @@ export default function SendToDrive({ runId }: { runId: number }) {
       <button
         onClick={send}
         disabled={busy}
-        className="cursor-pointer inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[11.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] tr hover:text-[var(--color-text)] hover:border-[var(--color-text-3)] disabled:opacity-40 disabled:cursor-not-allowed"
+        className="btn btn-sm"
       >
         {busy ? "Sending to Drive…" : "Send images to Drive"}
       </button>

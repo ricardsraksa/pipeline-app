@@ -82,7 +82,7 @@ export default function AIRegenerate({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="cursor-pointer inline-flex items-center gap-[7px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-transparent bg-transparent text-[var(--color-text-2)] transition-all hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] whitespace-nowrap"
+        className="btn btn-sm"
       >
         <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
         {triggerLabel}

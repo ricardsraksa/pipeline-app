@@ -22,6 +22,7 @@ import type { Stage2Json } from "@/lib/stage2/shape";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
 import SendToDoc from "@/components/SendToDoc";
+import SendToDrive from "@/components/SendToDrive";
 import ProductGate from "@/components/ProductGate";
 import AnglePicker from "@/components/AnglePicker";
 import JSZip from "jszip";
@@ -442,9 +443,9 @@ export default function RunPage() {
     error: "var(--color-red)", pending: "var(--color-text-4)",
   };
   const stateWord: Record<StageState, string> = { complete: "done", running: "running", waiting: "needs you", error: "failed", pending: "—" };
-  const textBtn = "cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr disabled:opacity-50";
+  const textBtn = "btn btn-sm";
   const RestartStage = ({ stage }: { stage: RestartStage }) => (
-    <button onClick={() => handleRestartStage(stage)} disabled={restarting} className={textBtn}>
+    <button onClick={() => handleRestartStage(stage)} disabled={restarting} className="btn btn-sm">
       {restarting ? "Restarting…" : "Restart stage"}
     </button>
   );
@@ -516,15 +517,31 @@ export default function RunPage() {
           {run.currentStep && a.running && <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] leading-snug">{run.currentStep}</p>}
         </div>
 
+        {/* deliver: the pushes out of the app, visible from every stage */}
+        {runId !== null && (
+          <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
+            <span className={label}>Deliver</span>
+            {outputs.stage2Json
+              ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
+              : <button disabled className="btn btn-sm" title="Needs the copy kit first">Send to Google Doc</button>}
+            <button onClick={() => openStage("stage3")} disabled={run.status !== "completed"} className="btn btn-sm" title={run.status === "completed" ? "Opens the Shopify fill on the Images stage" : "Needs the finished images first"}>
+              Fill Shopify →
+            </button>
+            {run.status === "completed"
+              ? <SendToDrive runId={runId} />
+              : <button disabled className="btn btn-sm" title="Needs the finished images first">Send images to Drive</button>}
+          </div>
+        )}
+
         <div className="flex-1" />
 
         {runId !== null && <RunCost runId={runId} />}
 
-        <div className="flex gap-3.5 text-[11.5px] text-[var(--color-text-3)] flex-wrap">
-          {hasDocs && <button onClick={handleDownloadDocs} className={textBtn}>Docs</button>}
-          <button onClick={handleDownloadImages} disabled={zippingImages} className={textBtn}>{zippingImages ? "Downloading…" : "Images"}</button>
+        <div className="flex gap-2 flex-wrap">
+          {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
+          <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>
           {a.running && !isTerminal && (
-            <button onClick={handleKill} disabled={killing} className="cursor-pointer text-[11.5px] text-[var(--color-text-3)] hover:text-[var(--color-red)] tr">{killing ? "Killing…" : "Kill"}</button>
+            <button onClick={handleKill} disabled={killing} className="btn btn-sm btn-danger">{killing ? "Killing…" : "Kill run"}</button>
           )}
         </div>
       </aside>
@@ -568,7 +585,7 @@ export default function RunPage() {
                     <div className="flex-1" />
                     {runId !== null && (
                       <div className="flex gap-3.5 items-center">
-                        <a href={`/api/runs/${runId}/stage1-docs`} download className={textBtn}>Documents</a>
+                        <a href={`/api/runs/${runId}/stage1-docs`} download className="btn btn-sm">Download documents</a>
                         <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
                         <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
                         <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
@@ -616,7 +633,7 @@ export default function RunPage() {
                   <div className="flex-1" />
                   {runId !== null && (
                     <div className="flex gap-3.5 items-center">
-                      {stage2View === "copy" && <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />}
+                      <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
                       <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
                       <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
                       <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />

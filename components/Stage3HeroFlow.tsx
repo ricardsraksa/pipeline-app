@@ -841,7 +841,7 @@ function PromptPreview({ p, heroUrl }: { p: RemainingPrompt; heroUrl: string | n
             <span className="font-[var(--font-ibm-plex-mono)] text-[8px] uppercase tracking-widest text-[var(--color-accent-text)]">With product</span>
             {heroUrl && (
               /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={heroUrl} alt="" className="w-[42%] max-h-[45%] object-contain rounded" />
+              <img src={heroUrl} alt="" className="w-[60%] max-h-[60%] object-contain rounded" />
             )}
             <span className="text-[10px] leading-snug font-[640] text-[var(--color-text)]">{overlayParts[1] || overlayParts[0] || "fixed by the product"}</span>
           </div>
@@ -855,7 +855,7 @@ function PromptPreview({ p, heroUrl }: { p: RemainingPrompt; heroUrl: string | n
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2">
         {heroUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={heroUrl} alt="" className="w-[52%] max-h-[55%] object-contain rounded" />
+          <img src={heroUrl} alt="" className="w-[72%] max-h-[72%] object-contain rounded" />
         )}
         <span className="font-[var(--font-ibm-plex-mono)] text-[8px] uppercase tracking-widest text-[var(--color-text-4)]">{(p.image_type || p.category || "").toString()}</span>
       </div>
@@ -908,10 +908,11 @@ function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
             onClick={() => onToggle(c.url)}
             disabled={disabled}
             title={`${c.label} — ${on ? "referenced; click to remove" : "not referenced; click to add"}`}
-            className={`relative w-[52px] h-[52px] rounded-[7px] overflow-hidden border-2 cursor-pointer tr ${on ? "border-[var(--color-accent)]" : "border-[var(--color-border)] opacity-40 grayscale hover:opacity-75"}`}
+            className={`relative w-[96px] h-[96px] rounded-[7px] overflow-hidden border-2 cursor-pointer tr bg-[var(--color-bg)] ${on ? "border-[var(--color-accent)]" : "border-[var(--color-border)] opacity-50 hover:opacity-90"}`}
           >
+            {/* whole photo, never cropped — the operator is choosing by what's IN it */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={c.url} alt="" className="w-full h-full object-cover" />
+            <img src={c.url} alt="" className="w-full h-full object-contain" />
             <span className="absolute inset-x-0 bottom-0 bg-black/65 text-white text-[7px] font-[700] text-center py-[1px] tracking-wider">{c.label}</span>
           </button>
         );

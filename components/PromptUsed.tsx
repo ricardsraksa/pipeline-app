@@ -28,7 +28,7 @@ function CopyBtn({ text }: { text: string }) {
           setTimeout(() => setCopied(false), 1500);
         });
       }}
-      className="cursor-pointer text-[10.5px] px-2 py-0.5 rounded border border-[var(--color-border)] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:border-[var(--color-border-strong)] tr"
+      className="btn btn-sm"
     >
       {copied ? "Copied" : "Copy"}
     </button>
