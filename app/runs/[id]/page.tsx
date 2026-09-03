@@ -546,7 +546,7 @@ export default function RunPage() {
             <span className={label}>Price</span>
             <button onClick={() => openStage("stage2")} className={deliverRow} style={deliverCols} title="Opens the Pricing card on the Copy stage">
               <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· cmp {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
-              <span className={`ff-mono text-[11px] ${run.meta.pricing.fit === "in range" ? "text-[var(--color-green)]" : run.meta.pricing.fit ? "text-[var(--color-amber)]" : "text-[var(--color-text-3)]"}`}>{run.meta.pricing.fit ?? `${(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×`}</span>
+              <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×</span>
             </button>
           </div>
         )}

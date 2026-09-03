@@ -80,8 +80,6 @@ export default function PricingCard({ runId, scrape, pricing, rules }: {
   const cur = p?.cogs_currency ?? "USD";
   const fmt = (x: number) => fmtMoney(x, cur);
   const warnings = p ? pricingWarnings(p, p.band, rules) : [];
-  const fitColor = p?.fit === "in range" ? "text-[var(--color-green)] border-[var(--color-green)]/50"
-    : p?.fit ? "text-[var(--color-amber)] border-[var(--color-amber)]/50" : "";
   const domain = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
   const pct = p?.band ? Math.round(((p.price - p.band.median) / p.band.median) * 100) : 0;
 
@@ -107,7 +105,6 @@ export default function PricingCard({ runId, scrape, pricing, rules }: {
     <div className="mb-6">
       <div className="flex items-center gap-3.5 mb-2.5">
         <span className="eyebrow">Pricing</span>
-        {p?.fit && <span className={`ff-mono text-[10px] uppercase tracking-wide border rounded-full px-2 py-0.5 ${fitColor}`}>{p.fit}</span>}
         {p?.source === "manual" && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">edited</span>}
         <div className="flex-1" />
         {p && <button onClick={reset} className="btn btn-sm">Reset to rules</button>}
