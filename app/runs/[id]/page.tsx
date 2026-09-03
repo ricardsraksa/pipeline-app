@@ -435,16 +435,17 @@ export default function RunPage() {
     }
     if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Ready for images", sub: "Hero first, then the 8.", cta: "Go to images", onClick: () => openStage("stage3") };
     if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Review the hero", sub: "It becomes the reference for the other 8.", cta: "Review hero", onClick: () => openStage("stage3") };
+    if ((s === "awaiting_qc" || s === "generating_remaining") && (run.stage4?.done ?? 0) > 0) return { tone: "amber", icon: "image", title: "Images generated", sub: "Review them, then push.", cta: "Open images", onClick: () => openStage("stage3") };
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", sub: "Then generate.", cta: "Review prompts", onClick: () => openStage("stage3") };
     if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete" };
+    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete", sub: "Push to Shopify, send to Drive.", cta: "Open images", onClick: () => openStage("stage3") };
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
   const a = nextAction();
   const toneBar = { amber: "var(--color-amber)", red: "var(--color-red)", green: "var(--color-green)", accent: "var(--color-accent)" }[a.tone];
   const hasDocs = Boolean(outputs.onePager || outputs.stage2Output);
-  const showPrimary = !a.running && run.status !== "completed";
+  const showPrimary = !a.running && Boolean(a.cta);
 
   // The stage on screen: the operator's pick, else the one that needs them,
   // else the furthest one that exists.

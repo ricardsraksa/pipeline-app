@@ -64,6 +64,7 @@ export const PRODUCT_PROMPT = `You are a product analyst. I will give you one or
    * Pack in as many real specs as the cap allows: dimensions, weight, material, capacity, power, battery, runtime, sizes, variants, compatibility, what's in the box, and how it is installed or cleaned. Prefer a stated number over a description of it. If it will not all fit, keep the specs that change what the product IS or how it works, and drop lab figures, manufacturing origin and marketing justifications.
    * Use aliexpress listings as source of truth for any specs and details, while using brand examples as positioning examples
    * Omit price and discount claims.
+   * Ignore seller and listing information that is not about the product itself: customization, OEM or ODM offers, minimum order quantities, wholesale or dropshipping notes, shipping, returns, warranty, seller ratings and store promotions.
    * No headers, no bullet lists, no bolding.
    * Plain declarative prose. Do not reuse the store's adjectives ("premium," "elegant," "innovative," "effortless") or its emotional framing.
    * Never use em dashes.

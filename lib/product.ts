@@ -117,7 +117,8 @@ export function buildAnalystContent(scrape: ProductScrape): Array<
       type: "text",
       text:
         "Here are the fetched pages. Use all of them. Where a supplier listing and a brand page disagree on specs or details, the supplier listing is the source of truth; " +
-        "if no supplier listing is present, write from the brand page(s) you have.\n\n" +
+        "if no supplier listing is present, write from the brand page(s) you have. " +
+        "Describe the product only: ignore seller-side listing information such as customization, OEM/ODM offers, minimum order quantities, wholesale or dropshipping notes, shipping, returns, warranty, seller ratings and promotions.\n\n" +
         parts.join("\n\n" + "=".repeat(60) + "\n\n"),
     },
   ];
