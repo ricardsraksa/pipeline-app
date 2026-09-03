@@ -156,6 +156,11 @@ chip per competitor, red flags when a rule is broken (below the minimum
 multiple, wrong ending, compare-at outside the range, above every competitor,
 below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
 
+Under it, the **Variants** card from the AliExpress listing: each option group
+(Colour, Size…) with its values and a copy-values button, and a table of every
+SKU with its AliExpress price and the price/compare-at the rules give it (sold
+out SKUs dimmed). The same card sits above the Shopify push on Stage 4.
+
 While working: "Generating copy…".
 
 Then the finished copy kit, in two views:

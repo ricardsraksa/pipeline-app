@@ -26,6 +26,7 @@ import SendToDrive from "@/components/SendToDrive";
 import ProductGate from "@/components/ProductGate";
 import AnglePicker from "@/components/AnglePicker";
 import PricingCard from "@/components/PricingCard";
+import VariantsCard from "@/components/VariantsCard";
 import { fmtMoney } from "@/lib/pricing";
 import JSZip from "jszip";
 
@@ -678,7 +679,10 @@ export default function RunPage() {
               )}
             </div>
             {runId !== null && run.product.scrape && (
-              <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
+              <>
+                <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
+                <VariantsCard scrape={run.product.scrape} rules={run.meta.pricingRules} band={run.meta.pricing?.band ?? null} />
+              </>
             )}
             {outputs.stage2Output ? (
               <>
