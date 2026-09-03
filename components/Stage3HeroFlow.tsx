@@ -778,7 +778,7 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-4">
         <SendToDrive runId={runId} />
-        <VariantsCard scrape={run.product_scrape ?? null} band={(() => { try { return run.product_pricing ? (JSON.parse(run.product_pricing) as { band?: import("@/lib/pricing").MarketBand | null }).band ?? null : null; } catch { return null; } })()} />
+        <VariantsCard runId={runId} requestedAt={run.variants_refresh_requested ?? null} scrape={run.product_scrape ?? null} band={(() => { try { return run.product_pricing ? (JSON.parse(run.product_pricing) as { band?: import("@/lib/pricing").MarketBand | null }).band ?? null : null; } catch { return null; } })()} />
         <ShopifyFill runId={runId} initialUrl={run.shopify_product_url} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
         <details>
           <summary className="cursor-pointer text-[11px] text-[var(--color-text-4)]">Create a brand-new draft product instead (old flow)</summary>

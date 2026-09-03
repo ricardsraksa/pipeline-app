@@ -685,7 +685,7 @@ def _multipart(fields: dict, files: list[tuple[str, Path]]) -> tuple[bytes, str]
 
 
 def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True,
-                password: str | None = None) -> None:
+                password: str | None = None, mode: str | None = None) -> None:
     app_url = app_url.rstrip("/")
     data = json.loads((folder / "data.json").read_text())
     # Callers (the worker) pass the password in; PIPELINE_APP_PASSWORD lets a
@@ -706,9 +706,13 @@ def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True,
     images = sorted(p for p in folder.glob("*") if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
     desc_images = sorted(p for p in (folder / "description").glob("*")
                          if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"))
-    body, boundary = _multipart(
-        {"data": json.dumps(data, ensure_ascii=False), "describe": "1" if describe else "0"},
+    fields = {"data": json.dumps(data, ensure_ascii=False), "describe": "1" if describe else "0"}
+    if mode:
+        fields["mode"] = mode
+    # A variants-only push carries no photos — the run keeps the ones it has.
+    file_parts = [] if mode == "variants" else (
         [("images", p) for p in images[:10]] + [("description_images", p) for p in desc_images[:12]])
+    body, boundary = _multipart(fields, file_parts)
     req = urllib.request.Request(
         f"{app_url}/api/runs/{run_id}/scrape-push", method="POST", data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Cookie": cookie})
@@ -719,6 +723,9 @@ def push_to_app(app_url: str, run_id: str, folder: Path, describe: bool = True,
         sys.exit(f"   Push failed ({e.code}): {e.read().decode()[:300]}")
     if not res.get("success"):
         sys.exit(f"   Push failed: {res.get('error')}")
+    if mode == "variants":
+        say(f"\n   Variants sent to run #{run_id}: {res.get('options', 0)} option groups, {res.get('variants', 0)} SKUs.\n")
+        return
     say(f"\n   Sent to run #{run_id}: {len(images)} photos + {len(desc_images)} description images.")
     say(f"   Open {app_url}/runs/{run_id} — the description is being written now.\n")
 

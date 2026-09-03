@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
      WHERE status = 'awaiting_product_approval' AND product_approved_at IS NULL
      ORDER BY id DESC LIMIT 20`,
   );
-  const jobs: { runId: number; urls: { url: string; role: "product" | "competitor" }[] }[] = [];
+  const jobs: { runId: number; urls: { url: string; role: "product" | "competitor" }[]; mode?: "variants" }[] = [];
   for (const row of r.rows as unknown as { id: number; product_url: string | null; competitor_urls: string | null; product_scrape: string | null }[]) {
     const scrape = parseProductScrape(row.product_scrape);
     if (!scrape) continue;
@@ -27,6 +27,16 @@ export async function GET(req: NextRequest) {
       .filter((p) => !p.ok)
       .map((p) => ({ url: p.url, role: p.role }));
     if (urls.length) jobs.push({ runId: Number(row.id), urls });
+  }
+  // Variant re-reads requested from the Variants card (any status): the
+  // worker scrapes the product page and pushes with mode=variants.
+  const v = await db.execute(
+    `SELECT id, product_url FROM runs
+     WHERE variants_refresh_requested IS NOT NULL AND product_url IS NOT NULL
+     ORDER BY id DESC LIMIT 20`,
+  );
+  for (const row of v.rows as unknown as { id: number; product_url: string }[]) {
+    jobs.push({ runId: Number(row.id), urls: [{ url: row.product_url, role: "product" }], mode: "variants" });
   }
   return Response.json({ jobs, now: new Date().toISOString() });
 }

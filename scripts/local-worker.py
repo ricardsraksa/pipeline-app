@@ -133,6 +133,26 @@ def run_once(app: App, scraper) -> int:
     done = 0
     for job in jobs:
         run_id = job["runId"]
+        if job.get("mode") == "variants":
+            # Re-read the listing's options + per-SKU prices only. Always a
+            # fresh fetch (the point is new data); the server clears the request.
+            u = job["urls"][0]
+            key = f"{run_id}:variants"
+            if not due(state, key):
+                continue
+            log(f"run #{run_id}: re-reading variants from {u['url'][:70]}")
+            try:
+                folder = scraper.scrape(u["url"], refresh=True)
+                scraper.push_to_app(APP_URL, str(run_id), folder, describe=False, password=app.password, mode="variants")
+                state.pop(key, None)
+                done += 1
+                log(f"run #{run_id}: variants pushed")
+            except SystemExit as e:
+                note_failure(state, key, run_id, str(e).strip() or f"exit {e.code!r}")
+            except Exception as e:
+                note_failure(state, key, run_id, f"{type(e).__name__}: {e}")
+            save_state(state)
+            continue
         # competitors first, product last — the final push triggers the analyst
         urls = sorted(job["urls"], key=lambda u: 0 if u["role"] == "competitor" else 1)
         pending = [u for u in urls if due(state, f"{run_id}:{u['url']}")]

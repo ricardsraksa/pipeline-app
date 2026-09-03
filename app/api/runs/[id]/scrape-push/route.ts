@@ -25,9 +25,6 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
 
   const run = await getRun(runId);
   if (!run) return NextResponse.json({ success: false, error: "Run not found" }, { status: 404 });
-  if (!["awaiting_product_approval", "product", "pending", "failed", "cancelled"].includes(run.status ?? "")) {
-    return NextResponse.json({ success: false, error: `Run is past Stage 1 (status ${run.status}) — restart Stage 1 first` }, { status: 400 });
-  }
 
   let form: FormData;
   try { form = await req.formData(); } catch { return NextResponse.json({ success: false, error: "Invalid multipart payload" }, { status: 400 }); }
@@ -39,6 +36,35 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
   try { data = JSON.parse(rawData); } catch { return NextResponse.json({ success: false, error: "data is not JSON" }, { status: 400 }); }
   const url = typeof data.url === "string" ? data.url : "";
   if (!/^https?:\/\//.test(url)) return NextResponse.json({ success: false, error: "data.url missing" }, { status: 400 });
+
+  // Variants-only refresh (from the Variants card): merge options, per-SKU
+  // prices and the listing price into the stored product page. Works at any
+  // status; never touches description, photos, approval or status.
+  if (form.get("mode") === "variants") {
+    const existing = parseProductScrape(run.product_scrape);
+    if (!existing) return NextResponse.json({ success: false, error: "No scrape on this run to update" }, { status: 400 });
+    const options = data.options && typeof data.options === "object" && !Array.isArray(data.options) ? data.options as Record<string, string[]> : {};
+    const variants = Array.isArray(data.variants) ? (data.variants as ProductScrapePage["variants"])!.slice(0, 100) : [];
+    const price = typeof data.price === "string" ? data.price.slice(0, 100) : null;
+    let touched = false;
+    const pages = existing.pages.map((p) => {
+      if (p.role !== "product") return p;
+      touched = true;
+      return { ...p, ok: true, options, variants, price: price ?? p.price };
+    });
+    if (!touched) pages.unshift({ url, role: "product", ok: true, mode: "local", options, variants, price, image_urls: [], description_image_urls: [] });
+    const at = new Date().toISOString();
+    await updateRun(runId, {
+      product_scrape: JSON.stringify({ ...existing, pages, scraped_at: at } satisfies ProductScrape),
+      variants_refresh_requested: null,
+      last_updated_at: at,
+    });
+    return NextResponse.json({ success: true, mode: "variants", options: Object.keys(options).length, variants: variants.length });
+  }
+
+  if (!["awaiting_product_approval", "product", "pending", "failed", "cancelled"].includes(run.status ?? "")) {
+    return NextResponse.json({ success: false, error: `Run is past Stage 1 (status ${run.status}) — restart Stage 1 first` }, { status: 400 });
+  }
 
   const files = form.getAll("images").filter((f): f is File => f instanceof File).slice(0, MAX_IMAGES);
   const descFiles = form.getAll("description_images").filter((f): f is File => f instanceof File).slice(0, MAX_DESC_IMAGES);

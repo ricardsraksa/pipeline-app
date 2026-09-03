@@ -60,6 +60,7 @@ export interface RunStatus {
     competitorUrls: string[];
     pricing: ProductPricing | null;
     pricingRules: PricingRules;
+    variantsRequestedAt: string | null;
   };
   timestamps: {
     startedAt: string | null;

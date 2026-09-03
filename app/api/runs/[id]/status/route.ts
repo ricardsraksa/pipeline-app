@@ -105,6 +105,7 @@ export async function GET(
       // Stage 3 Pricing card: the stored suggestion and the current rules.
       pricing: safeJson(run.product_pricing) ?? null,
       pricingRules,
+      variantsRequestedAt: run.variants_refresh_requested ?? null,
     },
     timestamps: {
       startedAt: run.started_at,

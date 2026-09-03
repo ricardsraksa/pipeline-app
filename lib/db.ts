@@ -189,6 +189,9 @@ async function migrateDB() {
     "shopify_product_url TEXT",
     // Stage 3 Pricing card: JSON ProductPricing (lib/pricing.ts). Display only.
     "product_pricing TEXT",
+    // Set when the operator asks the Mac worker to re-read the listing's
+    // options + per-SKU prices; cleared by scrape-push mode=variants.
+    "variants_refresh_requested TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -603,4 +606,5 @@ export interface Run {
   stage3_prompt_history: string | null;
   shopify_product_url: string | null;
   product_pricing: string | null;
+  variants_refresh_requested: string | null;
 }
