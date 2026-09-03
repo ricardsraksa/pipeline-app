@@ -631,7 +631,7 @@ export default function RunPage() {
             </div>
             {outputs.onePager ? (
               <>
-                {runId !== null && <div className="mb-[30px]"><AnglePicker runId={runId} run={run} editable={run.status === "awaiting_stage2_approval"} /></div>}
+                {runId !== null && <div className="mb-[30px]"><AnglePicker runId={runId} run={run} editable={["awaiting_stage2_approval", "failed", "cancelled"].includes(run.status)} /></div>}
                 <div>
                   <div className="flex items-center gap-2.5 mb-2.5">
                     <span className={label}>One-pager</span>

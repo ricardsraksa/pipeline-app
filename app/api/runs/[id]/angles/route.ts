@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRun } from "@/lib/db";
+import { getRun, updateRun } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { generateAngles } from "@/lib/angles-generate";
 
@@ -25,6 +25,16 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
   try { note = String(((await req.json()) as { note?: unknown }).note ?? "").slice(0, 2000); } catch { /* no body */ }
   try {
     const angles = await generateAngles(runId, note);
+    // A run that failed at the angles step is whole again once angles exist:
+    // park it at the research gate instead of leaving it "failed".
+    if (run.status === "failed" || run.status === "cancelled") {
+      await updateRun(runId, {
+        status: "awaiting_stage2_approval",
+        current_step: "Stage 2 complete — review the research and pick an angle",
+        error_message: null,
+        last_updated_at: new Date().toISOString(),
+      });
+    }
     return NextResponse.json({ success: true, angles });
   } catch (err) {
     return NextResponse.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
