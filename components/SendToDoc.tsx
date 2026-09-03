@@ -40,10 +40,13 @@ export default function SendToDoc({ runId, sentAt, variant = "button" }: { runId
   if (variant === "row") {
     const status = busy ? "sending…" : state.confirm ? "send again?" : state.err ? "failed" : state.sentAt ? `sent ${state.sentAt.slice(5, 10)}` : "ready";
     return (
-      <button onClick={() => send(state.confirm)} disabled={busy} className={railRow} style={railRowCols} title={state.err ?? (state.sentAt ? "Already in the doc — click to send again" : "Send the copy kit to the product's tab")}>
-        <span className="text-[13px] font-[500] text-[var(--color-text)]">Google Doc</span>
-        <span className="ff-mono text-[11px]" style={{ color: state.err ? "var(--color-red)" : state.confirm ? "var(--color-amber)" : "var(--color-text-3)" }}>{status}</span>
-      </button>
+      <>
+        <button onClick={() => send(state.confirm)} disabled={busy} className={railRow} style={railRowCols} title={state.err ?? (state.sentAt ? "Already in the doc — click to send again" : "Send the copy kit to the product's tab")}>
+          <span className="text-[13px] font-[500] text-[var(--color-text)]">Google Doc</span>
+          <span className="ff-mono text-[11px]" style={{ color: state.err ? "var(--color-red)" : state.confirm ? "var(--color-amber)" : "var(--color-text-3)" }}>{status}</span>
+        </button>
+        {state.err && <p className="px-2.5 text-[11px] leading-snug text-[var(--color-red)] break-words">{state.err}</p>}
+      </>
     );
   }
 

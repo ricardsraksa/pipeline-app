@@ -35,7 +35,7 @@ function CopyBtn({ text }: { text: string }) {
 }
 
 const STATUS_UI: Record<FieldRow["status"], { label: string; cls: string }> = {
-  "set": { label: "will set", cls: "text-[var(--color-green)]" },
+  "set": { label: "set", cls: "text-[var(--color-green)]" },
   "skipped-empty": { label: "empty — skipped", cls: "text-[var(--color-text-4)]" },
   "no-definition": { label: "no matching metafield", cls: "text-[var(--color-amber)]" },
   "unsupported-type": { label: "unsupported type", cls: "text-[var(--color-amber)]" },

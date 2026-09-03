@@ -81,63 +81,50 @@ const TERMINAL_STATUSES = new Set(["completed", "failed", "awaiting_user", "awai
 
 export function useRunPolling(runId: number | null, intervalMs = 3000): RunStatus | null {
   const [data, setData] = useState<RunStatus | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+  // Never stop polling: Stage 4 generates images from the browser with
+  // per-image saves, so the run keeps changing while its status word sits at
+  // a gate. Fast while the server is working, slow (but alive) otherwise, plus
+  // an immediate refetch on tab focus and on the "run:changed" event that
+  // components fire after their own writes.
   useEffect(() => {
     if (!runId) return;
-
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastStatus = "";
 
+    const schedule = () => {
+      if (!active) return;
+      if (timer) clearTimeout(timer);
+      const delay = TERMINAL_STATUSES.has(lastStatus) ? Math.max(intervalMs, 8000) : intervalMs;
+      timer = setTimeout(poll, delay);
+    };
     const poll = async () => {
       try {
         const res = await fetch(`/api/runs/${runId}/status`);
-        if (!res.ok) return;
-        const json: RunStatus = await res.json();
-        if (active) {
-          setData(json);
-          // Stop polling once in a terminal state
-          if (TERMINAL_STATUSES.has(json.status)) {
-            if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-            }
-          }
+        if (res.ok) {
+          const json: RunStatus = await res.json();
+          if (active) { setData(json); lastStatus = json.status; }
         }
       } catch {
         // Network hiccup — keep polling
       }
+      schedule();
     };
+    const refetchNow = () => { if (timer) clearTimeout(timer); void poll(); };
+    const onVisible = () => { if (document.visibilityState === "visible") refetchNow(); };
 
-    poll(); // immediate first fetch
-    intervalRef.current = setInterval(poll, intervalMs);
-
+    void poll();
+    window.addEventListener("focus", refetchNow);
+    window.addEventListener("run:changed", refetchNow);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("focus", refetchNow);
+      window.removeEventListener("run:changed", refetchNow);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [runId, intervalMs]);
-
-  // Resume polling when status becomes active again (e.g. after resume)
-  useEffect(() => {
-    if (!data || !runId) return;
-    if (!TERMINAL_STATUSES.has(data.status) && !intervalRef.current) {
-      const poll = async () => {
-        try {
-          const res = await fetch(`/api/runs/${runId}/status`);
-          if (!res.ok) return;
-          const json: RunStatus = await res.json();
-          setData(json);
-          if (TERMINAL_STATUSES.has(json.status)) {
-            if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-          }
-        } catch {}
-      };
-      intervalRef.current = setInterval(poll, intervalMs);
-    }
-  }, [data?.status, runId, intervalMs]);
 
   return data;
 }

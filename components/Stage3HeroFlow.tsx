@@ -187,6 +187,8 @@ export default function Stage3HeroFlow({
   const stopRef = useRef(false);
 
   const fetchRun = useCallback(async () => {
+    // The rail polls its own status feed — nudge it so Deliver/Next follow.
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("run:changed"));
     try {
       const r = await fetch(`/api/runs/${runId}`).then((x) => x.json());
       if (r.run) setRun(r.run as Run);
