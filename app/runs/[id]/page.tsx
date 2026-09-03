@@ -197,6 +197,9 @@ export default function RunPage() {
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
   const [activeOverride, setActiveOverride] = useState<StageKey | null>(null);
+  // The stage first shown on this page load stays on screen until the
+  // operator clicks another one — a stage finishing must not yank the view.
+  const lockedStage = useRef<StageKey | null>(null);
   const [stage2View, setStage2View] = useState<"text" | "copy">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -452,7 +455,10 @@ export default function RunPage() {
   const presentKeys = STAGE_DEFS.map((d) => d.key).filter((k) => present[k]);
   const autoKey: StageKey =
     (presentKeys.find((k) => stageActionable(states[k])) ?? (run.status === "completed" ? "stage3" : presentKeys[presentKeys.length - 1])) ?? "product";
-  const activeKey: StageKey = activeOverride && present[activeOverride] ? activeOverride : autoKey;
+  if (lockedStage.current === null) lockedStage.current = autoKey;
+  const activeKey: StageKey = activeOverride && present[activeOverride]
+    ? activeOverride
+    : (lockedStage.current && present[lockedStage.current] ? lockedStage.current : autoKey);
   const active = STAGE_DEFS.find((d) => d.key === activeKey)!;
 
   const stateTone: Record<StageState, string> = {
