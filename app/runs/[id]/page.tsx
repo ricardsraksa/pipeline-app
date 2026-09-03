@@ -25,6 +25,8 @@ import SendToDoc from "@/components/SendToDoc";
 import SendToDrive from "@/components/SendToDrive";
 import ProductGate from "@/components/ProductGate";
 import AnglePicker from "@/components/AnglePicker";
+import PricingCard from "@/components/PricingCard";
+import { fmtMoney } from "@/lib/pricing";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -538,6 +540,17 @@ export default function RunPage() {
           {run.currentStep && a.running && <p className="ff-mono text-[10.5px] text-[var(--color-text-3)] leading-snug">{run.currentStep}</p>}
         </div>
 
+        {/* price: the Stage 3 suggestion, visible from every stage */}
+        {run.meta.pricing && (
+          <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
+            <span className={label}>Price</span>
+            <button onClick={() => openStage("stage2")} className={deliverRow} style={deliverCols} title="Opens the Pricing card on the Copy stage">
+              <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· cmp {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
+              <span className={`ff-mono text-[11px] ${run.meta.pricing.fit === "in range" ? "text-[var(--color-green)]" : run.meta.pricing.fit ? "text-[var(--color-amber)]" : "text-[var(--color-text-3)]"}`}>{run.meta.pricing.fit ?? `${(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×`}</span>
+            </button>
+          </div>
+        )}
+
         {/* deliver: the pushes out of the app, visible from every stage */}
         {runId !== null && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
@@ -662,6 +675,9 @@ export default function RunPage() {
                 </div>
               )}
             </div>
+            {runId !== null && run.product.scrape && (
+              <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
+            )}
             {outputs.stage2Output ? (
               <>
                 <div className="flex items-center gap-3.5 mb-2.5">

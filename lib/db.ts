@@ -187,6 +187,8 @@ async function migrateDB() {
     // The Shopify product this run fills. Settable at any point in the run
     // (rail → Deliver), read by the fill panel as its default.
     "shopify_product_url TEXT",
+    // Stage 3 Pricing card: JSON ProductPricing (lib/pricing.ts). Display only.
+    "product_pricing TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -600,4 +602,5 @@ export interface Run {
   product_angle_selected: string | null;
   stage3_prompt_history: string | null;
   shopify_product_url: string | null;
+  product_pricing: string | null;
 }

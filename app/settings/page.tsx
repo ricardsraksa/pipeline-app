@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import ModelSettings from "@/components/ModelSettings";
+import PricingSettings from "@/components/PricingSettings";
 
 // Internal keys are one behind the displayed numbers (the product stage was
 // added in front): product = Stage 1, stage1 = Stage 2, and so on.
@@ -174,6 +175,7 @@ export default function SettingsPage() {
       </div>
 
       <ModelSettings />
+      <PricingSettings />
 
       <div className="space-y-5">
         {STAGE_ORDER.map((stage) => {

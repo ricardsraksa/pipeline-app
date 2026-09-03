@@ -126,6 +126,8 @@ export async function PATCH(
     stage3_prompt_history?: string | null;
     /** Manual section placement (JSON) — validated against the run's images below. */
     stage3_placement?: string | null;
+    /** Stage 3 Pricing card (JSON ProductPricing) — display only. */
+    product_pricing?: string | null;
     shopify_product_url?: string | null;
     product_code?: string | null;
     // Stage 1 · Product gate
@@ -342,6 +344,21 @@ export async function PATCH(
     values.push(raw ?? null);
   }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("product_pricing" in body) {
+    if (body.product_pricing == null) {
+      fields.push("product_pricing = ?"); values.push(null);
+    } else {
+      let pr: Record<string, unknown> | null = null;
+      try { pr = JSON.parse(String(body.product_pricing)); } catch { pr = null; }
+      const pos = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v > 0;
+      if (!pr || !pos(pr.cogs) || !pos(pr.price) || !pos(pr.compare_at)) {
+        return Response.json({ error: "product_pricing needs positive cogs, price and compare_at" }, { status: 400 });
+      }
+      const competitors = Array.isArray(pr.competitors) ? pr.competitors.slice(0, 20) : [];
+      fields.push("product_pricing = ?");
+      values.push(JSON.stringify({ ...pr, competitors, at: new Date().toISOString() }));
+    }
+  }
   if ("stage3_placement" in body) {
     if (body.stage3_placement == null) {
       fields.push("stage3_placement = ?"); values.push(null);

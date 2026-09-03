@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRun, getKV } from "@/lib/db";
 
 import { requireSession } from "@/lib/auth";
+import { getPricingRules } from "@/lib/pricing-store";
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<unknown> }
@@ -12,6 +13,7 @@ export async function GET(
   const run = await getRun(parseInt(id, 10));
   let workerLastSeen: string | null = null;
   try { workerLastSeen = await getKV("worker_last_seen"); } catch { /* optional */ }
+  const pricingRules = await getPricingRules();
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -87,6 +89,9 @@ export async function GET(
       productDescription: run.product_description,
       uploadedSourceImages: safeJson(run.uploaded_source_images) ?? [],
       competitorUrls: safeJson(run.competitor_urls) ?? [],
+      // Stage 3 Pricing card: the stored suggestion and the current rules.
+      pricing: safeJson(run.product_pricing) ?? null,
+      pricingRules,
     },
     timestamps: {
       startedAt: run.started_at,

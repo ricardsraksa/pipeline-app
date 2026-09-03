@@ -89,6 +89,8 @@ stage at a time and the app follows the pipeline to whichever needs attention.
 - What is happening right now, in plain words ("Stage 2: Market overview (2/5)",
   "Reading the product page…").
 - Cost so far: number of API calls, tokens, cache reads/writes, dollars.
+- Price: the suggested retail price and compare-at from the Pricing card, with
+  its market fit (in range / above market / below market). Opens Stage 3.
 - Downloads: the research and copy documents; the generated images.
 - Kill (while running), Resume (after a failure or cancel), Restart this stage.
 - A persistent "what to do next" line with a single action, e.g. "Pick an angle
@@ -145,6 +147,14 @@ At the gate, two halves:
 Copy cannot start until at least one angle is chosen.
 
 ### Stage 3 · Copy
+
+Above everything else on this stage, from the moment Stage 1 is approved: the
+**Pricing** card. COGS (from the AliExpress price, editable, with its currency),
+suggested Price and Compare-at (both editable), one line with the multiple and
+margin, the competitor price range with median and where this price sits, one
+chip per competitor, red flags when a rule is broken (below the minimum
+multiple, wrong ending, compare-at outside the range, above every competitor,
+below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
 
 While working: "Generating copy…".
 
@@ -205,12 +215,14 @@ generation interrupted by a restart, the model refusing a reference photo.
 
 ## 6. Settings
 
-Two blocks.
+Three blocks.
 
 - **Models** — one row per pipeline role (Stage 1 product, Stage 2 research,
   Stage 3 copy, Stage 4 prompts, Stage 4 rewrites, Stage 4 auditor, mechanical),
   each with a one-line description, the current model, a picker with price per
   million tokens, and what the default is.
+- **Pricing rules** — minimum multiple of COGS, price ending, compare-at
+  min/max above price; default markers; save.
 - **Prompts** — one block per stage (Stage 1 Product, Stage 2 Research, Stage 2
   Angles, Stage 3 Copy, Stage 4 Images). Each: a large editable prompt, a
   "modified" marker when it differs from the built-in default, when it was saved,

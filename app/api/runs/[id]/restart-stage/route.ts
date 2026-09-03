@@ -23,6 +23,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         product_description: null,
         scraper_data: null,
         scraped_image_urls: null,
+        product_pricing: null,
         ...fieldsToClear("stage1"),
       };
     case "stage1":

@@ -1,5 +1,6 @@
 "use client";
 
+import type { PricingRules, ProductPricing } from "@/lib/pricing";
 import { useEffect, useState, useRef } from "react";
 
 export interface RunStatus {
@@ -56,6 +57,8 @@ export interface RunStatus {
     productDescription: string | null;
     uploadedSourceImages: string[];
     competitorUrls: string[];
+    pricing: ProductPricing | null;
+    pricingRules: PricingRules;
   };
   timestamps: {
     startedAt: string | null;

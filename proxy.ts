@@ -73,6 +73,7 @@ export function proxy(req: NextRequest) {
     p === "/login" ||
     p === "/api/auth/login" ||
     p === "/api/auth/logout" ||
+    p === "/api/version" ||
     p === "/favicon.ico" ||
     p.startsWith("/_next/static/")
   ) {
