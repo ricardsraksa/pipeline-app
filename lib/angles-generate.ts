@@ -112,11 +112,36 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     ...(note?.trim() ? ["", `OPERATOR NOTE (highest priority): ${note.trim().slice(0, 2000)}`] : []),
   ].join("\n");
 
-  // One call, with a single corrective retry. Failure modes seen in practice:
-  // the tool input arrives as a stringified array (repair + parse it), the
-  // output is cut off at max_tokens (retry asking for tighter angles), or the
-  // input is empty (retry). The error names the reason so it can be acted on.
-  const callOnce = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
+  // Pull the angle list out of whatever shape the tool input arrived in: the
+  // expected { angles: [...] }, a stringified array, an object keyed by index,
+  // the array as the whole input, or a single angle object.
+  const looksLikeAngle = (x: unknown) => !!x && typeof x === "object" && "title" in (x as object) && "problem" in (x as object);
+  const asList = (v: unknown): unknown[] | null => {
+    if (Array.isArray(v)) return v.length ? v : null;
+    if (typeof v === "string") { try { return asList(JSON.parse(jsonrepair(v))); } catch { return null; } }
+    if (v && typeof v === "object") {
+      if (looksLikeAngle(v)) return [v];
+      const vals = Object.values(v as Record<string, unknown>);
+      if (vals.length && vals.every(looksLikeAngle)) return vals;
+    }
+    return null;
+  };
+  const extractAngles = (input: unknown): unknown[] | null => {
+    const direct = asList(input);
+    if (direct?.some(looksLikeAngle)) return direct;
+    if (input && typeof input === "object" && !Array.isArray(input)) {
+      for (const v of Object.values(input as Record<string, unknown>)) {
+        const list = asList(v);
+        if (list?.some(looksLikeAngle)) return list;
+      }
+    }
+    return null;
+  };
+  const shapeOf = (input: unknown) => { try { return JSON.stringify(input).slice(0, 240); } catch { return String(input); } };
+
+  // Forced tool call, one corrective retry, then a plain-JSON fallback (no
+  // tool) — each failure names its reason so the error is actionable.
+  const callTool = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
     const msg = await anthropic.messages.create({
       model,
       max_tokens: 8000,
@@ -128,23 +153,37 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     void recordUsage(runId, "positioning angles", model, msg.usage);
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return { raw: null, why: `no tool call (stop: ${msg.stop_reason})` };
-    let angles = (block.input as { angles?: unknown }).angles;
-    if (typeof angles === "string") {
-      try { angles = JSON.parse(jsonrepair(angles)); } catch { angles = undefined; }
-    }
-    if (!Array.isArray(angles) || !angles.length) {
-      return { raw: null, why: msg.stop_reason === "max_tokens" ? "output cut off at the token limit" : `empty angles (stop: ${msg.stop_reason})` };
+    const angles = extractAngles(block.input);
+    if (!angles) {
+      console.error(`[angles] run ${runId}: unusable tool input (stop=${msg.stop_reason}): ${shapeOf(block.input)}`);
+      return { raw: null, why: msg.stop_reason === "max_tokens" ? "output cut off at the token limit" : `tool input had no angles (stop: ${msg.stop_reason}, input: ${shapeOf(block.input)})` };
     }
     return { raw: angles, why: "" };
   };
+  const callJson = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
+    const msg = await anthropic.messages.create({
+      model,
+      max_tokens: 8000,
+      system,
+      messages: [{ role: "user", content: text + "\n\nReturn ONLY a JSON array of 4 to 6 angle objects with the keys title, problem, consequence, mechanism, who, hook, why_this_angle, competitor_angle, gap, crowding (open | partly-claimed | crowded). No prose, no markdown fences." }],
+    });
+    void recordUsage(runId, "positioning angles (json)", model, msg.usage);
+    const textOut = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n");
+    const m = textOut.match(/\[[\s\S]*\]/);
+    if (!m) return { raw: null, why: `no JSON array in text (stop: ${msg.stop_reason})` };
+    const angles = extractAngles(m[0]);
+    return angles ? { raw: angles, why: "" } : { raw: null, why: "JSON did not contain angle objects" };
+  };
 
-  let { raw, why } = await callOnce(user);
+  let { raw, why } = await callTool(user);
   if (!raw) {
-    const retry = await callOnce(
-      user + "\n\nYour previous answer was unusable (" + why + "). Call submit_angles with 4 to 6 angles as a JSON array of objects. Keep every field concise (problem, consequence and mechanism under 60 words each).",
-    );
+    const retry = await callTool(user + "\n\nYour previous answer was unusable (" + why + "). Call submit_angles with input {\"angles\": [ ...4 to 6 angle objects... ]}. Keep every field concise (problem, consequence and mechanism under 60 words each).");
     raw = retry.raw;
-    if (!raw) throw new Error(`The strategist returned no angles — ${why}; retry: ${retry.why}`);
+    if (!raw) {
+      const json = await callJson(user);
+      raw = json.raw;
+      if (!raw) throw new Error(`The strategist returned no angles — ${why}; retry: ${retry.why}; json fallback: ${json.why}`);
+    }
   }
 
   const str = (v: unknown, max = 1200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
