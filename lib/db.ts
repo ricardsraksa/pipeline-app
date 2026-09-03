@@ -184,6 +184,9 @@ async function migrateDB() {
     // newest first. Every edit and AI rewrite pushes the PREVIOUS text here, so
     // an operator can always get back to what the writer produced.
     "stage3_prompt_history TEXT",
+    // The Shopify product this run fills. Settable at any point in the run
+    // (rail → Deliver), read by the fill panel as its default.
+    "shopify_product_url TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -596,4 +599,5 @@ export interface Run {
   product_angles: string | null;
   product_angle_selected: string | null;
   stage3_prompt_history: string | null;
+  shopify_product_url: string | null;
 }

@@ -82,6 +82,7 @@ export async function GET(
       productUrl: run.product_url,
       productName: run.product_name,
       productCode: run.product_code ?? null,
+      shopifyProductUrl: run.shopify_product_url ?? null,
       brandName: run.brand_name,
       productDescription: run.product_description,
       uploadedSourceImages: safeJson(run.uploaded_source_images) ?? [],

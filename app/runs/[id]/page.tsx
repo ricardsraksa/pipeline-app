@@ -199,6 +199,19 @@ export default function RunPage() {
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameOverride, setNameOverride] = useState<string | null>(null);
+  const [shopifyUrl, setShopifyUrl] = useState<string | null>(null);
+  const [shopifySaved, setShopifySaved] = useState<"saved" | "error" | null>(null);
+  async function saveShopifyUrl(v: string) {
+    if (!runId) return;
+    const clean = v.trim();
+    setShopifySaved(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopify_product_url: clean || null }) });
+      if (!res.ok) throw new Error();
+      setShopifySaved("saved");
+    } catch { setShopifySaved("error"); }
+    setTimeout(() => setShopifySaved(null), 1500);
+  }
 
   // When the pipeline moves on, follow it to the stage that needs attention.
   useEffect(() => { setActiveOverride(null); }, [run?.status]);
@@ -521,6 +534,18 @@ export default function RunPage() {
         {runId !== null && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Deliver</span>
+            <div className="flex flex-col gap-1">
+              <input
+                value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}
+                onChange={(e) => setShopifyUrl(e.target.value)}
+                onBlur={(e) => saveShopifyUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                placeholder="Shopify product link"
+                spellCheck={false}
+                className="h-[30px] px-2.5 rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[12px] ff-mono text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-3)]"
+              />
+              {shopifySaved && <span className={cx("text-[10.5px]", shopifySaved === "saved" ? "text-[var(--color-text-3)]" : "text-[var(--color-red)]")}>{shopifySaved === "saved" ? "Saved" : "Needs an https:// link"}</span>}
+            </div>
             {outputs.stage2Json
               ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
               : <button disabled className="btn btn-sm" title="Needs the copy kit first">Send to Google Doc</button>}

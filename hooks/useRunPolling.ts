@@ -51,6 +51,7 @@ export interface RunStatus {
     productUrl: string;
     productName: string | null;
     productCode: string | null;
+    shopifyProductUrl: string | null;
     brandName: string | null;
     productDescription: string | null;
     uploadedSourceImages: string[];

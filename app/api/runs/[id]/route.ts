@@ -124,6 +124,7 @@ export async function PATCH(
     stage3_source_blacklist?: string | null;
     stage3_ref_overrides?: string | null;
     stage3_prompt_history?: string | null;
+    shopify_product_url?: string | null;
     product_code?: string | null;
     // Stage 1 · Product gate
     product_description_edited?: string | null;
@@ -339,6 +340,11 @@ export async function PATCH(
     values.push(raw ?? null);
   }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("shopify_product_url" in body) {
+    const v = typeof body.shopify_product_url === "string" ? body.shopify_product_url.trim().slice(0, 2048) : "";
+    if (v && !/^https:\/\//i.test(v)) return Response.json({ error: "Shopify link must start with https://" }, { status: 400 });
+    fields.push("shopify_product_url = ?"); values.push(v || null);
+  }
   if ("stage3_prompt_history" in body)            { fields.push("stage3_prompt_history = ?");            values.push(typeof body.stage3_prompt_history === "string" ? body.stage3_prompt_history.slice(0, 400_000) : null); }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }

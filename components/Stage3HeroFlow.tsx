@@ -717,7 +717,7 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-4">
         <SendToDrive runId={runId} />
-        <ShopifyFill runId={runId} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
+        <ShopifyFill runId={runId} initialUrl={run.shopify_product_url} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
         <details>
           <summary className="cursor-pointer text-[11px] text-[var(--color-text-4)]">Create a brand-new draft product instead (old flow)</summary>
           <div className="pt-2"><ShopifyPush runId={runId} /></div>
