@@ -202,6 +202,26 @@ export default function Stage3HeroFlow({
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [status, fetchRun]);
 
+  // Self-heal: every one of the 8 has a finished (or failed) image on the
+  // server, but the final "completed" write never landed (tab closed, network
+  // blip). Flip it now so the review and the Deliver rows appear instead of a
+  // stale prompt gate.
+  const healedRef = useRef(false);
+  useEffect(() => {
+    if (!run || healedRef.current || busy) return;
+    if (run.status !== "awaiting_qc" && run.status !== "generating_remaining") return;
+    const prompts = safeParse<Array<{ index: number }>>(run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts, []);
+    const imgs = safeParse<Array<{ index: number; status?: string; image_url?: string }>>(run.stage3_remaining_images, []);
+    if (!prompts.length || imgs.length < prompts.length) return;
+    const settled = prompts.every((p) => imgs.some((im) => im.index === p.index && (im.status === "failed" || (im.status === "done" && im.image_url))));
+    if (!settled) return;
+    healedRef.current = true;
+    fetch(`/api/runs/${runId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    }).then(() => fetchRun()).catch(() => {});
+  }, [run, busy, runId, fetchRun]);
+
   async function trigger(url: string, body: Record<string, unknown>, label: string) {
     setErr(null);
     setBusy(label);

@@ -474,6 +474,8 @@ export default function RunPage() {
   );
   const label = "eyebrow";
   const card = "border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]";
+  // Finished images exist — enough for Shopify and Drive, whatever the status word says.
+  const imagesReady = run.status === "completed" || (run.stage4?.done ?? 0) > 0;
   const waiting = (text: string) => (
     <div className={cx(card, "px-5 py-10 grid place-items-center")}>
       <p className="ff-mono text-[12px] text-[var(--color-text-2)]">{text}</p>
@@ -559,12 +561,12 @@ export default function RunPage() {
               {outputs.stage2Json
                 ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} variant="row" />
                 : <DeliverRow name="Google Doc" state="after copy" />}
-              <button onClick={() => openStage("stage3")} disabled={run.status !== "completed"} className={deliverRow} style={deliverCols}
-                title={run.status === "completed" ? "Opens the Shopify fill on the Images stage" : "Needs the finished images first"}>
+              <button onClick={() => openStage("stage3")} disabled={!imagesReady} className={deliverRow} style={deliverCols}
+                title={imagesReady ? "Opens the Shopify push on the Images stage" : "Needs the finished images first"}>
                 <span className="text-[13px] font-[500] text-[var(--color-text)]">Shopify</span>
-                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.status === "completed" ? "fill →" : "after images"}</span>
+                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{imagesReady ? "push →" : "after images"}</span>
               </button>
-              {run.status === "completed"
+              {imagesReady
                 ? <SendToDrive runId={runId} variant="row" />
                 : <DeliverRow name="Drive" state="after images" />}
             </div>

@@ -34,6 +34,7 @@ export interface RunStatus {
     scrapedUrls: string[];
     approvedUrls: string[];
   };
+  stage4: { hero: string | null; done: number; total: number };
   /** Stage 1 · Product — scrape JSON (see lib/product.ts), analyst text, gate state. */
   product: {
     scrape: string | null;

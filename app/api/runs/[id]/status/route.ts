@@ -63,6 +63,19 @@ export async function GET(
       scrapedUrls: safeJson(run.scraped_image_urls) ?? [],
       approvedUrls: safeJson(run.approved_image_urls) ?? [],
     },
+    // Stage 4 output as it stands — the rail unlocks Shopify/Drive on this,
+    // not on the status word (a lost "completed" write must not block them).
+    stage4: (() => {
+      let done = 0, total = 0;
+      try {
+        const arr = JSON.parse(run.stage3_remaining_images ?? "[]");
+        if (Array.isArray(arr)) {
+          total = arr.length;
+          done = arr.filter((x: { image_url?: string; status?: string }) => x?.image_url && x.status === "done").length;
+        }
+      } catch { /* none */ }
+      return { hero: run.stage3_hero_image_url ?? null, done, total };
+    })(),
     // Stage 1 · Product: the scrape, the analyst text, the operator's edit
     // and photo selection, and when the gate was passed.
     product: {
