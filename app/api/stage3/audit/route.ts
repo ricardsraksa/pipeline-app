@@ -40,18 +40,24 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
 export async function POST(req: NextRequest) {
   const denied = requireSession(req);
   if (denied) return denied;
-  const { image_url, category, prompt_used, product_description, overlay_text_used, run_id } = await req.json()
+  const { image_url, category, prompt_used, product_description, overlay_text_used, run_id, reference_urls } = await req.json()
 
   if (!image_url || !category || !prompt_used) {
     return Response.json({ success: false, error: 'image_url, category, prompt_used required' }, { status: 400 })
   }
+  // The reference photos the image was generated from — the auditor compares
+  // the rendered product against them. Same public-URL guard as the image.
+  const refs: string[] = Array.isArray(reference_urls)
+    ? (reference_urls as unknown[]).filter((u): u is string => typeof u === 'string' && u.startsWith('https://')).slice(0, 4)
+    : []
   try {
     await assertPublicUrl(String(image_url))
+    for (const u of refs) await assertPublicUrl(u)
   } catch (e) {
     return Response.json({ success: false, error: e instanceof Error ? e.message : 'blocked image URL' }, { status: 400 })
   }
 
-  const userMessage = buildAuditUserMessage({ image_url, category, prompt_used, product_description: product_description ?? '', overlay_text_used: overlay_text_used ?? null })
+  const userMessage = buildAuditUserMessage({ category, prompt_used, product_description: product_description ?? '', overlay_text_used: overlay_text_used ?? null, reference_count: refs.length })
 
   try {
     const model = await getModel('stage3Audit')
@@ -65,6 +71,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'url', url: image_url } },
+          ...refs.map((u) => ({ type: 'image' as const, source: { type: 'url' as const, url: u } })),
           { type: 'text', text: userMessage },
         ],
       }],

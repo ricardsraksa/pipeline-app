@@ -473,7 +473,7 @@ export default function Stage3HeroFlow({
           try {
             const audit = await fetch("/api/stage3/audit", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null, run_id: runId }),
+              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null, reference_urls: refs, run_id: runId }),
             }).then((r) => r.json());
             if (audit.success) {
               verdict = audit.result?.verdict === "pass" ? "pass" : "fail";
@@ -1095,12 +1095,16 @@ function CompletedReview({
   // operator is actually looking at.
   const [auditIdxs, setAuditIdxs] = useState<Set<number>>(new Set());
   const overlayFor = (imageIndex: number) => prompts.find((p) => p.index === imageIndex)?.overlay_text || null;
+  const refsForIndex = (imageIndex: number) => {
+    const p = prompts.find((x) => x.index === imageIndex);
+    return p ? refsFor(p, refOverrides, heroUrl) : (heroUrl ? [heroUrl] : []);
+  };
   const auditImage = useCallback(async (i: number, imageUrl: string, promptText: string, category: string, imageIndex: number) => {
     setAuditIdxs((prev) => new Set(prev).add(i));
     try {
       const audit = await fetch("/api/stage3/audit", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image_url: imageUrl, category, prompt_used: promptText, product_description: productDescription, overlay_text_used: overlayFor(imageIndex), run_id: runId }),
+        body: JSON.stringify({ image_url: imageUrl, category, prompt_used: promptText, product_description: productDescription, overlay_text_used: overlayFor(imageIndex), reference_urls: refsForIndex(imageIndex), run_id: runId }),
       }).then((r) => r.json());
       setImages((prev) => prev.map((x, j) => {
         if (j !== i) return x;
@@ -1191,7 +1195,7 @@ function CompletedReview({
       try {
         const audit = await fetch("/api/stage3/audit", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null, run_id: runId }),
+          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null, reference_urls: refs, run_id: runId }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
         else { console.error("audit failed:", audit.error); issues = ["Audit skipped (auditor unavailable) — review manually."]; }
@@ -1237,7 +1241,7 @@ function CompletedReview({
       const targets = images
         .map((im, i) => ({ im, i }))
         .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail")
-        .map(({ im, i }) => ({ i, text: drafts[i] ?? promptFor(im)?.prompt ?? "", cat: im.category }))
+        .map(({ im, i }) => ({ i, text: drafts[i] ?? promptFor(im)?.prompt ?? "" }))
         .filter((t) => t.text);
       const CONCURRENCY = 3;
       const queue = [...targets];
@@ -1245,7 +1249,7 @@ function CompletedReview({
         for (;;) {
           const t = queue.shift();
           if (!t) break;
-          await regenerate(t.i, t.text, t.cat, refsByIdx?.[t.i]);
+          await regenerate(t.i, t.text, productDescription, refsByIdx?.[t.i]);
         }
       };
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
@@ -1512,7 +1516,7 @@ function CompletedReview({
           prompt={promptFor(images[regenIdx])}
           busy={regenIdx != null && busyIdxs.has(regenIdx)}
           onClose={() => setRegenIdx(null)}
-          onRegenerate={(promptText, refs) => regenerate(regenIdx, promptText, images[regenIdx].category, refs)}
+          onRegenerate={(promptText, refs) => regenerate(regenIdx, promptText, productDescription, refs)}
           onUseVersion={(entry) => restoreVersion(regenIdx, entry)}
           candidates={promptFor(images[regenIdx]) ? candidatesFor(promptFor(images[regenIdx])!) : refCandidates}
           initialRefs={promptFor(images[regenIdx]) ? refsFor(promptFor(images[regenIdx])!, refOverrides, heroUrl) : []}
