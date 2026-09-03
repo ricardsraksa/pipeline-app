@@ -197,6 +197,18 @@ export default function RunPage() {
   const [killing, setKilling] = useState(false);
   const [startingStage2, setStartingStage2] = useState(false);
   const [activeOverride, setActiveOverride] = useState<StageKey | null>(null);
+  // Product code (e.g. P58): names the Google Doc tab and the Drive folder.
+  // Edited inline in the rail's identity line.
+  const [editingCode, setEditingCode] = useState(false);
+  const [codeDraft, setCodeDraft] = useState("");
+  const saveCode = async () => {
+    setEditingCode(false);
+    const v = codeDraft.trim().toUpperCase();
+    try {
+      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_code: v || null }) });
+      window.dispatchEvent(new Event("run:changed"));
+    } catch { /* the rail keeps the old value */ }
+  };
   // The stage first shown on this page load stays on screen until the
   // operator clicks another one — a stage finishing must not yank the view.
   const lockedStage = useRef<StageKey | null>(null);
@@ -514,8 +526,20 @@ export default function RunPage() {
                 <div className="text-[14px] font-[500] leading-[1.25] text-[var(--color-text)]">{displayName}</div>
               </button>
             )}
-            <div className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-[3px]">
-              run {runId}{run.meta.productCode ? ` · ${run.meta.productCode}` : ""}{elapsed ? ` · ${elapsed}` : ""}
+            <div className="ff-mono text-[10.5px] text-[var(--color-text-3)] mt-[3px] flex items-center gap-1 flex-wrap">
+              <span>run {runId} ·</span>
+              {editingCode ? (
+                <input autoFocus value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} onBlur={saveCode}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCode(); } else if (e.key === "Escape") { e.preventDefault(); setEditingCode(false); } }}
+                  placeholder="P58" aria-label="Product code"
+                  className="ff-mono w-[58px] text-[10.5px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[4px] px-1.5 py-px outline-none focus:border-[var(--color-accent)]" />
+              ) : (
+                <button onClick={() => { setCodeDraft(run.meta.productCode ?? ""); setEditingCode(true); }} title="Product code — names the Google Doc tab and the Drive folder"
+                  className={`cursor-pointer rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)] ${run.meta.productCode ? "text-[var(--color-text-2)]" : "text-[var(--color-amber)]"}`}>
+                  {run.meta.productCode || "set code"}
+                </button>
+              )}
+              {elapsed ? <span>· {elapsed}</span> : null}
             </div>
           </div>
         </div>
