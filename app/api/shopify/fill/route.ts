@@ -135,8 +135,10 @@ export async function POST(req: Request) {
       sectionPhotos,
       sectionFileIds: pushState?.productId ? pushState.sectionFileIds : undefined,
       alreadyPushedUrls: pushState?.productId === product.numericId ? pushState.pushedImageUrls : [],
-      includeTitle: body.includeTitle === true,
-      dryRun: body.dryRun !== false, // dry run unless explicitly disabled
+      // Title is set on every push unless the caller opts out; writes happen
+      // unless the caller explicitly asks for a dry run.
+      includeTitle: body.includeTitle !== false,
+      dryRun: body.dryRun === true,
     });
 
     if (!report.dryRun) {

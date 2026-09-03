@@ -200,9 +200,10 @@ Several consecutive states, one after the other:
      any image, "Swap 2 ↔ 3", and — when a placed image was regenerated since —
      a notice with Keep / Re-place. The prompt writer authors one image per
      section up front; placement confirms or overrides it.
-   - **Fill Shopify** — preview then apply: writes the copy into the product's
-     metafields and appends the images. Never publishes, never deletes, never
-     touches price. Reports per field what was set, skipped or missing.
+   - **Push to Shopify** — one button: sets the product title, writes the copy
+     into the product's metafields and appends the images. Never publishes,
+     never deletes, never touches price. Reports per field what was set,
+     skipped or missing.
    - **Send images to Drive** — uploads them to the product's folder.
    - **Relink / recover from Higgsfield** — pulls images that generated but were
      never saved.

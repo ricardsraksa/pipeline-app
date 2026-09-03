@@ -1,8 +1,8 @@
 "use client";
 
-// Shopify v2 panel: paste the existing product's URL → Preview (dry run, zero
-// writes) → Apply. Strict/reversible on the server: metafields + optional
-// title + append-only images; never publishes or deletes.
+// Shopify panel: the product URL (saved on the run) and one button. The push
+// sets the title, fills the metafields and appends the images. Strict/reversible
+// on the server: never publishes, never deletes, never touches price.
 
 import { useState } from "react";
 
@@ -49,19 +49,18 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
   const saveUrl = (v: string) => {
     void fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopify_product_url: v.trim() || null }) }).catch(() => undefined);
   };
-  const [includeTitle, setIncludeTitle] = useState(false);
-  const [busy, setBusy] = useState<"preview" | "apply" | null>(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
 
-  async function push(dryRun: boolean) {
-    setBusy(dryRun ? "preview" : "apply");
+  async function push() {
+    setBusy(true);
     setErr(null);
     try {
       const res = await fetch("/api/shopify/fill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId, productUrl: url.trim() || undefined, includeTitle, dryRun }),
+        body: JSON.stringify({ runId, productUrl: url.trim() || undefined, includeTitle: true, dryRun: false }),
       });
       const data = await res.json();
       if (!data.success) { setErr(data.error ?? `Failed (${res.status})`); return; }
@@ -69,60 +68,40 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
   return (
     <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-4 space-y-3">
-      <div>
-        <h3 className="text-[14px] font-[640] text-[var(--color-text)]">Fill Shopify PDP</h3>
-        <p className="text-[11.5px] text-[var(--color-text-3)] mt-0.5">
-          Fills the metafields and appends the images. Never publishes or deletes.
-        </p>
-      </div>
+      <h3 className="text-[14px] font-[640] text-[var(--color-text)]">Shopify</h3>
       <div className="flex gap-2 flex-wrap items-center">
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onBlur={(e) => saveUrl(e.target.value)}
-          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Paste the product URL (admin or storefront)"}
+          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Product URL (admin or storefront)"}
           className="flex-1 min-w-[260px] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--color-accent)]"
         />
-        <label className="flex items-center gap-1.5 text-[11.5px] text-[var(--color-text-2)] cursor-pointer select-none">
-          <input type="checkbox" checked={includeTitle} onChange={(e) => setIncludeTitle(e.target.checked)} />
-          also update title
-        </label>
-      </div>
-      <div className="flex gap-2 flex-wrap">
         <button
-          onClick={() => push(true)}
-          disabled={busy !== null}
-          className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] hover:text-[var(--color-text)] tr disabled:opacity-40"
+          onClick={push}
+          disabled={busy || !(url.trim() || initialAdminUrl)}
+          className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40"
         >
-          {busy === "preview" ? "Previewing…" : "Preview changes (no writes)"}
+          {busy ? "Pushing…" : "Push to Shopify"}
         </button>
-        {report?.dryRun && (
-          <button
-            onClick={() => push(false)}
-            disabled={busy !== null}
-            className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40"
-          >
-            {busy === "apply" ? "Applying…" : `Apply to “${report.product.title}”`}
-          </button>
-        )}
       </div>
       {err && <p className="text-[11.5px] text-[var(--color-red)]">{err}</p>}
       {report && (
         <div className="space-y-2">
           <p className="text-[11.5px] text-[var(--color-text-2)]">
-            {report.dryRun ? "Preview for" : "Applied to"}{" "}
+            Pushed to{" "}
             <a href={report.product.adminUrl} target="_blank" rel="noopener noreferrer" className="underline">
               {report.product.title}
             </a>{" "}
             ({report.product.status.toLowerCase()}, {report.product.mediaCount} existing images)
-            {report.titleUpdate && ` · title ${report.titleUpdate.applied ? "updated" : "would change"} from “${report.titleUpdate.from}”`}
-            {" · "}{report.images.toAdd.length} image{report.images.toAdd.length === 1 ? "" : "s"} {report.dryRun ? "to add" : "added"}
+            {report.titleUpdate ? ` · title ${report.titleUpdate.applied ? "updated" : "not updated"} from “${report.titleUpdate.from}”` : " · title unchanged"}
+            {" · "}{report.images.toAdd.length} image{report.images.toAdd.length === 1 ? "" : "s"} added
             {report.images.skipped > 0 && ` (${report.images.skipped} already there)`}
           </p>
           <div className="overflow-x-auto">
