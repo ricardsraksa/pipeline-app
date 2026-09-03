@@ -90,7 +90,7 @@ stage at a time and the app follows the pipeline to whichever needs attention.
   "Reading the product page…").
 - Cost so far: number of API calls, tokens, cache reads/writes, dollars.
 - Price: the suggested retail price and compare-at from the Pricing card, with
-  its market fit (in range / above market / below market). Opens Stage 3.
+  the multiple of COGS. Opens Stage 3.
 - Downloads: the research and copy documents; the generated images.
 - Kill (while running), Resume (after a failure or cancel), Restart this stage.
 - A persistent "what to do next" line with a single action, e.g. "Pick an angle
