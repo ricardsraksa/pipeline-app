@@ -3,6 +3,7 @@
 // call (structured output, no JSON-in-prose parsing).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { jsonrepair } from "jsonrepair";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "./db";
 import { getModel } from "./models";
 import { getPrompt } from "./prompts";
@@ -111,19 +112,40 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     ...(note?.trim() ? ["", `OPERATOR NOTE (highest priority): ${note.trim().slice(0, 2000)}`] : []),
   ].join("\n");
 
-  const msg = await anthropic.messages.create({
-    model,
-    max_tokens: 4000,
-    system,
-    tools: [ANGLES_TOOL],
-    tool_choice: { type: "tool", name: "submit_angles" },
-    messages: [{ role: "user", content: user }],
-  });
-  void recordUsage(runId, "positioning angles", model, msg.usage);
+  // One call, with a single corrective retry. Failure modes seen in practice:
+  // the tool input arrives as a stringified array (repair + parse it), the
+  // output is cut off at max_tokens (retry asking for tighter angles), or the
+  // input is empty (retry). The error names the reason so it can be acted on.
+  const callOnce = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
+    const msg = await anthropic.messages.create({
+      model,
+      max_tokens: 8000,
+      system,
+      tools: [ANGLES_TOOL],
+      tool_choice: { type: "tool", name: "submit_angles" },
+      messages: [{ role: "user", content: text }],
+    });
+    void recordUsage(runId, "positioning angles", model, msg.usage);
+    const block = msg.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") return { raw: null, why: `no tool call (stop: ${msg.stop_reason})` };
+    let angles = (block.input as { angles?: unknown }).angles;
+    if (typeof angles === "string") {
+      try { angles = JSON.parse(jsonrepair(angles)); } catch { angles = undefined; }
+    }
+    if (!Array.isArray(angles) || !angles.length) {
+      return { raw: null, why: msg.stop_reason === "max_tokens" ? "output cut off at the token limit" : `empty angles (stop: ${msg.stop_reason})` };
+    }
+    return { raw: angles, why: "" };
+  };
 
-  const block = msg.content.find((b) => b.type === "tool_use");
-  const raw = block && block.type === "tool_use" ? (block.input as { angles?: unknown[] }).angles : undefined;
-  if (!Array.isArray(raw) || !raw.length) throw new Error("The strategist returned no angles");
+  let { raw, why } = await callOnce(user);
+  if (!raw) {
+    const retry = await callOnce(
+      user + "\n\nYour previous answer was unusable (" + why + "). Call submit_angles with 4 to 6 angles as a JSON array of objects. Keep every field concise (problem, consequence and mechanism under 60 words each).",
+    );
+    raw = retry.raw;
+    if (!raw) throw new Error(`The strategist returned no angles — ${why}; retry: ${retry.why}`);
+  }
 
   const str = (v: unknown, max = 1200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   const angles: Angle[] = raw.slice(0, 6).map((a, i) => {
