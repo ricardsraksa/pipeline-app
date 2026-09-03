@@ -893,13 +893,14 @@ function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
   /** Long pools (every photo on the run) start folded to the chosen ones. */
   collapsible?: boolean;
 }) {
-  const [showAll, setShowAll] = useState(false);
   if (!candidates.length) return null;
-  const folded = collapsible && !showAll && candidates.length > 6;
-  const shown = folded ? candidates.filter((c) => selected.includes(c.url)) : candidates;
+  // Every candidate is always visible — the operator picks by looking, so
+  // nothing is hidden behind a toggle. `collapsible` is kept for the prop
+  // signature only.
+  void collapsible;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {shown.map((c) => {
+      {candidates.map((c) => {
         const on = selected.includes(c.url);
         return (
           <button
@@ -917,12 +918,6 @@ function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
           </button>
         );
       })}
-      {collapsible && candidates.length > 6 && (
-        <button type="button" onClick={() => setShowAll((v) => !v)} disabled={disabled}
-          className="cursor-pointer text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline decoration-dotted underline-offset-2 tr">
-          {folded ? `Choose from all ${candidates.length} photos` : "Show fewer"}
-        </button>
-      )}
     </div>
   );
 }
