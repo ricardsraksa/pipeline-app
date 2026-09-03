@@ -5,7 +5,9 @@
 
 import { useState } from "react";
 
-export default function SendToDrive({ runId }: { runId: number }) {
+import { railRow, railRowCols } from "@/components/SendToDoc";
+
+export default function SendToDrive({ runId, variant = "button" }: { runId: number; variant?: "button" | "row" }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -32,6 +34,15 @@ export default function SendToDrive({ runId }: { runId: number }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (variant === "row") {
+    return (
+      <button onClick={send} disabled={busy} className={railRow} style={railRowCols} title={err ?? msg ?? "Upload the finished images to the product's Drive folder"}>
+        <span className="text-[13px] font-[500] text-[var(--color-text)]">Drive</span>
+        <span className="ff-mono text-[11px]" style={{ color: err ? "var(--color-red)" : msg ? "var(--color-green)" : "var(--color-text-3)" }}>{busy ? "sending…" : err ? "failed" : msg ? "sent" : "ready"}</span>
+      </button>
+    );
   }
 
   return (

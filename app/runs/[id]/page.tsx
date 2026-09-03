@@ -457,6 +457,14 @@ export default function RunPage() {
   };
   const stateWord: Record<StageState, string> = { complete: "done", running: "running", waiting: "needs you", error: "failed", pending: "—" };
   const textBtn = "btn btn-sm";
+  const deliverRow = "w-full grid items-center gap-2.5 px-2.5 h-[34px] rounded-[6px] text-left cursor-pointer hover:bg-[var(--color-surface-2)] tr disabled:cursor-default disabled:hover:bg-transparent";
+  const deliverCols = { gridTemplateColumns: "minmax(0,1fr) auto" } as const;
+  const DeliverRow = ({ name, state }: { name: string; state: string }) => (
+    <div className={cx(deliverRow, "cursor-default opacity-45")} style={deliverCols}>
+      <span className="text-[13px] font-[500] text-[var(--color-text)]">{name}</span>
+      <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{state}</span>
+    </div>
+  );
   const RestartStage = ({ stage }: { stage: RestartStage }) => (
     <button onClick={() => handleRestartStage(stage)} disabled={restarting} className="btn btn-sm">
       {restarting ? "Restarting…" : "Restart stage"}
@@ -534,27 +542,30 @@ export default function RunPage() {
         {runId !== null && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Deliver</span>
-            <div className="flex flex-col gap-1">
-              <input
-                value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}
-                onChange={(e) => setShopifyUrl(e.target.value)}
-                onBlur={(e) => saveShopifyUrl(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                placeholder="Shopify product link"
-                spellCheck={false}
-                className="h-[30px] px-2.5 rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[12px] ff-mono text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-3)]"
-              />
-              {shopifySaved && <span className={cx("text-[10.5px]", shopifySaved === "saved" ? "text-[var(--color-text-3)]" : "text-[var(--color-red)]")}>{shopifySaved === "saved" ? "Saved" : "Needs an https:// link"}</span>}
+            <div className="flex flex-col gap-px">
+              {outputs.stage2Json
+                ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} variant="row" />
+                : <DeliverRow name="Google Doc" state="after copy" />}
+              <button onClick={() => openStage("stage3")} disabled={run.status !== "completed"} className={deliverRow} style={deliverCols}
+                title={run.status === "completed" ? "Opens the Shopify fill on the Images stage" : "Needs the finished images first"}>
+                <span className="text-[13px] font-[500] text-[var(--color-text)]">Shopify</span>
+                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.status === "completed" ? "fill →" : "after images"}</span>
+              </button>
+              {run.status === "completed"
+                ? <SendToDrive runId={runId} variant="row" />
+                : <DeliverRow name="Drive" state="after images" />}
             </div>
-            {outputs.stage2Json
-              ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
-              : <button disabled className="btn btn-sm" title="Needs the copy kit first">Send to Google Doc</button>}
-            <button onClick={() => openStage("stage3")} disabled={run.status !== "completed"} className="btn btn-sm" title={run.status === "completed" ? "Opens the Shopify fill on the Images stage" : "Needs the finished images first"}>
-              Fill Shopify →
-            </button>
-            {run.status === "completed"
-              ? <SendToDrive runId={runId} />
-              : <button disabled className="btn btn-sm" title="Needs the finished images first">Send images to Drive</button>}
+            <input
+              value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}
+              onChange={(e) => setShopifyUrl(e.target.value)}
+              onBlur={(e) => saveShopifyUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              placeholder="Shopify product link"
+              spellCheck={false}
+              title={shopifySaved === "error" ? "Needs an https:// link" : "The product this run fills — saved when you leave the field"}
+              className={cx("mt-1 h-[30px] px-2.5 rounded-[6px] bg-transparent border text-[11.5px] ff-mono text-[var(--color-text-2)] outline-none focus:text-[var(--color-text)] focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-4)]",
+                shopifySaved === "error" ? "border-[var(--color-red)]" : "border-[var(--color-border)]")}
+            />
           </div>
         )}
 
