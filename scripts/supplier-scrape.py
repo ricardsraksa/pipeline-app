@@ -398,8 +398,111 @@ def shopify_json(url: str) -> dict | None:
         return None
 
 
+def _json_after(html: str, key: str):
+    """The balanced JSON array/object that follows '"key":' in the HTML, parsed."""
+    i = html.find(f'"{key}":')
+    if i == -1:
+        return None
+    j = i + len(key) + 3
+    while j < len(html) and html[j] in " \t\r\n":
+        j += 1
+    if j >= len(html) or html[j] not in "[{":
+        return None
+    open_c, close_c = html[j], ("]" if html[j] == "[" else "}")
+    depth, in_str, esc = 0, False, False
+    for k in range(j, len(html)):
+        c = html[k]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == open_c:
+            depth += 1
+        elif c == close_c:
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(html[j:k + 1])
+                except Exception:
+                    return None
+    return None
+
+
+def aliexpress_sku_prices(html: str) -> tuple[dict, list]:
+    """Option groups + every SKU with its own price, from the JSON AliExpress
+    embeds in the page (productSKUPropertyList / skuPriceList). Works for the
+    classic runParams pages and the newer component-data pages; returns empty
+    when neither block is present."""
+    props = _json_after(html, "productSKUPropertyList") or []
+    prices = _json_after(html, "skuPriceList") or []
+    if not isinstance(props, list) or not isinstance(prices, list) or (not props and not prices):
+        return {}, []
+    names: dict[str, str] = {}
+    options: dict[str, list[str]] = {}
+    for p in props:
+        if not isinstance(p, dict):
+            continue
+        gname = str(p.get("skuPropertyName") or "").strip()
+        vals: list[str] = []
+        for v in p.get("skuPropertyValues") or []:
+            if not isinstance(v, dict):
+                continue
+            disp = str(v.get("propertyValueDisplayName") or v.get("propertyValueName") or "").strip()
+            vid = str(v.get("propertyValueIdLong") or v.get("propertyValueId") or "")
+            if disp:
+                vals.append(disp)
+                if vid:
+                    names[vid] = disp
+        if gname and vals:
+            options[gname] = list(dict.fromkeys(vals))
+    variants: list[dict] = []
+    for sp in prices:
+        if not isinstance(sp, dict):
+            continue
+        attr = str(sp.get("skuAttr") or "")
+        parts: list[str] = []
+        for seg in attr.split(";"):
+            seg = seg.strip()
+            if not seg:
+                continue
+            left, _, label = seg.partition("#")
+            vid = left.split(":")[-1]
+            disp = names.get(vid) or label.strip()
+            if disp:
+                parts.append(disp)
+        val = sp.get("skuVal") or {}
+        if not isinstance(val, dict):
+            val = {}
+        amt = None
+        for key in ("skuActivityAmount", "skuAmount"):
+            a = val.get(key)
+            if isinstance(a, dict) and a.get("value") not in (None, ""):
+                amt = a.get("value")
+                break
+        if amt is None:
+            amt = val.get("actSkuCalPrice") or val.get("skuCalPrice")
+        cur = ""
+        for key in ("skuActivityAmount", "skuAmount"):
+            a = val.get(key)
+            if isinstance(a, dict) and a.get("currency"):
+                cur = str(a["currency"])
+                break
+        qty = val.get("availQuantity")
+        price = f"{amt} {cur}".strip() if amt not in (None, "") else None
+        available = True if not isinstance(qty, (int, float)) else qty > 0
+        variants.append({"title": " / ".join(parts) or attr, "price": price, "available": available})
+    return options, variants
+
+
 def extract_variants(page, url: str) -> tuple[dict, list]:
-    """Every option and value. Shopify via its JSON API, AliExpress from the DOM."""
+    """Every option and value. Shopify via its JSON API, AliExpress from the
+    embedded SKU JSON (with per-variant prices), falling back to the DOM."""
     prod = shopify_json(url)
     if prod:
         options = {o["name"]: o["values"] for o in prod.get("options", []) if o.get("values")}
@@ -409,7 +512,12 @@ def extract_variants(page, url: str) -> tuple[dict, list]:
         ]
         return options, priced
 
-    # AliExpress: each option group is a "sku-item--property" block. Image
+    try:
+        json_options, json_variants = aliexpress_sku_prices(page.html_content)
+    except Exception:
+        json_options, json_variants = {}, []
+
+    # AliExpress DOM: each option group is a "sku-item--property" block. Image
     # swatches carry their name in the img alt, text swatches in a title attr.
     options: dict[str, list[str]] = {}
     for el in page.css('[class*="sku-item"]'):
@@ -422,7 +530,9 @@ def extract_variants(page, url: str) -> tuple[dict, list]:
         vals = list(dict.fromkeys(vals))
         if name and vals:
             options[name] = vals
-    return options, []
+    # The embedded JSON is the source of truth when present (it carries the
+    # per-SKU prices); the DOM fills in only when the JSON is missing.
+    return (json_options or options), json_variants
 
 
 def extract_long_description(page, url: str) -> tuple[str, list]:
