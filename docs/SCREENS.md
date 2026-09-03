@@ -183,9 +183,13 @@ Several consecutive states, one after the other:
    the ability to override a verdict, regenerate one image, or bulk-fix all
    failed ones with a single instruction.
    - **Auto-place images** assigns one image to page section 2 and one to
-     section 3; the rest become gallery/product shots. Section 1 is a GIF the
-     operator adds manually. Images are labelled by role afterwards (hero, main
-     product image, product shot, section 2, section 3).
+     section 3, judged against that section's headline and paragraph from the
+     copy; the rest become gallery/product shots. Section 1 is a GIF the
+     operator adds manually. Section tiles show the headline they sit beside
+     and the reason for the pick. The operator can override: "→ S2 / → S3" on
+     any image, "Swap 2 ↔ 3", and — when a placed image was regenerated since —
+     a notice with Keep / Re-place. The prompt writer authors one image per
+     section up front; placement confirms or overrides it.
    - **Fill Shopify** — preview then apply: writes the copy into the product's
      metafields and appends the images. Never publishes, never deletes, never
      touches price. Reports per field what was set, skipped or missing.

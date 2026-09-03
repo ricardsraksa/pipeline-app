@@ -25,6 +25,7 @@ interface RemainingPrompt {
   prompt: string;
   overlay_text: string;
   source_image_references: string[];
+  intended_section?: 2 | 3 | null;
 }
 interface RemImage {
   index: number;
@@ -54,6 +55,21 @@ interface Placement {
   section_2: number;
   section_3: number;
   reasons?: Record<string, string>;
+  /** URL of the image each section was placed with — lets us notice when the
+   *  image at that index was regenerated or restored since. */
+  placed_urls?: Record<string, string>;
+  at?: string;
+  source?: "auto" | "manual";
+  /** The model returned invalid picks twice; these are the fallback picks. */
+  fallback?: boolean;
+}
+interface PageSection { headline: string; paragraph: string }
+
+function sectionsFromStage2Json(raw: string | null | undefined): PageSection[] {
+  try {
+    const j = raw ? (JSON.parse(raw) as { sections?: Array<{ headline?: string; paragraph?: string }> }) : null;
+    return (j?.sections ?? []).map((x) => ({ headline: x?.headline ?? "", paragraph: x?.paragraph ?? "" }));
+  } catch { return []; }
 }
 
 function effVerdict(im: RemImage | null | undefined): "pass" | "fail" | null {
@@ -732,6 +748,7 @@ export default function Stage3HeroFlow({
           refCandidates={refCandidates}
           initialRefOverrides={effRefOverrides}
           productDescription={run.product_description ?? run.product_name ?? ""}
+          sections={sectionsFromStage2Json(run.stage2_json)}
         />
       </div>
     );
@@ -933,6 +950,7 @@ function CompletedReview({
   refCandidates,
   initialRefOverrides,
   productDescription,
+  sections,
 }: {
   runId: number;
   heroUrl: string | null;
@@ -944,6 +962,8 @@ function CompletedReview({
   /** What the product actually is — the auditor checks the image against it. */
   productDescription: string;
   initialRefOverrides: Record<string, string[]>;
+  /** Stage 3 copy sections — Section n Photo sits beside sections[n-1]. */
+  sections: PageSection[];
 }) {
   const [images, setImages] = useState<RemImage[]>(initialImages);
   // Per-image reference overrides — updated when the operator changes the
@@ -1032,9 +1052,65 @@ function CompletedReview({
   const autoTried = useRef(false);
   useEffect(() => {
     if (autoTried.current) return;
-    const usable = images.filter((im) => im.image_url && im.status !== "failed");
+    const usable = images.filter((im) => im.image_url && im.status === "done");
     if (!placement && usable.length >= 2) { autoTried.current = true; runPlacement(); }
   }, [placement, images, runPlacement]);
+  // Re-arm once a placement exists, so a later null (cleared placement) can auto-run again.
+  useEffect(() => { if (placement) autoTried.current = false; }, [placement]);
+
+  // Manual placement: the operator picks an image for a section, swaps the two,
+  // or keeps a regenerated image in place. Saved through the run PATCH, which
+  // validates both indices and stamps placed_urls / source: "manual".
+  const savePlacement = (next: Placement) => {
+    const urlOf = (idx: number) => images.find((im) => im.index === idx)?.image_url ?? "";
+    const full: Placement = {
+      section_2: next.section_2,
+      section_3: next.section_3,
+      reasons: next.reasons ?? {},
+      placed_urls: { "2": urlOf(next.section_2), "3": urlOf(next.section_3) },
+      at: new Date().toISOString(),
+      source: "manual",
+    };
+    setPlacement(full);
+    setPlaceErr(null);
+    fetch(`/api/runs/${runId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage3_placement: JSON.stringify(full) }),
+    })
+      .then(async (r) => {
+        if (!r.ok) { const d = await r.json().catch(() => ({})); setPlaceErr((d as { error?: string }).error || `Could not save placement (${r.status})`); }
+      })
+      .catch(() => setPlaceErr("Network error saving placement"));
+  };
+  const useForSection = (imageIndex: number, n: 2 | 3) => {
+    if (!placement) return;
+    const other: 2 | 3 = n === 2 ? 3 : 2;
+    const key = `section_${n}` as const;
+    const otherKey = `section_${other}` as const;
+    const reasons: Record<string, string> = { ...(placement.reasons ?? {}), [String(n)]: "Chosen by you" };
+    const next: Placement = { ...placement, [key]: imageIndex, reasons };
+    // Picking the image that holds the other section swaps the two.
+    if (placement[otherKey] === imageIndex) { next[otherKey] = placement[key]; reasons[String(other)] = "Chosen by you"; }
+    savePlacement(next);
+  };
+  const swapSections = () => {
+    if (!placement) return;
+    const r = placement.reasons ?? {};
+    savePlacement({ ...placement, section_2: placement.section_3, section_3: placement.section_2, reasons: { ...r, "2": r["3"] ?? "", "3": r["2"] ?? "" } });
+  };
+  const keepCurrent = (n: number) => {
+    if (!placement) return;
+    savePlacement({ ...placement, reasons: { ...(placement.reasons ?? {}), [String(n)]: "Regenerated image kept by you" } });
+  };
+  // Why a section's placement can no longer be trusted (null = fine).
+  const staleFor = (n: 2 | 3): string | null => {
+    if (!placement) return null;
+    const im = images.find((x) => x.index === placement[`section_${n}`]);
+    if (!im || im.status !== "done" || !im.image_url) return "This image failed — pick another image for this section or re-place.";
+    const placed = placement.placed_urls?.[String(n)];
+    if (placed && placed !== im.image_url) return "Image changed since it was placed.";
+    return null;
+  };
 
   // Persist ONE image via the server-side upsert (read-modify-write on the
   // server). Each image saves independently, so a stale full-array snapshot —
@@ -1329,7 +1405,7 @@ function CompletedReview({
   // Render one interactive image tile (verdict badge, regenerate, fail banner,
   // generating overlay). Index `i` is the position in the `images` array so
   // toggleVerdict/regenerate stay correct after regrouping.
-  const renderTile = (im: RemImage, i: number) => {
+  const renderTile = (im: RemImage, i: number, ctx?: { section?: number }) => {
     const v = effVerdict(im);
     const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
     const overridden = im.user_override != null;
@@ -1365,6 +1441,13 @@ function CompletedReview({
               </button>
             )}
             <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+              {placement && im.status === "done" && ([2, 3] as const).filter((n) => n !== ctx?.section).map((n) => (
+                <button key={n} onClick={() => useForSection(im.index, n)}
+                  title={ctx?.section ? `Swap with section ${n}` : `Use this image for section ${n}`}
+                  className="px-2 py-1 bg-[var(--color-accent)]/70 hover:bg-[var(--color-accent)] text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">
+                  → S{n}
+                </button>
+              ))}
               <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
               <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} title="Run the audit again on this image" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer disabled:opacity-50">Re-audit</button>
               <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
@@ -1422,14 +1505,23 @@ function CompletedReview({
       {relinkErr && <ErrBox msg={relinkErr} />}
       {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
-        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">Sections 2 and 3 get one image each; the rest go to the gallery. Section 1 is your GIF.</p>
-        <button
-          onClick={runPlacement}
-          disabled={placing}
-          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
-        >
-          {placing ? "Placing…" : placement ? "↺ Re-run auto-placement" : "Auto-place images"}
-        </button>
+        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">
+          Sections 2 and 3 get one image each; the rest go to the gallery. Section 1 is your GIF. Hover an image for “→ S2 / → S3”.
+          {placement?.source === "manual" && <span className="text-[var(--color-text-4)]"> · placed by you</span>}
+          {placement?.fallback && <span className="text-[var(--color-amber)]"> · fallback picks — the model returned invalid indices, check them</span>}
+        </p>
+        <div className="flex items-center gap-2">
+          {placement && (
+            <button onClick={swapSections} disabled={placing} className="btn btn-sm">Swap 2 ↔ 3</button>
+          )}
+          <button
+            onClick={runPlacement}
+            disabled={placing}
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
+          >
+            {placing ? "Placing…" : placement ? "↺ Re-run auto-placement" : "Auto-place images"}
+          </button>
+        </div>
       </div>
       {placeErr && <ErrBox msg={placeErr} />}
       {persistErr && <ErrBox msg={persistErr} />}
@@ -1487,16 +1579,28 @@ function CompletedReview({
               const { im, i } = entry;
               const copy = (promptFor(im)?.overlay_text || "").trim();
               const reason = placement?.reasons?.[String(section)] || "";
+              const headline = (sections[section - 1]?.headline ?? "").trim();
+              const stale = section === 2 || section === 3 ? staleFor(section) : null;
               return (
                 <div key={i} className="flex flex-col gap-1.5">
-                  {renderTile(im, i)}
-                  <div className="px-0.5">
+                  {renderTile(im, i, { section })}
+                  <div className="px-0.5 space-y-0.5">
                     <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-accent-text)]">Section {section} · {catLabel(im.category)}</p>
-                    {copy
-                      ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={copy}>Goes with: “{copy}”</p>
-                      : reason
-                        ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={reason}>{reason}</p>
+                    {headline && <p className="text-[11px] text-[var(--color-text)] leading-snug line-clamp-2" title={headline}>“{headline}”</p>}
+                    {reason
+                      ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={reason}>{reason}</p>
+                      : copy
+                        ? <p className="text-[10px] text-[var(--color-text-3)] leading-snug line-clamp-2" title={copy}>Overlay: “{copy}”</p>
                         : null}
+                    {stale && (
+                      <div className="mt-1 rounded-md border border-[var(--color-amber)]/50 px-2 py-1.5">
+                        <p className="text-[10px] text-[var(--color-amber)] leading-snug">{stale}</p>
+                        <div className="flex gap-1.5 mt-1">
+                          {im.status === "done" && im.image_url && <button onClick={() => keepCurrent(section)} className="btn btn-sm">Keep</button>}
+                          <button onClick={runPlacement} disabled={placing} className="btn btn-sm">Re-place</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

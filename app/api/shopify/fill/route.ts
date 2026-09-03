@@ -12,7 +12,9 @@ interface PushState {
   adminUrl: string;
   pushedImageUrls: string[];
   lastPushAt: string;
-  /** category → File GID for section photos (re-push reuse). */
+  /** image URL → File GID for section photos (re-push reuse). Older states
+   *  were keyed by category; those entries are ignored so a regenerated image
+   *  is uploaded fresh instead of re-pointing at the old file. */
   sectionFileIds?: Record<string, string>;
 }
 
@@ -46,16 +48,34 @@ export async function POST(req: Request) {
   // Hard prerequisite: image auto-placement must have run. Without it the
   // section photos can't be wired and every image would land in the gallery —
   // the operator wants the full, correctly-split PDP or nothing.
-  let placementOk = false;
-  try {
-    const pl = JSON.parse(run.stage3_placement ?? "null") as { section_2?: unknown; section_3?: unknown } | null;
-    placementOk = !!(pl && typeof pl.section_2 === "number" && typeof pl.section_3 === "number");
-  } catch { /* not ok */ }
-  if (!placementOk) {
+  let pl: { section_2?: unknown; section_3?: unknown; placed_urls?: Record<string, string> } | null = null;
+  try { pl = JSON.parse(run.stage3_placement ?? "null"); } catch { pl = null; }
+  if (!pl || typeof pl.section_2 !== "number" || typeof pl.section_3 !== "number") {
     return Response.json(
       { success: false, error: "Image auto-placement hasn't run for this run. Open Stage 4 and run “auto-placement” (it decides which images go to sections 2/3), then push again." },
       { status: 409 },
     );
+  }
+  // Both placed indices must resolve to finished images that are still the
+  // ones that were placed — otherwise the fill would silently push no section
+  // photo (or the wrong one) and drop everything into the gallery.
+  {
+    let remAll: Array<{ index?: number; image_url?: string; status?: string }> = [];
+    try { remAll = JSON.parse(run.stage3_remaining_images ?? "[]"); } catch { remAll = []; }
+    const problems: string[] = [];
+    for (const n of [2, 3] as const) {
+      const idx = pl[`section_${n}`];
+      const im = remAll.find((x) => x?.index === idx && x.image_url && x.status === "done");
+      if (!im) problems.push(`Section ${n} image is failed or missing`);
+      else if (pl.placed_urls?.[String(n)] && pl.placed_urls[String(n)] !== im.image_url) problems.push(`Section ${n} image changed since it was placed`);
+    }
+    if (pl.section_2 === pl.section_3) problems.push("Sections 2 and 3 point at the same image");
+    if (problems.length) {
+      return Response.json(
+        { success: false, error: `${problems.join("; ")} — open Stage 4 and Keep / Re-place (or pick another image for that section), then push again.` },
+        { status: 409 },
+      );
+    }
   }
 
   let pushState: PushState | null = null;

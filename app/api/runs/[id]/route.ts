@@ -124,6 +124,8 @@ export async function PATCH(
     stage3_source_blacklist?: string | null;
     stage3_ref_overrides?: string | null;
     stage3_prompt_history?: string | null;
+    /** Manual section placement (JSON) — validated against the run's images below. */
+    stage3_placement?: string | null;
     shopify_product_url?: string | null;
     product_code?: string | null;
     // Stage 1 · Product gate
@@ -340,6 +342,38 @@ export async function PATCH(
     values.push(raw ?? null);
   }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("stage3_placement" in body) {
+    if (body.stage3_placement == null) {
+      fields.push("stage3_placement = ?"); values.push(null);
+    } else {
+      // Two different indices, both resolving to finished images on this run.
+      // placed_urls/at/source are set here so the client can't store stale ones.
+      let pl: { section_2?: unknown; section_3?: unknown; reasons?: unknown; source?: unknown } | null = null;
+      try { pl = JSON.parse(String(body.stage3_placement)); } catch { pl = null; }
+      const s2 = pl?.section_2, s3 = pl?.section_3;
+      if (!pl || !Number.isInteger(s2) || !Number.isInteger(s3) || s2 === s3) {
+        return Response.json({ error: "stage3_placement needs two different image indices" }, { status: 400 });
+      }
+      const row = await db.execute({ sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?", args: [Number(id)] });
+      let imgs: Array<{ index?: number; image_url?: string; status?: string }> = [];
+      try {
+        const raw = (row.rows[0] as unknown as { stage3_remaining_images: string | null })?.stage3_remaining_images;
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) imgs = parsed;
+      } catch { /* empty */ }
+      const done = (n: unknown) => imgs.find((im) => im?.index === n && im.image_url && im.status === "done");
+      const im2 = done(s2), im3 = done(s3);
+      if (!im2 || !im3) return Response.json({ error: "Both placed images must be finished images on this run" }, { status: 400 });
+      const reasons = pl.reasons && typeof pl.reasons === "object" ? (pl.reasons as Record<string, string>) : {};
+      const stored = {
+        section_2: s2, section_3: s3, reasons,
+        placed_urls: { "2": im2.image_url, "3": im3.image_url },
+        at: new Date().toISOString(),
+        source: pl.source === "auto" ? "auto" : "manual",
+      };
+      fields.push("stage3_placement = ?"); values.push(JSON.stringify(stored));
+    }
+  }
   if ("shopify_product_url" in body) {
     const v = typeof body.shopify_product_url === "string" ? body.shopify_product_url.trim().slice(0, 2048) : "";
     if (v && !/^https:\/\//i.test(v)) return Response.json({ error: "Shopify link must start with https://" }, { status: 400 });

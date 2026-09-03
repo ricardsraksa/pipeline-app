@@ -152,7 +152,9 @@ export async function applyToProduct(params: {
    *  These images are uploaded to the store's FILES area, not product media,
    *  so nothing appears twice on the PDP. */
   sectionPhotos?: Array<{ defName: string; category: string; url: string }>;
-  /** category → File GID from a previous push (re-push reuse, no duplicate files). */
+  /** image URL → File GID from a previous push (re-push reuse, no duplicate
+   *  files). Keyed by URL so a regenerated section image gets its own file and
+   *  the metafield is re-pointed; legacy category-keyed entries are ignored. */
   sectionFileIds?: Record<string, string>;
   alreadyPushedUrls: string[];
   includeTitle: boolean;
@@ -184,10 +186,14 @@ export async function applyToProduct(params: {
   const pushed = new Set(params.alreadyPushedUrls);
   const toAdd: Array<{ url: string; alt: string }> = [];
   let skipped = 0;
+  // URL is the primary key. Alt-text dedupe only applies when we have no push
+  // state for this product (DB restore) — with push state, a regenerated image
+  // (new URL, same alt) must reach the store.
+  const altDedupe = params.alreadyPushedUrls.length === 0;
   params.images.forEach((im, i) => {
     if (!im.url || !im.url.startsWith("http")) return;
     const alt = mkAlt(im.category, i);
-    if (pushed.has(im.url) || existingAlts.has(alt)) { skipped++; return; }
+    if (pushed.has(im.url) || (altDedupe && existingAlts.has(alt))) { skipped++; return; }
     toAdd.push({ url: im.url, alt });
   });
 
@@ -271,12 +277,14 @@ export async function applyToProduct(params: {
   //    area (NOT product media — the operator wants no image visible twice on
   //    the PDP) and point the file_reference metafield at it. File ids are
   //    returned in the report so re-pushes reuse them instead of duplicating.
-  const sectionFiles: Record<string, string> = { ...(params.sectionFileIds ?? {}) };
+  const sectionFiles: Record<string, string> = Object.fromEntries(
+    Object.entries(params.sectionFileIds ?? {}).filter(([k]) => k.startsWith("http")),
+  );
   for (const sp of params.sectionPhotos ?? []) {
     const def = defs.find((d) => normalize(d.name) === normalize(sp.defName));
     if (!def) { rows.push({ label: sp.defName, status: "no-definition" }); continue; }
 
-    let fileId = sectionFiles[sp.category];
+    let fileId = sectionFiles[sp.url];
     if (!fileId) {
       try {
         const data = await mutate<{ fileCreate: { files: Array<{ id: string }> | null; userErrors: Array<{ message: string }> } }>(
@@ -293,7 +301,7 @@ export async function applyToProduct(params: {
           continue;
         }
         fileId = data.fileCreate.files[0].id;
-        sectionFiles[sp.category] = fileId;
+        sectionFiles[sp.url] = fileId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const hint = /access|permission|scope|denied/i.test(msg)

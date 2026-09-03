@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { anglesBlock, parseSelectedAngles } from '@/lib/angles'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
-import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection } from '@/lib/stage3/hero'
+import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection, pageSectionsFromStage2Json } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
 
 import { requireSession } from "@/lib/auth";
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       extraReferenceUrls: safeArr(run.stage3_reference_images),
       fromSource: true,
       runId,
+      sections: pageSectionsFromStage2Json(run.stage2_json),
     })
     if (!prompts.length) throw new Error('Prompt generation produced no prompts')
 

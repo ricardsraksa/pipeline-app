@@ -38,6 +38,20 @@ export interface RemainingPrompt {
   prompt: string
   overlay_text: string
   source_image_references: string[]
+  /** Page section this image was authored to sit beside (2 or 3); null for
+   *  gallery images. Auto-placement uses it as the default pick. */
+  intended_section?: 2 | 3 | null
+}
+
+/** Section 2 / Section 3 headline+paragraph from a run's stage2_json — what the
+ *  Section n Photo sits next to on the page (lib/shopify/fields.ts). */
+export function pageSectionsFromStage2Json(raw: string | null | undefined): Array<{ n: 2 | 3; headline: string; paragraph: string }> {
+  try {
+    const j = raw ? (JSON.parse(raw) as { sections?: Array<{ headline?: string; paragraph?: string }> }) : null
+    return ([2, 3] as const)
+      .map((n) => ({ n, headline: (j?.sections?.[n - 1]?.headline ?? '').trim(), paragraph: (j?.sections?.[n - 1]?.paragraph ?? '').trim() }))
+      .filter((s) => s.headline || s.paragraph)
+  } catch { return [] }
 }
 
 export const HERO_SYSTEM = `You are a product photography director. Generate ONE hero studio product image prompt for Higgsfield, using the source product images as the visual reference.
@@ -230,6 +244,8 @@ SECTION HEADERS: Every prompt contains exactly these headers in this order: IMAG
 
 OUTPUT FORMAT LINE: The OUTPUT FORMAT section of every prompt must begin verbatim with "Square 1:1 ecommerce-ready image, high-resolution," followed by one short composition descriptor fitting the image type (e.g. "clean product-first composition." for studio types, "natural product-in-use composition." for lifestyle, "authentic UGC-style composition." for native). Never replace "ecommerce-ready" with another word.
 
+PAGE SECTIONS: Two of the 8 images are placed beside fixed body sections of the product page — Section 2 and Section 3, each a headline + paragraph given under PAGE SECTIONS in the user message. Author exactly ONE image for each: a photographic lifestyle/benefit shot that illustrates THAT headline and paragraph (the product in use delivering that specific benefit) — never a chart, comparison, before/after split, feature diagram or testimonial graphic — with overlay text that does not repeat the headline word for word. Mark those two with "intended_section": 2 and 3 respectively; every other image has "intended_section": null. Section 1 is the operator's own GIF — never author for it. If no PAGE SECTIONS are given, set "intended_section": null everywhere.
+
 OUTPUT: A JSON array of exactly 8 objects, nothing before or after, no markdown fences:
 {
   "index": <2-9>,
@@ -239,6 +255,7 @@ OUTPUT: A JSON array of exactly 8 objects, nothing before or after, no markdown 
   "aspect_ratio": "1:1",
   "prompt": "<the full prompt in the exact gold-standard format, sections separated by blank lines>",
   "overlay_text": "<the overlay text used, or empty string>",
+  "intended_section": <2 | 3 | null — the page section this image is authored for>,
   "source_image_references": ["<approved hero image URL — or the source photo URL(s) showing the product state this scene needs>"]
 }`
 
@@ -303,6 +320,7 @@ const REMAINING_TOOL: Anthropic.Tool = {
             aspect_ratio: { type: 'string' },
             prompt: { type: 'string', description: 'The full prompt in the exact gold-standard format.' },
             overlay_text: { type: 'string' },
+            intended_section: { type: ['integer', 'null'], description: 'Page section (2 or 3) this image is authored to sit beside; null for gallery images.' },
             source_image_references: { type: 'array', items: { type: 'string' } },
           },
           required: ['index', 'image_type', 'category', 'model', 'aspect_ratio', 'prompt', 'overlay_text', 'source_image_references'],
@@ -463,6 +481,9 @@ export async function generateRemainingPrompts(params: {
   fromSource?: boolean
   /** Run to attribute API token usage to in the cost tracker. */
   runId?: number
+  /** Section 2/3 headline+paragraph (pageSectionsFromStage2Json) — the writer
+   *  authors one image for each and marks it via intended_section. */
+  sections?: Array<{ n: 2 | 3; headline: string; paragraph: string }>
 }): Promise<{ prompts: RemainingPrompt[]; validation: Stage3Validation }> {
   const refs = params.referenceImageUrls.filter(Boolean)
   const extras = (params.extraReferenceUrls ?? []).filter(Boolean)
@@ -483,6 +504,13 @@ export async function generateRemainingPrompts(params: {
     'STAGE 2 COPY (use overlays verbatim):',
     params.copy || '(none)',
     '',
+    ...(params.sections?.length
+      ? [
+          'PAGE SECTIONS (author exactly one image for each, mark it with intended_section):',
+          ...params.sections.flatMap((s) => [`SECTION ${s.n} — HEADLINE: ${s.headline || '(none)'}`, `SECTION ${s.n} — PARAGRAPH: ${s.paragraph || '(none)'}`]),
+          '',
+        ]
+      : []),
     'STAGE 1 AVATAR + VISUAL STRATEGY:',
     [params.avatar, params.visual].filter(Boolean).join('\n\n') || '(none)',
     '',
@@ -569,6 +597,7 @@ export async function generateRemainingPrompts(params: {
     aspect_ratio: p.aspect_ratio || '1:1',
     prompt: p.prompt || '',
     overlay_text: p.overlay_text || '',
+    intended_section: p.intended_section === 2 || p.intended_section === 3 ? p.intended_section : null,
     // Hero/product refs always; plus only the extra refs the model chose for
     // this image (validated against the pool so nothing hallucinated slips in).
     source_image_references: curateRefs(refs, p.source_image_references, [...refs, ...extras]),

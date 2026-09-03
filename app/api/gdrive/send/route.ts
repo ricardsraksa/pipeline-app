@@ -24,15 +24,23 @@ export async function POST(req: Request) {
 
   const images: Array<{ name: string; url: string }> = [];
   if (run.stage3_hero_image_url) images.push({ name: "01-hero.png", url: run.stage3_hero_image_url });
+  // Section 2/3 photos are named by their role so Drive says which is which.
+  let placement: { section_2?: number; section_3?: number } | null = null;
+  try { placement = JSON.parse(run.stage3_placement ?? "null"); } catch { placement = null; }
+  const sectionOf = (idx?: number) => (idx != null && placement?.section_2 === idx ? 2 : idx != null && placement?.section_3 === idx ? 3 : null);
   try {
     const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
     rem
       .filter((im) => im?.image_url && im.status === "done")
       .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-      .forEach((im) => images.push({
-        name: `${String(im.index ?? 0).padStart(2, "0")}-${(im.category ?? "image").replace(/[^a-z0-9_-]/gi, "_")}.png`,
-        url: im.image_url as string,
-      }));
+      .forEach((im) => {
+        const cat = (im.category ?? "image").replace(/[^a-z0-9_-]/gi, "_");
+        const sec = sectionOf(im.index);
+        images.push({
+          name: sec ? `section-${sec}-${cat}.png` : `${String(im.index ?? 0).padStart(2, "0")}-${cat}.png`,
+          url: im.image_url as string,
+        });
+      });
   } catch { /* none */ }
   if (!images.length) {
     return Response.json({ success: false, error: "No finished Stage 4 images on this run yet." }, { status: 400 });
