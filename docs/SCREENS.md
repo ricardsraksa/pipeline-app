@@ -158,10 +158,8 @@ multiple, wrong ending, compare-at outside the range, above every competitor,
 below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
 
 Under it, the **Variants** card from the AliExpress listing: each option group
-(Colour, Size…) with its values and a copy-values button, and a table of every
-SKU with its AliExpress price and the price/compare-at the rules give it (sold
-out SKUs dimmed). "Re-read listing" asks the Mac worker to fetch the options
-and per-SKU prices again. Because suppliers cram several dimensions into one
+(Colour, Size…) with its values and a copy-values button. "Re-read listing"
+asks the Mac worker to fetch the options again. Because suppliers cram several dimensions into one
 group, the card can be restructured: "Edit with AI" takes an instruction like
 "split into Color and Size", "Edit by hand" lets the operator rename groups,
 change values and add or remove groups, and "Revert" goes back to what the

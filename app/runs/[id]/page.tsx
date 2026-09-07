@@ -659,7 +659,6 @@ export default function RunPage() {
           <>
             <div className="flex items-baseline gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Product</h1>
-              <span className="text-[12.5px] text-[var(--color-text-2)]">Check the description and pick the photos.</span>
               <div className="flex-1" />
               {runId !== null && (
                 <div className="flex items-center gap-3.5">
@@ -679,7 +678,6 @@ export default function RunPage() {
           <>
             <div className="flex items-baseline gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Research</h1>
-              <span className="text-[12.5px] text-[var(--color-text-2)]">Tick the angle to build on. First tick is primary.</span>
             </div>
             {outputs.onePager ? (
               <>
@@ -734,7 +732,7 @@ export default function RunPage() {
             {runId !== null && run.product.scrape && (
               <>
                 <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
-                <VariantsCard runId={runId} scrape={run.product.scrape} rules={run.meta.pricingRules} band={run.meta.pricing?.band ?? null} requestedAt={run.meta.variantsRequestedAt ?? null} edited={run.meta.variantsEdited ?? null} />
+                <VariantsCard runId={runId} scrape={run.product.scrape} requestedAt={run.meta.variantsRequestedAt ?? null} edited={run.meta.variantsEdited ?? null} />
               </>
             )}
             {outputs.stage2Output ? (
@@ -769,7 +767,6 @@ export default function RunPage() {
           <>
             <div className="flex items-baseline gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Images</h1>
-              <span className="text-[12.5px] text-[var(--color-text-2)]">Hero first, then the eight.</span>
               <div className="flex-1" />
               {runId !== null && (
                 <div className="flex items-center gap-3.5">
@@ -787,7 +784,6 @@ export default function RunPage() {
           <>
             <div className="flex items-baseline gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Image ads</h1>
-              <span className="text-[12.5px] text-[var(--color-text-2)]">Five concepts, one ad each.</span>
               <div className="flex-1" />
               {runId !== null && <RestartStage stage="ads" />}
             </div>

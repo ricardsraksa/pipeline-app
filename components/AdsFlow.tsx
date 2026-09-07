@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
-import { AD_CONCEPTS, parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
+import { parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
 import { parseProductScrape } from "@/lib/product";
 
 type Cand = { url: string; tag: string };
@@ -263,7 +263,6 @@ export default function AdsFlow({ runId }: { runId: number }) {
   if (!drafts) {
     return (
       <div className="space-y-3">
-        <p className="text-[13px] text-[var(--color-text-2)] max-w-xl">Five ad briefs from the angle, the copy kit and the approved hero. You approve each premise and prompt before anything generates.</p>
         {step === "writing" || writing
           ? <p className="ff-mono text-[11px] text-[var(--color-text-3)]">Writing the five briefs…</p>
           : <button onClick={write} className="btn btn-primary">Write 5 ads</button>}
@@ -296,13 +295,11 @@ export default function AdsFlow({ runId }: { runId: number }) {
           const v = effVerdict(im);
           const busy = genBusy.has(p.index);
           const refs = refsFor(p);
-          const def = AD_CONCEPTS.find((c) => c.key === p.concept);
           return (
             <div key={p.index} className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] overflow-hidden">
               <div className="flex items-center gap-2 px-[13px] py-2.5 border-b border-[var(--color-border)] bg-[var(--color-surface-2)]">
                 <span className="ff-mono text-[10px] text-[var(--color-text-4)]">{p.index}</span>
                 <span className="text-[13px] font-[600] text-[var(--color-text)]">{p.concept_label}</span>
-                <span className="text-[11px] text-[var(--color-text-3)] truncate">{def?.what}</span>
                 <div className="flex-1" />
                 {im && im.status === "done" && v && (
                   <button onClick={() => toggleVerdict(p)} title={im.user_override ? "Overridden — click to cycle" : `Auditor: ${im.verdict}. Click to override.`}

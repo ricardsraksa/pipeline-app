@@ -316,7 +316,6 @@ export default function Stage3HeroFlow({
   if (!heroFlowStarted) {
     return (
       <div className="space-y-3">
-        <p className="text-[13px] text-[var(--color-text-2)]">Hero shot first; the other 8 are built from it.</p>
         <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap items-center">
@@ -374,9 +373,6 @@ export default function Stage3HeroFlow({
           )}
         </div>
         {heroZoom !== null && <Lightbox items={compareItems} index={heroZoom} onClose={() => setHeroZoom(null)} onIndex={setHeroZoom} />}
-        <p className="text-[13px] text-[var(--color-text-2)] max-w-md">
-          This hero becomes the reference for all other images. Make sure it matches the real product before continuing.
-        </p>
         <ValidationBadge raw={run.stage3_hero_validation} />
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap">
@@ -778,7 +774,7 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-4">
         <SendToDrive runId={runId} />
-        <VariantsCard runId={runId} requestedAt={run.variants_refresh_requested ?? null} edited={run.product_variants_edited ?? null} scrape={run.product_scrape ?? null} band={(() => { try { return run.product_pricing ? (JSON.parse(run.product_pricing) as { band?: import("@/lib/pricing").MarketBand | null }).band ?? null : null; } catch { return null; } })()} />
+        <VariantsCard runId={runId} requestedAt={run.variants_refresh_requested ?? null} edited={run.product_variants_edited ?? null} scrape={run.product_scrape ?? null} />
         <ShopifyFill runId={runId} initialUrl={run.shopify_product_url} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
         <details>
           <summary className="cursor-pointer text-[11px] text-[var(--color-text-4)]">Create a brand-new draft product instead (old flow)</summary>
@@ -1569,10 +1565,9 @@ function CompletedReview({
       {relinkErr && <ErrBox msg={relinkErr} />}
       {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
       <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
-        <p className="text-[11px] text-[var(--color-text-3)] max-w-xl">
-          Sections 2 and 3 get one image each; the rest go to the gallery. Section 1 is your GIF. Hover an image for “→ S2 / → S3”.
-          {placement?.source === "manual" && <span className="text-[var(--color-text-4)]"> · placed by you</span>}
-          {placement?.fallback && <span className="text-[var(--color-amber)]"> · fallback picks — the model returned invalid indices, check them</span>}
+        <p className="text-[11px] text-[var(--color-text-3)]">
+          {placement?.source === "manual" && <span className="text-[var(--color-text-4)]">placed by you</span>}
+          {placement?.fallback && <span className="text-[var(--color-amber)]">fallback picks — check them</span>}
         </p>
         <div className="flex items-center gap-2">
           {placement && (

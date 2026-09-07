@@ -316,7 +316,6 @@ export default function ProductGate({
               canApprove ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-90" : "bg-[var(--color-surface-2)] text-[var(--color-text-3)] cursor-not-allowed")}>
             {approving ? "Starting research…" : "Approve & start research"}
           </button>
-          <span className="text-[11.5px] text-[var(--color-text-3)]">The description and ticked photos are what every later stage uses.</span>
         </div>
       )}
       {approved && !waiting && <p className="text-[11.5px] text-[var(--color-text-3)]">Approved {new Date(product!.approvedAt!).toLocaleString()}.</p>}
