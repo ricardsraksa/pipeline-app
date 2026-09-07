@@ -192,6 +192,14 @@ async function migrateDB() {
     // Set when the operator asks the Mac worker to re-read the listing's
     // options + per-SKU prices; cleared by scrape-push mode=variants.
     "variants_refresh_requested TEXT",
+    // Stage 5 · Image ads (runs after Stage 4 completes; run.status stays
+    // "completed" — Stage 5 tracks itself in ads_step).
+    "ads_prompts TEXT",
+    "ads_prompts_edited TEXT",
+    "ads_images TEXT",
+    "ads_step TEXT",
+    "ads_error TEXT",
+    "ads_ref_overrides TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -333,7 +341,7 @@ export async function updateRun(id: number, fields: Partial<Run & { error_messag
  */
 export async function recordPromptUsed(
   id: number,
-  key: "product" | "stage1" | "angles" | "stage2" | "stage3_hero" | "stage3_remaining",
+  key: "product" | "stage1" | "angles" | "stage2" | "stage3_hero" | "stage3_remaining" | "ads",
   prompt: string,
 ): Promise<void> {
   try {
@@ -607,4 +615,10 @@ export interface Run {
   shopify_product_url: string | null;
   product_pricing: string | null;
   variants_refresh_requested: string | null;
+  ads_prompts: string | null;
+  ads_prompts_edited: string | null;
+  ads_images: string | null;
+  ads_step: string | null;
+  ads_error: string | null;
+  ads_ref_overrides: string | null;
 }

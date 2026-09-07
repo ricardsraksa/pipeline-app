@@ -11,8 +11,9 @@ runs in the background; the operator is pulled in at four review gates. One
 person uses it, on a desktop, often with a run open for a long time while
 generation runs.
 
-**The four stages.** 1 Product · 2 Research · 3 Copy · 4 Images. Every run walks
-them in order and stops at a gate between each.
+**The five stages.** 1 Product · 2 Research · 3 Copy · 4 Images · 5 Ads. Every
+run walks them in order and stops at a gate between each; Stage 5 is started by
+hand after Stage 4.
 
 ---
 
@@ -216,6 +217,28 @@ Several consecutive states, one after the other:
 
 Failure states appear inline anywhere in this flow: an image that failed, a
 generation interrupted by a restart, the model refusing a reference photo.
+
+### Stage 5 · Ads
+
+Started by hand ("Write 5 ads") once Stage 4 is complete. Five fixed concepts:
+Before/After, Features & Benefits, Handwritten Note, Testimonial,
+Problem/Solution. One card per concept:
+
+- **Premise** (what the ad shows and why, editable), **Headline on the image**
+  (editable), a proof line saying where any quote or stat came from ("none"
+  when the ad carries neither), the full prompt (collapsed, editable, "Edit
+  with AI"), and the reference photos the generator gets (every photo the run
+  has, tick to include; hero first).
+- "Generate 5 ads" runs them two at a time through the same generator and
+  auditor as Stage 4. Each card then shows its 1:1 image with the audit
+  verdict (click to override), Regenerate (with an instruction, pre-filled
+  with the audit issues), download, Previous (last version).
+- Top bar: Download all (zip), Send to Drive · Image Ads (the product folder's
+  third subfolder, next to Images and Videos), Stop after current, Generate
+  the missing N / Regenerate all 5.
+- Rules the writer follows (Settings → Stage 5 — Image ads): square 1:1,
+  product exactly as in the hero, quotes and stats only from real sources or
+  omitted, product name as plain-text wordmark, no logos.
 
 ---
 

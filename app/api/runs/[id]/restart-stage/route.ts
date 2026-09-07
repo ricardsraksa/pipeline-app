@@ -5,7 +5,7 @@ import { resumePipeline, runStage2Manually } from "@/lib/pipeline-runner";
 import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
 
-type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images" | "ads";
 
 // Map a stage label to the DB columns that need to be cleared so the pipeline
 // runner picks the stage back up from scratch on the next resume.
@@ -59,6 +59,16 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
     // flow (hero prompt/image/approval, the 8 derivative prompts/images, and the
     // AI section placement) plus any legacy /stage3 columns, so the run drops
     // back to the Stage 3 entry point and the whole stage runs again from scratch.
+    case "ads":
+      // Stage 5 only — Stage 4's images and the run status are untouched.
+      return {
+        ads_prompts: null,
+        ads_prompts_edited: null,
+        ads_images: null,
+        ads_step: null,
+        ads_error: null,
+        ads_ref_overrides: null,
+      };
     case "stage3-prompts":
     case "stage3-images":
       return {
@@ -101,7 +111,7 @@ export async function POST(
 
   const body = (await req.json().catch(() => ({}))) as { stage?: string };
   const stage = body.stage as RestartStage | undefined;
-  const validStages: RestartStage[] = ["product", "stage1", "stage2", "stage3-prompts", "stage3-images"];
+  const validStages: RestartStage[] = ["product", "stage1", "stage2", "stage3-prompts", "stage3-images", "ads"];
   if (!stage || !validStages.includes(stage)) {
     return NextResponse.json({ error: `stage must be one of ${validStages.join(", ")}` }, { status: 400 });
   }
@@ -112,6 +122,10 @@ export async function POST(
   }
 
   const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
+  if (stage === "ads") {
+    await updateRun(runId, { ...fieldsToClear(stage), last_updated_at: new Date().toISOString() });
+    return NextResponse.json({ success: true });
+  }
 
   await updateRun(runId, {
     ...fieldsToClear(stage),

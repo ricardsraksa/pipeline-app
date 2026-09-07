@@ -73,6 +73,7 @@ export interface ProductFolders {
   productFolderName: string;
   imagesFolderId: string;
   createdProductFolder: boolean;
+  adsFolderId: string;
 }
 
 /** Find the product folder by P-code prefix (or exact name); create the full
@@ -106,10 +107,13 @@ export async function ensureProductFolders(productCode: string, folderNameIfCrea
   }
 
   const sub = await listChildren(productFolderId, ` and mimeType = '${FOLDER_MIME}'`);
-  let images = sub.find((f) => f.name.trim().toLowerCase() === "images");
+  const images = sub.find((f) => f.name.trim().toLowerCase() === "images");
   const imagesFolderId = images ? images.id : await createFolder("Images", productFolderId);
+  // Stage 5 output. Every product folder carries Videos, Images and Image Ads.
+  const ads = sub.find((f) => f.name.trim().toLowerCase() === "image ads");
+  const adsFolderId = ads ? ads.id : await createFolder("Image Ads", productFolderId);
 
-  return { productFolderId, productFolderName, imagesFolderId, createdProductFolder };
+  return { productFolderId, productFolderName, imagesFolderId, adsFolderId, createdProductFolder };
 }
 
 export async function existingFileNames(folderId: string): Promise<Set<string>> {

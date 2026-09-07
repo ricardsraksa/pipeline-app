@@ -106,6 +106,16 @@ export async function GET(
       pricing: safeJson(run.product_pricing) ?? null,
       pricingRules,
       variantsRequestedAt: run.variants_refresh_requested ?? null,
+      // Stage 5 · Image ads
+      ads: (() => {
+        let prompts = 0, done = 0, failed = 0;
+        try { const p = JSON.parse(run.ads_prompts ?? "[]"); if (Array.isArray(p)) prompts = p.length; } catch { /* none */ }
+        try {
+          const a = JSON.parse(run.ads_images ?? "[]");
+          if (Array.isArray(a)) { done = a.filter((x: { status?: string; image_url?: string }) => x?.status === "done" && x.image_url).length; failed = a.filter((x: { status?: string }) => x?.status === "failed").length; }
+        } catch { /* none */ }
+        return { step: run.ads_step ?? null, error: run.ads_error ?? null, prompts, done, failed };
+      })(),
     },
     timestamps: {
       startedAt: run.started_at,

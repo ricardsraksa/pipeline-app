@@ -16,6 +16,7 @@ import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
 import FeedbackAppliedChip from "@/components/FeedbackAppliedChip";
 import Stage3HeroFlow from "@/components/Stage3HeroFlow";
+import AdsFlow from "@/components/AdsFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Shopify from "@/components/Stage2Shopify";
 import type { Stage2Json } from "@/lib/stage2/shape";
@@ -36,7 +37,7 @@ const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).jo
 
 // Internal keys are one behind the numbers on screen: product = Stage 1,
 // stage1 = Stage 2 (research), stage2 = Stage 3 (copy), stage3 = Stage 4 (images).
-type StageKey = "product" | "stage1" | "stage2" | "stage3";
+type StageKey = "product" | "stage1" | "stage2" | "stage3" | "ads";
 type StageState = "pending" | "running" | "complete" | "error" | "waiting";
 
 const PRODUCT_ACTIVE = ["product", "pending"];
@@ -73,6 +74,15 @@ function getStageState(run: RunStatus, stage: StageKey): StageState {
       if (["awaiting_user", "awaiting_qc", "awaiting_hero_qc"].includes(run.status)) return "waiting";
       if (["generating_hero", "generating_remaining"].includes(run.status)) return "running";
       return "pending";
+    case "ads": {
+      const a = run.meta.ads;
+      if (!a) return "pending";
+      if (a.step === "done") return "complete";
+      if (a.step === "writing" || a.step === "generating") return "running";
+      if (a.step === "review") return "waiting";
+      if (a.error) return "error";
+      return "pending";
+    }
   }
 }
 
@@ -141,13 +151,14 @@ const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: s
   { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Market, avatar, offer, angles" },
   { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Copy kit around the chosen angle" },
   { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero, then 8 images" },
+  { key: "ads", id: "v2-stage-ads", n: 5, title: "Ads", what: "Five image ads" },
 ];
 
 const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
 
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
-type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts";
+type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "ads";
 
 function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
   stage: RestartStage;
@@ -157,7 +168,7 @@ function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
   restarting: boolean;
 }) {
   const btn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
-  const label = stage === "product" ? "Stage 1" : stage === "stage1" ? "Stage 2" : stage === "stage2" ? "Stage 3" : "Stage 4";
+  const label = stage === "product" ? "Stage 1" : stage === "stage1" ? "Stage 2" : stage === "stage2" ? "Stage 3" : stage === "ads" ? "Stage 5" : "Stage 4";
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {prevId && (
@@ -279,6 +290,8 @@ export default function RunPage() {
     const isStage3 = stage === "stage3-prompts";
     if (!window.confirm(isStage3
       ? "Restart Stage 4? Deletes the hero, the 8 images and the placement."
+      : stage === "ads"
+      ? "Restart Stage 5? Deletes the five ad briefs and images."
       : stage === "product"
       ? "Restart Stage 1? Re-scrapes the links and clears the research."
       : `Restart ${stage === "stage1" ? "Stage 2" : "Stage 3"}? Clears its output and runs it again.`)) return;
@@ -406,6 +419,7 @@ export default function RunPage() {
     stage1: getStageState(run, "stage1"),
     stage2: getStageState(run, "stage2"),
     stage3: getStageState(run, "stage3"),
+    ads: getStageState(run, "ads"),
   };
   // The approval gate after research belongs on Stage 2 — that's what needs review.
   if (run.status === "awaiting_stage2_approval") { states.stage1 = "waiting"; states.stage2 = "pending"; }
@@ -436,6 +450,7 @@ export default function RunPage() {
     stage2: Boolean(outputs.stage2Output) || run.status === "stage2" || Boolean(outputs.onePager),
     stage3: Boolean(outputs.stage2Output) ||
       ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status),
+    ads: run.status === "completed" || Boolean(run.meta.ads?.step),
   };
 
   // ── Next action ──
@@ -454,7 +469,14 @@ export default function RunPage() {
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", sub: "Then generate.", cta: "Review prompts", onClick: () => openStage("stage3") };
     if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    if (s === "completed") return { tone: "green", icon: "check", title: "Run complete", sub: "Push to Shopify, send to Drive.", cta: "Open images", onClick: () => openStage("stage3") };
+    if (s === "completed") {
+      const a = run.meta.ads;
+      if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };
+      if (a?.step === "review") return { tone: "amber", icon: "review", title: "Review the 5 ads", sub: "Approve the briefs, then generate.", cta: "Review ads", onClick: () => openStage("ads") };
+      if (a?.step === "generating") return { tone: "accent", running: true, title: "Generating the ads", sub: `${a.done} of 5 done` };
+      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", sub: "Ads done — send them to Drive.", cta: "Open ads", onClick: () => openStage("ads") };
+      return { tone: "green", icon: "check", title: "Run complete", sub: "Push to Shopify, send to Drive, write the 5 ads.", cta: "Write 5 ads", onClick: () => openStage("ads") };
+    }
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
   const a = nextAction();
@@ -757,6 +779,19 @@ export default function RunPage() {
               )}
             </div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
+          </>
+        )}
+
+        {/* Stage 5 · Image ads */}
+        {activeKey === "ads" && (
+          <>
+            <div className="flex items-baseline gap-2.5 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Image ads</h1>
+              <span className="text-[12.5px] text-[var(--color-text-2)]">Five concepts, one ad each.</span>
+              <div className="flex-1" />
+              {runId !== null && <RestartStage stage="ads" />}
+            </div>
+            <AdsFlow runId={Number(runId)} />
           </>
         )}
       </div>

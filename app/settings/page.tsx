@@ -8,9 +8,9 @@ import PricingSettings from "@/components/PricingSettings";
 
 // Internal keys are one behind the displayed numbers (the product stage was
 // added in front): product = Stage 1, stage1 = Stage 2, and so on.
-type Stage = "product" | "stage1" | "angles" | "stage2" | "stage3";
+type Stage = "product" | "stage1" | "angles" | "stage2" | "stage3" | "ads";
 
-const STAGE_ORDER: Stage[] = ["product", "stage1", "angles", "stage2", "stage3"];
+const STAGE_ORDER: Stage[] = ["product", "stage1", "angles", "stage2", "stage3", "ads"];
 
 const STAGE_LABELS: Record<Stage, string> = {
   product: "Stage 1 — Product",
@@ -18,6 +18,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   angles: "Stage 2 — Angles",
   stage2: "Stage 3 — Copy",
   stage3: "Stage 4 — Images",
+  ads: "Stage 5 — Image ads",
 };
 
 const STAGE_NUMS: Record<Stage, string> = {
@@ -26,6 +27,7 @@ const STAGE_NUMS: Record<Stage, string> = {
   angles: "02",
   stage2: "03",
   stage3: "04",
+  ads: "05",
 };
 
 interface HistoryEntry {

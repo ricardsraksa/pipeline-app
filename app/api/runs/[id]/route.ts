@@ -128,6 +128,11 @@ export async function PATCH(
     stage3_placement?: string | null;
     /** Stage 3 Pricing card (JSON ProductPricing) — display only. */
     product_pricing?: string | null;
+    // Stage 5 · Image ads
+    ads_prompts_edited?: string | null;
+    ads_images?: string | null;
+    ads_step?: string | null;
+    ads_ref_overrides?: string | null;
     shopify_product_url?: string | null;
     product_code?: string | null;
     // Stage 1 · Product gate
@@ -169,12 +174,46 @@ export async function PATCH(
       if (!Array.isArray(parsed)) throw new Error("product_selected_images must be an array");
       await assertImageUrls(parsed);
     }
+    if (body.type === "ads_image_upsert") {
+      const img = (body as { image?: { image_url?: unknown } }).image;
+      if (img && img.image_url != null) await assertImageUrls([img.image_url]);
+    }
+    if (typeof body.ads_images === "string") {
+      const parsed = JSON.parse(body.ads_images);
+      if (!Array.isArray(parsed)) throw new Error("ads_images must be an array");
+      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => u != null));
+    }
     if (Array.isArray(body.uploaded_source_images)) await assertImageUrls(body.uploaded_source_images);
     if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
     if (Array.isArray(body.approved_image_urls)) await assertImageUrls(body.approved_image_urls);
     if (Array.isArray(body.scraped_image_urls)) await assertImageUrls(body.scraped_image_urls);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Invalid image URL" }, { status: 400 });
+  }
+
+  // Stage 5: merge one ad image into ads_images (same reasoning as the Stage 4
+  // upsert below — per-image saves must not clobber each other).
+  if (body.type === "ads_image_upsert") {
+    const { image } = body as { type: string; image?: { index?: number } & Record<string, unknown> };
+    if (!image || typeof image.index !== "number") {
+      return Response.json({ error: "image with numeric index required" }, { status: 400 });
+    }
+    const row = await db.execute({ sql: "SELECT ads_images FROM runs WHERE id = ?", args: [Number(id)] });
+    let arr: Array<{ index?: number }> = [];
+    try {
+      const raw = (row.rows[0] as unknown as { ads_images: string | null })?.ads_images;
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch { /* empty */ }
+    const i = arr.findIndex((x) => x?.index === image.index);
+    if (i >= 0) arr[i] = image;
+    else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
+    const extra: string[] = [];
+    const args: (string | number | null)[] = [JSON.stringify(arr)];
+    if (typeof (body as { ads_step?: unknown }).ads_step === "string") { extra.push("ads_step = ?"); args.push(String((body as { ads_step?: string }).ads_step)); }
+    args.push(new Date().toISOString(), Number(id));
+    await db.execute({ sql: `UPDATE runs SET ads_images = ?${extra.length ? ", " + extra.join(", ") : ""}, last_updated_at = ? WHERE id = ?`, args });
+    return Response.json({ success: true, images: arr });
   }
 
   // Merge a single Stage 3 image into stage3_remaining_images server-side.
@@ -344,6 +383,16 @@ export async function PATCH(
     values.push(raw ?? null);
   }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("ads_prompts_edited" in body) { fields.push("ads_prompts_edited = ?"); values.push(typeof body.ads_prompts_edited === "string" ? body.ads_prompts_edited.slice(0, 400_000) : null); }
+  if ("ads_images" in body)         { fields.push("ads_images = ?");         values.push(typeof body.ads_images === "string" ? body.ads_images.slice(0, 400_000) : null); }
+  if ("ads_ref_overrides" in body)  { fields.push("ads_ref_overrides = ?");  values.push(typeof body.ads_ref_overrides === "string" ? body.ads_ref_overrides.slice(0, 100_000) : null); }
+  if ("ads_step" in body) {
+    const v = body.ads_step;
+    if (v != null && !["writing", "review", "generating", "done"].includes(String(v))) {
+      return Response.json({ error: "ads_step must be writing, review, generating or done" }, { status: 400 });
+    }
+    fields.push("ads_step = ?"); values.push(v == null ? null : String(v));
+  }
   if ("product_pricing" in body) {
     if (body.product_pricing == null) {
       fields.push("product_pricing = ?"); values.push(null);

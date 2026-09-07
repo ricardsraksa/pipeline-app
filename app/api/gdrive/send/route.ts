@@ -15,7 +15,8 @@ export async function POST(req: Request) {
     return Response.json({ success: false, error: "Drive export not configured — set GOOGLE_SERVICE_ACCOUNT_JSON and GOOGLE_DRIVE_PRODUCTS_FOLDER_ID in Render." }, { status: 503 });
   }
 
-  const { runId } = (await req.json()) as { runId?: number };
+  const { runId, kind } = (await req.json()) as { runId?: number; kind?: string };
+  const wantAds = kind === "ads";
   if (typeof runId !== "number" || !Number.isInteger(runId)) {
     return Response.json({ success: false, error: "runId (integer) required" }, { status: 400 });
   }
@@ -23,12 +24,23 @@ export async function POST(req: Request) {
   if (!run) return Response.json({ success: false, error: "Run not found" }, { status: 404 });
 
   const images: Array<{ name: string; url: string }> = [];
-  if (run.stage3_hero_image_url) images.push({ name: "01-hero.png", url: run.stage3_hero_image_url });
+  if (wantAds) {
+    // Stage 5: the five ads, named by concept, into the "Image Ads" folder.
+    try {
+      const ads = JSON.parse(run.ads_images ?? "[]") as Array<{ index?: number; concept?: string; image_url?: string; status?: string }>;
+      ads
+        .filter((a) => a?.image_url && a.status === "done")
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+        .forEach((a) => images.push({ name: `ad-${a.index ?? 0}-${(a.concept ?? "ad").replace(/[^a-z0-9_-]/gi, "_")}.png`, url: a.image_url as string }));
+    } catch { /* none */ }
+    if (!images.length) return Response.json({ success: false, error: "No finished ads on this run yet." }, { status: 400 });
+  }
+  if (!wantAds && run.stage3_hero_image_url) images.push({ name: "01-hero.png", url: run.stage3_hero_image_url });
   // Section 2/3 photos are named by their role so Drive says which is which.
   let placement: { section_2?: number; section_3?: number } | null = null;
   try { placement = JSON.parse(run.stage3_placement ?? "null"); } catch { placement = null; }
   const sectionOf = (idx?: number) => (idx != null && placement?.section_2 === idx ? 2 : idx != null && placement?.section_3 === idx ? 3 : null);
-  try {
+  if (!wantAds) try {
     const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
     rem
       .filter((im) => im?.image_url && im.status === "done")
@@ -53,13 +65,14 @@ export async function POST(req: Request) {
     const tabTitle = await docTabTitleForCode(code);
     const folderName = tabTitle ?? `${code} - ${(run.brand_name ?? run.product_name ?? "product").trim()}`;
     const folders = await ensureProductFolders(code, folderName);
-    const existing = await existingFileNames(folders.imagesFolderId);
+    const targetFolderId = wantAds ? folders.adsFolderId : folders.imagesFolderId;
+    const existing = await existingFileNames(targetFolderId);
 
     const results: Array<{ name: string; status: "uploaded" | "already-there" | "error"; detail?: string }> = [];
     for (const im of images) {
       if (existing.has(im.name)) { results.push({ name: im.name, status: "already-there" }); continue; }
       try {
-        await uploadImageFromUrl(folders.imagesFolderId, im.name, im.url);
+        await uploadImageFromUrl(targetFolderId, im.name, im.url);
         results.push({ name: im.name, status: "uploaded" });
       } catch (err) {
         results.push({ name: im.name, status: "error", detail: err instanceof Error ? err.message : String(err) });
