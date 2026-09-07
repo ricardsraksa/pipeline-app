@@ -234,8 +234,10 @@ Problem/Solution. One card per concept:
 - **Premise** (what the ad shows and why, editable), **Headline on the image**
   (editable), a proof line saying where any quote or stat came from ("none"
   when the ad carries neither), the full prompt (collapsed, editable, "Edit
-  with AI"), and the reference photos the generator gets (every photo the run
-  has, tick to include; hero first).
+  with AI"), and the reference photos the generator gets (the hero, the eight
+  Stage 4 images, the operator's uploads and every scraped photo; tick to
+  include). The writer reuses the Stage 4 scenes so the ads match the product
+  page, and picks the relevant one per ad.
 - "Generate 5 ads" runs them two at a time through the same generator and
   auditor as Stage 4. Each card then shows its 1:1 image with the audit
   verdict (click to override), Regenerate (with an instruction, pre-filled

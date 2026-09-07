@@ -82,6 +82,14 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const seen = new Set<string>();
   const add = (url: string | null | undefined, tag: string) => { if (url && !seen.has(url)) { seen.add(url); cands.push({ url, tag }); } };
   add(hero, "hero");
+  // Stage 4's finished images — the scenes the ads should reuse.
+  try {
+    const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
+    rem
+      .filter((im) => im?.image_url && im.status === "done")
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      .forEach((im) => add(im.image_url, "stage 4"));
+  } catch { /* none */ }
   safeParse<string[]>(run.uploaded_source_images, []).forEach((u) => add(u, "yours"));
   (scrape?.pages ?? []).forEach((p) => {
     p.image_urls?.forEach((u) => add(u, p.role === "product" ? "listing" : "comp"));

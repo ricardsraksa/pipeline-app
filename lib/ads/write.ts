@@ -35,6 +35,11 @@ const TOOL: Anthropic.Tool = {
             headline: { type: "string" },
             proof: { type: "string" },
             prompt: { type: "string", description: "The filled template, ending with the filled PRODUCT FIDELITY RULES block." },
+            source_image_references: {
+              type: "array",
+              description: "The exact reference image URLs this ad should be generated from, chosen from the list given. Always include the hero (or a source photo) so the product stays right; add the Stage 4 image whose scene this ad reuses.",
+              items: { type: "string" },
+            },
           },
           required: ["index", "concept", "premise", "headline", "proof", "prompt"],
         },
@@ -72,8 +77,20 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   if (!run) throw new Error("Run not found");
   const hero = run.stage3_hero_image_url ?? null;
   const sources = stage3ActiveSourceImages(run, 4);
+  // Stage 4's finished images: the product already rendered correctly, in
+  // scenes built around this run's angle. They are the best references the
+  // ads can have, so the writer picks per ad which one to reuse.
+  let stage4: Array<{ url: string; category: string }> = [];
+  try {
+    const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string; verdict?: string; user_override?: string | null }>;
+    stage4 = rem
+      .filter((im) => im?.image_url && im.status === "done" && (im.user_override ?? im.verdict ?? "pass") !== "fail")
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      .map((im) => ({ url: im.image_url as string, category: im.category || "image" }));
+  } catch { /* none */ }
   const refs = [...(hero ? [hero] : []), ...sources].filter((u, i, a) => a.indexOf(u) === i);
   if (!refs.length) throw new Error("No hero or source photos on this run — the ads need a product reference");
+  const pool = [...refs, ...stage4.map((s) => s.url)].filter((u, i, a) => a.indexOf(u) === i);
 
   const system = await getPrompt("ads");
   await recordPromptUsed(runId, "ads", system);
@@ -105,14 +122,24 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     "SUPPLIER LISTING TEXT (the only source for customer quotes and ratings — if it holds no review text, there is no usable quote):",
     listingText || "(none)",
     "",
-    `REFERENCE IMAGES attached below, in this order: ${hero ? "the approved hero first, then " : ""}${sources.length} source photo(s). Describe the product in the fidelity rules from these. Use these URLs, in this order, as the references: ${refs.join(", ")}`,
+    `PRODUCT REFERENCES (write the fidelity rules from these): ${hero ? `approved hero ${hero}` : ""}${sources.length ? `${hero ? "; " : ""}source photos ${sources.join(", ")}` : ""}`,
     "",
+    ...(stage4.length
+      ? [
+          `STAGE 4 IMAGES (${stage4.length}) — this run's finished product images, already on-brand and built around the same angle. Reuse their scenes, models, rooms and lighting so the ads look like the product page. For EACH ad put in source_image_references the hero (or a source photo) PLUS the Stage 4 image whose scene that ad reuses. Never invent a URL:`,
+          ...stage4.map((s) => `- ${s.category}: ${s.url}`),
+          "",
+        ]
+      : []),
     "Write the five ads now and submit them with submit_ad_prompts.",
   ].join("\n");
 
+  // Vision budget: the hero and a couple of source photos lock the product's
+  // appearance; a few Stage 4 frames show the look to match.
+  const attach = [...refs.slice(0, 3), ...stage4.slice(0, 3).map((s) => s.url)].filter((u, i, a) => a.indexOf(u) === i).slice(0, 6);
   const content: Anthropic.MessageParam["content"] = [
     { type: "text", text: user },
-    ...refs.slice(0, 5).map((u) => ({ type: "image" as const, source: { type: "url" as const, url: u } })),
+    ...attach.map((u) => ({ type: "image" as const, source: { type: "url" as const, url: u } })),
   ];
 
   const call = async (extra?: string) => {
@@ -158,7 +185,14 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
       prompt: str(o.prompt, 6000),
       model: "gpt_image_2",
       aspect_ratio: "1:1",
-      source_image_references: refs.slice(0, 4),
+      // The writer's picks, validated against the pool so nothing hallucinated
+      // reaches the generator; the product references are always pinned.
+      source_image_references: (() => {
+        const picked = Array.isArray(o.source_image_references)
+          ? (o.source_image_references as unknown[]).filter((u): u is string => typeof u === "string" && pool.includes(u))
+          : [];
+        return [...refs.slice(0, 2), ...picked].filter((u, i, a) => a.indexOf(u) === i).slice(0, 5);
+      })(),
     };
   });
   const missing = prompts.filter((p) => !p.prompt);
