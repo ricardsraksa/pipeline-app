@@ -653,6 +653,9 @@ export default function RunPage() {
               {imagesReady
                 ? <SendToDrive runId={runId} variant="row" />
                 : <DeliverRow name="Drive" state="after images" />}
+              {(run.meta.ads?.done ?? 0) > 0
+                ? <SendToDrive runId={runId} variant="row" kind="ads" />
+                : <DeliverRow name="Drive · ads" state="after ads" />}
             </div>
             <input
               value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}

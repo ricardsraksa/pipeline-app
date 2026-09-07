@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 import { parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
+import SendToDrive from "@/components/SendToDrive";
 
 type Cand = { url: string; tag: string };
 
@@ -34,7 +35,6 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const [regenIdx, setRegenIdx] = useState<number | null>(null);
   const [regenText, setRegenText] = useState("");
   const [lb, setLb] = useState<string | null>(null);
-  const [drive, setDrive] = useState<{ busy: boolean; msg: string | null; err: string | null }>({ busy: false, msg: null, err: null });
   const [zipping, setZipping] = useState(false);
   const stopRef = useRef(false);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
@@ -230,15 +230,6 @@ export default function AdsFlow({ runId }: { runId: number }) {
   };
 
   /* ── deliver ───────────────────────────────────────────────────────── */
-  const sendToDrive = async () => {
-    setDrive({ busy: true, msg: null, err: null });
-    try {
-      const r = await fetch("/api/gdrive/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, kind: "ads" }) });
-      const d = await r.json();
-      if (!d.success) { setDrive({ busy: false, msg: null, err: d.error || `Failed (${r.status})` }); return; }
-      setDrive({ busy: false, msg: `${d.uploaded} uploaded${d.skipped ? ` · ${d.skipped} already there` : ""} · ${d.subfolder ?? "Image Ads"} in “${d.folder}”`, err: d.errors?.length ? `${d.errors.length} failed` : null });
-    } catch (e) { setDrive({ busy: false, msg: null, err: e instanceof Error ? e.message : "Network error" }); }
-  };
   const downloadAll = async () => {
     const done = images.filter((im) => im.status === "done" && im.image_url);
     if (!done.length) return;
@@ -280,7 +271,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
         <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / 5 generated{images.some((im) => effVerdict(im) === "fail") ? ` · ${images.filter((im) => effVerdict(im) === "fail").length} flagged` : ""}</span>
         <div className="flex-1" />
         {doneCount > 0 && <button onClick={downloadAll} disabled={zipping} className="btn btn-sm">{zipping ? "Zipping…" : "↓ Download all"}</button>}
-        {doneCount > 0 && <button onClick={sendToDrive} disabled={drive.busy} className="btn btn-sm">{drive.busy ? "Sending…" : "Send to Drive · Image Ads"}</button>}
+        {doneCount > 0 && <SendToDrive runId={runId} kind="ads" />}
         {anyBusy
           ? <button onClick={() => { stopRef.current = true; }} className="btn btn-sm">Stop after current</button>
           : doneCount === 0
@@ -289,7 +280,6 @@ export default function AdsFlow({ runId }: { runId: number }) {
               ? <button onClick={() => generateAll(true)} className="btn btn-primary">Generate the missing {5 - doneCount}</button>
               : <button onClick={() => { if (window.confirm("Regenerate all five ads from the current briefs?")) void generateAll(false); }} className="btn btn-sm">Regenerate all 5</button>}
       </div>
-      {(drive.msg || drive.err) && <p className={`text-[12px] ${drive.err ? "text-[var(--color-red)]" : "text-[var(--color-green)]"}`}>{drive.msg}{drive.err ? ` · ${drive.err}` : ""}</p>}
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(520px, 1fr))" }}>

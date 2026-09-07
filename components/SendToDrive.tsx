@@ -1,14 +1,23 @@
 "use client";
 
-// "Send images to Drive" — uploads the run's final images into the product's
-// Drive folder (created on first send). Skip-if-exists, never overwrites.
+// Uploads a run's finished images into the product's Drive folder (created on
+// first send). kind="images" fills the Images subfolder with the hero + the 8;
+// kind="ads" fills that week's "Image Ads Wnn" with the five Stage 5 ads.
+// Skip-if-exists, never overwrites.
 
 import { useState } from "react";
 
 import { railRow, railRowCols } from "@/components/SendToDoc";
 import { useToast } from "@/components/Toasts";
 
-export default function SendToDrive({ runId, variant = "button" }: { runId: number; variant?: "button" | "row" }) {
+export default function SendToDrive({ runId, variant = "button", kind = "images", label }: {
+  runId: number;
+  variant?: "button" | "row";
+  kind?: "images" | "ads";
+  /** Row label; defaults to "Drive" / "Drive · ads". */
+  label?: string;
+}) {
+  const rowLabel = label ?? (kind === "ads" ? "Drive · ads" : "Drive");
   const { push } = useToast();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -22,14 +31,14 @@ export default function SendToDrive({ runId, variant = "button" }: { runId: numb
       const res = await fetch("/api/gdrive/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId }),
+        body: JSON.stringify({ runId, kind }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) { fail(data.error ?? `Failed (${res.status})`); return; }
       const bits = [
         `${data.uploaded} uploaded`,
         data.skipped ? `${data.skipped} already there` : null,
-        data.createdFolder ? `folder “${data.folder}” created` : `into “${data.folder}”`,
+        data.subfolder ? `into “${data.subfolder}”` : data.createdFolder ? `folder “${data.folder}” created` : `into “${data.folder}”`,
       ].filter(Boolean).join(" · ");
       setMsg(bits + (data.errors?.length ? ` · ${data.errors.length} failed` : ""));
       if (data.errors?.length) fail(data.errors.map((e: { name: string; detail?: string }) => `${e.name}: ${e.detail ?? "failed"}`).join(" | ").slice(0, 300));
@@ -44,8 +53,8 @@ export default function SendToDrive({ runId, variant = "button" }: { runId: numb
   if (variant === "row") {
     return (
       <>
-        <button onClick={send} disabled={busy} className={railRow} style={railRowCols} title={err ?? msg ?? "Upload the finished images to the product's Drive folder"}>
-          <span className="text-[13px] font-[500] text-[var(--color-text)]">Drive</span>
+        <button onClick={send} disabled={busy} className={railRow} style={railRowCols} title={err ?? msg ?? (kind === "ads" ? "Upload the five ads to this week's Image Ads folder" : "Upload the hero and the 8 images to the product's Images folder")}>
+          <span className="text-[13px] font-[500] text-[var(--color-text)]">{rowLabel}</span>
           <span className="ff-mono text-[11px]" style={{ color: err ? "var(--color-red)" : msg ? "var(--color-green)" : "var(--color-text-3)" }}>{busy ? "sending…" : err ? "failed" : msg ? "sent" : "ready"}</span>
         </button>
         {err && <p className="px-2.5 text-[11px] leading-snug text-[var(--color-red)] break-words">{err}</p>}
@@ -60,7 +69,7 @@ export default function SendToDrive({ runId, variant = "button" }: { runId: numb
         disabled={busy}
         className="btn btn-sm"
       >
-        {busy ? "Sending to Drive…" : "Send images to Drive"}
+        {busy ? "Sending to Drive…" : kind === "ads" ? "Send ads to Drive" : "Send images to Drive"}
       </button>
       {msg && <span className="text-[11px] text-[var(--color-green)]">{msg}</span>}
       {err && <span className="text-[11px] text-[var(--color-red)]">{err}</span>}
