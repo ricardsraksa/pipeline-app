@@ -211,6 +211,10 @@ async function migrateDB() {
     // When stage2_json was last derived from the copy text. The Shopify push
     // compares it with stage2_edited_at and re-derives when the text is newer.
     "stage2_json_at TEXT",
+    // What this run has uploaded to each weekly ads folder: JSON
+    // { "<folder>": { "<file name>": "<image url>" } }. Lets a re-send tell a
+    // regenerated ad from one that is already there.
+    "ads_drive_state TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -637,4 +641,5 @@ export interface Run {
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
   stage2_json_at: string | null;
+  ads_drive_state: string | null;
 }

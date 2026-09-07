@@ -70,6 +70,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         ads_error: null,
         ads_ref_overrides: null,
         ads_angle_key: null,
+        ads_drive_state: null,
       };
     case "stage3-prompts":
     case "stage3-images":

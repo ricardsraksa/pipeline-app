@@ -37,6 +37,7 @@ export default function SendToDrive({ runId, variant = "button", kind = "images"
       if (!res.ok || !data.success) { fail(data.error ?? `Failed (${res.status})`); return; }
       const bits = [
         `${data.uploaded} uploaded`,
+        data.replaced ? `${data.replaced} replaced` : null,
         data.skipped ? `${data.skipped} already there` : null,
         data.subfolder ? `into “${data.subfolder}”` : data.createdFolder ? `folder “${data.folder}” created` : `into “${data.folder}”`,
       ].filter(Boolean).join(" · ");

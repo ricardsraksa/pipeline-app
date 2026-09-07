@@ -94,7 +94,9 @@ stage at a time and the app follows the pipeline to whichever needs attention.
   the multiple of COGS. Opens Stage 3.
 - Downloads: the research and copy documents; the generated images.
 - Deliver rows: Google Doc, Shopify, Drive (the hero and the 8 into Images) and
-  Drive · ads (the five ads into that week's "Image Ads Wnn").
+  Drive · ads (the five ads into that week's "Image Ads Wnn"). Re-sending ads
+  after regenerating one replaces that file: the superseded version goes to
+  Drive's bin and the report says "replaced". Images stay append-only.
 - Kill (while running), Resume (after a failure or cancel), Restart this stage.
 - A persistent "what to do next" line with a single action, e.g. "Pick an angle
   → Pick an angle", "Ready for copy → Run copy", "Review the hero → Review hero".

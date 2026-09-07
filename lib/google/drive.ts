@@ -133,6 +133,25 @@ export async function existingFileNames(folderId: string): Promise<Set<string>> 
   return new Set(files.map((f) => f.name));
 }
 
+/** name → file id for one folder (newest wins on duplicate names). */
+export async function existingFilesByName(folderId: string): Promise<Map<string, string>> {
+  const files = await listChildren(folderId);
+  const out = new Map<string, string>();
+  for (const f of files) if (f.mimeType !== FOLDER_MIME) out.set(f.name, f.id);
+  return out;
+}
+
+/** Move one file to Drive's bin. Used only to retire an ad this app itself
+ *  uploaded, when the operator regenerated it and re-sent. Recoverable from
+ *  the bin for 30 days; nothing is ever hard-deleted. */
+export async function trashFile(fileId: string): Promise<void> {
+  await driveFetch(`${DRIVE}/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ trashed: true }),
+  });
+}
+
 /** Download an image (SSRF-guarded) and upload it into the folder. */
 export async function uploadImageFromUrl(folderId: string, name: string, url: string): Promise<void> {
   await assertPublicUrl(url);

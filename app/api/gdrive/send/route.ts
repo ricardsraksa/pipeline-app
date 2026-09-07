@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth";
-import { getRun } from "@/lib/db";
-import { driveConfigured, ensureProductFolders, existingFileNames, uploadImageFromUrl } from "@/lib/google/drive";
+import { getRun, updateRun } from "@/lib/db";
+import { driveConfigured, ensureProductFolders, existingFileNames, existingFilesByName, trashFile, uploadImageFromUrl } from "@/lib/google/drive";
 import { docTabTitleForCode } from "@/lib/google/docs";
 
 export const maxDuration = 300;
@@ -66,17 +66,38 @@ export async function POST(req: Request) {
     const folderName = tabTitle ?? `${code} - ${(run.brand_name ?? run.product_name ?? "product").trim()}`;
     const folders = await ensureProductFolders(code, folderName);
     const targetFolderId = wantAds ? folders.adsFolderId : folders.imagesFolderId;
-    const existing = await existingFileNames(targetFolderId);
+    const folderKey = wantAds ? folders.adsFolderName : "Images";
 
-    const results: Array<{ name: string; status: "uploaded" | "already-there" | "error"; detail?: string }> = [];
+    // Ads keep the same file name across regenerations, so a plain
+    // skip-if-exists would leave the OLD picture in Drive for good. Track what
+    // this run uploaded under each name; when the image behind a name has
+    // changed, bin the superseded file and upload the new one. Stage 4 images
+    // stay strictly append-only.
+    let driveState: Record<string, Record<string, string>> = {};
+    if (wantAds) {
+      try { const v = JSON.parse(run.ads_drive_state ?? "{}"); if (v && typeof v === "object") driveState = v as Record<string, Record<string, string>>; } catch { /* fresh */ }
+    }
+    const sent = { ...(driveState[folderKey] ?? {}) };
+    const existing = wantAds ? null : await existingFileNames(targetFolderId);
+    const byName = wantAds ? await existingFilesByName(targetFolderId) : null;
+
+    const results: Array<{ name: string; status: "uploaded" | "replaced" | "already-there" | "error"; detail?: string }> = [];
     for (const im of images) {
-      if (existing.has(im.name)) { results.push({ name: im.name, status: "already-there" }); continue; }
+      const onDrive = wantAds ? byName!.has(im.name) : existing!.has(im.name);
+      if (onDrive && (!wantAds || sent[im.name] === im.url)) { results.push({ name: im.name, status: "already-there" }); continue; }
+      const replacing = wantAds && onDrive;
       try {
+        if (replacing) await trashFile(byName!.get(im.name)!);
         await uploadImageFromUrl(targetFolderId, im.name, im.url);
-        results.push({ name: im.name, status: "uploaded" });
+        if (wantAds) sent[im.name] = im.url;
+        results.push({ name: im.name, status: replacing ? "replaced" : "uploaded" });
       } catch (err) {
         results.push({ name: im.name, status: "error", detail: err instanceof Error ? err.message : String(err) });
       }
+    }
+    if (wantAds) {
+      driveState[folderKey] = sent;
+      await updateRun(runId, { ads_drive_state: JSON.stringify(driveState), last_updated_at: new Date().toISOString() }).catch(() => {});
     }
 
     return Response.json({
@@ -85,6 +106,7 @@ export async function POST(req: Request) {
       subfolder: wantAds ? folders.adsFolderName : "Images",
       createdFolder: folders.createdProductFolder,
       uploaded: results.filter((r) => r.status === "uploaded").length,
+      replaced: results.filter((r) => r.status === "replaced").length,
       skipped: results.filter((r) => r.status === "already-there").length,
       errors: results.filter((r) => r.status === "error"),
     });
