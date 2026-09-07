@@ -346,7 +346,7 @@ export default function Stage3HeroFlow({
   }
 
   /* ── HERO QC GATE ────────────────────────────────────────────────────── */
-  if (status === "awaiting_hero_qc" && heroUrl) {
+  if ((status === "awaiting_hero_qc" || status === "awaiting_user") && heroUrl) {
     // The photos the hero was built from, so they can be compared side by side.
     const activeSources = sourceCandidates.filter((u) => !sourceBlacklist.includes(u));
     const compareItems = [{ url: heroUrl, label: "Hero" }, ...activeSources.map((u, i) => ({ url: u, label: `Source ${i + 1}` }))];
@@ -855,7 +855,25 @@ export default function Stage3HeroFlow({
         </>
       )}
       <p className="text-[12px] text-[var(--color-text-3)]">Stage 4 status: {status || "unknown"}.</p>
-      <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
+      <div className="flex gap-3 flex-wrap">
+        <button disabled={busy !== null} onClick={fetchRun} className={btnSecondary}>Refresh</button>
+        <button
+          disabled={busy !== null}
+          onClick={async () => {
+            if (!window.confirm("Start Stage 4 over? Deletes the hero, the 8 images and the placement.")) return;
+            setBusy("restart");
+            try {
+              await fetch(`/api/runs/${runId}/restart-stage`, {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ stage: "stage3-prompts" }),
+              });
+            } finally { setBusy(null); await fetchRun(); }
+          }}
+          className={btnSecondary}
+        >
+          {busy === "restart" ? "Restarting…" : "Start Stage 4 over"}
+        </button>
+      </div>
     </div>
   );
 }
