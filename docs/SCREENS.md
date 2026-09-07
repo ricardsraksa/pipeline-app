@@ -247,7 +247,8 @@ Problem/Solution. One card per concept:
 Three blocks.
 
 - **Models** — one row per pipeline role (Stage 1 product, Stage 2 research,
-  Stage 3 copy, Stage 4 prompts, Stage 4 rewrites, Stage 4 auditor, mechanical),
+  Stage 3 copy, Stage 4 prompts, Stage 4 rewrites, Stage 4 auditor, Stage 5 ad
+  briefs, mechanical),
   each with a one-line description, the current model, a picker with price per
   million tokens, and what the default is.
 - **Pricing rules** — minimum multiple of COGS, price ending, compare-at
