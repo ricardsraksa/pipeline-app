@@ -160,7 +160,13 @@ below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
 Under it, the **Variants** card from the AliExpress listing: each option group
 (Colour, Size…) with its values and a copy-values button, and a table of every
 SKU with its AliExpress price and the price/compare-at the rules give it (sold
-out SKUs dimmed). The same card sits above the Shopify push on Stage 4.
+out SKUs dimmed). "Re-read listing" asks the Mac worker to fetch the options
+and per-SKU prices again. Because suppliers cram several dimensions into one
+group, the card can be restructured: "Edit with AI" takes an instruction like
+"split into Color and Size", "Edit by hand" lets the operator rename groups,
+change values and add or remove groups, and "Revert" goes back to what the
+listing said. An edited card is badged. The same card sits above the Shopify
+push on Stage 4.
 
 While working: "Generating copy…".
 

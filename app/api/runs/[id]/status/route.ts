@@ -136,6 +136,7 @@ export async function GET(
       pricing: safeJson(run.product_pricing) ?? null,
       pricingRules,
       variantsRequestedAt: run.variants_refresh_requested ?? null,
+      variantsEdited: run.product_variants_edited ?? null,
       // Stage 5 · Image ads
       ads: (() => {
         let prompts = 0, done = 0, failed = 0;

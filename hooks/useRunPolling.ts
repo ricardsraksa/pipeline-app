@@ -61,6 +61,7 @@ export interface RunStatus {
     pricing: ProductPricing | null;
     pricingRules: PricingRules;
     variantsRequestedAt: string | null;
+    variantsEdited: string | null;
     ads: { step: string | null; error: string | null; prompts: number; done: number; failed: number };
   };
   timestamps: {

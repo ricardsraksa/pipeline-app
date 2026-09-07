@@ -128,6 +128,8 @@ export async function PATCH(
     stage3_placement?: string | null;
     /** Stage 3 Pricing card (JSON ProductPricing) — display only. */
     product_pricing?: string | null;
+    /** Variants card: operator-restructured option groups. */
+    product_variants_edited?: string | null;
     // Stage 5 · Image ads
     ads_prompts_edited?: string | null;
     ads_images?: string | null;
@@ -383,6 +385,18 @@ export async function PATCH(
     values.push(raw ?? null);
   }
   if ("stage3_source_blacklist" in body)          { fields.push("stage3_source_blacklist = ?");          values.push(body.stage3_source_blacklist ?? null); }
+  if ("product_variants_edited" in body) {
+    if (body.product_variants_edited == null) { fields.push("product_variants_edited = ?"); values.push(null); }
+    else {
+      let v: { options?: unknown } | null = null;
+      try { v = JSON.parse(String(body.product_variants_edited)); } catch { v = null; }
+      const ok = v && typeof v.options === "object" && v.options !== null && !Array.isArray(v.options)
+        && Object.values(v.options as Record<string, unknown>).every((x) => Array.isArray(x) && x.every((y) => typeof y === "string"));
+      if (!ok) return Response.json({ error: "product_variants_edited needs an options object of name → string values" }, { status: 400 });
+      fields.push("product_variants_edited = ?");
+      values.push(JSON.stringify({ ...(v as object), at: new Date().toISOString() }).slice(0, 200_000));
+    }
+  }
   if ("ads_prompts_edited" in body) { fields.push("ads_prompts_edited = ?"); values.push(typeof body.ads_prompts_edited === "string" ? body.ads_prompts_edited.slice(0, 400_000) : null); }
   if ("ads_images" in body)         { fields.push("ads_images = ?");         values.push(typeof body.ads_images === "string" ? body.ads_images.slice(0, 400_000) : null); }
   if ("ads_ref_overrides" in body)  { fields.push("ads_ref_overrides = ?");  values.push(typeof body.ads_ref_overrides === "string" ? body.ads_ref_overrides.slice(0, 100_000) : null); }

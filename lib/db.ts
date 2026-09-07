@@ -200,6 +200,9 @@ async function migrateDB() {
     "ads_step TEXT",
     "ads_error TEXT",
     "ads_ref_overrides TEXT",
+    // Variants card: the operator's restructured option groups (by hand or by
+    // AI). Overrides what the listing said; "Revert" clears it.
+    "product_variants_edited TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -621,4 +624,5 @@ export interface Run {
   ads_step: string | null;
   ads_error: string | null;
   ads_ref_overrides: string | null;
+  product_variants_edited: string | null;
 }

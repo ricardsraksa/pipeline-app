@@ -734,7 +734,7 @@ export default function RunPage() {
             {runId !== null && run.product.scrape && (
               <>
                 <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
-                <VariantsCard runId={runId} scrape={run.product.scrape} rules={run.meta.pricingRules} band={run.meta.pricing?.band ?? null} requestedAt={run.meta.variantsRequestedAt ?? null} />
+                <VariantsCard runId={runId} scrape={run.product.scrape} rules={run.meta.pricingRules} band={run.meta.pricing?.band ?? null} requestedAt={run.meta.variantsRequestedAt ?? null} edited={run.meta.variantsEdited ?? null} />
               </>
             )}
             {outputs.stage2Output ? (
