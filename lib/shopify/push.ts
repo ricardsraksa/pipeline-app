@@ -186,14 +186,18 @@ export async function applyToProduct(params: {
   const pushed = new Set(params.alreadyPushedUrls);
   const toAdd: Array<{ url: string; alt: string }> = [];
   let skipped = 0;
-  // URL is the primary key. Alt-text dedupe only applies when we have no push
-  // state for this product (DB restore) — with push state, a regenerated image
-  // (new URL, same alt) must reach the store.
-  const altDedupe = params.alreadyPushedUrls.length === 0;
+  // An image is "already there" only when BOTH hold: we pushed this exact URL
+  // before AND a media with its alt is still on the product. Our push-state
+  // alone is not enough — if the operator deleted the media in Shopify, the
+  // image must go up again. A regenerated image (new URL, same alt) is never
+  // skipped. With no push state at all (DB restore) the alt is all we have.
+  const havePushState = params.alreadyPushedUrls.length > 0;
   params.images.forEach((im, i) => {
     if (!im.url || !im.url.startsWith("http")) return;
     const alt = mkAlt(im.category, i);
-    if (pushed.has(im.url) || (altDedupe && existingAlts.has(alt))) { skipped++; return; }
+    const onProduct = existingAlts.has(alt);
+    const already = havePushState ? (pushed.has(im.url) && onProduct) : onProduct;
+    if (already) { skipped++; return; }
     toAdd.push({ url: im.url, alt });
   });
 

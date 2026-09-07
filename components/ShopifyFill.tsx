@@ -105,8 +105,9 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
             </a>{" "}
             ({report.product.status.toLowerCase()}, {report.product.mediaCount} existing images)
             {report.titleUpdate ? ` · title ${report.titleUpdate.applied ? "updated" : "not updated"} from “${report.titleUpdate.from}”` : " · title unchanged"}
-            {" · "}{report.images.toAdd.length} image{report.images.toAdd.length === 1 ? "" : "s"} added
-            {report.images.skipped > 0 && ` (${report.images.skipped} already there)`}
+            {" · "}{report.images.toAdd.length === 0 && report.images.skipped > 0
+              ? `no new images — all ${report.images.skipped} already on the product`
+              : `${report.images.toAdd.length} image${report.images.toAdd.length === 1 ? "" : "s"} added${report.images.skipped > 0 ? ` (${report.images.skipped} already there)` : ""}`}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-[11px]">
