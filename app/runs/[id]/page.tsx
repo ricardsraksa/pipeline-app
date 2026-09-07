@@ -652,7 +652,7 @@ export default function RunPage() {
       </aside>
 
       {/* ── main ── */}
-      <div style={{ padding: "26px 30px 100px", maxWidth: activeKey === "ads" ? "none" : 1000 }}>
+      <div style={{ padding: "26px 30px 100px" }}>
 
         {/* Stage 1 · Product */}
         {activeKey === "product" && (
@@ -697,7 +697,9 @@ export default function RunPage() {
                     )}
                   </div>
                   <div className={cx(card, "px-[22px] py-5")}>
-                    <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+                    <div className="max-w-[78ch]">
+                      <OnePagerMarkdown text={outputs.onePagerEdited ?? outputs.onePager ?? ""} />
+                    </div>
                   </div>
                   {run.scrapeErrors && run.scrapeErrors.length > 0 && (
                     <p className="mt-3 text-[11.5px] text-[var(--color-amber)]">{run.scrapeErrors.length} competitor link{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be read.</p>

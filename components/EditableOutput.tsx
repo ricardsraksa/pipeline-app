@@ -144,8 +144,8 @@ export default function EditableOutput({
   const displayValue = editedValue ?? originalValue;
   const isEdited = editedValue !== null;
   const textCls = monospace
-    ? "font-[var(--font-ibm-plex-mono)] text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words"
-    : "text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words";
+    ? "font-[var(--font-ibm-plex-mono)] text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words max-w-[78ch]"
+    : "text-[13px] leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words max-w-[78ch]";
 
   return (
     <div className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_1px_2px_rgba(20,20,18,.05)] overflow-hidden">

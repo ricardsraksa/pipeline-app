@@ -1595,7 +1595,7 @@ function CompletedReview({
         <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
           Top of page · product shots <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {productEntries.length + (heroUrl ? 1 : 0)} images</span>
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
           {heroUrl && (
             <div className="flex flex-col gap-1.5">
               <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
@@ -1633,7 +1633,7 @@ function CompletedReview({
           <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
             Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— problem → solution → proof</span>
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
             {sectionEntries.map(({ section, entry }) => {
               const { im, i } = entry;
               const copy = (promptFor(im)?.overlay_text || "").trim();
@@ -2212,7 +2212,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
   const openLb = (url: string) => { const i = lbItems.findIndex((x) => x.url === url); if (i >= 0) setLb(i); };
   return (
     <>
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
       {heroUrl && (
         <div className="aspect-square rounded-[11px] border-2 border-[var(--color-green)] overflow-hidden relative group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
