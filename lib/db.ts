@@ -215,6 +215,8 @@ async function migrateDB() {
     // { "<folder>": { "<file name>": "<image url>" } }. Lets a re-send tell a
     // regenerated ad from one that is already there.
     "ads_drive_state TEXT",
+    // Stage 1 gate "Try again": tells the Mac worker to restart its attempts.
+    "scrape_retry_requested TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -642,4 +644,5 @@ export interface Run {
   ads_angle_key: string | null;
   stage2_json_at: string | null;
   ads_drive_state: string | null;
+  scrape_retry_requested: string | null;
 }

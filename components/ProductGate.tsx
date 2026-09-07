@@ -202,10 +202,20 @@ export default function ProductGate({
   const lastSeenMs = product?.workerLastSeen ? Date.now() - new Date(product.workerLastSeen).getTime() : Infinity;
   const workerOnline = lastSeenMs < 2 * 60 * 1000;
   const workerAgo = lastSeenMs < 60_000 ? "just now" : `${Math.round(lastSeenMs / 60_000)} min ago`;
-  // The worker stops after ~3 minutes of failures. If the page has been sitting
-  // unread longer than that with the worker alive, it has given up.
+  // The worker backs off for hours on a throttled page (2, 10, 30 min, then
+  // hourly). A page unread for more than 5 min with the worker alive is in that
+  // back-off; "Try again" resets its attempts so it retries within a poll.
   const scrapedAgoMs = scrape?.scraped_at ? Date.now() - new Date(scrape.scraped_at).getTime() : 0;
   const gaveUp = workerOnline && scrapedAgoMs > 5 * 60 * 1000;
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const tryAgain = async () => {
+    setRetrying("…");
+    try {
+      const r = await fetch(`/api/runs/${runId}/scrape-retry`, { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      setRetrying(r.ok && d.success ? "requested — your Mac retries within a minute; a browser window may open, complete any check it shows" : (d.error || `Failed (${r.status})`));
+    } catch { setRetrying("Network error"); }
+  };
   const pushCmd = `scrapling-py ~/Desktop/supplier-scrape.py --push ${typeof window !== "undefined" ? window.location.origin : ""} --run ${runId} ${run.meta.productUrl || "<product url>"}`;
 
   const grouped = (["uploaded", "product", "description", "competitor"] as const)
@@ -224,12 +234,18 @@ export default function ProductGate({
           style={{ borderColor: "color-mix(in srgb, var(--color-amber) 40%, var(--color-border))", background: "var(--color-amber-bg)" }}>
           <p className="text-[12.5px] font-[600] text-[var(--color-text)]">
             {productPage.deferred
-              ? (gaveUp ? "Your Mac couldn't get this page. Scrape it by hand:" : workerOnline ? "Your Mac is scraping this page." : "Mac worker offline.")
+              ? (gaveUp ? "AliExpress is throttling your Mac's IP. It retries on a schedule, or press Try again." : workerOnline ? "Your Mac is scraping this page." : "Mac worker offline.")
               : productPage.rateLimited ? "The supplier site is rate-limiting the server." : "The app couldn't read the product page."}
           </p>
-          <p className="text-[12px] text-[var(--color-text-2)]">
-            {productPage.deferred && !gaveUp && workerOnline ? `Checked in ${workerAgo}.` : "Run this on your Mac, or write the description yourself."}
-          </p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-[12px] text-[var(--color-text-2)]">
+              {productPage.deferred && !gaveUp && workerOnline ? `Checked in ${workerAgo}.` : "Or run this on your Mac, or write the description yourself."}
+            </p>
+            {productPage.deferred && workerOnline && (
+              <button onClick={tryAgain} disabled={retrying === "…"} className="btn btn-sm">{retrying === "…" ? "Requesting…" : "Try again"}</button>
+            )}
+            {retrying && retrying !== "…" && <span className="text-[11.5px] text-[var(--color-text-3)]">{retrying}</span>}
+          </div>
           <div className="flex items-center gap-2">
             <code className="ff-mono text-[11px] flex-1 min-w-0 overflow-x-auto whitespace-nowrap rounded-[6px] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[var(--color-text)]">{pushCmd}</code>
             <button onClick={() => { navigator.clipboard.writeText(pushCmd).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className={textBtn}>

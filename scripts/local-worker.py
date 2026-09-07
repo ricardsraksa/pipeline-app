@@ -38,8 +38,16 @@ STATE_FILE = Path.home() / "Desktop" / "scraped" / ".worker-state.json"
 # Fail fast: the operator would rather scrape it by hand than have the worker
 # grind for hours. A page gets a couple of quick retries over ~3 minutes and is
 # then left alone, with the manual command already on the run page.
-RETRY_AFTER = 90           # seconds between attempts on the same URL
-MAX_ATTEMPTS = 3           # ~3 minutes total, then stop
+# Back-off between attempts on the same URL. AliExpress throttles an IP for an
+# hour or more, so the gaps grow: 2 min, 10 min, 30 min, then hourly — about
+# four hours in total before the worker stops trying on its own. The gate's
+# "Try again" resets the count.
+RETRY_SCHEDULE = [120, 600, 1800, 3600, 3600, 3600]
+MAX_ATTEMPTS = len(RETRY_SCHEDULE)
+
+
+def retry_after(attempts: int) -> int:
+    return RETRY_SCHEDULE[min(max(attempts, 1), len(RETRY_SCHEDULE)) - 1]
 
 
 def log(msg: str) -> None:
@@ -107,13 +115,25 @@ def save_state(state: dict) -> None:
     STATE_FILE.write_text(json.dumps(state, indent=2))
 
 
+def parse_iso(value) -> float:
+    """ISO timestamp → epoch seconds, 0 when absent or unparseable."""
+    if not value or not isinstance(value, str):
+        return 0.0
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
 def due(state: dict, key: str) -> bool:
     e = state.get(key)
     if not e:
         return True
-    if e.get("attempts", 0) >= MAX_ATTEMPTS:
+    attempts = e.get("attempts", 0)
+    if attempts >= MAX_ATTEMPTS:
         return False
-    return time.time() - e.get("at", 0) >= RETRY_AFTER
+    return time.time() - e.get("at", 0) >= retry_after(attempts)
 
 
 def note_failure(state: dict, key: str, run_id: int, msg: str) -> None:
@@ -121,8 +141,9 @@ def note_failure(state: dict, key: str, run_id: int, msg: str) -> None:
     attempts = st["attempts"] + 1
     state[key] = {"attempts": attempts, "at": time.time(), "error": msg[:300]}
     left = MAX_ATTEMPTS - attempts
-    tail = (f"retrying in {RETRY_AFTER}s ({left} attempt{'s' if left != 1 else ''} left)"
-            if left > 0 else "giving up on this URL — scrape it manually from the run page")
+    wait = retry_after(attempts)
+    tail = (f"retrying in {wait // 60} min ({left} attempt{'s' if left != 1 else ''} left)"
+            if left > 0 else "giving up on this URL — press “Try again” on the run page to restart the attempts")
     log(f"run #{run_id}: failed — {msg[:140]} | {tail}")
 
 
@@ -155,6 +176,14 @@ def run_once(app: App, scraper) -> int:
             continue
         # competitors first, product last — the final push triggers the analyst
         urls = sorted(job["urls"], key=lambda u: 0 if u["role"] == "competitor" else 1)
+        # "Try again" on the run page: forget the failures older than the request.
+        retry_at = parse_iso(job.get("retryAt"))
+        if retry_at:
+            for u in urls:
+                key = f"{run_id}:{u['url']}"
+                if key in state and state[key].get("at", 0) < retry_at:
+                    state.pop(key, None)
+                    log(f"run #{run_id}: retry requested from the run page — attempts reset")
         pending = [u for u in urls if due(state, f"{run_id}:{u['url']}")]
         if not pending:
             continue

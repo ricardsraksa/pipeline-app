@@ -15,18 +15,20 @@ export async function GET(req: NextRequest) {
   try { await setKV("worker_last_seen", new Date().toISOString()); } catch { /* heartbeat is best-effort */ }
 
   const r = await db.execute(
-    `SELECT id, product_url, competitor_urls, product_scrape FROM runs
+    `SELECT id, product_url, competitor_urls, product_scrape, scrape_retry_requested FROM runs
      WHERE status = 'awaiting_product_approval' AND product_approved_at IS NULL
      ORDER BY id DESC LIMIT 20`,
   );
-  const jobs: { runId: number; urls: { url: string; role: "product" | "competitor" }[]; mode?: "variants" }[] = [];
-  for (const row of r.rows as unknown as { id: number; product_url: string | null; competitor_urls: string | null; product_scrape: string | null }[]) {
+  const jobs: { runId: number; urls: { url: string; role: "product" | "competitor" }[]; mode?: "variants"; retryAt?: string | null }[] = [];
+  for (const row of r.rows as unknown as { id: number; product_url: string | null; competitor_urls: string | null; product_scrape: string | null; scrape_retry_requested: string | null }[]) {
     const scrape = parseProductScrape(row.product_scrape);
     if (!scrape) continue;
     const urls = scrape.pages
       .filter((p) => !p.ok)
       .map((p) => ({ url: p.url, role: p.role }));
-    if (urls.length) jobs.push({ runId: Number(row.id), urls });
+    // retryAt: the operator pressed "Try again" — the worker resets its
+    // attempt count for this run when this is newer than its last failure.
+    if (urls.length) jobs.push({ runId: Number(row.id), urls, retryAt: row.scrape_retry_requested ?? null });
   }
   // Variant re-reads requested from the Variants card (any status): the
   // worker scrapes the product page and pushes with mode=variants.

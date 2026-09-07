@@ -49,6 +49,10 @@ MIN_BYTES = 15_000          # smaller than this is an icon or swatch, not a phot
 WANT_IMAGES = 6
 WANT_DESC_IMAGES = 12
 BROWSER_ATTEMPTS = 3
+# On the Mac, a rate-limited AliExpress page gets one more try in a visible
+# browser window (see fetch()). Off on servers, which have no display.
+HEADED_FALLBACK = sys.platform == "darwin" and os.environ.get("SCRAPE_HEADED_FALLBACK", "1") != "0"
+HEADED_TIMEOUT_MS = 180000   # time for the page — and the operator — to get through a challenge
 
 # Gallery images often sit in a JSON blob rather than an <img> tag. They're
 # recognisable by a descriptive, hyphenated filename (Wall-Lights-With-Remote.jpg)
@@ -160,6 +164,17 @@ def fetch(url: str):
         if (page.css("title::text").get() or "").strip():
             return page, "browser"
         if is_rate_limited(page):
+            if HEADED_FALLBACK:
+                say("   AliExpress is challenging this IP — opening a browser window. "
+                    "If a slider or check appears there, complete it; the page is read as soon as the product shows.")
+                headed = DynamicFetcher.fetch(
+                    url, headless=False, network_idle=True, timeout=HEADED_TIMEOUT_MS,
+                    wait_selector='[data-pl="product-title"], [class*="sku-item"], h1',
+                    wait=3000, capture_xhr="desc.htm")
+                if (headed.css("title::text").get() or "").strip() and not is_rate_limited(headed):
+                    state["last_browser_fetch"] = time.time()
+                    save_state(state)
+                    return headed, "browser-headed"
             raise RateLimited(
                 "AliExpress is rate-limiting this IP address. It serves an anti-bot "
                 "page instead of the product; the IP is what is throttled, so retrying "
