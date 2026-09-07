@@ -9,7 +9,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
 import { parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
-import { parseProductScrape } from "@/lib/product";
 
 type Cand = { url: string; tag: string };
 
@@ -77,24 +76,20 @@ export default function AdsFlow({ runId }: { runId: number }) {
 
   // Every photo the run has, as reference candidates: hero first, then the
   // operator's uploads, then everything the scrape read.
-  const scrape = parseProductScrape(run.product_scrape);
+  // Only the run's own finished images: the hero, then the eight. The scraped
+  // listing photos are what Stage 4 already worked from — offering them again
+  // here just crowds the card.
   const cands: Cand[] = [];
   const seen = new Set<string>();
   const add = (url: string | null | undefined, tag: string) => { if (url && !seen.has(url)) { seen.add(url); cands.push({ url, tag }); } };
   add(hero, "hero");
-  // Stage 4's finished images — the scenes the ads should reuse.
   try {
     const rem = JSON.parse(run.stage3_remaining_images ?? "[]") as Array<{ index?: number; category?: string; image_url?: string; status?: string }>;
     rem
       .filter((im) => im?.image_url && im.status === "done")
       .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
-      .forEach((im) => add(im.image_url, "stage 4"));
+      .forEach((im) => add(im.image_url, im.category || "image"));
   } catch { /* none */ }
-  safeParse<string[]>(run.uploaded_source_images, []).forEach((u) => add(u, "yours"));
-  (scrape?.pages ?? []).forEach((p) => {
-    p.image_urls?.forEach((u) => add(u, p.role === "product" ? "listing" : "comp"));
-    p.description_image_urls?.forEach((u) => add(u, "desc"));
-  });
   const refsFor = (p: AdPrompt) => refOverrides[String(p.index)] ?? p.source_image_references ?? [];
 
   /* ── write ─────────────────────────────────────────────────────────── */
@@ -297,7 +292,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
       {(drive.msg || drive.err) && <p className={`text-[12px] ${drive.err ? "text-[var(--color-red)]" : "text-[var(--color-green)]"}`}>{drive.msg}{drive.err ? ` · ${drive.err}` : ""}</p>}
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(460px, 1fr))" }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(520px, 1fr))" }}>
         {drafts.map((p) => {
           const im = images.find((x) => x.index === p.index);
           const v = effVerdict(im);
@@ -317,7 +312,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
 
               <div className="flex gap-3 p-[13px]">
                 {/* image / placeholder */}
-                <div className="w-[200px] shrink-0">
+                <div className="w-[240px] shrink-0">
                   <div className={`aspect-square rounded-[9px] border overflow-hidden relative bg-[var(--color-surface-2)] ${v === "fail" || im?.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"}`}>
                     {busy && (
                       <div className="absolute inset-0 z-20 grid place-items-center bg-black/60">
@@ -396,10 +391,10 @@ export default function AdsFlow({ runId }: { runId: number }) {
                         const on = refs.includes(c.url);
                         return (
                           <button key={c.url} onClick={() => toggleRef(p, c.url)} title={c.tag}
-                            className={`relative w-[52px] h-[52px] rounded-[6px] overflow-hidden border-2 bg-[var(--color-surface-2)] cursor-pointer ${on ? "border-[var(--color-accent)]" : "border-transparent opacity-60 hover:opacity-100"}`}>
+                            className={`relative w-[46px] h-[46px] rounded-[6px] overflow-hidden border-2 bg-[var(--color-surface-2)] cursor-pointer group/ref ${on ? "border-[var(--color-accent)]" : "border-transparent opacity-55 hover:opacity-100"}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={c.url} alt="" loading="lazy" className="w-full h-full object-contain" />
-                            <span className="absolute bottom-0 left-0 right-0 ff-mono text-[7.5px] uppercase text-center bg-black/55 text-white">{c.tag}</span>
+                            <span className="absolute bottom-0 left-0 right-0 ff-mono text-[7px] uppercase text-center bg-black/60 text-white opacity-0 group-hover/ref:opacity-100 transition-opacity truncate px-0.5">{c.tag}</span>
                           </button>
                         );
                       })}

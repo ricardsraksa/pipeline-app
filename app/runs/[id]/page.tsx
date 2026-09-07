@@ -652,7 +652,7 @@ export default function RunPage() {
       </aside>
 
       {/* ── main ── */}
-      <div style={{ padding: "26px 30px 100px", maxWidth: 1000 }}>
+      <div style={{ padding: "26px 30px 100px", maxWidth: activeKey === "ads" ? "none" : 1000 }}>
 
         {/* Stage 1 · Product */}
         {activeKey === "product" && (
