@@ -165,16 +165,23 @@ def fetch(url: str):
             return page, "browser"
         if is_rate_limited(page):
             if HEADED_FALLBACK:
-                say("   AliExpress is challenging this IP — opening a browser window. "
-                    "If a slider or check appears there, complete it; the page is read as soon as the product shows.")
+                say(f"   AliExpress is challenging this IP — opening a browser window for up to {HEADED_TIMEOUT_MS // 1000}s. "
+                    "Complete any slider or check it shows; the page is read as soon as the product appears.")
+                # Wait ONLY on markup the real product page has. The block page
+                # carries an <h1>, so including it here made the window close
+                # the instant the challenge rendered — before it could be
+                # solved. network_idle is off for the same reason: the wait has
+                # to outlast a human dragging a slider.
                 headed = DynamicFetcher.fetch(
-                    url, headless=False, network_idle=True, timeout=HEADED_TIMEOUT_MS,
-                    wait_selector='[data-pl="product-title"], [class*="sku-item"], h1',
+                    url, headless=False, network_idle=False, timeout=HEADED_TIMEOUT_MS,
+                    wait_selector='[data-pl="product-title"], [class*="sku-item--property"]',
                     wait=3000, capture_xhr="desc.htm")
                 if (headed.css("title::text").get() or "").strip() and not is_rate_limited(headed):
                     state["last_browser_fetch"] = time.time()
                     save_state(state)
+                    say("   got the product from the visible window.")
                     return headed, "browser-headed"
+                say("   the visible window didn't get through either.")
             raise RateLimited(
                 "AliExpress is rate-limiting this IP address. It serves an anti-bot "
                 "page instead of the product; the IP is what is throttled, so retrying "
