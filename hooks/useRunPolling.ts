@@ -48,6 +48,10 @@ export interface RunStatus {
   angles: {
     proposed: string | null;
     selected: string | null;
+    key: string | null;
+    stage2Key: string | null;
+    stage3Key: string | null;
+    adsKey: string | null;
   };
   meta: {
     productUrl: string;

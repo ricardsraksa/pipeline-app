@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { anglesBlock, parseSelectedAngles } from '@/lib/angles'
+import { anglesBlock, parseSelectedAngles, angleKey } from '@/lib/angles'
 import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
 import { generateRemainingPrompts, REMAINING_SYSTEM, extractVisualSection, pageSectionsFromStage2Json } from '@/lib/stage3/hero'
 import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
 
     await updateRun(runId, {
       stage3_remaining_prompts: JSON.stringify(prompts),
+      stage3_angle_key: angleKey(run.product_angle_selected),
       stage3_remaining_validation: JSON.stringify(validation),
       status: 'awaiting_qc',
       current_step: 'Stage 4: Review the 8 prompts before generating',

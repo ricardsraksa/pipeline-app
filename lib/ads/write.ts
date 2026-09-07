@@ -9,7 +9,7 @@ import { jsonrepair } from "jsonrepair";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
-import { anglesBlock, parseSelectedAngles } from "@/lib/angles";
+import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
 import { parseProductScrape } from "@/lib/product";
 import { stage3ActiveSourceImages } from "@/lib/stage3/sources";
 import { AD_CONCEPTS, type AdConcept, type AdPrompt } from "@/lib/ads/shape";
@@ -200,6 +200,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
 
   await updateRun(runId, {
     ads_prompts: JSON.stringify(prompts),
+    ads_angle_key: angleKey(run.product_angle_selected),
     ads_prompts_edited: null,
     ads_step: "review",
     ads_error: null,

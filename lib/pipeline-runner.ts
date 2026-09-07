@@ -3,7 +3,7 @@ import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import { scraplingScrape } from "./scrapling";
 import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
 import { generateAngles } from "./angles-generate";
-import { anglesBlock, parseSelectedAngles } from "./angles";
+import { anglesBlock, parseSelectedAngles, angleKey } from "./angles";
 import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
@@ -736,6 +736,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
 
   await updateRun(runId, {
     stage2_output: output,
+    stage2_angle_key: angleKey(run.product_angle_selected),
     current_step: "Stage 3: Saving output",
     last_updated_at: now(),
   });

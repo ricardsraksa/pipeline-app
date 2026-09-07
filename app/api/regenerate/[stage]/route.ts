@@ -3,6 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
+import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
+
+// The cheap path when the operator changes the angle after the copy exists:
+// one revision pass that rewrites around the new angle instead of a full
+// Stage 3 re-run, keeping the structure and the operator's edits.
+const REBUILD_ON_ANGLE =
+  "The positioning angle for this product has changed to the one given under POSITIONING ANGLE. Rebuild the copy around it: the headlines, the benefits, the three sections, the FAQ questions and the Facebook copy must open on THIS problem and mechanism, not the previous one. Keep the section structure, the product name, What's Included and every fact that is not tied to the old angle. Do not mention that the angle changed.";
 
 import { requireSession } from "@/lib/auth";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -29,8 +36,9 @@ export async function POST(
   if (denied) return denied;
   const { stage } = (await context.params) as { stage: string };
 
-  const body = (await req.json()) as { runId?: number; instructions?: string };
-  const { runId, instructions } = body;
+  const body = (await req.json()) as { runId?: number; instructions?: string; mode?: string };
+  const { runId } = body;
+  const instructions = body.mode === "angle" ? REBUILD_ON_ANGLE : body.instructions;
 
   if (!runId || typeof runId !== "number") {
     return NextResponse.json({ error: "runId required" }, { status: 400 });
@@ -72,6 +80,8 @@ export async function POST(
     // loses the race and the Copy tab keeps showing the old structure. Still
     // best-effort — a structuring failure never fails the regeneration itself.
     if (stage === "stage2") {
+      // The rewrite was built on the current pick — the stage is no longer stale.
+      await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
       try {
         const structured = await structureStage2Copy(result.output, runId);
         if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), gdoc_appended_at: null });
@@ -239,7 +249,9 @@ Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`,
     },
   ];
 
+  const angle = anglesBlock(parseSelectedAngles(run.product_angle_selected));
   const user = [
+    ...(angle ? ["POSITIONING ANGLE (the copy is built around this):", angle, ""] : []),
     "CURRENT COPY:",
     currentCopy,
     "",

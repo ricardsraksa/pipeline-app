@@ -211,6 +211,8 @@ export default function RunPage() {
   // Product code (e.g. P58): names the Google Doc tab and the Drive folder.
   // Edited inline in the rail's identity line.
   const [editingCode, setEditingCode] = useState(false);
+  // Copy stage: the cheap "rebuild on this angle" revision pass in flight.
+  const [rebuilding, setRebuilding] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
   const saveCode = async () => {
     setEditingCode(false);
@@ -518,6 +520,34 @@ export default function RunPage() {
   const card = "border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]";
   // Finished images exist — enough for Shopify and Drive, whatever the status word says.
   const imagesReady = run.status === "completed" || (run.stage4?.done ?? 0) > 0;
+  // A stage is stale when it was built on a different angle than the one now
+  // ticked. Unknown (older runs, no stamp) never counts as stale.
+  const ak = run.angles;
+  const staleOn = (built: string | null | undefined, exists: boolean) => Boolean(exists && ak?.key && built && built !== ak.key);
+  const angleStale: Record<StageKey, boolean> = {
+    product: false,
+    stage1: false,
+    stage2: staleOn(ak?.stage2Key, Boolean(outputs.stage2Output)),
+    stage3: staleOn(ak?.stage3Key, (run.stage4?.done ?? 0) > 0 || run.status === "completed"),
+    ads: staleOn(ak?.adsKey, Boolean(run.meta.ads?.step)),
+  };
+  const rebuildCopyOnAngle = async () => {
+    if (!runId || rebuilding) return;
+    setRebuilding(true);
+    try {
+      const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "angle" }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { push(`Rebuild failed: ${data.error ?? res.status}`); setRebuilding(false); return; }
+      window.location.reload();
+    } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
+  };
+  const StaleFlag = ({ stage, action }: { stage: StageKey; action?: React.ReactNode }) => angleStale[stage] ? (
+    <div className="mb-4 flex items-center gap-3 flex-wrap rounded-[8px] border border-[var(--color-amber)]/50 px-3 py-2">
+      <span className="text-[12.5px] text-[var(--color-amber)]">Built on a different angle than the one now ticked.</span>
+      <div className="flex-1" />
+      {action}
+    </div>
+  ) : null;
   const waiting = (text: string) => (
     <div className={cx(card, "px-5 py-10 grid place-items-center")}>
       <p className="ff-mono text-[12px] text-[var(--color-text-2)]">{text}</p>
@@ -578,7 +608,7 @@ export default function RunPage() {
                 style={{ gridTemplateColumns: "16px 1fr auto" }}>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{def.n}</span>
                 <span className={cx("text-[13px] font-[500]", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
-                <span className="ff-mono text-[11px]" style={{ color: stateTone[st] }}>{stateWord[st]}</span>
+                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : stateWord[st]}</span>
               </button>
             );
           })}
@@ -731,6 +761,9 @@ export default function RunPage() {
                 </div>
               )}
             </div>
+            <StaleFlag stage="stage2" action={
+              <button onClick={rebuildCopyOnAngle} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on this angle"}</button>
+            } />
             {runId !== null && run.product.scrape && (
               <>
                 <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
@@ -777,6 +810,7 @@ export default function RunPage() {
                 </div>
               )}
             </div>
+            <StaleFlag stage="stage3" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]">Restart stage to rebuild the images on it</span>} />
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
           </>
         )}
@@ -789,6 +823,7 @@ export default function RunPage() {
               <div className="flex-1" />
               {runId !== null && <RestartStage stage="ads" />}
             </div>
+            <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]">Restart stage to rewrite the ads on it</span>} />
             <AdsFlow runId={Number(runId)} />
           </>
         )}

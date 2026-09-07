@@ -95,6 +95,18 @@ export function anglesBlock(angles: Angle[]): string {
   return parts.join("\n\n");
 }
 
+/** Fingerprint of the selected angles (ids + the wording that matters). Each
+ *  downstream stage stores the key it was built with; when the current key
+ *  differs, that stage is shown as built on a different angle. */
+export function angleKey(selectedJson: string | null | undefined): string | null {
+  const angles = parseSelectedAngles(selectedJson);
+  if (!angles.length) return null;
+  const s = JSON.stringify(angles.map((a) => [a.id, a.title, a.problem, a.mechanism, a.hook]));
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 /** @deprecated single-angle form kept for older call sites. */
 export function angleBlock(angle: Angle | null): string {
   return angle ? anglesBlock([angle]) : "";

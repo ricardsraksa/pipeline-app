@@ -4,6 +4,7 @@ import { getRun, getKV } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { getPricingRules } from "@/lib/pricing-store";
 import type { PricingRules } from "@/lib/pricing";
+import { angleKey } from "@/lib/angles";
 
 // This route is polled every few seconds per open run, so the two settings
 // lookups (worker heartbeat, pricing rules) are cached in-process for 10s —
@@ -122,6 +123,11 @@ export async function GET(
     angles: {
       proposed: run.product_angles ?? null,
       selected: run.product_angle_selected ?? null,
+      // Current pick vs. what each stage was built with (null = unknown/none).
+      key: angleKey(run.product_angle_selected),
+      stage2Key: run.stage2_angle_key ?? null,
+      stage3Key: run.stage3_angle_key ?? null,
+      adsKey: run.ads_angle_key ?? null,
     },
     meta: {
       productUrl: run.product_url,

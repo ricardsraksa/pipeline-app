@@ -54,6 +54,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage2_output: null,
         stage2_copy_edited: null,
         stage2_edited_at: null,
+        stage2_angle_key: null,
       };
     // Both Stage 3 restart variants do a FULL reset: wipe the entire hero-first
     // flow (hero prompt/image/approval, the 8 derivative prompts/images, and the
@@ -68,6 +69,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         ads_step: null,
         ads_error: null,
         ads_ref_overrides: null,
+        ads_angle_key: null,
       };
     case "stage3-prompts":
     case "stage3-images":
@@ -82,6 +84,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage3_ref_overrides: null,
         stage3_prompt_history: null,
         stage3_placement: null,
+        stage3_angle_key: null,
         // Format-validation results from the previous pass — stale after a
         // restart, and their badges would otherwise show against fresh prompts.
         stage3_hero_validation: null,

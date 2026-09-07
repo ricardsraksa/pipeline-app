@@ -145,7 +145,11 @@ At the gate, two halves:
   exact prompt this run used, download the foundational documents, a note when
   competitor links couldn't be read.
 
-Copy cannot start until at least one angle is chosen.
+Copy cannot start until at least one angle is chosen. The angles stay editable
+for the whole run. When the ticked angle differs from the one a later stage was
+built on, that stage's rail row reads "angle changed" and the stage shows a
+flag: Copy offers "Rebuild copy on this angle" (one revision pass that keeps
+the structure and edits); Images and Ads point to Restart stage.
 
 ### Stage 3 · Copy
 

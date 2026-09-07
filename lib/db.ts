@@ -203,6 +203,11 @@ async function migrateDB() {
     // Variants card: the operator's restructured option groups (by hand or by
     // AI). Overrides what the listing said; "Revert" clears it.
     "product_variants_edited TEXT",
+    // Which angle (lib/angles.ts angleKey) each downstream stage was built
+    // with — compared with the current pick to flag stale stages.
+    "stage2_angle_key TEXT",
+    "stage3_angle_key TEXT",
+    "ads_angle_key TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -625,4 +630,7 @@ export interface Run {
   ads_error: string | null;
   ads_ref_overrides: string | null;
   product_variants_edited: string | null;
+  stage2_angle_key: string | null;
+  stage3_angle_key: string | null;
+  ads_angle_key: string | null;
 }
