@@ -753,6 +753,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
       const stage2Name = structured.product_name?.trim();
       await updateRun(runId, {
         stage2_json: JSON.stringify(structured),
+        stage2_json_at: now(),
         ...(stage2Name ? { brand_name: stage2Name } : {}),
         last_updated_at: now(),
       });

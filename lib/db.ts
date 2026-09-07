@@ -208,6 +208,9 @@ async function migrateDB() {
     "stage2_angle_key TEXT",
     "stage3_angle_key TEXT",
     "ads_angle_key TEXT",
+    // When stage2_json was last derived from the copy text. The Shopify push
+    // compares it with stage2_edited_at and re-derives when the text is newer.
+    "stage2_json_at TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -633,4 +636,5 @@ export interface Run {
   stage2_angle_key: string | null;
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
+  stage2_json_at: string | null;
 }

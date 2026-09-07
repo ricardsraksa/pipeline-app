@@ -84,7 +84,7 @@ export async function POST(
       await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
       try {
         const structured = await structureStage2Copy(result.output, runId);
-        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), gdoc_appended_at: null });
+        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), stage2_json_at: new Date().toISOString(), gdoc_appended_at: null });
       } catch (e) {
         console.error("[stage2 structure] regen:", e);
       }

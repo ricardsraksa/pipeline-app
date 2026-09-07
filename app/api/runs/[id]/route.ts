@@ -317,20 +317,23 @@ export async function PATCH(
     // (cheap mechanical model, same helper the generate/regenerate paths use).
     // Best-effort: the free text stays canonical, so a failure here never fails
     // the save — the Copy tab just keeps showing the previous structure.
+    let structuredOk: boolean | null = null;
     if (field === "stage2_copy" && typeof value === "string" && value.trim() && !stage2TextUnchanged) {
       try {
         const structured = await structureStage2Copy(value, Number(id));
+        structuredOk = Boolean(structured);
         if (structured) {
           await db.execute({
-            sql: "UPDATE runs SET stage2_json = ? WHERE id = ?",
-            args: [JSON.stringify(structured), Number(id)],
+            sql: "UPDATE runs SET stage2_json = ?, stage2_json_at = ? WHERE id = ?",
+            args: [JSON.stringify(structured), new Date().toISOString(), Number(id)],
           });
         }
       } catch (err) {
+        structuredOk = false;
         console.error(`[field_edit] re-structuring stage2_json for run ${id} failed:`, err);
       }
     }
-    return Response.json({ success: true });
+    return Response.json({ success: true, structured: structuredOk });
   }
 
   const fields: string[] = [];

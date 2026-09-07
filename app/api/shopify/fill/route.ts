@@ -4,6 +4,7 @@ import { shopifyConfigured } from "@/lib/shopify";
 import { parseProductRef } from "@/lib/shopify/resolve";
 import { resolveProduct, applyToProduct } from "@/lib/shopify/push";
 import type { Stage2Json } from "@/lib/stage2/shape";
+import { structureStage2Copy } from "@/lib/stage2/format";
 
 export const maxDuration = 120;
 
@@ -43,6 +44,30 @@ export async function POST(req: Request) {
 
   let json: Stage2Json | null = null;
   try { json = run.stage2_json ? (JSON.parse(run.stage2_json) as Stage2Json) : null; } catch { /* below */ }
+
+  // The fields come from stage2_json, which is derived from the copy text. An
+  // edit to the text re-derives it, but that step is best-effort — so if the
+  // text is newer than the structure (or the structure is missing), derive it
+  // again here. A push must always reflect the copy the operator can see.
+  const text = (run.stage2_copy_edited ?? run.stage2_output ?? "").trim();
+  const textNewer = Boolean(run.stage2_edited_at && (!run.stage2_json_at || run.stage2_json_at < run.stage2_edited_at));
+  let restructured = false;
+  let restructureWarning: string | null = null;
+  if (text && (!json || textNewer)) {
+    try {
+      const fresh = await structureStage2Copy(text, runId);
+      if (fresh) {
+        json = fresh;
+        restructured = true;
+        const at = new Date().toISOString();
+        await updateRun(runId, { stage2_json: JSON.stringify(fresh), stage2_json_at: at, last_updated_at: at }).catch(() => {});
+      } else if (json) {
+        restructureWarning = "Couldn't re-derive the fields from your edited copy — pushed the previous structure.";
+      }
+    } catch (err) {
+      if (json) restructureWarning = `Couldn't re-derive the fields from your edited copy (${err instanceof Error ? err.message : String(err)}) — pushed the previous structure.`;
+    }
+  }
   if (!json) return Response.json({ success: false, error: "No structured Stage 3 copy on this run yet" }, { status: 400 });
 
   // Hard prerequisite: image auto-placement must have run. Without it the
@@ -153,7 +178,7 @@ export async function POST(req: Request) {
       await updateRun(runId, { shopify_push_state: JSON.stringify(newState), last_updated_at: newState.lastPushAt }).catch(() => {});
     }
 
-    return Response.json({ success: true, report });
+    return Response.json({ success: true, report, restructured, warning: restructureWarning });
   } catch (err) {
     return Response.json({ success: false, error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }

@@ -52,6 +52,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   async function push() {
     setBusy(true);
@@ -65,6 +66,8 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       const data = await res.json();
       if (!data.success) { setErr(data.error ?? `Failed (${res.status})`); return; }
       setReport(data.report as Report);
+      if (data.warning) setErr(String(data.warning));
+      setNote(data.restructured ? "Fields re-derived from your edited copy before pushing." : null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -91,6 +94,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
           {busy ? "Pushing…" : "Push to Shopify"}
         </button>
       </div>
+      {note && <p className="text-[11.5px] text-[var(--color-text-3)]">{note}</p>}
       {err && <p className="text-[11.5px] text-[var(--color-red)]">{err}</p>}
       {report && (
         <div className="space-y-2">
