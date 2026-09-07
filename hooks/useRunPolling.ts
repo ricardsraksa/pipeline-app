@@ -97,7 +97,11 @@ export function useRunPolling(runId: number | null, intervalMs = 3000): RunStatu
     const schedule = () => {
       if (!active) return;
       if (timer) clearTimeout(timer);
-      const delay = TERMINAL_STATUSES.has(lastStatus) ? Math.max(intervalMs, 8000) : intervalMs;
+      // Nothing to see in a hidden tab — the visibility handler refetches the
+      // moment it comes back, so stop polling entirely instead of burning
+      // requests in the background.
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      const delay = TERMINAL_STATUSES.has(lastStatus) ? Math.max(intervalMs, 12_000) : intervalMs;
       timer = setTimeout(poll, delay);
     };
     const poll = async () => {

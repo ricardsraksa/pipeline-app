@@ -3,6 +3,31 @@ import { getRun, getKV } from "@/lib/db";
 
 import { requireSession } from "@/lib/auth";
 import { getPricingRules } from "@/lib/pricing-store";
+import type { PricingRules } from "@/lib/pricing";
+
+// This route is polled every few seconds per open run, so the two settings
+// lookups (worker heartbeat, pricing rules) are cached in-process for 10s —
+// otherwise every poll costs three round trips to a remote database instead
+// of one. Both change rarely; 10s of staleness is invisible in the UI.
+type Cached<T> = { at: number; value: T };
+let kvCache: Cached<string | null> | null = null;
+let rulesCache: Cached<PricingRules> | null = null;
+const TTL = 10_000;
+
+// The scrape is sent on every poll but the browser only reads the structured
+// fields — never the raw page text. Dropping those keeps a poll small even on
+// runs with long listings and several competitor pages.
+function slimScrape(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { pages?: Array<Record<string, unknown>> };
+    if (!Array.isArray(v?.pages)) return raw;
+    return JSON.stringify({
+      ...v,
+      pages: v.pages.map(({ scraped_text, long_description, image_text, specs, ...rest }) => rest),
+    });
+  } catch { return raw; }
+}
 export async function GET(
   _req: NextRequest,
   context: { params: Promise<unknown> }
@@ -11,9 +36,14 @@ export async function GET(
   if (denied) return denied;
   const { id } = (await context.params) as { id: string };
   const run = await getRun(parseInt(id, 10));
-  let workerLastSeen: string | null = null;
-  try { workerLastSeen = await getKV("worker_last_seen"); } catch { /* optional */ }
-  const pricingRules = await getPricingRules();
+  const now = Date.now();
+  let workerLastSeen: string | null = kvCache && now - kvCache.at < TTL ? kvCache.value : null;
+  if (!kvCache || now - kvCache.at >= TTL) {
+    try { workerLastSeen = await getKV("worker_last_seen"); kvCache = { at: now, value: workerLastSeen }; } catch { /* optional */ }
+  }
+  let pricingRules: PricingRules;
+  if (rulesCache && now - rulesCache.at < TTL) pricingRules = rulesCache.value;
+  else { pricingRules = await getPricingRules(); rulesCache = { at: now, value: pricingRules }; }
 
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
@@ -79,7 +109,7 @@ export async function GET(
     // Stage 1 · Product: the scrape, the analyst text, the operator's edit
     // and photo selection, and when the gate was passed.
     product: {
-      scrape: run.product_scrape ?? null,
+      scrape: slimScrape(run.product_scrape),
       descriptionAi: run.product_description_ai ?? null,
       descriptionEdited: run.product_description_edited ?? null,
       selectedImages: safeJson(run.product_selected_images) ?? [],
