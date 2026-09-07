@@ -82,6 +82,7 @@ export async function POST(req: Request) {
     return Response.json({
       success: true,
       folder: folders.productFolderName,
+      subfolder: wantAds ? folders.adsFolderName : "Images",
       createdFolder: folders.createdProductFolder,
       uploaded: results.filter((r) => r.status === "uploaded").length,
       skipped: results.filter((r) => r.status === "already-there").length,

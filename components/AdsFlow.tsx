@@ -236,7 +236,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
       const r = await fetch("/api/gdrive/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, kind: "ads" }) });
       const d = await r.json();
       if (!d.success) { setDrive({ busy: false, msg: null, err: d.error || `Failed (${r.status})` }); return; }
-      setDrive({ busy: false, msg: `${d.uploaded} uploaded${d.skipped ? ` · ${d.skipped} already there` : ""} · Image Ads in “${d.folder}”`, err: d.errors?.length ? `${d.errors.length} failed` : null });
+      setDrive({ busy: false, msg: `${d.uploaded} uploaded${d.skipped ? ` · ${d.skipped} already there` : ""} · ${d.subfolder ?? "Image Ads"} in “${d.folder}”`, err: d.errors?.length ? `${d.errors.length} failed` : null });
     } catch (e) { setDrive({ busy: false, msg: null, err: e instanceof Error ? e.message : "Network error" }); }
   };
   const downloadAll = async () => {

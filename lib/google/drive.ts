@@ -74,6 +74,7 @@ export interface ProductFolders {
   imagesFolderId: string;
   createdProductFolder: boolean;
   adsFolderId: string;
+  adsFolderName: string;
 }
 
 /** Find the product folder by P-code prefix (or exact name); create the full
@@ -124,7 +125,7 @@ export async function ensureProductFolders(productCode: string, folderNameIfCrea
   const ads = sub.find((f) => f.name.trim().toLowerCase() === adsFolderName.trim().toLowerCase());
   const adsFolderId = ads ? ads.id : await createFolder(adsFolderName, productFolderId);
 
-  return { productFolderId, productFolderName, imagesFolderId, adsFolderId, createdProductFolder };
+  return { productFolderId, productFolderName, imagesFolderId, adsFolderId, adsFolderName, createdProductFolder };
 }
 
 export async function existingFileNames(folderId: string): Promise<Set<string>> {
