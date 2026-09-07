@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { parseProductScrape } from "@/lib/product";
+import type { VariantPlan } from "@/lib/shopify/variants";
 
 
 // The options to set up in Shopify, read from the AliExpress listing and
@@ -40,6 +41,11 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
   const [aiBusy, setAiBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Array<{ name: string; values: string }>>([]);
+  // Shopify: preview what would be created, then create it.
+  const [plan, setPlan] = useState<VariantPlan | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [applied, setApplied] = useState<string | null>(null);
 
   useEffect(() => { setAsked(requestedAt); }, [requestedAt]);
   useEffect(() => { setOverride(parseEdited(edited)); }, [edited]);
@@ -92,6 +98,27 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
     finally { setAiBusy(false); }
   };
 
+  const askShopify = async (dryRun: boolean) => {
+    if (dryRun) { setPlanBusy(true); setPlan(null); } else setApplyBusy(true);
+    setErr(null); setApplied(null);
+    try {
+      const r = await fetch("/api/shopify/variants", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, dryRun }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.success) { setErr((d as { error?: string }).error || `Failed (${r.status})`); return; }
+      setPlan(d.plan as VariantPlan);
+      if (!dryRun) {
+        const res = d.result as { created: number; optionsCreated: string[]; errors: string[] };
+        setApplied(`${res.created} variant${res.created === 1 ? "" : "s"} created on “${(d.plan as VariantPlan).productTitle}”${res.errors.length ? ` · ${res.errors.length} error(s)` : ""}`);
+        if (res.errors.length) setErr(res.errors.join("; "));
+        setPlan(null);
+      }
+    } catch { setErr("Network error"); }
+    finally { setPlanBusy(false); setApplyBusy(false); }
+  };
+
   const startEditing = () => {
     setDraft(groups.map(([name, vals]) => ({ name, values: vals.join(", ") })));
     setEditing(true);
@@ -128,6 +155,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
           ? <><button onClick={saveEditing} className="btn btn-sm btn-primary">Save</button><button onClick={() => setEditing(false)} className="btn btn-sm">Cancel</button></>
           : <button onClick={startEditing} className="btn btn-sm">Edit by hand</button>)}
         {override && !editing && <button onClick={() => saveOverride(null)} className="btn btn-sm" title="Go back to what the listing said">Revert</button>}
+        {!empty && !editing && <button onClick={() => askShopify(true)} disabled={planBusy} className="btn btn-sm">{planBusy ? "Checking…" : "Set in Shopify"}</button>}
         {asked
           ? <span className="ff-mono text-[10.5px] text-[var(--color-amber)]" title="The Mac worker picks this up on its next poll (about 20 s) and re-reads the listing">re-reading on your Mac…</span>
           : <button onClick={reread} disabled={asking} className="btn btn-sm">Re-read listing</button>}
@@ -146,7 +174,30 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
         </div>
       )}
       {note && <p className="text-[11.5px] text-[var(--color-amber)] mb-2">{note}</p>}
+      {applied && <p className="text-[11.5px] text-[var(--color-green)] mb-2">{applied}</p>}
       {err && <p className="text-[11.5px] text-[var(--color-red)] mb-2">{err}</p>}
+
+      {plan && (
+        <div className="mb-2 border border-[var(--color-border-strong)] rounded-[9px] bg-[var(--color-surface-2)] px-[13px] py-3 space-y-2">
+          <p className="text-[12.5px] text-[var(--color-text)]">
+            <a href={plan.adminUrl} target="_blank" rel="noreferrer" className="underline">{plan.productTitle}</a>
+            {" · "}{plan.options.map((o) => `${o.name} (${o.values.length})`).join(" × ")}
+            {" · "}{plan.combinations.length} variant{plan.combinations.length === 1 ? "" : "s"}
+            {plan.price != null ? ` · all at ${plan.currency === "USD" ? "$" : ""}${plan.price.toFixed(2)}${plan.compareAt != null ? ` (compare ${plan.compareAt.toFixed(2)})` : ""}` : ""}
+          </p>
+          {plan.blocked
+            ? <p className="text-[11.5px] text-[var(--color-red)]">{plan.blocked}</p>
+            : (
+              <div className="flex gap-2 items-center flex-wrap">
+                <button onClick={() => askShopify(false)} disabled={applyBusy} className="btn btn-sm btn-primary">
+                  {applyBusy ? "Creating…" : `Create ${plan.combinations.length} variants`}
+                </button>
+                <button onClick={() => setPlan(null)} className="btn btn-sm">Cancel</button>
+                <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">{plan.combinations.slice(0, 4).map((c) => c.join(" / ")).join(" · ")}{plan.combinations.length > 4 ? " · …" : ""}</span>
+              </div>
+            )}
+        </div>
+      )}
 
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] px-[13px] py-3 space-y-3">
         {empty && <p className="ff-mono text-[11px] text-[var(--color-text-4)]">No option groups in the stored scrape.</p>}

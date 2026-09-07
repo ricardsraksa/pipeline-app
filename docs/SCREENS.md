@@ -159,7 +159,10 @@ below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
 
 Under it, the **Variants** card from the AliExpress listing: each option group
 (Colour, Size…) with its values and a copy-values button. "Re-read listing"
-asks the Mac worker to fetch the options again. Because suppliers cram several dimensions into one
+asks the Mac worker to fetch the options again. "Set in Shopify" previews the
+options and every combination it would create, at one price for all of them
+from the Pricing card, then creates them — only on a product that still has
+the single default variant, and only ever adding. Because suppliers cram several dimensions into one
 group, the card can be restructured: "Edit with AI" takes an instruction like
 "split into Color and Size", "Edit by hand" lets the operator rename groups,
 change values and add or remove groups, and "Revert" goes back to what the
