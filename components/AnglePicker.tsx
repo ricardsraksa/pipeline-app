@@ -121,9 +121,6 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
   const rows = [...proposed].sort((x, y) => order(x) - order(y));
 
   const textBtn = "cursor-pointer text-[11.5px] text-[var(--color-text-2)] hover:text-[var(--color-text)] tr disabled:opacity-50";
-  const groundTone = (c?: Angle["crowding"]) =>
-    c === "open" ? "var(--color-green)" : c === "crowded" ? "var(--color-red)" : "var(--color-amber)";
-  const groundWord = (c?: Angle["crowding"]) => (c === "open" ? "open ground" : c === "crowded" ? "crowded" : "partly claimed");
 
   return (
     <div className="flex flex-col gap-2">
@@ -167,9 +164,7 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
                       {idx === 0 ? "primary" : "supporting"}
                     </span>
                   )}
-                  {own
-                    ? <span className="ff-mono text-[9.5px] uppercase tracking-[0.04em] px-1.5 py-0.5 rounded-[4px] border border-[var(--color-border-strong)] text-[var(--color-text-3)]">yours</span>
-                    : a.crowding && <span className="text-[11px]" style={{ color: groundTone(a.crowding) }}>{groundWord(a.crowding)}</span>}
+                  {own && <span className="ff-mono text-[9.5px] uppercase tracking-[0.04em] px-1.5 py-0.5 rounded-[4px] border border-[var(--color-border-strong)] text-[var(--color-text-3)]">yours</span>}
                 </div>
                 <p className="text-[13px] text-[var(--color-text-2)] mt-1 leading-[1.5]">{a.problem}</p>
 

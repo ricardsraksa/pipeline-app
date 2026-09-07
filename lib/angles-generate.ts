@@ -33,9 +33,8 @@ const ANGLES_TOOL: Anthropic.Tool = {
             why_this_angle: { type: "string", description: "Why this beats generic 'best X / only Y' framing for this product. One sentence." },
             competitor_angle: { type: "string", description: "What the competitors in the research currently lead with on this same ground. Say 'not visible in the research' if it isn't there. One or two sentences." },
             gap: { type: "string", description: "The gap being taken: why this angle is unclaimed, under-served or said badly by them. One or two sentences." },
-            crowding: { type: "string", enum: ["open", "partly-claimed", "crowded"], description: "How contested this ground is among the competitors in the research." },
           },
-          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle", "competitor_angle", "gap", "crowding"],
+          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle", "competitor_angle", "gap"],
         },
       },
     },
@@ -165,7 +164,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
       model,
       max_tokens: 8000,
       system,
-      messages: [{ role: "user", content: text + "\n\nReturn ONLY a JSON array of 4 to 6 angle objects with the keys title, problem, consequence, mechanism, who, hook, why_this_angle, competitor_angle, gap, crowding (open | partly-claimed | crowded). No prose, no markdown fences." }],
+      messages: [{ role: "user", content: text + "\n\nReturn ONLY a JSON array of 4 to 6 angle objects with the keys title, problem, consequence, mechanism, who, hook, why_this_angle, competitor_angle, gap. No prose, no markdown fences." }],
     });
     void recordUsage(runId, "positioning angles (json)", model, msg.usage);
     const textOut = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n");
