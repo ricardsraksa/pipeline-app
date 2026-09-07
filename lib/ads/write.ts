@@ -77,7 +77,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
 
   const system = await getPrompt("ads");
   await recordPromptUsed(runId, "ads", system);
-  const model = await getModel("stage3Prompt");
+  const model = await getModel("ads");
 
   const productName = (run.brand_name ?? run.product_name ?? "").trim() || "the product";
   const scrape = parseProductScrape(run.product_scrape);
