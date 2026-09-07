@@ -246,9 +246,9 @@ Problem/Solution. One card per concept:
   auditor as Stage 4. Each card then shows its 1:1 image with the audit
   verdict (click to override), Regenerate (with an instruction, pre-filled
   with the audit issues), download, Previous (last version).
-- Top bar: Download all (zip), Send to Drive · Image Ads (the product folder's
-  third subfolder, next to Images and Videos), Stop after current, Generate
-  the missing N / Regenerate all 5.
+- Top bar: Download all (zip), Send to Drive · Image Ads (a subfolder named
+  for the ISO week they were sent, e.g. "Image Ads W37", next to Images and
+  Videos), Stop after current, Generate the missing N / Regenerate all 5.
 - Rules the writer follows (Settings → Stage 5 — Image ads): square 1:1,
   product exactly as in the hero, quotes and stats only from real sources or
   omitted, product name as plain-text wordmark, no logos.

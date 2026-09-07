@@ -78,7 +78,17 @@ export interface ProductFolders {
 
 /** Find the product folder by P-code prefix (or exact name); create the full
  *  structure ("P58 - Name" with Images + Videos) when missing. */
-export async function ensureProductFolders(productCode: string, folderNameIfCreating: string): Promise<ProductFolders> {
+/** ISO week label for a date, e.g. "W37" (Monday-based, week 1 holds Jan 4). */
+export function isoWeekLabel(d = new Date()): string {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return `W${String(week).padStart(2, "0")}`;
+}
+
+export async function ensureProductFolders(productCode: string, folderNameIfCreating: string, adsFolderName = `Image Ads ${isoWeekLabel()}`): Promise<ProductFolders> {
   const code = productCode.trim();
   if (!code) throw new Error("Set a Product code on this run first (e.g. P58) — it names the Drive folder.");
 
@@ -109,9 +119,10 @@ export async function ensureProductFolders(productCode: string, folderNameIfCrea
   const sub = await listChildren(productFolderId, ` and mimeType = '${FOLDER_MIME}'`);
   const images = sub.find((f) => f.name.trim().toLowerCase() === "images");
   const imagesFolderId = images ? images.id : await createFolder("Images", productFolderId);
-  // Stage 5 output. Every product folder carries Videos, Images and Image Ads.
-  const ads = sub.find((f) => f.name.trim().toLowerCase() === "image ads");
-  const adsFolderId = ads ? ads.id : await createFolder("Image Ads", productFolderId);
+  // Stage 5 output: one "Image Ads Wnn" folder per ISO week the ads were sent,
+  // next to Videos and Images. Created on first use for that week.
+  const ads = sub.find((f) => f.name.trim().toLowerCase() === adsFolderName.trim().toLowerCase());
+  const adsFolderId = ads ? ads.id : await createFolder(adsFolderName, productFolderId);
 
   return { productFolderId, productFolderName, imagesFolderId, adsFolderId, createdProductFolder };
 }
