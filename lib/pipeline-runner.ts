@@ -154,21 +154,39 @@ async function anthropicMessage(args: {
   // await can't live inside it. Default role is Stage 1 reasoning; callers that
   // pass an explicit model (mechanical / Stage 2) override it.
   const model = args.model ?? (await getModel("stage1"));
-  const msg = await withRetry(
-    () =>
-      anthropic.messages.create(
-        {
-          model,
-          max_tokens: args.maxTokens,
-          system: args.system,
-          messages: [{ role: "user", content: args.user }],
-        },
-        args.timeoutMs ? { timeout: args.timeoutMs } : undefined,
-      ),
-    { label: args.label },
-  );
-  void recordUsage(args.runId ?? null, args.label, model, msg.usage);
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  // An empty reply (no text block — a refusal, a stop before any text, or a
+  // transient model hiccup) used to come back as "" and fail the whole stage
+  // with "returned empty". Empties are now retried like network errors: up to
+  // three attempts, the later ones with a nudge, and the final error names the
+  // stop reason so it can be acted on.
+  const nudge = "Your previous reply was empty. Write the complete document now, as plain text, following the instructions above.";
+  let lastStop: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const content: Anthropic.MessageParam["content"] = attempt === 0
+      ? args.user
+      : typeof args.user === "string"
+        ? `${args.user}\n\n${nudge}`
+        : [...(args.user as Exclude<Anthropic.MessageParam["content"], string>), { type: "text", text: nudge }];
+    const msg = await withRetry(
+      () =>
+        anthropic.messages.create(
+          {
+            model,
+            max_tokens: args.maxTokens,
+            system: args.system,
+            messages: [{ role: "user", content }],
+          },
+          args.timeoutMs ? { timeout: args.timeoutMs } : undefined,
+        ),
+      { label: args.label },
+    );
+    void recordUsage(args.runId ?? null, args.label, model, msg.usage);
+    const text = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
+    if (text) return text;
+    lastStop = msg.stop_reason ?? null;
+    console.warn(`[${args.label}] empty response (stop: ${lastStop}, model: ${model}) — attempt ${attempt + 1}/3`);
+  }
+  throw new Error(`${args.label}: the model returned no text after 3 attempts (stop: ${lastStop ?? "unknown"}, model: ${model})`);
 }
 
 // ── Slug helpers (mirrored from page.tsx) ────────────────────────────────────
