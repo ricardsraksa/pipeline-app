@@ -5,6 +5,7 @@ import { runPipeline } from "@/lib/pipeline-runner";
 
 import { requireSession } from "@/lib/auth";
 import { assertPublicUrl } from "@/lib/ssrf";
+import { nextProductCode } from "@/lib/product-code";
 export const maxDuration = 10;
 
 export async function POST(req: NextRequest) {
@@ -55,12 +56,16 @@ export async function POST(req: NextRequest) {
     ? body.competitorUrls.map((u) => u.trim()).filter((u) => !!u && u.length <= 2048).slice(0, 5)
     : [];
 
+  // The code continues the operator's sequence (last product + 1) unless one
+  // was passed in, so a run never sits without one.
+  const productCode = body.productCode?.trim().slice(0, 100) || (await nextProductCode());
+
   const runId = await createRun({
     product_url: productUrl || null,
     product_description: productDescription,
     competitor_urls: competitorUrls.length ? competitorUrls : null,
     uploaded_source_images: sourceImages,
-    product_code: body.productCode?.trim().slice(0, 100) || null,
+    product_code: productCode,
     status: "pending",
   });
 

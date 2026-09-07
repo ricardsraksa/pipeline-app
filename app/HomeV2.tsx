@@ -81,7 +81,7 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
               <div key={r.id} onClick={() => router.push(`/runs/${r.id}`)}
                 className={cx("group w-full grid items-center gap-3.5 px-[13px] py-[11px] text-left cursor-pointer hover:bg-[var(--color-surface-2)] tr",
                   i > 0 && "border-t border-[var(--color-border)]")}
-                style={{ gridTemplateColumns: "34px minmax(0,1fr) 210px 74px 18px" }}>
+                style={{ gridTemplateColumns: "34px 44px minmax(0,1fr) 210px 74px 18px" }}>
                 <div className="w-[34px] h-[34px] rounded-[5px] border border-[var(--color-border)] grid place-items-center ff-mono text-[9px] text-[var(--color-text-3)] overflow-hidden"
                   style={{ background: "repeating-linear-gradient(135deg,var(--color-surface-2) 0 4px,var(--color-bg) 4px 8px)" }}>
                   {r.stage3_hero_image_url
@@ -89,6 +89,7 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                     ? <img src={r.stage3_hero_image_url} alt="" className="w-full h-full object-cover" />
                     : (r.product_code || "—")}
                 </div>
+                <span className="ff-mono text-[11.5px] text-[var(--color-text-2)]">{r.product_code || "—"}</span>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-[13.5px] font-[500] truncate text-[var(--color-text)]">{r.brand_name || r.product_name || `Run ${r.id}`}</span>

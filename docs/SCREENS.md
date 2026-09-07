@@ -52,8 +52,11 @@ The run inbox. Three groups, each with a count:
 - **Recent** — completed and cancelled runs.
 
 Each row: thumbnail (generated hero if there is one, else a source photo, else a
-generated pattern), product/brand name, product code (e.g. "P58"), run number,
-status, relative time, product URL, delete.
+generated pattern), product code in its own column (e.g. "P58"), product/brand
+name, run number, status, relative time, product URL, delete. The code is
+assigned when the run is created, continuing the sequence from the highest
+number already used by a run or by a tab in the master doc; it stays editable
+in the run's rail.
 
 Also: a search field filtering by name, code or run number; an empty state
 ("No runs yet" / "Nothing matches …"); a link to start a new run.
