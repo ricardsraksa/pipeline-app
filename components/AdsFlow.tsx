@@ -93,7 +93,9 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const refsFor = (p: AdPrompt) => refOverrides[String(p.index)] ?? p.source_image_references ?? [];
 
   /* ── write ─────────────────────────────────────────────────────────── */
-  const write = useCallback(async () => {
+  // A plain function, not a hook: everything below here runs after the early
+  // return above, so a hook here would change the hook count between renders.
+  const write = async () => {
     setWriting(true); setErr(null);
     try {
       const r = await fetch("/api/ads/write", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) });
@@ -104,20 +106,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
       await fetchRun();
     } catch (e) { setErr(e instanceof Error ? e.message : "Network error"); }
     finally { setWriting(false); }
-  }, [runId, fetchRun]);
-
-  // Stage 4 finishing is the cue to write the briefs — the operator still
-  // approves every premise and prompt before an image is generated, so this
-  // only removes a click. Once per run: a previous failure or a restart that
-  // cleared the briefs does not re-trigger it.
-  const autoWrote = useRef(false);
-  useEffect(() => {
-    if (!run || autoWrote.current || writing) return;
-    if (run.status !== "completed") return;
-    if (run.ads_step || run.ads_error || run.ads_prompts) return;
-    autoWrote.current = true;
-    void write();
-  }, [run, writing, write]);
+  };
 
   /* ── edit briefs ───────────────────────────────────────────────────── */
   const updateDraft = (index: number, patchP: Partial<AdPrompt>, save = false) => {

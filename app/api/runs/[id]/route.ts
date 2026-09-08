@@ -494,9 +494,12 @@ export async function PATCH(
   if (body.status === "completed") {
     void (async () => {
       try {
-        const fresh = await getRun(Number(id));
-        if (!fresh || fresh.ads_step || fresh.ads_prompts || fresh.ads_error) return;
-        await updateRun(Number(id), { ads_step: "writing", last_updated_at: new Date().toISOString() });
+        const claim = await db.execute({
+          sql: `UPDATE runs SET ads_step = 'writing', last_updated_at = ?
+                WHERE id = ? AND ads_step IS NULL AND ads_prompts IS NULL AND ads_error IS NULL`,
+          args: [new Date().toISOString(), Number(id)],
+        });
+        if (!claim.rowsAffected) return;
         const { generateAdPrompts } = await import("@/lib/ads/write");
         await generateAdPrompts(Number(id));
       } catch (err) {
