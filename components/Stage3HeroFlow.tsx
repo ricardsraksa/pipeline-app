@@ -1142,7 +1142,7 @@ function CompletedReview({
       })
       .catch(() => setPlaceErr("Network error saving placement"));
   };
-  const useForSection = (imageIndex: number, n: 2 | 3) => {
+  const assignToSection = (imageIndex: number, n: 2 | 3) => {
     if (!placement) return;
     const other: 2 | 3 = n === 2 ? 3 : 2;
     const key = `section_${n}` as const;
@@ -1502,7 +1502,7 @@ function CompletedReview({
             )}
             <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
               {placement && im.status === "done" && ([2, 3] as const).filter((n) => n !== ctx?.section).map((n) => (
-                <button key={n} onClick={() => useForSection(im.index, n)}
+                <button key={n} onClick={() => assignToSection(im.index, n)}
                   title={ctx?.section ? `Swap with section ${n}` : `Use this image for section ${n}`}
                   className="px-2 py-1 bg-[var(--color-accent)]/70 hover:bg-[var(--color-accent)] text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">
                   → S{n}
