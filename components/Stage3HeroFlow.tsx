@@ -773,7 +773,7 @@ export default function Stage3HeroFlow({
     const referenceImages = safeParse<string[]>(run.stage3_reference_images, []);
     return (
       <div className="space-y-4">
-        <SendToDrive runId={runId} />
+        <SendToDrive runId={runId} kind="images" />
         <VariantsCard runId={runId} requestedAt={run.variants_refresh_requested ?? null} edited={run.product_variants_edited ?? null} scrape={run.product_scrape ?? null} />
         <ShopifyFill runId={runId} initialUrl={run.shopify_product_url} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
         <details>

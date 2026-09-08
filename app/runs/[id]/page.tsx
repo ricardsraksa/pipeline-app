@@ -146,6 +146,11 @@ function OnePagerMarkdown({ text }: { text: string }) {
 
 // ── Stage accordion card ──────────────────────────────────────────────────────
 
+/** "aliexpress.com" from a URL, for the rail's link rows. */
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
+}
+
 const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
   { key: "product", id: "v2-stage-product", n: 1, title: "Product", what: "Description and photos from the links" },
   { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Market, avatar, offer, angles" },
@@ -637,6 +642,28 @@ export default function RunPage() {
           </div>
         )}
 
+        {/* the links this run was built from */}
+        {(run.meta.productUrl || run.meta.competitorUrls.length > 0) && (
+          <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
+            <span className={label}>Links</span>
+            <div className="flex flex-col gap-px">
+              {run.meta.productUrl && (
+                <a href={run.meta.productUrl} target="_blank" rel="noreferrer" className={deliverRow} style={deliverCols}
+                  title={run.meta.productUrl}>
+                  <span className="text-[13px] font-[500] text-[var(--color-text)] truncate">Source listing</span>
+                  <span className="ff-mono text-[11px] text-[var(--color-text-3)] truncate max-w-[110px]">{hostOf(run.meta.productUrl)}</span>
+                </a>
+              )}
+              {run.meta.competitorUrls.map((u, i) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer" className={deliverRow} style={deliverCols} title={u}>
+                  <span className="text-[13px] font-[500] text-[var(--color-text)] truncate">Competitor {i + 1}</span>
+                  <span className="ff-mono text-[11px] text-[var(--color-text-3)] truncate max-w-[110px]">{hostOf(u)}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* deliver: the pushes out of the app, visible from every stage */}
         {runId !== null && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
@@ -650,12 +677,9 @@ export default function RunPage() {
                 <span className="text-[13px] font-[500] text-[var(--color-text)]">Shopify</span>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{imagesReady ? "push →" : "after images"}</span>
               </button>
-              {imagesReady
-                ? <SendToDrive runId={runId} variant="row" />
+              {imagesReady || (run.meta.ads?.done ?? 0) > 0
+                ? <SendToDrive runId={runId} variant="row" hasImages={imagesReady} hasAds={(run.meta.ads?.done ?? 0) > 0} />
                 : <DeliverRow name="Drive" state="after images" />}
-              {(run.meta.ads?.done ?? 0) > 0
-                ? <SendToDrive runId={runId} variant="row" kind="ads" />
-                : <DeliverRow name="Drive · ads" state="after ads" />}
             </div>
             <input
               value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}
