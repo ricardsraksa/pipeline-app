@@ -9,7 +9,7 @@
 
 import { getKV, setKV } from "./db";
 
-export type ModelRole = "product" | "stage1" | "stage2" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "mechanical";
+export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "mechanical";
 
 export interface ModelOption {
   id: string;
@@ -48,6 +48,12 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     description: "Research documents, one-pager and angles.",
     env: "STAGE1_MODEL",
     default: "claude-sonnet-5",
+  },
+  angles: {
+    label: "Stage 2 · Angles",
+    description: "The positioning angles the whole page is built on.",
+    env: "ANGLES_MODEL",
+    default: "claude-opus-5",
   },
   stage2: {
     label: "Stage 3 · Copy",

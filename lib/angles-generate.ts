@@ -83,7 +83,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
 
   const system = await getPrompt("angles");
   await recordPromptUsed(runId, "angles", system);
-  const model = await getModel("stage1");
+  const model = await getModel("angles");
 
   const user = [
     "Here are the finished research documents for this product. Propose the angles now.",
@@ -143,7 +143,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   const callTool = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 8000,
+      max_tokens: 24000,
       system,
       tools: [ANGLES_TOOL],
       tool_choice: { type: "tool", name: "submit_angles" },
@@ -162,7 +162,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   const callJson = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 8000,
+      max_tokens: 24000,
       system,
       messages: [{ role: "user", content: text + "\n\nReturn ONLY a JSON array of 4 to 6 angle objects with the keys title, problem, consequence, mechanism, who, hook, why_this_angle, competitor_angle, gap. No prose, no markdown fences." }],
     });
