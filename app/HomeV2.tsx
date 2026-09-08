@@ -37,9 +37,14 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
     !query || `${r.product_code || ""} ${r.brand_name || ""} ${r.product_name || ""} #${r.id}`.toLowerCase().includes(query);
 
   const asleep = (r: RunSummary) => Boolean(r.snoozed_at);
-  const needs = runs.filter((r) => !asleep(r) && (WAITING_STATUSES.has(r.status ?? "") || r.status === "failed") && match(r));
-  const running = runs.filter((r) => !asleep(r) && ACTIVE_STATUSES.has(r.status ?? "") && match(r));
-  const recent = runs.filter((r) => !asleep(r) && ["completed", "cancelled"].includes(r.status ?? "") && match(r));
+  // Stage 5 runs after the pipeline is "completed", so its state lives in
+  // ads_step rather than status — a run waiting on the ad review still needs
+  // the operator, and one writing or generating ads is still working.
+  const adsWaiting = (r: RunSummary) => r.ads_step === "review" || Boolean(r.ads_error);
+  const adsRunning = (r: RunSummary) => r.ads_step === "writing" || r.ads_step === "generating";
+  const needs = runs.filter((r) => !asleep(r) && (WAITING_STATUSES.has(r.status ?? "") || r.status === "failed" || adsWaiting(r)) && match(r));
+  const running = runs.filter((r) => !asleep(r) && !adsWaiting(r) && (ACTIVE_STATUSES.has(r.status ?? "") || adsRunning(r)) && match(r));
+  const recent = runs.filter((r) => !asleep(r) && !adsWaiting(r) && !adsRunning(r) && ["completed", "cancelled"].includes(r.status ?? "") && match(r));
   // Set aside: still live, just not asking for attention.
   const later = runs.filter((r) => asleep(r) && match(r));
   const groups = [
@@ -118,7 +123,13 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                 </div>
                 <div className="flex items-center gap-[7px] min-w-0">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: toneOf(r.status) }} />
-                  <span className="text-[12.5px] text-[var(--color-text)] truncate">{NEED_COPY[r.status ?? ""] ?? statusLabel(r.status) ?? r.current_step ?? ""}</span>
+                  <span className="text-[12.5px] text-[var(--color-text)] truncate">{
+                    r.ads_error ? "Ads failed"
+                    : r.ads_step === "review" ? "Review the 5 ads"
+                    : r.ads_step === "writing" ? "Writing the ad briefs"
+                    : r.ads_step === "generating" ? "Generating the ads"
+                    : NEED_COPY[r.status ?? ""] ?? statusLabel(r.status) ?? r.current_step ?? ""
+                  }</span>
                 </div>
                 <div className="ff-mono text-[11px] text-[var(--color-text-3)] text-right">{relativeTime(r.last_updated_at ?? r.created_at)}</div>
                 <button onClick={(e) => snooze(e, r)} disabled={snoozing === r.id}

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { db, detachRunFeedback, upsertFeedbackNote, type FeedbackStage } from "@/lib/db";
+import { db, detachRunFeedback, getRun, updateRun, upsertFeedbackNote, type FeedbackStage } from "@/lib/db";
 import type { Run } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 
@@ -486,6 +486,26 @@ export async function PATCH(
     sql: `UPDATE runs SET ${fields.join(", ")} WHERE id = ?`,
     args: [...values, Number(id)],
   });
+
+  // Stage 4 finishing is the cue to write the five ad briefs. Fire-and-forget,
+  // once per run: the operator still approves every premise and prompt before
+  // an image is generated, so this only removes a click — but it means the run
+  // is asking for attention on Home instead of sitting silently completed.
+  if (body.status === "completed") {
+    void (async () => {
+      try {
+        const fresh = await getRun(Number(id));
+        if (!fresh || fresh.ads_step || fresh.ads_prompts || fresh.ads_error) return;
+        await updateRun(Number(id), { ads_step: "writing", last_updated_at: new Date().toISOString() });
+        const { generateAdPrompts } = await import("@/lib/ads/write");
+        await generateAdPrompts(Number(id));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[ads] auto-write for run ${id} failed:`, message);
+        await updateRun(Number(id), { ads_step: null, ads_error: message, last_updated_at: new Date().toISOString() }).catch(() => {});
+      }
+    })();
+  }
 
   // Mirror feedback writes into the durable feedback_notes table so they
   // outlive the run. Each stage's vote and note are tracked independently;

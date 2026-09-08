@@ -269,6 +269,9 @@ export interface RunSummary {
   product_code: string | null;
   /** Set when the operator put this run aside for later. */
   snoozed_at: string | null;
+  /** Stage 5: writing | review | generating | done. */
+  ads_step: string | null;
+  ads_error: string | null;
 }
 
 export async function listRuns(): Promise<RunSummary[]> {
@@ -278,7 +281,7 @@ export async function listRuns(): Promise<RunSummary[]> {
     SELECT
       id, created_at, product_url, product_name, brand_name, status,
       current_step, last_updated_at, stage3_hero_image_url, uploaded_source_images,
-      product_code, snoozed_at,
+      product_code, snoozed_at, ads_step, ads_error,
       (
         (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +

@@ -245,7 +245,9 @@ generation interrupted by a restart, the model refusing a reference photo.
 
 ### Stage 5 · Ads
 
-Started by hand ("Write 5 ads") once Stage 4 is complete. Five fixed concepts:
+The five briefs are written automatically as soon as Stage 4 finishes (or by
+hand with "Write 5 ads" if that never ran); the run then appears in "Needs you"
+as "Review the 5 ads". Five fixed concepts:
 Before/After, Features & Benefits, Handwritten Note, Testimonial,
 Problem/Solution. One card per concept:
 
