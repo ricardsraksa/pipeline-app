@@ -36,14 +36,33 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
   const match = (r: RunSummary) =>
     !query || `${r.product_code || ""} ${r.brand_name || ""} ${r.product_name || ""} #${r.id}`.toLowerCase().includes(query);
 
-  const needs = runs.filter((r) => (WAITING_STATUSES.has(r.status ?? "") || r.status === "failed") && match(r));
-  const running = runs.filter((r) => ACTIVE_STATUSES.has(r.status ?? "") && match(r));
-  const recent = runs.filter((r) => ["completed", "cancelled"].includes(r.status ?? "") && match(r));
+  const asleep = (r: RunSummary) => Boolean(r.snoozed_at);
+  const needs = runs.filter((r) => !asleep(r) && (WAITING_STATUSES.has(r.status ?? "") || r.status === "failed") && match(r));
+  const running = runs.filter((r) => !asleep(r) && ACTIVE_STATUSES.has(r.status ?? "") && match(r));
+  const recent = runs.filter((r) => !asleep(r) && ["completed", "cancelled"].includes(r.status ?? "") && match(r));
+  // Set aside: still live, just not asking for attention.
+  const later = runs.filter((r) => asleep(r) && match(r));
   const groups = [
     { label: "Needs you", rows: needs },
     { label: "Running", rows: running },
+    { label: "For later", rows: later },
     { label: "Recent", rows: recent },
   ].filter((g) => g.rows.length);
+
+  const [snoozing, setSnoozing] = useState<number | null>(null);
+  async function snooze(e: React.MouseEvent, r: RunSummary) {
+    e.stopPropagation();
+    setSnoozing(r.id);
+    try {
+      const res = await fetch(`/api/runs/${r.id}/snooze`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snoozed: !r.snoozed_at }),
+      });
+      if (!res.ok) { push("Couldn't update the run"); return; }
+      router.refresh();
+    } catch { push("Couldn't update the run"); }
+    finally { setSnoozing(null); }
+  }
 
   async function del(e: React.MouseEvent, r: RunSummary) {
     e.stopPropagation();
@@ -81,7 +100,7 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
               <div key={r.id} onClick={() => router.push(`/runs/${r.id}`)}
                 className={cx("group w-full grid items-center gap-3.5 px-[13px] py-[11px] text-left cursor-pointer hover:bg-[var(--color-surface-2)] tr",
                   i > 0 && "border-t border-[var(--color-border)]")}
-                style={{ gridTemplateColumns: "34px 44px minmax(0,1fr) 210px 74px 18px" }}>
+                style={{ gridTemplateColumns: "34px 44px minmax(0,1fr) 210px 74px 18px 18px" }}>
                 <div className="w-[34px] h-[34px] rounded-[5px] border border-[var(--color-border)] grid place-items-center ff-mono text-[9px] text-[var(--color-text-3)] overflow-hidden"
                   style={{ background: "repeating-linear-gradient(135deg,var(--color-surface-2) 0 4px,var(--color-bg) 4px 8px)" }}>
                   {r.stage3_hero_image_url
@@ -102,6 +121,13 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                   <span className="text-[12.5px] text-[var(--color-text)] truncate">{NEED_COPY[r.status ?? ""] ?? statusLabel(r.status) ?? r.current_step ?? ""}</span>
                 </div>
                 <div className="ff-mono text-[11px] text-[var(--color-text-3)] text-right">{relativeTime(r.last_updated_at ?? r.created_at)}</div>
+                <button onClick={(e) => snooze(e, r)} disabled={snoozing === r.id}
+                  aria-label={r.snoozed_at ? "Bring back" : "Set aside for later"}
+                  title={r.snoozed_at ? "Bring back" : "Set aside for later"}
+                  className={cx("cursor-pointer text-[13px] tr hover:text-[var(--color-amber)]",
+                    r.snoozed_at ? "text-[var(--color-amber)]" : "text-[var(--color-text-4)] opacity-0 group-hover:opacity-100")}>
+                  {r.snoozed_at ? "☾" : "☾"}
+                </button>
                 <button onClick={(e) => del(e, r)} disabled={deleting === r.id} aria-label="Delete run"
                   className="cursor-pointer text-[13px] text-[var(--color-text-4)] opacity-0 group-hover:opacity-100 hover:text-[var(--color-red)] tr">×</button>
               </div>

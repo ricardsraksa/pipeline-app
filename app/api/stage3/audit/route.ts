@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const model = await getModel('stage3Audit')
     const message = await createWithRetry({
       model,
-      max_tokens: 2000,
+      max_tokens: 8000,
       // No cache_control: at ~590 tokens the auditor prompt is below the model's
       // 1024-token minimum cacheable prefix, so a cache marker here never caches.
       system: IMAGE_AUDIT_SYSTEM,

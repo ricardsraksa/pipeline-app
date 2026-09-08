@@ -217,6 +217,9 @@ async function migrateDB() {
     "ads_drive_state TEXT",
     // Stage 1 gate "Try again": tells the Mac worker to restart its attempts.
     "scrape_retry_requested TEXT",
+    // Set aside for later: keeps the run out of "Needs you" and the header
+    // count without changing its status or its work.
+    "snoozed_at TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -264,6 +267,8 @@ export interface RunSummary {
   uploaded_source_images: string | null;
   /** Operator-assigned product code (e.g. "P50"). */
   product_code: string | null;
+  /** Set when the operator put this run aside for later. */
+  snoozed_at: string | null;
 }
 
 export async function listRuns(): Promise<RunSummary[]> {
@@ -273,7 +278,7 @@ export async function listRuns(): Promise<RunSummary[]> {
     SELECT
       id, created_at, product_url, product_name, brand_name, status,
       current_step, last_updated_at, stage3_hero_image_url, uploaded_source_images,
-      product_code,
+      product_code, snoozed_at,
       (
         (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +
@@ -645,4 +650,5 @@ export interface Run {
   stage2_json_at: string | null;
   ads_drive_state: string | null;
   scrape_retry_requested: string | null;
+  snoozed_at: string | null;
 }

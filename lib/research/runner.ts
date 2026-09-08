@@ -124,6 +124,8 @@ function buildCompetitorContext(inputs: ResearchInputs): string {
 // download the file. Please try again later." — transient, not a bad image.
 // Retry these (and 429 / 5xx / overloaded) a few times before giving up so a
 // single hiccup doesn't fail the whole run.
+// Budgets here cover adaptive thinking as well as the answer — the models
+// think by default and both come out of max_tokens.
 async function createWithRetry(
   body: Anthropic.MessageCreateParamsNonStreaming,
   opts?: { timeout?: number; usageLabel?: string; runId?: number },
@@ -158,7 +160,7 @@ async function createWithRetry(
 export async function runIdentify(inputs: ResearchInputs): Promise<string> {
   const msg = await createWithRetry({
     model: await getModel("stage1"),
-    max_tokens: 1500,
+    max_tokens: 8000,
     system: IDENTIFY_PROMPT,
     messages: [
       { role: "user", content: buildMessageContent(buildBaseContext(inputs), inputs.source_image_urls) },
@@ -178,7 +180,7 @@ export async function runMarket(inputs: ResearchInputs, identifyOutput: string):
   const msg = await createWithRetry(
     {
       model: await getModel("stage1"),
-      max_tokens: 4000,
+      max_tokens: 12000,
       system: withSearchDirective(MARKET_PROMPT),
       messages: [{ role: "user", content: userMessage }],
       ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
@@ -206,7 +208,7 @@ export async function runCompetitive(
   const msg = await createWithRetry(
     {
       model: await getModel("stage1"),
-      max_tokens: 4000,
+      max_tokens: 12000,
       system: withSearchDirective(COMPETITIVE_PROMPT),
       messages: [{ role: "user", content: userMessage }],
       ...(WEB_SEARCH_ENABLED ? { tools: [WEB_SEARCH_TOOL] } : {}),
@@ -237,7 +239,7 @@ export async function runProductAnalysis(
 
   const msg = await createWithRetry({
     model: await getModel("stage1"),
-    max_tokens: 2000,
+    max_tokens: 8000,
     system: PRODUCT_ANALYSIS_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   }, { usageLabel: "stage1: product analysis", runId: inputs.runId });
@@ -269,7 +271,7 @@ export async function runVisual(
 
   const msg = await createWithRetry({
     model: await getModel("stage1"),
-    max_tokens: 2000,
+    max_tokens: 8000,
     system: VISUAL_PROMPT,
     messages: [
       { role: "user", content: buildMessageContent(userMessage, inputs.source_image_urls) },

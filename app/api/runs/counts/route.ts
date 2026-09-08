@@ -8,7 +8,8 @@ export async function GET(req: Request) {
   try {
     const r = await db.execute(
       `SELECT COUNT(*) AS needs FROM runs
-       WHERE status IN ('awaiting_product_approval','awaiting_stage2_approval','awaiting_user','awaiting_qc','awaiting_hero_qc','failed')`,
+       WHERE snoozed_at IS NULL
+         AND status IN ('awaiting_product_approval','awaiting_stage2_approval','awaiting_user','awaiting_qc','awaiting_hero_qc','failed')`,
     );
     const needs = Number((r.rows[0] as unknown as { needs: number | bigint }).needs ?? 0);
     return Response.json({ needs });

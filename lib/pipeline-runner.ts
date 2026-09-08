@@ -159,8 +159,14 @@ async function anthropicMessage(args: {
   // with "returned empty". Empties are now retried like network errors: up to
   // three attempts, the later ones with a nudge, and the final error names the
   // stop reason so it can be acted on.
+  // The current models think adaptively by default and thinking is billed
+  // against max_tokens, so a budget that only fits the answer can be spent
+  // entirely on reasoning — the reply then arrives with no text at all and
+  // stop_reason "max_tokens". Retrying at the same size just repeats it, so
+  // each retry doubles the ceiling (capped).
   const nudge = "Your previous reply was empty. Write the complete document now, as plain text, following the instructions above.";
   let lastStop: string | null = null;
+  let budget = args.maxTokens;
   for (let attempt = 0; attempt < 3; attempt++) {
     const content: Anthropic.MessageParam["content"] = attempt === 0
       ? args.user
@@ -172,7 +178,7 @@ async function anthropicMessage(args: {
         anthropic.messages.create(
           {
             model,
-            max_tokens: args.maxTokens,
+            max_tokens: budget,
             system: args.system,
             messages: [{ role: "user", content }],
           },
@@ -184,7 +190,8 @@ async function anthropicMessage(args: {
     const text = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
     if (text) return text;
     lastStop = msg.stop_reason ?? null;
-    console.warn(`[${args.label}] empty response (stop: ${lastStop}, model: ${model}) — attempt ${attempt + 1}/3`);
+    if (lastStop === "max_tokens") budget = Math.min(budget * 2, 32_000);
+    console.warn(`[${args.label}] empty response (stop: ${lastStop}, model: ${model}) — attempt ${attempt + 1}/3, next budget ${budget}`);
   }
   throw new Error(`${args.label}: the model returned no text after 3 attempts (stop: ${lastStop ?? "unknown"}, model: ${model})`);
 }
@@ -388,8 +395,9 @@ export async function describeProduct(runId: number): Promise<string | null> {
   const text = (await anthropicMessage({
     system,
     user: buildAnalystContent(scrape),
-    // 200 words is ~300 tokens; the headroom is for the model's own slack.
-    maxTokens: 1200,
+    // 200 words is ~300 tokens — the rest is headroom for adaptive thinking,
+    // which is billed against this ceiling.
+    maxTokens: 8000,
     label: "product description",
     runId,
     model: await getModel("product"),
@@ -528,7 +536,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
           anthropicMessage({
             system: AVATAR_PROMPT,
             user: `RESEARCH.txt:\n\n${researchRevised}`,
-            maxTokens: 3500,
+            maxTokens: 16000,
             label: "avatar",
             runId,
           }),
@@ -541,7 +549,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
           anthropicMessage({
             system: OFFER_BRIEF_PROMPT,
             user: `RESEARCH.txt:\n\n${researchRevised}`,
-            maxTokens: 3500,
+            maxTokens: 16000,
             label: "offer brief",
             runId,
           }),
@@ -554,7 +562,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
           anthropicMessage({
             system: NECESSARY_BELIEFS_PROMPT,
             user: `RESEARCH.txt:\n\n${researchRevised}`,
-            maxTokens: 3500,
+            maxTokens: 16000,
             label: "necessary beliefs",
             runId,
           }),

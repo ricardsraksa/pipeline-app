@@ -49,7 +49,11 @@ The run inbox. Three groups, each with a count:
   hero / Reference for the other 8", "Review the 8 prompts / Then generate",
   "Run failed / Resume to continue".
 - **Running** — runs currently working, with the step they're on.
+- **For later** — runs the operator set aside. Still live and untouched; just
+  out of "Needs you" and out of the header count until brought back.
 - **Recent** — completed and cancelled runs.
+
+Each row has a moon button to set a run aside for later, or bring it back.
 
 Each row: thumbnail (generated hero if there is one, else a source photo, else a
 generated pattern), product code in its own column (e.g. "P58"), product/brand

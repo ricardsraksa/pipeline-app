@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     const model = await getModel("stage3Edit");
     const msg = await client.messages.create({
       model,
-      max_tokens: 2000,
+      max_tokens: 8000,
       system: SYSTEM,
       messages: [{
         role: "user",

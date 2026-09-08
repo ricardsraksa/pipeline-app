@@ -381,7 +381,7 @@ export async function generateHeroPrompt(params: {
   async function callOnce(text: string): Promise<HeroPrompt> {
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 4000,
+      max_tokens: 16000,
       // temperature:0 for run-to-run determinism, but only on models that still
       // accept sampling params — the newer tier (Fable 5, Opus 4.8, …) 400s on it.
       ...(modelSupportsSamplingParams(model) ? { temperature: 0 } : {}),

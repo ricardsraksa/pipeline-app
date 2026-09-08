@@ -198,7 +198,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
     "Regenerate the one-pager now.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 2000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
+  const output = await ask({ system, user, maxTokens: 8000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
 }
 
