@@ -4,6 +4,7 @@ import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
 import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
+import { getPrompt } from "@/lib/prompts";
 
 // The cheap path when the operator changes the angle after the copy exists:
 // one revision pass that rewrites around the new angle instead of a full
@@ -131,6 +132,9 @@ async function regenerateStage1(run: Run, instructions: string): Promise<RegenRe
   const avatar = pickRevised(run, "step_avatar");
   const offer = pickRevised(run, "step_offer_brief");
   const beliefs = pickRevised(run, "step_necessary_beliefs");
+  // Same reasoning as the copy path: a revision must honour the rules the
+  // document was written under (Settings override included).
+  const onePagerRules = await getPrompt("stage1");
 
   // Cache layout: the task rules + the big research context are byte-stable
   // across edit clicks, so they form the cached prefix. The things that change
@@ -139,7 +143,15 @@ async function regenerateStage1(run: Run, instructions: string): Promise<RegenRe
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: `You are regenerating a Stage 1 product research one-pager based on user feedback.
+      text: `${onePagerRules}
+
+════════════════════════════════════════════════════════════════════
+YOU ARE REVISING A ONE-PAGER THAT ALREADY EXISTS
+════════════════════════════════════════════════════════════════════
+
+Everything above is the standard it is held to and applies in full to your rewrite.
+
+You are regenerating a Stage 1 product research one-pager based on user feedback.
 
 You have access to all the underlying research documents, so you can pull in more detail, change focus, adjust tone, etc.
 
@@ -215,15 +227,28 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   // the per-click parts (current copy, instructions) after the breakpoint.
   // Observed cost of NOT doing this: 5 edit clicks on one run = 125k Opus
   // input tokens billed in full ($0.85).
+  // The rules the copy was WRITTEN under have to apply to every rewrite too —
+  // banned phrases, no em dashes, claim safety, the FAQ format, pricing out of
+  // scope. Without them an edit quietly drops the house style. getPrompt honours
+  // the live Settings override, so a rewrite follows the same text as Stage 3.
+  const copyRules = await getPrompt("stage2");
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: `You are regenerating DTC product page copy based on user feedback.
+      text: `${copyRules}
+
+════════════════════════════════════════════════════════════════════
+YOU ARE REVISING COPY THAT ALREADY EXISTS
+════════════════════════════════════════════════════════════════════
+
+Everything above is the standard this copy is held to. It applies in full to your rewrite: every rule about banned phrases, punctuation (no em dashes), claim safety, structure, tone and what is out of scope.
 
 YOUR TASK:
 Regenerate the copy following the user's instructions. Keep the same section structure that was already in the current copy. Apply the requested changes consistently.
 
 If they ask for "more technical" add specifications. If they ask for "shorter" condense. If they ask to "emphasise X" make that the focus. If they ask for "warmer tone" adjust language accordingly.
+
+Where the instructions and the rules above genuinely conflict, follow the instructions for what to say and the rules for how to say it.
 
 Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`,
     },
