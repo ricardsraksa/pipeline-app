@@ -113,26 +113,31 @@ Submit all five with the tool. Every prompt ends with its filled PRODUCT FIDELIT
 // everything downstream is built around the chosen one.
 export const ANGLES_PROMPT = `You are a DTC positioning strategist. You will receive the finished research for one physical product: description, one-pager, market and competitive research, the customer avatar, the offer brief and the necessary beliefs.
 
-Work in two steps.
+Work in two steps, in this order. The order matters: angles come from the customer's life, and the competition is only a check on how to say them.
 
-STEP 1 — Map the competition. From the competitive research and the competitor pages you are given, work out what the competitors are ACTUALLY selling on right now: the problem each one leads with, the promise in their hero line, the proof they lean on. Most of them will be selling on features, specs or superlatives ("quietest", "largest capacity", "award-winning"). Note where they all crowd together, and note what nobody is saying.
+STEP 1 — Live in the customer's day. From the avatar and the research, list the concrete moments where this product's job goes wrong for her right now, before she has ever heard of this product or any competitor. What is she doing, what does she reach for, what happens, what does it cost her in time, mess, money, worry or dignity. Stay in her kitchen, her bathroom, her car, her morning. Do not think about competitors in this step at all.
 
-STEP 2 — Propose 4 to 6 distinct POSITIONING ANGLES for this product, strongest first, favouring the ground the competitors have left open. An angle is not a feature and not a superlative. It is a specific problem in the customer's life, the real consequence of leaving that problem unsolved, and the reason this product's mechanism fixes it.
+STEP 2 — Check each moment against the competition. Now look at what competitors lead with. For each problem from Step 1, decide whether anyone already owns that ground, whether they say it badly, or whether nobody has named it. This step decides the ORDER and the WORDING of your angles. It never invents one.
+
+Then propose 4 to 6 distinct POSITIONING ANGLES, strongest first. An angle is not a feature and not a superlative. It is a specific problem in the customer's life, the real consequence of leaving that problem unsolved, and the reason this product's mechanism fixes it.
 
 Example of the standard: for a cat water fountain the angle is not "the quietest fountain" or "the only fountain with a triple filter". It is: cats instinctively refuse still water, so they drink too little, and chronic mild dehydration is the leading path to urinary crystals and kidney disease in indoor cats; moving, filtered water triggers the drinking instinct, so the cat drinks more without the owner doing anything.
 
+THE PROBLEM MUST BE HERS, NOT THE CATEGORY'S. A competitor's product breaking, a listing being vague, a spec sheet contradicting itself, a rival brand overpromising: none of these are problems. They are differentiation notes, and they belong in the gap field, never in the problem. Apply this test to every angle before you submit it: if every competitor were well made and honestly described, would this problem still exist in her life? If it disappears, it was a complaint about the category. Replace it.
+
 Rules for every angle:
-- Lead with a problem the customer already recognises or would immediately recognise once named. Name it concretely, in their world, not in marketing language.
+- Lead with a problem the customer already recognises or would immediately recognise once named. Name it concretely, in her world, not in marketing language.
 - State the consequence honestly. Real stakes (health, money, time, sleep, safety, relationships), never invented or exaggerated ones. If the research does not support a consequence, do not claim it.
 - Explain the mechanism: WHY the product solves it, as cause and effect. "It has X, which does Y, so Z stops happening."
 - Name who feels it most. A specific person, not "everyone".
 - Give one opening hook line a page or ad could start with. Plain language. Never use em dashes.
 - Say in one sentence why this angle beats a generic "best X" or "only Y" pitch for this product.
-- For every angle, state what the competitors currently lead with on that same ground, and the gap you are taking: why this is unclaimed, under-served, or said badly by them. If the research does not show what a competitor says, say so plainly instead of guessing.
-- Rate how contested that ground is: "open" (nobody is saying it), "partly-claimed" (someone touches it but weakly or in passing), or "crowded" (several competitors lead with it). Prefer open ground, but a crowded angle is worth listing when it is the real reason people buy — say what would have to be done differently to win it.
+- For every angle, state what the competitors currently lead with on that same ground, and the gap you are taking: why this is unclaimed, under-served, or said badly by them. If the research does not show what a competitor says, say so plainly instead of guessing. This is context for how to phrase the angle. It is never the angle itself.
 - Angles must be genuinely different from each other: different problems or different people, not the same problem reworded.
 - Ground everything in the research. Do not invent claims, statistics, studies, or certifications that are not there.
 - Never name competitor brands, stores, or the supplier.
+
+Fewer, sharper angles beat a filled quota. If only four moments in her life are genuinely worth building a page on, submit four.
 
 Submit the angles with the tool provided.`;
 
