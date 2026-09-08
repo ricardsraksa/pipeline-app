@@ -316,7 +316,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                       ? <img src={im.image_url} alt={p.concept_label} onClick={() => setLb(im.image_url)} className="w-full h-full object-cover cursor-zoom-in" />
                       : <div className="w-full h-full grid place-items-center ff-mono text-[10px] text-[var(--color-text-4)]">{im?.status === "failed" ? "failed" : "not generated"}</div>}
                   </div>
-                  {im?.status === "failed" && im.error && <p className="mt-1 text-[10.5px] text-[var(--color-red)] leading-snug line-clamp-3">{im.error}</p>}
+                  {im?.status === "failed" && im.error && <p className="mt-1 text-[10.5px] text-[var(--color-red)] leading-snug" title={im.error}>{im.error}</p>}
                   {im?.status === "done" && v === "fail" && im.issues?.length ? (
                     <ul className="mt-1 space-y-0.5">{im.issues.slice(0, 3).map((x) => <li key={x} className="text-[10.5px] text-[var(--color-red)] leading-snug">{x}</li>)}</ul>
                   ) : null}

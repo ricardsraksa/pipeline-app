@@ -398,7 +398,17 @@ export async function generateImageViaMcp(req: McpImageRequest): Promise<string>
       throw new Error("Higgsfield job completed but no image URL was found in the result.");
     }
     if (status === "failed" || status === "nsfw" || status === "canceled") {
-      throw new Error(`Higgsfield generation ${status}.`);
+      // Higgsfield sometimes explains itself; carry that through instead of a
+      // bare status word. "nsfw" is their content filter refusing the prompt or
+      // a reference photo — usually bare skin — not a fault to retry.
+      const detail = typeof job?.error === "string" ? job.error
+        : typeof job?.message === "string" ? job.message
+        : typeof job?.reason === "string" ? job.reason
+        : "";
+      const hint = status === "nsfw"
+        ? " Their content filter refused it — usually bare skin in the scene or in a reference photo. Reword the scene, or untick that reference."
+        : "";
+      throw new Error(`Higgsfield generation ${status}.${detail ? ` ${detail.slice(0, 200)}` : ""}${hint}`);
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }

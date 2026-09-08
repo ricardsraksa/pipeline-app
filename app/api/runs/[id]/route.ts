@@ -159,12 +159,14 @@ export async function PATCH(
   try {
     if (body.type === "stage3_image_upsert") {
       const img = (body as { image?: { image_url?: unknown } }).image;
-      if (img && img.image_url != null) await assertImageUrls([img.image_url]);
+      // A failed image carries no URL — the record of the failure still has
+      // to save, so only a non-empty value is checked.
+      if (img && typeof img.image_url === "string" && img.image_url !== "") await assertImageUrls([img.image_url]);
     }
     if (typeof body.stage3_remaining_images === "string") {
       const parsed = JSON.parse(body.stage3_remaining_images);
       if (!Array.isArray(parsed)) throw new Error("stage3_remaining_images must be an array");
-      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => u != null));
+      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => typeof u === "string" && u !== ""));
     }
     if (typeof body.stage3_reference_images === "string") {
       const parsed = JSON.parse(body.stage3_reference_images);
@@ -178,12 +180,14 @@ export async function PATCH(
     }
     if (body.type === "ads_image_upsert") {
       const img = (body as { image?: { image_url?: unknown } }).image;
-      if (img && img.image_url != null) await assertImageUrls([img.image_url]);
+      // A failed image carries no URL — the record of the failure still has
+      // to save, so only a non-empty value is checked.
+      if (img && typeof img.image_url === "string" && img.image_url !== "") await assertImageUrls([img.image_url]);
     }
     if (typeof body.ads_images === "string") {
       const parsed = JSON.parse(body.ads_images);
       if (!Array.isArray(parsed)) throw new Error("ads_images must be an array");
-      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => u != null));
+      await assertImageUrls(parsed.map((x: { image_url?: unknown }) => x?.image_url).filter((u) => typeof u === "string" && u !== ""));
     }
     if (Array.isArray(body.uploaded_source_images)) await assertImageUrls(body.uploaded_source_images);
     if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
