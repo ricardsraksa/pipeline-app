@@ -8,7 +8,7 @@ import { getRun, updateRun, recordUsage, recordPromptUsed } from "./db";
 import { getModel } from "./models";
 import { getPrompt } from "./prompts";
 import { parseProductScrape } from "./product";
-import type { Angle } from "./angles";
+import { parseAngles, type Angle } from "./angles";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
 
@@ -108,6 +108,14 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     "",
     "NECESSARY BELIEFS:",
     (run.step_necessary_beliefs_revised ?? run.step_necessary_beliefs ?? "(none)").slice(0, DOC_CAP),
+    // Without the previous set, a steer like "keep the second one" or "less
+    // like the last lot" has nothing to refer to.
+    ...(() => {
+      const prev = parseAngles(run.product_angles);
+      if (!prev.length) return [];
+      return ["", "THE SET YOU PROPOSED LAST TIME (the operator asked for another pass — do not simply repeat these, and read the note below as a reaction to them):",
+        ...prev.map((a, i) => `${i + 1}. ${a.title} — ${a.problem}`)];
+    })(),
     ...(note?.trim() ? ["", `OPERATOR NOTE (highest priority): ${note.trim().slice(0, 2000)}`] : []),
   ].join("\n");
 

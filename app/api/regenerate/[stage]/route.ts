@@ -5,6 +5,8 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
 import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
 import { getPrompt } from "@/lib/prompts";
+import { buildStage1FeedbackBlock, buildStage2FeedbackBlock } from "@/lib/feedback";
+import { recordPromptUsed } from "@/lib/db";
 
 // The cheap path when the operator changes the angle after the copy exists:
 // one revision pass that rewrites around the new angle instead of a full
@@ -27,6 +29,8 @@ interface RegenResult {
   /** which {stage}_edited_at column to bump */
   stageTimestamp: "stage1_edited_at" | "stage2_edited_at" | "stage3_edited_at";
   output: string;
+  /** The system prompt this rewrite ran with, for the audit trail. */
+  systemUsed: string;
 }
 
 export async function POST(
@@ -69,6 +73,8 @@ export async function POST(
     }
 
     const ts = new Date().toISOString();
+    // Audit trail: every other model call records the prompt it ran with.
+    void recordPromptUsed(runId, stage === "stage1" ? "stage1" : "stage2", result.systemUsed).catch(() => {});
     await updateRun(runId, {
       [`${result.field}_edited`]: result.output,
       [result.stageTimestamp]: ts,
@@ -81,8 +87,12 @@ export async function POST(
     // loses the race and the Copy tab keeps showing the old structure. Still
     // best-effort — a structuring failure never fails the regeneration itself.
     if (stage === "stage2") {
-      // The rewrite was built on the current pick — the stage is no longer stale.
-      await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
+      // Only a rebuild ON the angle clears the stale flag. A plain "make it
+      // warmer" edit used to clear it too, hiding that the copy still predates
+      // the angle change.
+      if (body.mode === "angle") {
+        await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
+      }
       try {
         const structured = await structureStage2Copy(result.output, runId);
         if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), stage2_json_at: new Date().toISOString(), gdoc_appended_at: null });
@@ -135,6 +145,9 @@ async function regenerateStage1(run: Run, instructions: string): Promise<RegenRe
   // Same reasoning as the copy path: a revision must honour the rules the
   // document was written under (Settings override included).
   const onePagerRules = await getPrompt("stage1");
+  // The generator's system carries past thumbs feedback; a rewrite that drops
+  // it quietly loses the steer the operator already gave.
+  const onePagerFeedback = await buildStage1FeedbackBlock().catch(() => "");
 
   // Cache layout: the task rules + the big research context are byte-stable
   // across edit clicks, so they form the cached prefix. The things that change
@@ -143,7 +156,7 @@ async function regenerateStage1(run: Run, instructions: string): Promise<RegenRe
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: `${onePagerRules}
+      text: `${onePagerRules}${onePagerFeedback}
 
 ════════════════════════════════════════════════════════════════════
 YOU ARE REVISING A ONE-PAGER THAT ALREADY EXISTS
@@ -211,7 +224,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
   ].join("\n");
 
   const output = await ask({ system, user, maxTokens: 32_000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
-  return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
+  return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output, systemUsed: system.map((b) => b.text).join("\n\n") };
 }
 
 // ── Stage 2: regenerate the copy ──────────────────────────────────────────────
@@ -232,10 +245,11 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   // scope. Without them an edit quietly drops the house style. getPrompt honours
   // the live Settings override, so a rewrite follows the same text as Stage 3.
   const copyRules = await getPrompt("stage2");
+  const copyFeedback = await buildStage2FeedbackBlock().catch(() => "");
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: `${copyRules}
+      text: `${copyRules}${copyFeedback}
 
 ════════════════════════════════════════════════════════════════════
 YOU ARE REVISING COPY THAT ALREADY EXISTS
@@ -287,7 +301,7 @@ Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`,
   ].join("\n");
 
   const output = await ask({ system, user, maxTokens: 32_000, role: "stage2", runId: run.id, label: "stage2: edit with AI" });
-  return { field: "stage2_copy", stageTimestamp: "stage2_edited_at", output };
+  return { field: "stage2_copy", stageTimestamp: "stage2_edited_at", output, systemUsed: system.map((b) => b.text).join("\n\n") };
 }
 
 

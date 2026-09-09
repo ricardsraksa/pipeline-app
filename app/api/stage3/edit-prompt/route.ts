@@ -5,6 +5,9 @@ import { recordUsage } from "@/lib/db";
 import { assertPublicUrl } from "@/lib/ssrf";
 
 import { requireSession } from "@/lib/auth";
+import { getRun } from "@/lib/db";
+import { getPrompt } from "@/lib/prompts";
+import { HERO_SYSTEM, REMAINING_SYSTEM } from "@/lib/stage3/hero";
 // POST { prompt, instructions, category? }  →  { success, prompt }
 //
 // Takes one Stage-3 image prompt + a short natural-language instruction
@@ -24,6 +27,16 @@ Your job is to rewrite the prompt incorporating the operator's note. Hard rules:
 - Keep the prompt in the same overall style and length as the original. Don't append commentary or explanations.
 - If reference images are attached, treat them as the desired SCENE / setting / lighting / style to move toward — never as the product. Describe what you actually see in them (a setting, a background, a mood, a prop) and fold it into the rewrite where the operator's note calls for it. The product still comes from the existing product references; do not describe an attached reference as the product.
 - Output ONLY the new prompt text. No preamble, no markdown headers, no quotes around it.`;
+
+/** The rules the prompt being rewritten was WRITTEN under. Without these the
+ *  rewriter has never seen the required section headers, the no-logos rule, the
+ *  overlay-text rules or the ad concept templates — it kept the house style
+ *  only by accident, because it was told to keep the same length. */
+async function rulesFor(category: string | undefined): Promise<string> {
+  if (category?.startsWith("ad_")) return getPrompt("ads");
+  if (category === "hero_studio") return HERO_SYSTEM;
+  return REMAINING_SYSTEM;
+}
 
 export async function POST(req: NextRequest) {
   const denied = requireSession(req);
@@ -57,8 +70,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // What the product actually is — the rewriter had no idea until now.
+  let productLine: string | null = null;
+  if (typeof body.run_id === "number") {
+    try {
+      const run = await getRun(body.run_id);
+      const desc = (run?.product_description ?? run?.product_name ?? "").trim();
+      if (desc) productLine = `THE PRODUCT (never change what it is):\n${desc.slice(0, 2000)}`;
+    } catch { /* the rewrite still works without it */ }
+  }
+
   const userMsg = [
     category ? `CATEGORY: ${category}` : null,
+    productLine,
     "",
     "CURRENT PROMPT:",
     prompt,
@@ -78,10 +102,19 @@ export async function POST(req: NextRequest) {
     // Rewrites/edits run on the cheaper stage3Edit role (Sonnet by default) —
     // this is the most-clicked Stage 4 call (single rewrites + bulk fix).
     const model = await getModel("stage3Edit");
+    const rules = await rulesFor(category);
     const msg = await client.messages.create({
       model,
       max_tokens: 8000,
-      system: SYSTEM,
+      system: `${rules}
+
+════════════════════════════════════════════════════════════════════
+YOU ARE REVISING A PROMPT THAT ALREADY EXISTS
+════════════════════════════════════════════════════════════════════
+
+Everything above is the standard the prompt you are given was written to, and it applies in full to your rewrite: the required section headers and their order, the output-format line, the brand-safety and negative rules, the overlay-text rules, and the model and aspect ratio. Keep every one of them.
+
+${SYSTEM}`,
       messages: [{
         role: "user",
         content: [

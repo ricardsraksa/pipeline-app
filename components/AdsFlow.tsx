@@ -95,6 +95,12 @@ export default function AdsFlow({ runId }: { runId: number }) {
       .forEach((im) => add(im.image_url, im.category || "image"));
   } catch { /* none */ }
   const refsFor = (p: AdPrompt) => refOverrides[String(p.index)] ?? p.source_image_references ?? [];
+  // Which of the candidates are photographs of the real product, as opposed to
+  // Stage 4's generated scenes. Only these are fair fidelity references.
+  const productRefs = new Set<string>([
+    ...(hero ? [hero] : []),
+    ...safeParse<string[]>(run.uploaded_source_images, []),
+  ]);
 
   /* ── write ─────────────────────────────────────────────────────────── */
   // A plain function, not a hook: everything below here runs after the early
@@ -160,7 +166,11 @@ export default function AdsFlow({ runId }: { runId: number }) {
       try {
         const audit = await fetch("/api/stage3/audit", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: gen.image_url, category: `ad_${p.concept}`, prompt_used: promptText, product_description: productDesc, overlay_text_used: p.headline || null, reference_urls: refs, run_id: runId }),
+          // Fidelity is judged against real product photos only: the picked
+          // references include Stage 4 scenes, and the auditor treats every
+          // reference as "the real product", so a scene with a model in it
+          // corrupted the comparison.
+          body: JSON.stringify({ image_url: gen.image_url, category: `ad_${p.concept}`, prompt_used: promptText, product_description: productDesc, overlay_text_used: p.headline || null, reference_urls: refs.filter((u) => productRefs.has(u)), run_id: runId }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
         else issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`];

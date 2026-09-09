@@ -45,6 +45,19 @@ export function buildAuditUserMessage(params: {
   reference_count: number
 }): string {
   const { category, prompt_used, product_description, overlay_text_used, reference_count } = params
+  // Stage 5 ads break three of the standing rules by design: they carry a lot
+  // of on-image text (BEFORE/AFTER labels, callouts, badges, a quote), some
+  // concepts show the product twice in a split screen, and the product name is
+  // rendered as a plain-text wordmark. Without this the auditor fails them for
+  // doing exactly what they were asked to do.
+  const isAd = category.startsWith('ad_')
+  const adNote = isAd
+    ? `\n\nTHIS IS A STATIC AD, NOT A PRODUCT PHOTO. For this image only:
+- Heavy on-image text is intended: headlines, BEFORE/AFTER labels, feature callouts with leader lines, badges, a spec line, a handwritten note, a customer quote, a "Shop Now" button. Judge text on whether it is legible and correctly spelled, never on whether it "should" be there.
+- A split screen or before/after layout showing the product twice is intended. Two views of the same product in one frame is not a defect here.
+- The product's own name rendered as plain text is intended and is not a third-party brand mark. Only a REAL other company's logo or name is a failure.
+Everything else — product fidelity against the references, anatomy, warped or duplicated parts, garbled text — is judged exactly as usual.`
+    : ''
   const refLine = reference_count > 0
     ? `IMAGE 1 is the generated image to audit. IMAGES 2 to ${reference_count + 1} are reference photos of the real product — the product in image 1 must match them.`
     : 'IMAGE 1 is the generated image to audit. No reference photos are attached: judge generation defects and the standing rules only.'
@@ -60,7 +73,9 @@ ${prompt_used}
 
 ${overlay_text_used
   ? `TEXT EXPECTED ON THE IMAGE, SPELLED EXACTLY:\n${overlay_text_used}`
-  : 'No text is expected on the image. Text is only a problem if it is garbled, misspelled or a third-party brand.'}
+  : isAd
+    ? 'The ad carries its own on-image copy as described in the prompt above. Judge it on legibility and spelling.'
+    : 'No text is expected on the image. Text is only a problem if it is garbled, misspelled or a third-party brand.'}${adNote}
 
 Audit image 1 and output the JSON.`
 }

@@ -482,7 +482,7 @@ export default function Stage3HeroFlow({
       try {
         const res = await fetch("/api/stage3/edit-prompt", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: saved[i].prompt, instructions: instr, category: saved[i].category, run_id: runId }),
+          body: JSON.stringify({ prompt: saved[i].prompt, instructions: instr, category: saved[i].category, reference_images: refsFor(saved[i], effRefOverrides, heroUrl), run_id: runId }),
         });
         const data = await res.json();
         if (!data.success || !data.prompt) { setAiCardErr(data.error ?? `HTTP ${res.status}`); return; }
@@ -1765,7 +1765,7 @@ function BulkFixModal({
               : text;
             const res = await fetch("/api/stage3/edit-prompt", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: drafts[i], instructions: perImageInstr, category: im.category, run_id: runId }),
+              body: JSON.stringify({ prompt: drafts[i], instructions: perImageInstr, category: im.category, reference_images: refSel[i] ?? [], run_id: runId }),
             });
             const data = await res.json();
             return { i, prompt: data.success && data.prompt ? (data.prompt as string) : null };
@@ -1908,7 +1908,7 @@ function RegenImageModal({
     try {
       const res = await fetch("/api/stage3/edit-prompt", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: draft, instructions: instr, category: image.category, run_id: runId }),
+        body: JSON.stringify({ prompt: draft, instructions: instr, category: image.category, reference_images: refs, run_id: runId }),
       });
       const data = await res.json();
       if (!data.success || !data.prompt) { setAiErr(data.error ?? `HTTP ${res.status}`); return; }
