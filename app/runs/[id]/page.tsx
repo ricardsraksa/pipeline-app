@@ -151,12 +151,12 @@ function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 }
 
-const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string; what: string }[] = [
-  { key: "product", id: "v2-stage-product", n: 1, title: "Product", what: "Description and photos from the links" },
-  { key: "stage1", id: "v2-stage-1", n: 2, title: "Research", what: "Market, avatar, offer, angles" },
-  { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy", what: "Copy kit around the chosen angle" },
-  { key: "stage3", id: "v2-stage-3", n: 4, title: "Images", what: "Hero, then 8 images" },
-  { key: "ads", id: "v2-stage-ads", n: 5, title: "Ads", what: "Five image ads" },
+const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string }[] = [
+  { key: "product", id: "v2-stage-product", n: 1, title: "Product" },
+  { key: "stage1", id: "v2-stage-1", n: 2, title: "Research" },
+  { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy" },
+  { key: "stage3", id: "v2-stage-3", n: 4, title: "Images" },
+  { key: "ads", id: "v2-stage-ads", n: 5, title: "Ads" },
 ];
 
 const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
@@ -164,29 +164,6 @@ const stageActionable = (st: StageState) => ["running", "waiting", "error"].incl
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
 type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "ads";
-
-function StageActions({ stage, prevLabel, prevId, onRestart, restarting }: {
-  stage: RestartStage;
-  prevLabel?: string;
-  prevId?: string;
-  onRestart: (s: RestartStage) => void;
-  restarting: boolean;
-}) {
-  const btn = "cursor-pointer inline-flex items-center gap-[7px] rounded-[var(--radius-sm)] px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] tr hover:border-[var(--color-text-3)] hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
-  const label = stage === "product" ? "Stage 1" : stage === "stage1" ? "Stage 2" : stage === "stage2" ? "Stage 3" : stage === "ads" ? "Stage 5" : "Stage 4";
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {prevId && (
-        <button onClick={() => document.getElementById(prevId)?.scrollIntoView({ behavior: "smooth", block: "start" })} className={btn}>
-          <Icon.ArrowLeft className="w-3.5 h-3.5" /> Back to {prevLabel}
-        </button>
-      )}
-      <button onClick={() => onRestart(stage)} disabled={restarting} className={btn}>
-        {restarting ? <Icon.Loader className="w-3.5 h-3.5" /> : <Icon.Refresh className="w-3.5 h-3.5" />} Restart {label}
-      </button>
-    </div>
-  );
-}
 
 // ── Next action (bottom bar content) ──────────────────────────────────────────
 
@@ -254,7 +231,7 @@ export default function RunPage() {
 
   async function handleKill() {
     if (!runId || killing) return;
-    if (!window.confirm("Kill this run? It stops at the next stage boundary. You can Resume it later.")) return;
+    if (!window.confirm("Kill this run? You can resume it later.")) return;
     setKilling(true);
     try { await fetch(`/api/runs/${runId}/cancel`, { method: "POST" }); } catch { /* ignore */ }
     finally { setTimeout(() => setKilling(false), 1200); }
@@ -431,23 +408,6 @@ export default function RunPage() {
 
   const openStage = (key: StageKey) => setActiveOverride(key);
 
-  const summary = (key: StageKey): string | null => {
-    if (key === "product") {
-      const d = run.product?.descriptionEdited ?? run.product?.descriptionAi ?? run.meta.productDescription;
-      if (!d) return null;
-      return d.replace(/\s+/g, " ").slice(0, 90) + (d.length > 90 ? "…" : "") + (run.product?.descriptionEdited ? " · edited" : "");
-    }
-    if (key === "stage1") {
-      if (!outputs.onePager) return null;
-      return (run.meta.brandName ? run.meta.brandName + " · " : "") + "research one-pager" + (outputs.onePagerEdited ? " · edited" : "");
-    }
-    if (key === "stage2") {
-      if (!outputs.stage2Output) return null;
-      return "Copy kit" + (outputs.stage2OutputEdited ? " · edited" : "");
-    }
-    if (run.status === "completed") return "hero + 8 images";
-    return null;
-  };
 
   const present: Record<StageKey, boolean> = {
     product: Boolean(run.product?.scrape) || PRODUCT_DONE(run) || [...PRODUCT_ACTIVE, "awaiting_product_approval"].includes(run.status),
@@ -461,17 +421,17 @@ export default function RunPage() {
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
-    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Review the product", sub: "Check the description, tick the photos.", cta: "Review", onClick: () => openStage("product") };
+    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Review the product", cta: "Review", onClick: () => openStage("product") };
     if (s === "awaiting_stage2_approval") {
       const hasAngle = Boolean(run.angles?.selected);
       return hasAngle
-        ? { tone: "amber", icon: "review", title: "Ready for copy", sub: "Built around the angle you picked.", cta: startingStage2 ? "Starting…" : "Run copy", onClick: handleStartStage2 }
-        : { tone: "amber", icon: "review", title: "Pick an angle", sub: "Research is done.", cta: "Pick an angle", onClick: () => openStage("stage1") };
+        ? { tone: "amber", icon: "review", title: "Ready for copy", cta: startingStage2 ? "Starting…" : "Run copy", onClick: handleStartStage2 }
+        : { tone: "amber", icon: "review", title: "Pick an angle", cta: "Pick an angle", onClick: () => openStage("stage1") };
     }
-    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Ready for images", sub: "Hero first, then the 8.", cta: "Go to images", onClick: () => openStage("stage3") };
-    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Review the hero", sub: "It becomes the reference for the other 8.", cta: "Review hero", onClick: () => openStage("stage3") };
-    if ((s === "awaiting_qc" || s === "generating_remaining") && (run.stage4?.done ?? 0) > 0) return { tone: "amber", icon: "image", title: "Images generated", sub: "Review them, then push.", cta: "Open images", onClick: () => openStage("stage3") };
-    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", sub: "Then generate.", cta: "Review prompts", onClick: () => openStage("stage3") };
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Ready for images", cta: "Go to images", onClick: () => openStage("stage3") };
+    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Review the hero", cta: "Review hero", onClick: () => openStage("stage3") };
+    if ((s === "awaiting_qc" || s === "generating_remaining") && (run.stage4?.done ?? 0) > 0) return { tone: "amber", icon: "image", title: "Images generated", cta: "Open images", onClick: () => openStage("stage3") };
+    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", cta: "Review prompts", onClick: () => openStage("stage3") };
     if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     // Several routes write error_message next to a status that is not "failed"
@@ -483,10 +443,10 @@ export default function RunPage() {
     if (s === "completed") {
       const a = run.meta.ads;
       if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };
-      if (a?.step === "review") return { tone: "amber", icon: "review", title: "Review the 5 ads", sub: "Approve the briefs, then generate.", cta: "Review ads", onClick: () => openStage("ads") };
+      if (a?.step === "review") return { tone: "amber", icon: "review", title: "Review the 5 ads", cta: "Review ads", onClick: () => openStage("ads") };
       if (a?.step === "generating") return { tone: "accent", running: true, title: "Generating the ads", sub: `${a.done} of 5 done` };
-      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", sub: "Ads done — send them to Drive.", cta: "Open ads", onClick: () => openStage("ads") };
-      return { tone: "green", icon: "check", title: "Run complete", sub: "Push to Shopify, send to Drive, write the 5 ads.", cta: "Write 5 ads", onClick: () => openStage("ads") };
+      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", cta: "Open ads", onClick: () => openStage("ads") };
+      return { tone: "green", icon: "check", title: "Run complete", cta: "Write 5 ads", onClick: () => openStage("ads") };
     }
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
@@ -639,7 +599,7 @@ export default function RunPage() {
         {run.meta.pricing && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Price</span>
-            <button onClick={() => openStage("stage2")} className={deliverRow} style={deliverCols} title="Opens the Pricing card on the Copy stage">
+            <button onClick={() => openStage("stage2")} className={deliverRow} style={deliverCols}>
               <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· cmp {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
               <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×</span>
             </button>
@@ -677,7 +637,7 @@ export default function RunPage() {
                 ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} variant="row" />
                 : <DeliverRow name="Google Doc" state="after copy" />}
               <button onClick={() => openStage("stage3")} disabled={!imagesReady} className={deliverRow} style={deliverCols}
-                title={imagesReady ? "Opens the Shopify push on the Images stage" : "Needs the finished images first"}>
+                title={undefined}>
                 <span className="text-[13px] font-[500] text-[var(--color-text)]">Shopify</span>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{imagesReady ? "push →" : "after images"}</span>
               </button>
@@ -770,7 +730,7 @@ export default function RunPage() {
               </>
             ) : ["stage1", "scraping"].includes(run.status) || outputs.research
               ? waiting(run.currentStep ?? "Researching…")
-              : waiting("Starts after you approve the product.")}
+              : waiting("After the product gate")}
           </>
         )}
 
@@ -824,7 +784,7 @@ export default function RunPage() {
                 )}
                 <div className="mt-3"><FeedbackAppliedChip stage={2} /></div>
               </>
-            ) : run.status === "stage2" ? waiting("Writing the copy…") : waiting("Starts after you pick an angle.")}
+            ) : run.status === "stage2" ? waiting("Writing the copy…") : waiting("After an angle is picked")}
           </>
         )}
 
@@ -856,7 +816,7 @@ export default function RunPage() {
               <div className="flex-1" />
               {runId !== null && <RestartStage stage="ads" />}
             </div>
-            <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]">Restart stage to rewrite the ads on it</span>} />
+            <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]"></span>} />
             <AdsFlow runId={Number(runId)} />
           </>
         )}

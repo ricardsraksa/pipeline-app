@@ -326,7 +326,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                 <span className="text-[13px] font-[600] text-[var(--color-text)]">{p.concept_label}</span>
                 <div className="flex-1" />
                 {im && im.status === "done" && v && (
-                  <button onClick={() => toggleVerdict(p)} title={im.user_override ? "Overridden — click to cycle" : `Auditor: ${im.verdict}. Click to override.`}
+                  <button onClick={() => toggleVerdict(p)} title={`Auditor: ${im.verdict ?? "not run"}`}
                     className={`ff-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{v}{im.user_override ? "•" : ""}</button>
                 )}
               </div>
@@ -353,7 +353,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <button onClick={() => { setRegenIdx(regenIdx === p.index ? null : p.index); setRegenText(im.issues?.length && v === "fail" ? `Fix the audit issues:\n- ${im.issues.join("\n- ")}` : ""); }} className="btn btn-sm">Regenerate</button>
                       <a href={im.image_url} download={`ad-${p.index}-${p.concept}.png`} target="_blank" rel="noreferrer" className="btn btn-sm">↓</a>
-                      {im.history?.[0] && <button onClick={() => restorePrevious(p)} className="btn btn-sm" title="Bring back the previous version">Previous</button>}
+                      {im.history?.[0] && <button onClick={() => restorePrevious(p)} className="btn btn-sm">Previous</button>}
                     </div>
                   )}
                   {!im?.image_url && !busy && doneCount > 0 && !anyBusy && (
@@ -361,7 +361,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                   )}
                   {regenIdx === p.index && (
                     <div className="mt-2 space-y-1.5">
-                      <textarea value={regenText} onChange={(e) => setRegenText(e.target.value)} rows={3} placeholder="What to change (leave empty to re-roll)"
+                      <textarea value={regenText} onChange={(e) => setRegenText(e.target.value)} rows={3} placeholder="What to change"
                         className="w-full px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[11.5px] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]" />
                       <div className="flex gap-1.5">
                         <button onClick={() => regenerate(p, regenText.trim().length >= 5)} className="btn btn-sm btn-primary">{regenText.trim().length >= 5 ? "Rewrite & regenerate" : "Regenerate as is"}</button>

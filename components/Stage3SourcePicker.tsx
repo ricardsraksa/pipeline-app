@@ -58,7 +58,7 @@ export default function Stage3SourcePicker({
           Source images — {activeCount} of {candidates.length} in use
         </h4>
       </div>
-      <p className="text-[11px] text-[var(--color-text-3)]">Click to exclude or include.</p>
+      <p className="text-[11px] text-[var(--color-text-3)]"></p>
       <div className="flex flex-wrap gap-2">
         {candidates.map((url) => {
           const off = excluded.has(url);

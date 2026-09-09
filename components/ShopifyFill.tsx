@@ -67,7 +67,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       if (!data.success) { setErr(data.error ?? `Failed (${res.status})`); return; }
       setReport(data.report as Report);
       if (data.warning) setErr(String(data.warning));
-      setNote(data.restructured ? "Fields re-derived from your edited copy before pushing." : null);
+      setNote(data.restructured ? "Re-derived from your edits." : null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {

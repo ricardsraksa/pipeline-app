@@ -73,7 +73,7 @@ export default function SendToDrive({ runId, variant = "button", kind = "both", 
   if (variant === "row") {
     return (
       <>
-        <button onClick={send} disabled={busy} className={railRow} style={railRowCols} title={err ?? msg ?? "Upload the images to Images and the ads to this week's Image Ads folder"}>
+        <button onClick={send} disabled={busy} className={railRow} style={railRowCols} title={err ?? msg ?? undefined}>
           <span className="text-[13px] font-[500] text-[var(--color-text)]">{rowLabel}</span>
           <span className="ff-mono text-[11px]" style={{ color: err ? "var(--color-red)" : msg ? "var(--color-green)" : "var(--color-text-3)" }}>{busy ? "sending…" : err ? "failed" : msg ? "sent" : "ready"}</span>
         </button>

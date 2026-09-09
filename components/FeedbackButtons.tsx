@@ -116,7 +116,7 @@ export default function FeedbackButtons({
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
             onBlur={() => persistNote(note)}
-            placeholder={vote === "down" ? "What was wrong? (optional, will guide future runs)" : "What worked, or what to lean into next time? (optional)"}
+            placeholder={vote === "down" ? "What was wrong?" : "What worked?"}
             rows={2}
             className="w-full text-[12px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md px-2 py-1.5 placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] resize-y"
           />

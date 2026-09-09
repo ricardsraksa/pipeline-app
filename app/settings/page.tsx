@@ -172,7 +172,7 @@ export default function SettingsPage() {
           Settings
         </h1>
         <p className="text-[13px] text-[var(--color-text-2)]">
-          Models and prompts per stage. Changes apply to the next run.
+          Changes apply to the next run.
         </p>
       </div>
 

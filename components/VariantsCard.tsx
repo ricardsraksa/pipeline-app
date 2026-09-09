@@ -154,10 +154,10 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
         {!empty && (editing
           ? <><button onClick={saveEditing} className="btn btn-sm btn-primary">Save</button><button onClick={() => setEditing(false)} className="btn btn-sm">Cancel</button></>
           : <button onClick={startEditing} className="btn btn-sm">Edit by hand</button>)}
-        {override && !editing && <button onClick={() => saveOverride(null)} className="btn btn-sm" title="Go back to what the listing said">Revert</button>}
+        {override && !editing && <button onClick={() => saveOverride(null)} className="btn btn-sm">Revert</button>}
         {!empty && !editing && <button onClick={() => askShopify(true)} disabled={planBusy} className="btn btn-sm">{planBusy ? "Checking…" : "Set in Shopify"}</button>}
         {asked
-          ? <span className="ff-mono text-[10.5px] text-[var(--color-amber)]" title="The Mac worker picks this up on its next poll (about 20 s) and re-reads the listing">re-reading on your Mac…</span>
+          ? <span className="ff-mono text-[10.5px] text-[var(--color-amber)]" title="~20 s">re-reading on your Mac…</span>
           : <button onClick={reread} disabled={asking} className="btn btn-sm">Re-read listing</button>}
       </div>
 
@@ -210,7 +210,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
                   placeholder="Option name" className="w-[130px] shrink-0 px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[12.5px] font-[600] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]" />
                 <textarea value={row.values} onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? { ...x, values: e.target.value } : x)))} rows={2}
                   placeholder="Values, comma separated" className="flex-1 px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] ff-mono text-[11.5px] text-[var(--color-text)] outline-none resize-y focus:border-[var(--color-border-strong)]" />
-                <button onClick={() => setDraft((d) => d.filter((_, j) => j !== i))} title="Remove this option" className="btn btn-sm btn-danger">×</button>
+                <button onClick={() => setDraft((d) => d.filter((_, j) => j !== i))} className="btn btn-sm btn-danger">×</button>
               </div>
             ))}
             <button onClick={() => setDraft((d) => [...d, { name: "", values: "" }])} className="btn btn-sm">+ Add option</button>

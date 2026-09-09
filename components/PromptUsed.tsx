@@ -67,7 +67,7 @@ export default function PromptUsed({
         <div className="mt-2 space-y-3">
           {entries.length === 0 ? (
             <p className="text-[11.5px] text-[var(--color-text-3)] italic">
-              Not recorded — this run predates prompt snapshots, so the exact prompt it used can&apos;t be shown.
+              Not recorded (older run).
             </p>
           ) : (
             entries.map((e) => (

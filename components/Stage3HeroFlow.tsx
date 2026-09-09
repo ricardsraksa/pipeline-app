@@ -139,7 +139,7 @@ export default function Stage3HeroFlow({
 
   async function rewriteHeroWithAi() {
     const instr = heroAiInstr.trim();
-    if (instr.length < 5) { setHeroAiErr("Tell Claude what to change (5+ characters)"); return; }
+    if (instr.length < 5) { setHeroAiErr("Too short"); return; }
     setHeroAiLoading(true);
     setHeroAiErr(null);
     try {
@@ -334,14 +334,13 @@ export default function Stage3HeroFlow({
             {busy === "skip" ? "Writing prompts…" : "Skip hero — use source images"}
           </button>
         </div>
-        {!stage2Ready && <p className="text-[11px] text-[var(--color-text-3)]">Finish Stage 3 first.</p>}
       </div>
     );
   }
 
   /* ── generating_hero ─────────────────────────────────────────────────── */
   if (status === "generating_hero") {
-    return <Spinner label="Generating the hero shot from your source photos…" />;
+    return <Spinner label="Generating the hero…" />;
   }
 
   /* ── HERO QC GATE ────────────────────────────────────────────────────── */
@@ -356,14 +355,14 @@ export default function Stage3HeroFlow({
           <div className="space-y-1.5">
             <p className="eyebrow">Hero</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(0)} title="Click to view fullscreen" className="rounded-lg w-[420px] max-w-full border border-[var(--color-border)] cursor-zoom-in" />
+            <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(0)} className="rounded-lg w-[420px] max-w-full border border-[var(--color-border)] cursor-zoom-in" />
           </div>
           {activeSources.length > 0 && (
             <div className="space-y-1.5 min-w-0 flex-1">
               <p className="eyebrow">Source photos <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {activeSources.length}</span></p>
               <div className="grid grid-cols-3 gap-2 max-w-[420px]">
                 {activeSources.map((u, i) => (
-                  <button key={u} onClick={() => setHeroZoom(i + 1)} title="Click to view fullscreen" className="aspect-square rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-hidden cursor-zoom-in">
+                  <button key={u} onClick={() => setHeroZoom(i + 1)} className="aspect-square rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-hidden cursor-zoom-in">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={u} alt={`Source ${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
                   </button>
@@ -396,7 +395,7 @@ export default function Stage3HeroFlow({
               <textarea
                 value={heroAiInstr}
                 onChange={(e) => setHeroAiInstr(e.target.value)}
-                placeholder="e.g. warmer lighting, darker background, slight three-quarter angle"
+                placeholder="e.g. warmer lighting"
                 rows={2}
                 disabled={heroAiLoading}
                 className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
@@ -422,7 +421,7 @@ export default function Stage3HeroFlow({
 
   /* ── generating_remaining (writing the 8 prompts) ───────────────────── */
   if (status === "generating_remaining") {
-    return <Spinner label="Hero approved. Writing the 8 derivative prompts…" />;
+    return <Spinner label="Writing the 8 prompts…" />;
   }
 
   /* ── PROMPT QC GATE (awaiting_qc, 8 prompts) ────────────────────────── */
@@ -476,7 +475,7 @@ export default function Stage3HeroFlow({
     // text changes here — nothing generates until "Generate 8 Images".
     const aiRewriteCard = async (i: number) => {
       const instr = aiCardText.trim();
-      if (instr.length < 5) { setAiCardErr("Describe the change (5+ characters)"); return; }
+      if (instr.length < 5) { setAiCardErr("Too short"); return; }
       setAiCardBusy(true);
       setAiCardErr(null);
       try {
@@ -612,7 +611,7 @@ export default function Stage3HeroFlow({
       <div className="space-y-4">
         <div>
           <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the 8 prompts</h3>
-          <p className="text-[12px] text-[var(--color-text-3)]">What each image will show.</p>
+          <p className="text-[12px] text-[var(--color-text-3)]"></p>
         </div>
         <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
@@ -703,7 +702,7 @@ export default function Stage3HeroFlow({
                       )}
                       {doneByIndex.get(p.index) && (
                         <span className="text-[11px] text-[var(--color-text-3)]">
-                          An image already exists for this slot — generating replaces it.
+                          Will be replaced.
                         </span>
                       )}
                     </div>
@@ -1166,7 +1165,7 @@ function CompletedReview({
   const staleFor = (n: 2 | 3): string | null => {
     if (!placement) return null;
     const im = images.find((x) => x.index === placement[`section_${n}`]);
-    if (!im || im.status !== "done" || !im.image_url) return "This image failed — pick another image for this section or re-place.";
+    if (!im || im.status !== "done" || !im.image_url) return "Image failed.";
     const placed = placement.placed_urls?.[String(n)];
     if (placed && placed !== im.image_url) return "Image changed since it was placed.";
     return null;
@@ -1486,7 +1485,7 @@ function CompletedReview({
             <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className={`w-full h-full object-cover cursor-zoom-in ${v === "fail" ? "opacity-80" : ""}`} />
             {!v && !auditing && (
               <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)}
-                title="This image has not been audited"
+               
                 className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full cursor-pointer bg-[var(--color-surface-3)] text-[var(--color-text-2)]">
                 not audited
               </button>
@@ -1494,7 +1493,7 @@ function CompletedReview({
             {v && (
               <button
                 onClick={() => toggleVerdict(i)}
-                title={overridden ? `Overridden — auditor said ${im.verdict}. Click to cycle.` : `Auditor: ${im.verdict}. Click to override.`}
+                title={`Auditor: ${im.verdict ?? "not run"}`}
                 className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"} ${overridden ? "ring-1 ring-white/60" : ""}`}
               >
                 {v}{overridden ? "•" : ""}
@@ -1508,13 +1507,13 @@ function CompletedReview({
                   → S{n}
                 </button>
               ))}
-              <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
-              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} title="Run the audit again on this image" className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer disabled:opacity-50">Re-audit</button>
+              <button onClick={() => openLb(im.image_url)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
+              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer disabled:opacity-50">Re-audit</button>
               <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
               <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
             </div>
             {v === "fail" && failReason && (
-              <button onClick={() => setRegenIdx(i)} title="Click to regenerate this image" className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
+              <button onClick={() => setRegenIdx(i)} className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
                 <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to fix</span>
                 <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
               </button>
@@ -1603,13 +1602,13 @@ function CompletedReview({
                 <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" onClick={() => openLb(heroUrl)} className="w-full h-full object-cover cursor-zoom-in" />
                 <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
                 <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openLb(heroUrl)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+                  <button onClick={() => openLb(heroUrl)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
                   <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
                 </div>
               </div>
               <div className="px-0.5">
                 <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">Hero shot</p>
-                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Main product image</p>
+                
               </div>
             </div>
           )}
@@ -1618,7 +1617,7 @@ function CompletedReview({
               {renderTile(im, i)}
               <div className="px-0.5">
                 <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{catLabel(im.category)}</p>
-                <p className="text-[10px] text-[var(--color-text-3)] leading-snug">Product shot</p>
+                
               </div>
             </div>
           ))}
@@ -1627,7 +1626,7 @@ function CompletedReview({
 
       {/* ── Body sections — AI-placed, one image each ──────────────────── */}
       {placing && !placement ? (
-        <Spinner label="Looking at the images and assigning sections…" />
+        <Spinner label="Placing images…" />
       ) : sectionEntries.length > 0 ? (
         <div className="space-y-2">
           <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
@@ -1903,7 +1902,7 @@ function RegenImageModal({
   // regenerate), so successive rewrites compound instead of starting over.
   async function runAi() {
     const instr = aiInstr.trim();
-    if (instr.length < 5) { setAiErr("Tell Claude what to change (5+ chars)"); return; }
+    if (instr.length < 5) { setAiErr("Too short"); return; }
     setAiLoading(true); setAiErr(null);
     try {
       const res = await fetch("/api/stage3/edit-prompt", {
@@ -1950,7 +1949,7 @@ function RegenImageModal({
                   </button>
                   {h.prompt?.trim() && (
                     <button onClick={() => { setDraft(h.prompt!); setUpdated(true); }} disabled={busy || aiLoading}
-                      title="Load this version's prompt into the editor below"
+                     
                       className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border)] text-[var(--color-text-2)] hover:text-[var(--color-text)] disabled:opacity-40">
                       Edit from this
                     </button>
@@ -1968,7 +1967,7 @@ function RegenImageModal({
           {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={runAi} disabled={aiLoading || busy || aiInstr.trim().length < 5}
-              title="Rewrites the prompt with your instructions, then regenerates the image straight away"
+             
               className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
               {aiLoading ? "Rewriting…" : "Rewrite prompt & regenerate"}
             </button>
@@ -2219,7 +2218,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
           <img src={heroUrl} alt="Hero" loading="lazy" decoding="async" onClick={() => openLb(heroUrl)} className="w-full h-full object-cover cursor-zoom-in" />
           <span className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide bg-[var(--color-green)] text-white px-2 py-0.5 rounded-full">Hero</span>
           <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => openLb(heroUrl)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+            <button onClick={() => openLb(heroUrl)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
             <button onClick={() => dl(heroUrl, "01_hero.png")} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
           </div>
         </div>
@@ -2234,7 +2233,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
                 <span className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white ${im.verdict === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{im.verdict}</span>
               )}
               <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => openLb(im.image_url)} title="View fullscreen" className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
+                <button onClick={() => openLb(im.image_url)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>
                 <button onClick={() => dl(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
               </div>
             </>

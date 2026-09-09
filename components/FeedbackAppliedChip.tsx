@@ -49,7 +49,7 @@ export default function FeedbackAppliedChip({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-[var(--font-ibm-plex-mono)] text-[var(--color-text-3)] hover:text-[var(--color-text)] border border-dashed border-[var(--color-border)] rounded-full px-2.5 py-1 transition-colors"
-        title="Past feedback that will steer the next regeneration of this stage"
+       
       >
         <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]" />
         Applied {items.length} past feedback{items.length === 1 ? "" : "s"}
@@ -79,7 +79,7 @@ export default function FeedbackAppliedChip({
             })}
           </ul>
           <p className="text-[10px] text-[var(--color-text-4)] pt-1 border-t border-[var(--color-border)]">
-            Soft hints — the model is informed but not forced.
+            
           </p>
         </div>
       )}

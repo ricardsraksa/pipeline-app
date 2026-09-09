@@ -73,7 +73,7 @@ export default function RunCost({ runId }: { runId: number }) {
           {error && <p className="text-[11.5px] text-[var(--color-danger,#dc2626)]">{error}</p>}
           {data && data.breakdown.length === 0 && (
             <p className="text-[11.5px] text-[var(--color-text-3)]">
-              No usage recorded yet — tracking started with v2.22.0, so older runs have no data.
+              No usage recorded (older run).
             </p>
           )}
           {data && data.breakdown.length > 0 && (

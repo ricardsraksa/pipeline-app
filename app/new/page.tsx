@@ -98,13 +98,13 @@ export default function NewRunPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label hint="Optional · up to 5, one per line · positioning only">Competitor links</Label>
+          <Label hint="Optional · up to 5, one per line">Competitor links</Label>
           <textarea value={competitors} onChange={(e) => setCompetitors(e.target.value)} rows={4} spellCheck={false} disabled={submitting}
             className={cx(inputCls, "py-[9px] ff-mono resize-y", competitorList.length > 0 && !competitorsValid && "border-[var(--color-red)]")} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label hint="Optional · listing photos are added automatically">Your photos</Label>
+          <Label hint="Optional">Your photos</Label>
           <div {...getRootProps()}
             className={cx("h-[84px] rounded-[6px] border border-dashed grid place-items-center text-[12.5px] bg-[var(--color-surface)] tr",
               isDragActive ? "border-[var(--color-accent)] text-[var(--color-text)]" : "border-[var(--color-border-strong)] text-[var(--color-text-2)]",

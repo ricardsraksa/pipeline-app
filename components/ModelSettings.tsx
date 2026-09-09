@@ -81,9 +81,6 @@ export default function ModelSettings() {
       </div>
 
       <div className="px-5 py-4">
-        <p className="text-[12.5px] text-[var(--color-text-2)] mb-3.5">
-          Model per stage.
-        </p>
 
         {loading ? (
           <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">Loading…</p>
