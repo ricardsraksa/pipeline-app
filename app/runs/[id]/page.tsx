@@ -340,8 +340,6 @@ export default function RunPage() {
       [run.meta.productDescription, `${slug}_PRODUCT_DESCRIPTION.txt`],
       [outputs.onePagerEdited ?? outputs.onePager, `${slug}_STAGE1_ONE_PAGER.md`],
       [outputs.research, `${slug}_RESEARCH.txt`],
-      [outputs.chiefMid, `${slug}_CHIEF_MID.txt`],
-      [outputs.researchRevised, `${slug}_RESEARCH_REVISED.txt`],
       [outputs.avatar, `${slug}_AVATAR.txt`],
       [outputs.avatarRevised, `${slug}_AVATAR_REVISED.txt`],
       [outputs.offerBrief, `${slug}_OFFER_BRIEF.txt`],
@@ -839,11 +837,13 @@ export default function RunPage() {
               {runId !== null && (
                 <div className="flex items-center gap-3.5">
                   <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
+                  <FeedbackButtons runId={runId} stage="stage3" initialVote={run.feedback?.stage3 ?? null} initialNote={run.feedback?.stage3Note ?? null} />
                   <RestartStage stage="stage3-prompts" />
                 </div>
               )}
             </div>
-            <StaleFlag stage="stage3" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]">Restart stage to rebuild the images on it</span>} />
+            <StaleFlag stage="stage3" />
+            <div className="mb-3"><FeedbackAppliedChip stage={3} /></div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
           </>
         )}

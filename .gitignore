@@ -44,3 +44,7 @@ next-env.d.ts
 /data
 /.claude
 /design-system
+
+# python bytecode from the Mac scraper/worker
+__pycache__/
+*.pyc

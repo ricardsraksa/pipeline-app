@@ -1,4 +1,4 @@
-import { IMAGE_PROMPTS_SYSTEM } from "@/lib/prompts/image_prompts";
+import { REMAINING_SYSTEM } from "@/lib/prompts/remaining_images";
 import { ONE_PAGER_PROMPT } from "@/lib/prompts/one_pager";
 import { loadPromptsFile, getCurrentOverride, type PromptStage } from "@/lib/prompts-store";
 
@@ -425,7 +425,7 @@ Sweep 7 — ZERO RISK: Are objections handled and trust established? FAQs addres
 Only output the final copy after all 7 sweeps pass.`;
 
 // Stage 3 uses the template-based system from lib/prompts/image_prompts.ts.
-// Re-exported here so getPrompt() and the Settings page (which imports
-// STAGE3_PROMPT as the default) stay in sync with the actual prompt that
-// /api/stage3/prompts uses at runtime.
-export const STAGE3_PROMPT = IMAGE_PROMPTS_SYSTEM;
+// Settings "Stage 4 — Images" edits the prompt the live 8-image writer runs
+// with (lib/stage3/hero.ts). It used to point at the retired standalone page's
+// 9-prompt system, so edits there changed nothing.
+export const STAGE3_PROMPT = REMAINING_SYSTEM;
