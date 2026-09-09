@@ -283,7 +283,7 @@ Three blocks.
 - **Pricing rules** — minimum multiple of COGS, price ending, compare-at
   min/max above price; default markers; save.
 - **Prompts** — one block per stage (Stage 1 Product, Stage 2 Research, Stage 2
-  Angles, Stage 3 Copy, Stage 4 Images). Each: a large editable prompt, a
+  Angles, Stage 3 Copy, Stage 4 Images, Stage 5 Image ads). Each: a large editable prompt, a
   "modified" marker when it differs from the built-in default, when it was saved,
   save / reset to default, and a version history that can be previewed and
   restored.
@@ -292,11 +292,8 @@ Three blocks.
 
 ## 7. Redirects and legacy
 
-- `/history` and `/history/<id>` — old links; both forward into Home or the run.
-- `/stage3` — the previous standalone image workflow, still reachable, replaced
-  by Stage 4 inside the run. Not part of the redesign.
-- `/preview` — a full-screen frame showing an older vendored design prototype.
-  Staging surface only.
+- `/history` — an old link that forwards into Home. The standalone `/stage3`
+  workflow and the `/preview` prototype frame were removed in v2.84.0.
 
 ---
 
