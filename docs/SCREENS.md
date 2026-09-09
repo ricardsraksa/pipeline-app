@@ -162,6 +162,13 @@ At the gate, two halves:
 Copy cannot start until at least one angle is chosen. The angles stay editable
 for the whole run. When the ticked angle differs from the one a later stage was
 built on, that stage's rail row reads "angle changed" and the stage shows a
+Above the angles on Stage 2, the **Market** card: two selectors, Awareness
+(Unaware → Most aware) and Sophistication (Stage 1 → 5), diagnosed by the Stage
+2 research and correctable here. They decide what the copy may open on and
+whether it leads with the claim or the mechanism, and are read by the angles,
+the copy kit and the Stage 5 ad hooks — so a correction here changes every
+stage generated after it.
+
 flag: Copy offers "Rebuild copy on this angle" (one revision pass that keeps
 the structure and edits); Images and Ads point to Restart stage.
 

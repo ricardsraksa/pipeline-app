@@ -137,6 +137,12 @@ Rules for every angle:
 - Ground everything in the research. Do not invent claims, statistics, studies, or certifications that are not there.
 - Never name competitor brands, stores, or the supplier.
 
+ORDER THEM BY THE STRENGTH OF THE DESIRE, NOT BY HOW CLEVER THEY ARE. Copy cannot manufacture a desire; it can only point one that already exists at this product. So judge each angle's underlying desire on three things and rank strongest first:
+- How badly it is felt. A daily physical or emotional irritation outranks a mild preference.
+- Whether it keeps coming back. A problem that returns every morning outranks one she meets once a year and forgets.
+- How many people share it. A problem most of this product's buyers have outranks one only a narrow slice feels.
+An angle that scores high on all three beats a sharper-sounding angle that scores high on one.
+
 Fewer, sharper angles beat a filled quota. If only four moments in her life are genuinely worth building a page on, submit four.
 
 Submit the angles with the tool provided.`;
@@ -249,11 +255,16 @@ CORE PRINCIPLES:
 
 COPY FRAMEWORKS:
 
-Headline formula options (pick strongest for each):
-- "{Achieve outcome} without {pain point}" — e.g. "Teach your kid to swim without goggles that keep leaking"
-- "Finally, {desired outcome}" — e.g. "Finally, goggles that actually stay sealed"
-- "{Question highlighting main pain point}" — e.g. "Do your kid's goggles keep filling up with water?"
-- "Never {unpleasant event} again" — e.g. "Never deal with an ear infection after swim class again"
+WHERE THE COPY OPENS:
+The MARKET POSITION block in the brief decides this, and it overrides every formula below. Its awareness line says what the headline may open on — the product, the outcome, the problem, or her situation. Its sophistication line says whether the opening leads with the claim, a bigger claim, or the mechanism. Choose the headline that obeys both lines; a headline that opens in the wrong place is wrong no matter how good it reads. If no MARKET POSITION block is present, open on the angle's problem.
+
+The headline is not asked to sell. Its only job is to make her read the next line, and that line's only job is to make her read the one after it. Do not try to compress the whole argument into the headline.
+
+Headline shapes that fit each opening (pick the strongest that obeys the block):
+- Opening on the problem: "{Question naming the pain point}" or "Never {unpleasant event} again"
+- Opening on the outcome: "{Achieve outcome} without {the thing she hates}" or "Finally, {desired outcome}"
+- Opening on the mechanism: "{What it does, mechanically} — {the claim as its result}"
+- Opening on her situation: a line she would recognise herself in, naming no product and no promise
 
 The "Without" structure:
 Frame benefits as: "[Desired outcome] without [the obvious solution everyone hates or has tried]"

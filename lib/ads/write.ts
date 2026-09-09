@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
+import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
 import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
@@ -107,6 +108,10 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     "PRODUCT DESCRIPTION (what it physically is):",
     run.product_description ?? "(none)",
     "",
+    ...(() => {
+      const mb = marketBlock(parseStoredMarketPosition(run.market_position));
+      return mb ? [mb, ""] : [];
+    })(),
     "POSITIONING ANGLE (chosen by the operator — Concepts 1, 3 and 5 open on THIS problem):",
     anglesBlock(parseSelectedAngles(run.product_angle_selected)) || "(none chosen)",
     "",

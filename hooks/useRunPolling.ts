@@ -1,6 +1,7 @@
 "use client";
 
 import type { PricingRules, ProductPricing } from "@/lib/pricing";
+import type { MarketPosition } from "@/lib/market";
 import { useEffect, useState, useRef } from "react";
 
 export interface RunStatus {
@@ -64,6 +65,7 @@ export interface RunStatus {
     competitorUrls: string[];
     pricing: ProductPricing | null;
     pricingRules: PricingRules;
+    marketPosition: MarketPosition | null;
     variantsRequestedAt: string | null;
     variantsEdited: string | null;
     ads: { step: string | null; error: string | null; prompts: number; done: number; failed: number; stalled: boolean };

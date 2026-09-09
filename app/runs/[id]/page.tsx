@@ -26,6 +26,7 @@ import SendToDoc from "@/components/SendToDoc";
 import SendToDrive from "@/components/SendToDrive";
 import ProductGate from "@/components/ProductGate";
 import AnglePicker from "@/components/AnglePicker";
+import MarketPositionCard from "@/components/MarketPosition";
 import PricingCard from "@/components/PricingCard";
 import VariantsCard from "@/components/VariantsCard";
 import { fmtMoney } from "@/lib/pricing";
@@ -707,7 +708,12 @@ export default function RunPage() {
             </div>
             {outputs.onePager ? (
               <>
-                {runId !== null && <div className="mb-[30px]"><AnglePicker runId={runId} run={run} editable /></div>}
+                {runId !== null && (
+                  <div className="mb-[30px]">
+                    <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
+                    <AnglePicker runId={runId} run={run} editable />
+                  </div>
+                )}
                 <div>
                   <div className="flex items-center gap-2.5 mb-2.5">
                     <span className={label}>One-pager</span>

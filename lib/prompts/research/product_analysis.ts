@@ -18,8 +18,13 @@ OUTPUT — write only these sections:
 - Features ranked by likely customer importance (cross-reference the pain points in Section 3)
 
 7. MARKET SOPHISTICATION
-- Awareness stage diagnosis: which Eugene Schwartz stage does the typical buyer (the middle-aged mom in the US-led English-speaking market) start at? Provide evidence for this diagnosis.
-- Ad exposure level in this category in the US / English-speaking markets: light / moderate / heavy — with reasoning
+Diagnose which of Eugene Schwartz's five stages of sophistication this category is in for the US-led English-speaking market. The stage is decided by how many similar products this buyer has already been sold, not by how good this product is:
+- Stage 1 — nothing like it has been advertised to her; the plain claim is still news
+- Stage 2 — the claim works and competitors are outbidding each other on it (bigger, faster, more)
+- Stage 3 — every version of the claim has been made; she discounts them, and only a new mechanism (a new HOW) makes the old promise believable again
+- Stage 4 — the mechanisms have been copied too, and competitors are now elaborating on each other's mechanism
+- Stage 5 — she believes neither claims nor mechanisms in this category; only identification with her situation gets a hearing
+State the stage, then the evidence: what the competitor listings and ads in the research are actually leading with, and whether that is a bare claim, an outbid claim, a mechanism, an elaborated mechanism, or identification. If competitors are leading with mechanisms, the market is at least Stage 3.
 - Skepticism patterns:
   - What triggers distrust in buyers for this category
   - What specifically builds trust: Trustpilot reviews, verified-purchase Amazon reviews, BBB accreditation, third-party lab testing, money-back guarantees, recognizable certification marks — only mention the ones actually relevant
@@ -34,5 +39,11 @@ Apply Eugene Schwartz's 5 levels to this product in the US-led English-speaking 
 - Most Aware: [% estimate] — have bought before, looking to upgrade or switch
 Primary target segment: [which level to target and why — based on market size and conversion opportunity]
 Secondary target segment: [which level and why]
+
+Then, as the last two lines of your output, restate the primary diagnosis in exactly this form and nothing else on those lines. The pipeline reads these two lines directly, so the wording must match:
+AWARENESS: [Unaware | Problem Aware | Solution Aware | Product Aware | Most Aware]
+SOPHISTICATION: [1 | 2 | 3 | 4 | 5]
+
+The awareness value is the PRIMARY target segment you named above, not the largest segment and not a range. The sophistication value is the stage you diagnosed in section 7.
 
 Output plain text. Headers: "6. PRODUCT ANALYSIS", "7. MARKET SOPHISTICATION", "8. LEVELS OF CONSCIOUSNESS". No preamble. No other sections.`;

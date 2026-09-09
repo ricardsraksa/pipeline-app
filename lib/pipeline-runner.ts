@@ -7,6 +7,7 @@ import { anglesBlock, parseSelectedAngles, angleKey } from "./angles";
 import { fillProductTab, googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
+import { marketBlock, parseMarketPosition, parseStoredMarketPosition } from "./market";
 import {
   runIdentify,
   runMarket,
@@ -508,6 +509,16 @@ async function runStage1(runId: number, run: Run): Promise<void> {
     research = [identify, market, competitive, productAnalysis, visual].filter(Boolean).join("\n\n");
     if (!research) throw new Error("Stage 2 produced no research output");
 
+    // Schwartz's two coordinates, read off the last two lines the analysis
+    // writes. Never overwrites a value the operator set by hand.
+    const diagnosed = parseMarketPosition(research);
+    if (diagnosed && parseStoredMarketPosition(run.market_position)?.source !== "manual") {
+      await updateRun(runId, {
+        market_position: JSON.stringify({ ...diagnosed, source: "research", at: now() }),
+        last_updated_at: now(),
+      });
+    }
+
     const productName = extractProductName(research);
     // Only persist a name we actually extracted. Don't fall back to product_url
     // (it can be null in the description-first flow, and a raw URL is a bad
@@ -761,6 +772,8 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const productName = run.brand_name ?? run.product_name ?? "";
   // The angle the operator chose at the gate. Everything in the kit is built
   // around this one problem, not a generic best-X pitch.
+  const market = marketBlock(parseStoredMarketPosition(run.market_position));
+  const marketSection = market ? `\n\n${market}` : "";
   const angle = anglesBlock(parseSelectedAngles(run.product_angle_selected));
   const angleSection = angle
     ? `\n\nPOSITIONING ANGLE(S) (chosen by the operator — build the ENTIRE copy kit around the PRIMARY angle's problem and mechanism; the headline, hero benefit and first section serve it; supporting angles, if any, appear in later benefits, sections, FAQs and objections; never drift back to a generic "best X" or "only Y" pitch):\n${angle}`
@@ -771,7 +784,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
 
   const output = await anthropicMessage({
     system: stage2System,
-    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${angleSection}\n\nProduce the complete copy kit now.`,
+    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${marketSection}${angleSection}\n\nProduce the complete copy kit now.`,
     maxTokens: 32_000,
     label: "stage 2 copy",
       runId,

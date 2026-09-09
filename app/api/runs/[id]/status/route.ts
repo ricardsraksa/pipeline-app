@@ -141,6 +141,8 @@ export async function GET(
       // Stage 3 Pricing card: the stored suggestion and the current rules.
       pricing: safeJson(run.product_pricing) ?? null,
       pricingRules,
+      // Schwartz coordinates: what the angles, copy and ads open on.
+      marketPosition: safeJson(run.market_position) ?? null,
       variantsRequestedAt: run.variants_refresh_requested ?? null,
       variantsEdited: run.product_variants_edited ?? null,
       // Stage 5 · Image ads

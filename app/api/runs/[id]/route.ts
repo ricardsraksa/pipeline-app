@@ -5,6 +5,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 
 import { requireSession } from "@/lib/auth";
 import { validateBundles } from "@/lib/pricing";
+import { validateMarketPosition } from "@/lib/market";
 import { assertPublicUrl } from "@/lib/ssrf";
 // A stage2_copy edit re-derives the structured JSON via a (small) model call,
 // so this route needs more than the default budget.
@@ -133,6 +134,7 @@ export async function PATCH(
     stage3_placement?: string | null;
     /** Stage 3 Pricing card (JSON ProductPricing) — display only. */
     product_pricing?: string | null;
+    market_position?: string | null;
     /** Variants card: operator-restructured option groups. */
     product_variants_edited?: string | null;
     // Stage 5 · Image ads
@@ -462,6 +464,18 @@ export async function PATCH(
       }
       fields.push("product_pricing = ?");
       values.push(JSON.stringify({ ...pr, competitors, at: new Date().toISOString() }));
+    }
+  }
+  if ("market_position" in body) {
+    if (body.market_position == null) {
+      fields.push("market_position = ?"); values.push(null);
+    } else {
+      let mp: unknown = null;
+      try { mp = JSON.parse(String(body.market_position)); } catch { mp = null; }
+      const err = validateMarketPosition(mp);
+      if (err) return Response.json({ error: `market_position: ${err}` }, { status: 400 });
+      fields.push("market_position = ?");
+      values.push(JSON.stringify({ ...(mp as object), at: new Date().toISOString() }));
     }
   }
   if ("stage3_placement" in body) {

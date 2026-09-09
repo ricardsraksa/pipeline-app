@@ -9,6 +9,7 @@ import { getModel } from "./models";
 import { getPrompt } from "./prompts";
 import { parseProductScrape } from "./product";
 import { parseAngles, type Angle } from "./angles";
+import { marketBlock, parseStoredMarketPosition } from "./market";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
 
@@ -85,9 +86,11 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   await recordPromptUsed(runId, "angles", system);
   const model = await getModel("angles");
 
+  const market = marketBlock(parseStoredMarketPosition(run.market_position));
   const user = [
     "Here are the finished research documents for this product. Propose the angles now.",
     "",
+    ...(market ? [market, ""] : []),
     "PRODUCT DESCRIPTION:",
     run.product_description ?? "(none)",
     "",
