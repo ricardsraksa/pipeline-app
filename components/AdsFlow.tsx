@@ -37,6 +37,9 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const [lb, setLb] = useState<string | null>(null);
   const [zipping, setZipping] = useState(false);
   const stopRef = useRef(false);
+  // Mirrors `images` so the end of a batch can write the real final array
+  // rather than the snapshot this closure captured when it started.
+  const imagesRef = useRef<AdImage[]>([]);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
 
   const fetchRun = useCallback(async () => {
@@ -52,6 +55,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
       }
     } catch { /* keep the last copy */ }
   }, [runId]);
+  useEffect(() => { imagesRef.current = images; }, [images]);
   useEffect(() => { void fetchRun(); }, [fetchRun]);
   useEffect(() => {
     if (run?.ads_step !== "writing") return;
@@ -184,7 +188,15 @@ export default function AdsFlow({ runId }: { runId: number }) {
     const queue = [...targets];
     const worker = async () => { while (queue.length && !stopRef.current) { const p = queue.shift()!; await generateOne(p, p.prompt); } };
     await Promise.all([worker(), worker()]);
-    await patch({ ads_step: "done" });
+    // The step reflects what actually happened. Marking "done" unconditionally
+    // reported a finished stage after a Stop, and after a batch where every
+    // generation failed. An authoritative write of the whole array also repairs
+    // any per-image save lost to two workers upserting at once.
+    const finished = imagesRef.current.filter((im) => im.status === "done" && im.image_url).length;
+    await patch({
+      ads_images: JSON.stringify(imagesRef.current),
+      ads_step: finished > 0 ? "done" : "review",
+    });
     setGenerating(false);
     await fetchRun();
   };
@@ -251,17 +263,24 @@ export default function AdsFlow({ runId }: { runId: number }) {
 
   /* ── render ────────────────────────────────────────────────────────── */
   const doneCount = images.filter((im) => im.status === "done" && im.image_url).length;
+  // A step that has not moved in 15 minutes is stalled: the tab that was
+  // generating is gone, or the process writing the briefs died. Without this
+  // the UI spins on "Writing…" or "generating" for good.
+  const stalled = (run.ads_step === "writing" || run.ads_step === "generating")
+    && !generating && !writing
+    && Boolean(run.last_updated_at) && Date.now() - new Date(run.last_updated_at as string).getTime() > 15 * 60 * 1000;
   const anyBusy = generating || genBusy.size > 0;
 
   if (run.status !== "completed" && !drafts) {
-    return <p className="text-[13px] text-[var(--color-text-2)]">Starts after Stage 4 is complete.</p>;
+    return <p className="text-[13px] text-[var(--color-text-2)]">After Stage 4.</p>;
   }
   if (!drafts) {
     return (
       <div className="space-y-3">
-        {step === "writing" || writing
+        {(step === "writing" || writing) && !stalled
           ? <p className="ff-mono text-[11px] text-[var(--color-text-3)]">Writing the five briefs…</p>
-          : <button onClick={write} className="btn btn-primary">Write 5 ads</button>}
+          : <button onClick={write} disabled={writing} className="btn btn-primary">{stalled ? "Write 5 ads again" : "Write 5 ads"}</button>}
+        {stalled && <p className="text-[12px] text-[var(--color-amber)]">Stopped part-way.</p>}
         {(err || run.ads_error) && <p className="text-[12px] text-[var(--color-red)]">{err ?? run.ads_error}</p>}
       </div>
     );

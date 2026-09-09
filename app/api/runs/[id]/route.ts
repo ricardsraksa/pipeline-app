@@ -83,7 +83,11 @@ export async function PATCH(
   const { id } = (await context.params) as { id: string };
   const rawBody = await req.text();
   if (rawBody.length > 2_000_000) return Response.json({ error: "Payload too large" }, { status: 413 });
-  const body = JSON.parse(rawBody) as { type?: string } & {
+  // Malformed JSON is the caller's mistake, not a server fault.
+  let parsedBody: unknown;
+  try { parsedBody = JSON.parse(rawBody); }
+  catch { return Response.json({ error: "Body is not valid JSON" }, { status: 400 }); }
+  const body = parsedBody as { type?: string } & {
     feedback_stage1?: string | null;
     feedback_stage2?: string | null;
     feedback_stage3?: string | null;
@@ -192,6 +196,9 @@ export async function PATCH(
     if (Array.isArray(body.uploaded_source_images)) await assertImageUrls(body.uploaded_source_images);
     if (Array.isArray(body.image_urls)) await assertImageUrls(body.image_urls);
     if (Array.isArray(body.approved_image_urls)) await assertImageUrls(body.approved_image_urls);
+    if (Array.isArray((body as { approved_urls?: unknown }).approved_urls)) {
+      await assertImageUrls((body as { approved_urls: unknown[] }).approved_urls);
+    }
     if (Array.isArray(body.scraped_image_urls)) await assertImageUrls(body.scraped_image_urls);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : "Invalid image URL" }, { status: 400 });
@@ -204,21 +211,34 @@ export async function PATCH(
     if (!image || typeof image.index !== "number") {
       return Response.json({ error: "image with numeric index required" }, { status: 400 });
     }
-    const row = await db.execute({ sql: "SELECT ads_images FROM runs WHERE id = ?", args: [Number(id)] });
+    // Two workers generate ads at once, so this read-modify-write can collide.
+    // Retry on a busy database, the same way the Stage 4 upsert below does; the
+    // batch also writes the whole array at the end, which repairs a lost update.
     let arr: Array<{ index?: number }> = [];
-    try {
-      const raw = (row.rows[0] as unknown as { ads_images: string | null })?.ads_images;
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) arr = parsed;
-    } catch { /* empty */ }
-    const i = arr.findIndex((x) => x?.index === image.index);
-    if (i >= 0) arr[i] = image;
-    else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
-    const extra: string[] = [];
-    const args: (string | number | null)[] = [JSON.stringify(arr)];
-    if (typeof (body as { ads_step?: unknown }).ads_step === "string") { extra.push("ads_step = ?"); args.push(String((body as { ads_step?: string }).ads_step)); }
-    args.push(new Date().toISOString(), Number(id));
-    await db.execute({ sql: `UPDATE runs SET ads_images = ?${extra.length ? ", " + extra.join(", ") : ""}, last_updated_at = ? WHERE id = ?`, args });
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const row = await db.execute({ sql: "SELECT ads_images FROM runs WHERE id = ?", args: [Number(id)] });
+        arr = [];
+        try {
+          const raw = (row.rows[0] as unknown as { ads_images: string | null })?.ads_images;
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) arr = parsed;
+        } catch { /* treat unparseable as empty */ }
+        const i = arr.findIndex((x) => x?.index === image.index);
+        if (i >= 0) arr[i] = image;
+        else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
+        const extra: string[] = [];
+        const args: (string | number | null)[] = [JSON.stringify(arr)];
+        if (typeof (body as { ads_step?: unknown }).ads_step === "string") { extra.push("ads_step = ?"); args.push(String((body as { ads_step?: string }).ads_step)); }
+        args.push(new Date().toISOString(), Number(id));
+        await db.execute({ sql: `UPDATE runs SET ads_images = ?${extra.length ? ", " + extra.join(", ") : ""}, last_updated_at = ? WHERE id = ?`, args });
+        break;
+      } catch (e) {
+        const busy = e instanceof Error && /SQLITE_BUSY|database is locked/i.test(e.message);
+        if (!busy || attempt >= 4) throw e;
+        await new Promise((r) => setTimeout(r, 80 * (attempt + 1)));
+      }
+    }
     return Response.json({ success: true, images: arr });
   }
 
@@ -353,7 +373,17 @@ export async function PATCH(
   if ("stage2_output" in body)    { fields.push("stage2_output = ?");    values.push(body.stage2_output ?? null); }
   if ("stage3_prompts" in body)   { fields.push("stage3_prompts = ?");   values.push(body.stage3_prompts ? JSON.stringify(body.stage3_prompts) : null); }
   if ("image_urls" in body)       { fields.push("image_urls = ?");       values.push(body.image_urls ? JSON.stringify(body.image_urls) : null); }
-  if ("status" in body)           { fields.push("status = ?");           values.push(body.status ?? null); }
+  if ("status" in body) {
+    // Every gate in the UI keys off this column, so an unknown value strands a
+    // run in a state nothing renders.
+    const KNOWN = new Set(["pending", "product", "scraping", "awaiting_product_approval", "stage1",
+      "awaiting_stage2_approval", "stage2", "awaiting_user", "generating_hero", "awaiting_hero_qc",
+      "generating_remaining", "awaiting_qc", "completed", "failed", "cancelled"]);
+    if (body.status != null && !KNOWN.has(String(body.status))) {
+      return Response.json({ error: `Unknown status: ${String(body.status).slice(0, 40)}` }, { status: 400 });
+    }
+    fields.push("status = ?"); values.push(body.status ?? null);
+  }
   if ("image_prompts" in body)    { fields.push("image_prompts = ?");    values.push(body.image_prompts ?? null); }
   if ("generated_images" in body) { fields.push("generated_images = ?"); values.push(body.generated_images ?? null); }
   if ("audit_results" in body)    { fields.push("audit_results = ?");    values.push(body.audit_results ?? null); }
@@ -467,6 +497,17 @@ export async function PATCH(
     fields.push("shopify_product_url = ?"); values.push(v || null);
   }
   if ("stage3_prompt_history" in body)            { fields.push("stage3_prompt_history = ?");            values.push(typeof body.stage3_prompt_history === "string" ? body.stage3_prompt_history.slice(0, 400_000) : null); }
+  if ("stage3_ref_overrides" in body && typeof body.stage3_ref_overrides === "string") {
+    // These URLs are handed to the image generator — same guarantee as every
+    // other image column in this route.
+    try {
+      const parsed = JSON.parse(body.stage3_ref_overrides) as Record<string, unknown>;
+      const urls = Object.values(parsed ?? {}).flatMap((v) => (Array.isArray(v) ? v : []));
+      await assertImageUrls(urls);
+    } catch (e) {
+      return Response.json({ error: e instanceof Error ? e.message : "Invalid reference override" }, { status: 400 });
+    }
+  }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
   if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
   if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 20_000) : null); }

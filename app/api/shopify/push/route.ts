@@ -87,7 +87,10 @@ export async function POST(req: NextRequest) {
     const imgs = JSON.parse(run.stage3_remaining_images || '[]') as StoredImage[]
     if (Array.isArray(imgs)) {
       imgs
-        .filter((im) => im?.image_url && im.status !== 'failed')
+        // Same bar as the fill and the placement: only finished images reach
+        // Shopify. This accepted images with no status at all, so a run could
+        // push a picture that placement refuses to place.
+        .filter((im) => im?.image_url && im.status === 'done')
         .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
         .forEach((im) => imageUrls.push(im.image_url as string))
     }

@@ -475,7 +475,13 @@ export default function RunPage() {
     if ((s === "awaiting_qc" || s === "generating_remaining") && (run.stage4?.done ?? 0) > 0) return { tone: "amber", icon: "image", title: "Images generated", sub: "Review them, then push.", cta: "Open images", onClick: () => openStage("stage3") };
     if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", sub: "Then generate.", cta: "Review prompts", onClick: () => openStage("stage3") };
     if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", sub: "Resume to continue.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    // Several routes write error_message next to a status that is not "failed"
+    // (a refused hero reference, a skip-hero failure, the stall watchdog).
+    // Those explanations were stored and never shown to anyone.
+    if (run.error && ["awaiting_user", "awaiting_hero_qc", "awaiting_qc"].includes(s)) {
+      return { tone: "amber", icon: "alert", title: "Stage 4 stopped", sub: run.error, cta: "Open images", onClick: () => openStage("stage3") };
+    }
     if (s === "completed") {
       const a = run.meta.ads;
       if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };

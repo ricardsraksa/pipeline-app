@@ -151,7 +151,14 @@ export async function GET(
           const a = JSON.parse(run.ads_images ?? "[]");
           if (Array.isArray(a)) { done = a.filter((x: { status?: string; image_url?: string }) => x?.status === "done" && x.image_url).length; failed = a.filter((x: { status?: string }) => x?.status === "failed").length; }
         } catch { /* none */ }
-        return { step: run.ads_step ?? null, error: run.ads_error ?? null, prompts, done, failed };
+        // A step that has not moved in 15 minutes is stalled, not working:
+        // the browser tab that was generating is gone, or the process that was
+        // writing the briefs died. Reported so the UI can offer a retry
+        // instead of spinning forever.
+        const working = run.ads_step === "writing" || run.ads_step === "generating";
+        const ageMs = run.last_updated_at ? Date.now() - new Date(run.last_updated_at).getTime() : 0;
+        const stalled = working && ageMs > 15 * 60 * 1000;
+        return { step: run.ads_step ?? null, error: run.ads_error ?? null, prompts, done, failed, stalled };
       })(),
     },
     timestamps: {

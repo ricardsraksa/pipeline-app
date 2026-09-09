@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const denied = requireSession(req);
   if (denied) return denied;
   if (!shopifyConfigured()) {
-    return Response.json({ success: false, error: "Shopify is not configured — set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN in Render." }, { status: 503 });
+    return Response.json({ success: false, error: "Shopify is not configured — set SHOPIFY_STORE_DOMAIN plus either SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET, or SHOPIFY_ADMIN_TOKEN, in Render." }, { status: 503 });
   }
   try {
     const { url } = (await req.json()) as { url?: string };
