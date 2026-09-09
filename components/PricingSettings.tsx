@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { DEFAULT_PRICING_RULES, validateRules, type PricingRules } from "@/lib/pricing";
+import { DEFAULT_PRICING_RULES, parseBundleDiscounts, validateRules, type PricingRules } from "@/lib/pricing";
 
-type Field = keyof PricingRules;
+type Field = Exclude<keyof PricingRules, "bundle_discounts">;
 const FIELDS: Array<{ key: Field; label: string; step: string }> = [
   { key: "min_multiple", label: "Minimum multiple of COGS", step: "0.5" },
   { key: "ending", label: "Price ending", step: "0.01" },
@@ -12,10 +12,13 @@ const FIELDS: Array<{ key: Field; label: string; step: string }> = [
   { key: "compare_at_max", label: "Compare-at above price · max ($)", step: "1" },
 ];
 
+const fmtDiscounts = (d: number[]) => d.map((x) => String(Math.round(x * 100))).join(", ");
+
 // Settings block for the pricing rules used by the Stage 3 Pricing card.
 export default function PricingSettings() {
   const [saved, setSaved] = useState<PricingRules | null>(null);
   const [draft, setDraft] = useState<Record<Field, string>>({ min_multiple: "", ending: "", compare_at_min: "", compare_at_max: "" });
+  const [bundleText, setBundleText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [ok, setOk] = useState(false);
@@ -24,6 +27,7 @@ export default function PricingSettings() {
   const apply = (r: PricingRules) => {
     setSaved(r);
     setDraft({ min_multiple: String(r.min_multiple), ending: r.ending.toFixed(2), compare_at_min: String(r.compare_at_min), compare_at_max: String(r.compare_at_max) });
+    setBundleText(fmtDiscounts(r.bundle_discounts));
   };
 
   useEffect(() => {
@@ -34,14 +38,16 @@ export default function PricingSettings() {
       .finally(() => setLoading(false));
   }, []);
 
+  const bundle_discounts = parseBundleDiscounts(bundleText);
   const parsed: PricingRules = {
     min_multiple: Number(draft.min_multiple),
     ending: Number(draft.ending),
     compare_at_min: Number(draft.compare_at_min),
     compare_at_max: Number(draft.compare_at_max),
+    bundle_discounts: bundle_discounts ?? [],
   };
-  const invalid = validateRules(parsed);
-  const dirty = !!saved && FIELDS.some((f) => parsed[f.key] !== saved[f.key]);
+  const invalid = bundle_discounts ? validateRules(parsed) : "Bundle discounts: numbers separated by commas, e.g. 0, 20, 25";
+  const dirty = !!saved && (FIELDS.some((f) => parsed[f.key] !== saved[f.key]) || fmtDiscounts(parsed.bundle_discounts) !== fmtDiscounts(saved.bundle_discounts));
 
   async function save() {
     setSaving(true); setOk(false); setErr(null);
@@ -103,6 +109,24 @@ export default function PricingSettings() {
                 </div>
               );
             })}
+            <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-[600] text-[var(--color-text)]">Bundle discounts per item (%)</p>
+                  {fmtDiscounts(parsed.bundle_discounts) === fmtDiscounts(DEFAULT_PRICING_RULES.bundle_discounts) ? (
+                    <span className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-wider text-[var(--color-text-4)] border border-[var(--color-border)] rounded px-1.5 py-0.5">default</span>
+                  ) : (
+                    <span className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-wider text-[var(--color-amber)] bg-[var(--color-amber-bg)] rounded px-1.5 py-0.5">custom</span>
+                  )}
+                </div>
+                <p className="text-[10.5px] text-[var(--color-text-4)] mt-0.5 font-[var(--font-ibm-plex-mono)]">Default: {fmtDiscounts(DEFAULT_PRICING_RULES.bundle_discounts)}</p>
+              </div>
+              <input
+                type="text" inputMode="decimal" value={bundleText}
+                onChange={(e) => setBundleText(e.target.value)}
+                className="w-[110px] shrink-0 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] ff-mono text-[12.5px] px-3 py-2 text-right focus:outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
           </div>
         )}
         {(err || (dirty && invalid)) && <p className="text-[11.5px] text-[var(--color-red)] mt-3">{err ?? invalid}</p>}

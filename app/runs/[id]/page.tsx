@@ -603,6 +603,11 @@ export default function RunPage() {
               <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· cmp {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
               <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×</span>
             </button>
+            {run.meta.pricing.bundles && run.meta.pricing.bundles.tiers.length > 1 && (
+              <button onClick={() => openStage("stage2")} className="ff-mono text-[11px] text-[var(--color-text-3)] text-left leading-snug cursor-pointer hover:text-[var(--color-text)]">
+                {run.meta.pricing.bundles.tiers.map((t) => `${t.qty} · ${fmtMoney(t.price, run.meta.pricing!.cogs_currency)}`).join("  /  ")}
+              </button>
+            )}
           </div>
         )}
 

@@ -173,7 +173,18 @@ suggested Price and Compare-at (both editable), one line with the multiple and
 margin, the competitor price range with median and where this price sits, one
 chip per competitor, red flags when a rule is broken (below the minimum
 multiple, wrong ending, compare-at outside the range, above every competitor,
-below the cheapest), "Reset to rules". Not part of the copy; no prompt reads it.
+below the cheapest), "Reset to rules". Under the competitors, **Bundles**: the
+Kaching-style ladder (default single / 2 pack / 3 pack at 0 / 20 / 25 % off per
+item), one row per tier with quantity, discount, price and compare-at (all
+editable), the per-item price and its multiple of COGS. Tier prices round up
+to the next .95; compare-at is the single compare-at times the quantity. The
+quantities are suggested once per run by the "Bundle quantities" model from
+the product's use (stair lights → 12 / 16 / 20), "Suggest again" takes a
+one-line note, "Reset" returns to the rules ladder. Checks appear as red lines
+only when broken: ending, compare-at above price, each tier cheaper per item
+than the last, discount not shrinking, at most four tiers, a round-up that
+crossed a $10/$100 line, under 2× COGS per item. Not part of the copy; no
+prompt, Shopify write or doc reads it.
 
 Under it, the **Variants** card from the AliExpress listing: each option group
 (Colour, Size…) with its values and a copy-values button. "Re-read listing"
@@ -277,11 +288,12 @@ Three blocks.
 
 - **Models** — one row per pipeline role (Stage 1 product, Stage 2 research,
   Stage 2 angles, Stage 3 copy, Stage 4 prompts, Stage 4 rewrites, Stage 4
-  auditor, Stage 5 ad briefs, mechanical),
+  auditor, Stage 3 bundle quantities, Stage 5 ad briefs, mechanical),
   each with a one-line description, the current model, a picker with price per
   million tokens, and what the default is.
 - **Pricing rules** — minimum multiple of COGS, price ending, compare-at
-  min/max above price; default markers; save.
+  min/max above price, bundle discounts per item (`0, 20, 25`); default
+  markers; save.
 - **Prompts** — one block per stage (Stage 1 Product, Stage 2 Research, Stage 2
   Angles, Stage 3 Copy, Stage 4 Images, Stage 5 Image ads). Each: a large editable prompt, a
   "modified" marker when it differs from the built-in default, when it was saved,

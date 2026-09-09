@@ -4,6 +4,7 @@ import type { Run } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 
 import { requireSession } from "@/lib/auth";
+import { validateBundles } from "@/lib/pricing";
 import { assertPublicUrl } from "@/lib/ssrf";
 // A stage2_copy edit re-derives the structured JSON via a (small) model call,
 // so this route needs more than the default budget.
@@ -455,6 +456,10 @@ export async function PATCH(
         return Response.json({ error: "product_pricing needs positive cogs, price and compare_at" }, { status: 400 });
       }
       const competitors = Array.isArray(pr.competitors) ? pr.competitors.slice(0, 20) : [];
+      if (pr.bundles != null) {
+        const bErr = validateBundles(pr.bundles);
+        if (bErr) return Response.json({ error: `product_pricing.bundles: ${bErr}` }, { status: 400 });
+      }
       fields.push("product_pricing = ?");
       values.push(JSON.stringify({ ...pr, competitors, at: new Date().toISOString() }));
     }
