@@ -525,7 +525,7 @@ export default function Stage3HeroFlow({
           }).then((r) => r.json());
           if (!gen.success) throw new Error(gen.error || "generation failed");
 
-          let verdict: "pass" | "fail" = "pass";
+          let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
           let issues: string[] = [];
           try {
             const audit = await fetch("/api/stage3/audit", {
@@ -537,11 +537,11 @@ export default function Stage3HeroFlow({
               issues = audit.result?.issues ?? [];
             } else {
               console.error("audit failed:", audit.error);
-              issues = ["Audit skipped (auditor unavailable) — review manually."];
+              issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`];
             }
           } catch (e) {
             console.error("audit call failed:", e);
-            issues = ["Audit skipped (network error) — review manually."];
+            issues = ["Audit unavailable"];
           }
 
           results[i] = { index: p.index, category: p.category, image_url: gen.image_url, status: "done", verdict, issues };
@@ -1242,7 +1242,7 @@ function CompletedReview({
         if (j !== i) return x;
         const updated: RemImage = audit.success
           ? { ...x, verdict: audit.result?.verdict === "pass" ? "pass" : "fail", issues: audit.result?.issues ?? [], user_override: null }
-          : { ...x, verdict: undefined, issues: ["Audit unavailable — review manually."], user_override: null };
+          : { ...x, verdict: undefined, issues: ["Audit unavailable"], user_override: null };
         persistImage(updated);
         return updated;
       }));
@@ -1322,7 +1322,7 @@ function CompletedReview({
       }).then((r) => r.json());
       if (!gen.success) throw new Error(gen.error || "generation failed");
 
-      let verdict: "pass" | "fail" = "pass";
+      let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
       let issues: string[] = [];
       try {
         const audit = await fetch("/api/stage3/audit", {
@@ -1330,10 +1330,10 @@ function CompletedReview({
           body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null, reference_urls: refs, run_id: runId }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
-        else { console.error("audit failed:", audit.error); issues = ["Audit skipped (auditor unavailable) — review manually."]; }
+        else { console.error("audit failed:", audit.error); issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`]; }
       } catch (e) {
         console.error("audit call failed:", e);
-        issues = ["Audit skipped (network error) — review manually."];
+        issues = ["Audit unavailable"];
       }
 
       // Functional update + per-image persist, so a concurrent regeneration of

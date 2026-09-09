@@ -188,12 +188,23 @@ async function anthropicMessage(args: {
     );
     void recordUsage(args.runId ?? null, args.label, model, msg.usage);
     const text = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
-    if (text) return text;
     lastStop = msg.stop_reason ?? null;
-    if (lastStop === "max_tokens") budget = Math.min(budget * 2, 32_000);
-    console.warn(`[${args.label}] empty response (stop: ${lastStop}, model: ${model}) — attempt ${attempt + 1}/3, next budget ${budget}`);
+    // A reply that hit the ceiling is INCOMPLETE, not finished — a copy kit cut
+    // off mid-FAQ or a one-pager missing its last section used to be stored as
+    // if it were whole. Only a reply that stopped on its own is accepted.
+    if (text && lastStop !== "max_tokens") return text;
+    if (lastStop === "max_tokens") {
+      budget = Math.min(budget * 2, 64_000);
+      console.warn(`[${args.label}] hit the token ceiling${text ? ` after ${text.length} chars` : " with no text"} — retrying at ${budget}`);
+      continue;
+    }
+    console.warn(`[${args.label}] empty response (stop: ${lastStop}, model: ${model}) — attempt ${attempt + 1}/3`);
   }
-  throw new Error(`${args.label}: the model returned no text after 3 attempts (stop: ${lastStop ?? "unknown"}, model: ${model})`);
+  throw new Error(
+    lastStop === "max_tokens"
+      ? `${args.label}: the model kept hitting the token ceiling (last budget ${budget}, model: ${model}) — the document would have been truncated, so nothing was saved.`
+      : `${args.label}: the model returned no text after 3 attempts (stop: ${lastStop ?? "unknown"}, model: ${model})`,
+  );
 }
 
 // ── Slug helpers (mirrored from page.tsx) ────────────────────────────────────
@@ -281,7 +292,7 @@ async function reviseDoc(runId: number, original: string, docType: string, chang
   const text = await anthropicMessage({
     system: REVISE_DOC_PROMPT,
     user: `Document type: ${docType}\n\nOriginal document:\n\n${original}\n\n---\n\nRequired changes:\n\n${changes}`,
-    maxTokens: 4000,
+    maxTokens: 16_000,
     label: `revise ${docType}`,
     runId,
     // Mechanical doc editing against an explicit changelist — the cheap model.
@@ -292,11 +303,22 @@ async function reviseDoc(runId: number, original: string, docType: string, chang
 
 // ── Last completed stage detector ────────────────────────────────────────────
 
-export type LastStage = "none" | "product" | "scrape" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images";
+export type LastStage = "none" | "product" | "scrape" | "stage1" | "stage2" | "stage3-hero" | "stage3-prompts" | "stage3-images";
 
 export function getLastCompletedStage(run: Run): LastStage {
-  if (run.generated_images) return "stage3-images";
-  if (run.image_prompts) return "stage3-prompts";
+  // Stage 4 progress lives in the hero-first columns. `generated_images` and
+  // `image_prompts` were the pre-hero flow's columns and are never written any
+  // more, so reading only those made every finished run look like it had
+  // stopped after Copy — and Resume then rewound it to the Stage 4 entry gate.
+  const remaining = (() => {
+    try {
+      const arr = JSON.parse(run.stage3_remaining_images ?? "[]");
+      return Array.isArray(arr) ? arr as Array<{ image_url?: string; status?: string }> : [];
+    } catch { return []; }
+  })();
+  if (run.generated_images || remaining.some((im) => im?.image_url && im.status === "done")) return "stage3-images";
+  if (run.image_prompts || run.stage3_remaining_prompts) return "stage3-prompts";
+  if (run.stage3_hero_image_url) return "stage3-hero";
   if (run.stage2_output) return "stage2";
   // Stage 1 is only "complete" once the one-pager exists (it's the final sub-step now)
   if (run.stage1_one_pager) return "stage1";
@@ -619,7 +641,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
         `\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
         `\n\n---\n\nNECESSARY_BELIEFS.txt:\n\n${necessaryBeliefs}`,
       ].join(""),
-      maxTokens: 4000,
+      maxTokens: 16_000,
       label: "chief final review",
       runId,
     });
@@ -695,7 +717,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
         "NECESSARY BELIEFS:",
         beliefsForOnePager,
       ].join("\n"),
-      maxTokens: 2000,
+      maxTokens: 16_000,
       label: "one-pager synthesis",
       runId,
       // Pure summarization of finished docs — the cheap model.
@@ -750,7 +772,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const output = await anthropicMessage({
     system: stage2System,
     user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${angleSection}\n\nProduce the complete copy kit now.`,
-    maxTokens: 8192,
+    maxTokens: 32_000,
     label: "stage 2 copy",
       runId,
     model: await getModel("stage2"),
@@ -953,6 +975,15 @@ export async function resumePipeline(runId: number): Promise<void> {
       await updateRun(runId, {
         status: "awaiting_user",
         current_step: "Awaiting image approval for Stage 4",
+        last_updated_at: now(),
+      });
+      return;
+    }
+
+    if (lastStage === "stage3-hero") {
+      await updateRun(runId, {
+        status: "awaiting_hero_qc",
+        current_step: "Stage 4: Review the hero",
         last_updated_at: now(),
       });
       return;

@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       const msgContent = feedback ? [...content, { type: "text" as const, text: feedback }] : content;
       const message = await anthropic.messages.create({
         model,
-        max_tokens: 8000,
+        max_tokens: 16_000,
         system: SYSTEM,
         messages: [{ role: "user", content: msgContent }],
       });

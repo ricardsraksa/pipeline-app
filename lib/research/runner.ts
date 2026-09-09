@@ -53,6 +53,15 @@ function collectText(content: Anthropic.ContentBlock[]): string {
     .trim();
 }
 
+/** Text from a research call, or a thrown error. An empty module used to flow
+ *  downstream as a heading with nothing under it, and the pipeline only failed
+ *  if ALL of them came back empty — so a run could finish missing research. */
+function requireText(msg: Anthropic.Message, label: string): string {
+  const text = collectText(msg.content);
+  if (text) return text;
+  throw new Error(`Stage 2 research (${label}) returned no text (stop: ${msg.stop_reason ?? "unknown"}).`);
+}
+
 export interface ResearchInputs {
   /** Run to attribute API token usage to in the cost tracker. */
   runId?: number;
@@ -166,7 +175,7 @@ export async function runIdentify(inputs: ResearchInputs): Promise<string> {
       { role: "user", content: buildMessageContent(buildBaseContext(inputs), inputs.source_image_urls) },
     ],
   }, { usageLabel: "stage1: identify", runId: inputs.runId });
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  return requireText(msg, "identify");
 }
 
 // ── Call 2: Market Overview + Pain Points + Desires ──────────────────────────
@@ -243,7 +252,7 @@ export async function runProductAnalysis(
     system: PRODUCT_ANALYSIS_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   }, { usageLabel: "stage1: product analysis", runId: inputs.runId });
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  return requireText(msg, "product analysis");
 }
 
 // ── Call 5: Visual Strategy ──────────────────────────────────────────────────
@@ -277,5 +286,5 @@ export async function runVisual(
       { role: "user", content: buildMessageContent(userMessage, inputs.source_image_urls) },
     ],
   }, { usageLabel: "stage1: visual", runId: inputs.runId });
-  return msg.content.find((b) => b.type === "text")?.text ?? "";
+  return requireText(msg, "visual strategy");
 }

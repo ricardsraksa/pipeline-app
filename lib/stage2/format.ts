@@ -41,7 +41,7 @@ export async function structureStage2Copy(text: string, runId?: number): Promise
     const model = await getModel("mechanical");
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 4000,
+      max_tokens: 32_000,
       // No cache_control: at ~290 tokens this prompt is far below Haiku's 4096-token
       // minimum cacheable prefix, so the marker was a silent no-op.
       system: STRUCTURE_SYSTEM,

@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     const model = await getModel("mechanical");
     const msg = await anthropic.messages.create({
       model,
-      max_tokens: 4000,
+      max_tokens: 16_000,
       system: SYSTEM,
       tools: [TOOL],
       tool_choice: { type: "tool", name: "submit_options" },

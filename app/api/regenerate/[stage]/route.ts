@@ -210,7 +210,7 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
     "Regenerate the one-pager now.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 8000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
+  const output = await ask({ system, user, maxTokens: 32_000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output };
 }
 
@@ -286,7 +286,7 @@ Return ONLY the regenerated copy. No preamble, no explanation, no code fences.`,
     "Now regenerate the copy following the user's instructions.",
   ].join("\n");
 
-  const output = await ask({ system, user, maxTokens: 8000, role: "stage2", runId: run.id, label: "stage2: edit with AI" });
+  const output = await ask({ system, user, maxTokens: 32_000, role: "stage2", runId: run.id, label: "stage2: edit with AI" });
   return { field: "stage2_copy", stageTimestamp: "stage2_edited_at", output };
 }
 

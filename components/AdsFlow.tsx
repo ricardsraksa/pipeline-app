@@ -151,7 +151,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
         body: JSON.stringify({ prompt: promptText, model: p.model || "gpt_image_2", reference_images: refs, aspect_ratio: "1:1" }),
       }).then((r) => r.json());
       if (!gen.success) throw new Error(gen.error || "generation failed");
-      let verdict: "pass" | "fail" = "pass";
+      let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
       let issues: string[] = [];
       try {
         const audit = await fetch("/api/stage3/audit", {
@@ -159,8 +159,8 @@ export default function AdsFlow({ runId }: { runId: number }) {
           body: JSON.stringify({ image_url: gen.image_url, category: `ad_${p.concept}`, prompt_used: promptText, product_description: productDesc, overlay_text_used: p.headline || null, reference_urls: refs, run_id: runId }),
         }).then((r) => r.json());
         if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
-        else issues = ["Audit skipped (auditor unavailable) — review manually."];
-      } catch { issues = ["Audit skipped (network error) — review manually."]; }
+        else issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`];
+      } catch { issues = ["Audit unavailable"]; }
       const history = [
         ...(keepHistoryOf?.image_url ? [{ image_url: keepHistoryOf.image_url, prompt: p.prompt }] : []),
         ...(keepHistoryOf?.history ?? []),
