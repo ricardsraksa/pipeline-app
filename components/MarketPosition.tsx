@@ -16,14 +16,22 @@ const selectCls =
 
 export default function MarketPositionCard({ runId, position }: { runId: number; position: MP | null }) {
   const [mp, setMp] = useState<MP | null>(position);
+  // Runs whose research predates the diagnosis have nothing stored, so both
+  // halves start empty and the operator sets them; nothing is saved (and
+  // nothing reaches the writers) until both are chosen.
+  const [draft, setDraft] = useState<{ awareness: AwarenessStage | ""; sophistication: SophisticationStage | "" }>({
+    awareness: position?.awareness ?? "",
+    sophistication: position?.sophistication ?? "",
+  });
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (position && (!mp || position.at > mp.at)) setMp(position);
+    if (position && (!mp || position.at > mp.at)) {
+      setMp(position);
+      setDraft({ awareness: position.awareness, sophistication: position.sophistication });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [position]);
-
-  if (!mp) return null;
 
   const save = (next: MP) => {
     setMp(next);
@@ -36,33 +44,41 @@ export default function MarketPositionCard({ runId, position }: { runId: number;
       .catch(() => setErr("Network error saving market position"));
   };
 
-  const set = (patch: Partial<MP>) => save({ ...mp, ...patch, source: "manual", at: new Date().toISOString() });
+  const set = (patch: Partial<Pick<MP, "awareness" | "sophistication">>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    if (!next.awareness || !next.sophistication) return;
+    save({ awareness: next.awareness, sophistication: next.sophistication, source: "manual", at: new Date().toISOString() });
+  };
 
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3.5 mb-2.5">
         <span className="eyebrow">Market</span>
-        {mp.source === "manual" && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">edited</span>}
+        {mp?.source === "manual" && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">edited</span>}
+        {!mp && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">not set</span>}
       </div>
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] px-[13px] py-3">
         <div className="grid grid-cols-2 gap-3">
           <label className="min-w-0 flex flex-col gap-1">
             <span className="eyebrow">Awareness</span>
             <select
-              value={mp.awareness}
+              value={draft.awareness}
               onChange={(e) => set({ awareness: e.target.value as AwarenessStage })}
               className={selectCls}
             >
+              <option value="" disabled>—</option>
               {AWARENESS_STAGES.map((a) => <option key={a} value={a}>{AWARENESS_LABEL[a]}</option>)}
             </select>
           </label>
           <label className="min-w-0 flex flex-col gap-1">
             <span className="eyebrow">Sophistication</span>
             <select
-              value={mp.sophistication}
+              value={draft.sophistication}
               onChange={(e) => set({ sophistication: Number(e.target.value) as SophisticationStage })}
               className={selectCls}
             >
+              <option value="" disabled>—</option>
               {SOPHISTICATION_STAGES.map((s) => <option key={s} value={s}>{SOPHISTICATION_LABEL[s]}</option>)}
             </select>
           </label>
