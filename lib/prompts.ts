@@ -39,6 +39,7 @@ HARD RULES
 - Format: every ad is a SQUARE 1:1 image. Where a template says vertical, write square.
 - Product fidelity: the product must look exactly like the attached hero/source photos. Fill the PRODUCT FIDELITY RULES block from what you actually see: category, silhouette, components, controls, colors, finish. Name the product categories it could be mistaken for. Never redesign it.
 - Angle: Concepts 1, 3 and 5 open on the operator's chosen angle — its specific problem, not a generic one. Concept 2 leads with the mechanism. Concept 4 lands the angle's payoff.
+- Comparisons: anything the ads set the product against is the baseline alternative from the one-pager's "Compared to" section (the lesser version in the same category), on its criteria. Never a competitor brand or a rival version of the same good product.
 - Copy: reuse lines from the copy kit verbatim where they fit (benefits, section headlines, one-liners). Overlay text is flat, functional benefit language, never slogans or wordplay.
 - Real sources only: a customer quote may ONLY be taken from the supplier listing text or the research (a real review, lightly trimmed, no name unless the source has one). A statistic may ONLY be used if it appears in the research. If there is no usable quote, Concept 4 shows a pull-quote of one benefit line from the copy kit with NO name, NO "Verified Customer" tag and NO star row. If there is no usable statistic, Concept 1 has no stat callout at all. Never fabricate reviews, names, ratings, percentages or review counts.
 - Brand: where a template shows a brand wordmark, render the product name given as PRODUCT NAME as plain text. No logos, no icons that imitate a logo, no third-party brand marks anywhere.
@@ -48,7 +49,7 @@ HARD RULES
 
 === CONCEPT 1 · BEFORE / AFTER ===
 A square split-screen ad. Same subject and setting shown on both sides, divided by a clean vertical line down the center.
-LEFT SIDE (labeled "BEFORE" in bold caps): [the problem state from the angle], dimmer/cooler lighting, subject looking [tired/frustrated/neutral].
+LEFT SIDE (labeled "BEFORE" in bold caps): [the problem state from the angle; where that problem is what she uses today, show the baseline alternative from the one-pager's "Compared to" section in use, never a competitor's product], dimmer/cooler lighting, subject looking [tired/frustrated/neutral].
 RIGHT SIDE (labeled "AFTER" in bold caps): same subject and setting, now showing the result of using [PRODUCT NAME], [the improved state], brighter/warmer lighting, subject looking [relieved/confident/happy].
 [PRODUCT NAME] is visibly present in the after side, naturally integrated into the scene (not a floating studio product shot).
 A short headline above or below the split, in bold sans-serif or serif text: "[Problem reframed — e.g. Your [X] isn't the problem, [real cause] is.]"
@@ -66,7 +67,7 @@ Thin straight leader lines (muted [COLOR] accent) from specific points on the pr
 — "[Feature/Spec 2]" (pointing to [location]) — "[Benefit]"
 — "[Feature/Spec 3]" (pointing to [location]) — "[Benefit]"
 — "[Feature/Spec 4]" (pointing to [location]) — "[Benefit]"
-— "[Differentiator]" (pointing to [location]) — "[What makes it unlike competitors]"
+— "[Differentiator]" (pointing to [location]) — "[What the baseline alternative lacks, from the one-pager's Compared to]"
 Arrange callouts evenly (2-3 left, 2-3 right), balanced and scannable like a spec sheet.
 A "[Badge text]" badge (rounded pill, subtle fill) near the top corner of the product shot, plus a small spec line: "[dimensions/materials/weight from the description]."
 Clean e-commerce/DTC ad aesthetic, studio-quality lighting, plenty of white space, sans-serif label typography.
@@ -97,7 +98,7 @@ PRODUCT FIDELITY RULES: [filled]
 === CONCEPT 5 · PROBLEM / SOLUTION (SPLIT SCREEN) ===
 A square ad split into two halves.
 Small "[PRODUCT NAME]" wordmark as plain text centered at the very top spanning both halves (no logo).
-LEFT HALF (dark/muted background), headed "The Problem:" with a red "X" icon: a vertical list of 2-3 short pain points from the angle, each with a small relevant icon above short text.
+LEFT HALF (dark/muted background), headed "The Problem:" with a red "X" icon: a vertical list of 2-3 short pain points from the angle and the one-pager's "Compared to" criteria (what the baseline alternative does wrong), each with a small relevant icon above short text.
 RIGHT HALF (photo of [PRODUCT NAME] in use, worn/held/applied by a partially visible person), headed "The Fix:" with a green checkmark icon: below the photo, [PRODUCT NAME] in bold, a short tagline stating the core benefit, and a "Shop Now" button.
 Clean, editorial, high-contrast layout, warm-vs-cool color grading between the two halves.
 PRODUCT FIDELITY RULES: [filled]
@@ -129,6 +130,7 @@ Rules for every angle:
 - Lead with a problem the customer already recognises or would immediately recognise once named. Name it concretely, in her world, not in marketing language.
 - State the consequence honestly. Real stakes (health, money, time, sleep, safety, relationships), never invented or exaggerated ones. If the research does not support a consequence, do not claim it.
 - Explain the mechanism: WHY the product solves it, as cause and effect. "It has X, which does Y, so Z stops happening."
+- When an angle contrasts the product with what she uses today, the contrast is the baseline alternative from the research (section 6B, restated in the one-pager's "Compared to"): the lesser version in the same category, on the criteria listed there. Wooden utensils against plastic ones that scratch and shed, not against another wooden brand. Never a competitor brand, never "other products".
 - Name who feels it most. A specific person, not "everyone".
 - Give one opening hook line a page or ad could start with. Plain language. Never use em dashes.
 - Say in one sentence why this angle beats a generic "best X" or "only Y" pitch for this product.
@@ -332,6 +334,9 @@ Match the language level of the actual target customer:
 
 NO COMPETITOR NAMES:
 The research names competitor brands and products — that is internal material only. Customer-facing copy must NEVER name a competitor brand, product, or store. Refer to alternatives generically: "standard organizers", "typical bed rails", "ordinary compression socks". Before outputting, scan every field for brand names that are not this product's own and replace them.
+
+COMPARISONS:
+Whenever the copy sets this product against something else (a benefit, a section, a FAQ answer, the ad, a one-liner), that something is the baseline alternative the research names in section 6B "THE BASELINE ALTERNATIVE": the common lesser version in the same category, compared on the criteria listed there and in the research's wording. "Plastic utensils scratch and shed into hot food. Solid beech doesn't." Never a competitor brand, never "other brands", never "cheap knock-offs", never a rival version of the same good product. Do not invent points of comparison the research does not list.
 
 VOICE-OF-CUSTOMER FAQs:
 The two FAQs must each tackle one of the TWO MOST COMMON OBJECTIONS to buying this product, ranked by how often they show up in the research (pain points, competitor complaints, belief gaps). Phrase each as the question a hesitant buyer would actually ask, in their own words. The question field is ONE plain question and nothing else: no lead-in, no problem statement, no story before the question mark. WRONG: "Every mask I've tried either leaks at the nose or ends up on my forehead by 3am. What actually holds this one in place?" RIGHT: "What keeps it in place all night?" Keep the question under 15 words. The objection lives in the ANSWER: answer it head-on so the objection is neutralized — concrete facts from the research, not reassurance fluff. Do not invent objections the research does not show; if it surfaces fewer than two, use the strongest doubt a first-time buyer of this product category would have.

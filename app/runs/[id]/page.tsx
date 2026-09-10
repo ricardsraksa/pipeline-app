@@ -147,6 +147,14 @@ function OnePagerMarkdown({ text }: { text: string }) {
 
 // ── Stage accordion card ──────────────────────────────────────────────────────
 
+/** "58", "p58", " P058 " → "P58"; "" → undefined (clear); anything else → null. */
+function normalizeProductCode(text: string): string | undefined | null {
+  const t = text.trim().toUpperCase();
+  if (!t) return undefined;
+  const m = t.match(/^P?\s*0*(\d{1,6})$/);
+  return m ? `P${m[1]}` : null;
+}
+
 /** "aliexpress.com" from a URL, for the rail's link rows. */
 function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
@@ -197,13 +205,20 @@ export default function RunPage() {
   // Copy stage: the cheap "rebuild on this angle" revision pass in flight.
   const [rebuilding, setRebuilding] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
+  // What the rail shows the moment a code is saved, until the next poll
+  // confirms it (a poll already in flight can otherwise hand back the old
+  // value for one cycle and make the edit look ignored).
+  const [codeOverride, setCodeOverride] = useState<string | null>(null);
   const saveCode = async () => {
     setEditingCode(false);
-    const v = codeDraft.trim().toUpperCase();
+    const v = normalizeProductCode(codeDraft);
+    if (v === null) { push("Product code: a number, e.g. 58 or P58"); return; }
+    setCodeOverride(v ?? "");
     try {
-      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_code: v || null }) });
+      const res = await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_code: v }) });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); push(`Product code not saved: ${(d as { error?: string }).error ?? res.status}`); setCodeOverride(null); return; }
       window.dispatchEvent(new Event("run:changed"));
-    } catch { /* the rail keeps the old value */ }
+    } catch { push("Product code not saved: network error"); setCodeOverride(null); }
   };
   // The stage first shown on this page load stays on screen until the
   // operator clicks another one — a stage finishing must not yank the view.
@@ -229,6 +244,11 @@ export default function RunPage() {
 
   // When the pipeline moves on, follow it to the stage that needs attention.
   useEffect(() => { setActiveOverride(null); }, [run?.status]);
+  // Drop the optimistic code once a poll returns the saved value.
+  useEffect(() => {
+    if (codeOverride !== null && (run?.meta.productCode ?? "") === codeOverride) setCodeOverride(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.meta.productCode]);
 
   async function handleKill() {
     if (!runId || killing) return;
@@ -535,7 +555,7 @@ export default function RunPage() {
             {run.meta.uploadedSourceImages[0]
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={run.meta.uploadedSourceImages[0]} alt="" className="w-full h-full object-cover" />
-              : (run.meta.productCode || `#${runId}`)}
+              : ((codeOverride ?? run.meta.productCode) || `#${runId}`)}
           </div>
           <div className="min-w-0">
             {renaming ? (
@@ -553,12 +573,12 @@ export default function RunPage() {
               {editingCode ? (
                 <input autoFocus value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} onBlur={saveCode}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCode(); } else if (e.key === "Escape") { e.preventDefault(); setEditingCode(false); } }}
-                  placeholder="P58" aria-label="Product code"
+                  placeholder="58" aria-label="Product code" inputMode="numeric"
                   className="ff-mono w-[58px] text-[10.5px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[4px] px-1.5 py-px outline-none focus:border-[var(--color-accent)]" />
               ) : (
-                <button onClick={() => { setCodeDraft(run.meta.productCode ?? ""); setEditingCode(true); }} title="Product code — names the Google Doc tab and the Drive folder"
-                  className={`cursor-pointer rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)] ${run.meta.productCode ? "text-[var(--color-text-2)]" : "text-[var(--color-amber)]"}`}>
-                  {run.meta.productCode || "set code"}
+                <button onClick={() => { setCodeDraft((codeOverride ?? run.meta.productCode ?? "").replace(/^P/i, "")); setEditingCode(true); }} title="Product code — names the Google Doc tab and the Drive folder"
+                  className={`cursor-pointer rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)] ${(codeOverride ?? run.meta.productCode) ? "text-[var(--color-text-2)]" : "text-[var(--color-amber)]"}`}>
+                  {(codeOverride ?? run.meta.productCode) || "set code"}
                 </button>
               )}
               {elapsed ? <span>· {elapsed}</span> : null}

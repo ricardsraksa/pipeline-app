@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
 
   // The code continues the operator's sequence (last product + 1) unless one
   // was passed in, so a run never sits without one.
-  const productCode = body.productCode?.trim().slice(0, 100) || (await nextProductCode());
+  const typed = body.productCode?.trim().toUpperCase().match(/^P?\s*0*(\d{1,6})$/);
+  const productCode = typed ? `P${typed[1]}` : await nextProductCode();
 
   const runId = await createRun({
     product_url: productUrl || null,

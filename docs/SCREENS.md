@@ -90,7 +90,7 @@ stage at a time and the app follows the pipeline to whichever needs attention.
 
 **Always present, whatever stage is open:**
 
-- Run identity: thumbnail, editable name, run number, product code, elapsed time,
+- Run identity: thumbnail, editable name, run number, product code (type the number, the P is added), elapsed time,
   link to the product URL, status.
 - The four stages with their state each: done, running, needs you, failed, or
   not started yet. Clicking one opens it.

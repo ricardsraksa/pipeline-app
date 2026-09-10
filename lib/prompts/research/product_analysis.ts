@@ -17,6 +17,15 @@ OUTPUT — write only these sections:
 - UNVERIFIED features: mark each [UNVERIFIED] — list what should NOT be claimed without proof
 - Features ranked by likely customer importance (cross-reference the pain points in Section 3)
 
+6B. THE BASELINE ALTERNATIVE
+Name the common lesser version of this product in the same category: what most of these buyers use today or would buy by default. It is a material, construction or type, never a brand. Plastic cooking utensils, not a rival brand of wooden ones. A still water bowl, not another fountain. Foam ear plugs, not a competing silicone plug. Every comparison made downstream (angles, copy, images, ads) is made against this, so choose the one she actually has in her kitchen, bathroom or car.
+- Baseline: [one plain phrase]
+- Why it is the baseline: [one sentence: who buys it and why]
+- Criteria: 3 to 5, ranked by how strongly she feels each. For each, one line in this shape:
+  [Criterion] — [what the baseline does] / [what this product does instead, VERIFIED only] — "[the consequence in her own words]"
+  Example: Sheds into food — plastic scratches and sheds fragments into hot food / solid beech does not scratch or shed [VERIFIED: solid beech] — "I don't want bits of plastic in the kids' dinner"
+- Only use a criterion this product can back with a [VERIFIED] fact from the listing or description. Say what the material or construction does; never claim a health outcome it cures or prevents.
+
 7. MARKET SOPHISTICATION
 Diagnose which of Eugene Schwartz's five stages of sophistication this category is in for the US-led English-speaking market. The stage is decided by how many similar products this buyer has already been sold, not by how good this product is:
 - Stage 1 — nothing like it has been advertised to her; the plain claim is still news
@@ -46,4 +55,4 @@ SOPHISTICATION: [1 | 2 | 3 | 4 | 5]
 
 The awareness value is the PRIMARY target segment you named above, not the largest segment and not a range. The sophistication value is the stage you diagnosed in section 7.
 
-Output plain text. Headers: "6. PRODUCT ANALYSIS", "7. MARKET SOPHISTICATION", "8. LEVELS OF CONSCIOUSNESS". No preamble. No other sections.`;
+Output plain text. Headers: "6. PRODUCT ANALYSIS", "6B. THE BASELINE ALTERNATIVE", "7. MARKET SOPHISTICATION", "8. LEVELS OF CONSCIOUSNESS". No preamble. No other sections.`;

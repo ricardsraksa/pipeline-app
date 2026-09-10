@@ -18,7 +18,7 @@ Use the research document and the avatar document as your sources.
 
 Cover these sections:
 1. Product Name & Hook — 3 brand name suggestions if no name exists, plus a one-sentence hook capturing the core promise. Each name suggestion must be a brand word plus plain category descriptor ("FlowVet Stainless Steel Fountain"), ecommerce-friendly: simple, instantly understandable, easy to pronounce and remember, not technical, not long, brandable or benefit-led
-2. The Problem — the specific problem this product solves, and why existing solutions fail this avatar
+2. The Problem — the specific problem this product solves, and why what she uses today fails her: the baseline alternative from research section 6B first (the lesser version in the same category, on its criteria), then competitors only where the research shows them failing
 3. The Unique Mechanism — the verified differentiator that makes this product work when others don't. This must be grounded in the research. Frame it as a proprietary angle the avatar cannot get from competitors. If no real differentiator exists, say so honestly — do not invent one.
 4. The Offer — what is included in the package, the bundle composition, and any guarantee that removes risk. Do NOT mention price. Non-price offer angles to test:
 - [angle 1: e.g. multi-pack / bundle]

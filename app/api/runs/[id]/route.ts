@@ -528,7 +528,13 @@ export async function PATCH(
     }
   }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
-  if ("product_code" in body)                     { fields.push("product_code = ?");                     values.push(body.product_code?.toString().trim() || null); }
+  if ("product_code" in body) {
+    // "58" and "p58" both mean P58 — the P is the app's, the number is the operator's.
+    const raw = body.product_code?.toString().trim().toUpperCase() ?? "";
+    const m = raw.match(/^P?\s*0*(\d{1,6})$/);
+    if (raw && !m) return Response.json({ error: "product_code must be a number, e.g. 58 or P58" }, { status: 400 });
+    fields.push("product_code = ?"); values.push(m ? `P${m[1]}` : null);
+  }
   if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 20_000) : null); }
   if ("product_selected_images" in body)          { fields.push("product_selected_images = ?");          values.push(body.product_selected_images ?? null); }
   if ("product_angles" in body)                   { fields.push("product_angles = ?");                   values.push(typeof body.product_angles === "string" ? body.product_angles.slice(0, 40_000) : null); }

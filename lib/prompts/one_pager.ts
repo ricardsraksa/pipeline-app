@@ -17,8 +17,12 @@ OUTPUT FORMAT — return exactly this markdown structure, no preamble, no closin
 ## Positioning Angle
 [ONE sentence: the single sharpest angle this product should be sold on, drawn from the offer brief and avatar. Not a feature list — the one reason this product wins for this customer. Example: "The hygienic stainless steel fountain for moms tired of plastic fountains that turn slimy."]
 
-## Key Competitor Gap
-[ONE to TWO sentences: the specific weakness in what competitors currently offer that this product exploits. Name the gap concretely. If the research does not clearly identify a competitor gap, write "No clear competitor gap identified in research" — do not invent one.]
+## Compared to
+[The baseline alternative from research section 6B, as one plain phrase: the common lesser version of this product in the same category. A material, construction or type, never a brand. Example: "plastic cooking utensils"]
+- [Criterion] — [what the baseline does] / [what this product does instead]
+- [Criterion] — [baseline] / [this product]
+- [Criterion] — [baseline] / [this product]
+[3 to 5 lines, in the research's order, strongest first. Every later stage (angles, copy, images, ads) compares the product against this and nothing else.]
 
 ## Benefits
 1. [Benefit 1 — one sentence, concrete]
@@ -40,18 +44,18 @@ OUTPUT FORMAT — return exactly this markdown structure, no preamble, no closin
 5. [Use case 5]
 
 ## USPs
-- [Primary differentiator vs competitors — one sentence]
+- [Primary differentiator vs the baseline alternative — one sentence]
 - [Secondary USP if it exists]
 - [Tertiary USP if it exists — only include if genuinely differentiating]
 
 RULES:
 - Product name: NEVER carry over a brand name from the supplier listing, supplier photos, or competitor links — text printed on supplier images is the manufacturer's brand and competitor names belong to competitors. Use a plain descriptive category name (e.g. "Anti-Theft Crossbody Chest Bag"); the final invented brand name is chosen later, in Stage 2
 - Positioning Angle must be ONE sentence reflecting the actual avatar (middle-aged mom) and offer brief — the sharpest single reason to buy, the argument Stage 2 copy and Stage 3 images should both build on
-- Key Competitor Gap must be grounded in competitors actually named in the research. If the research does not support a gap, say so rather than inventing one.
+- Compared to must restate research section 6B (THE BASELINE ALTERNATIVE): the same baseline, the same criteria, the same order, shortened to one line each. Never swap in a competitor brand. If the research has no 6B, name the most common lesser version in the category from the research's own evidence and keep the criteria to what the research verifies.
 - Benefits must be specific outcomes/feelings, not features. "Cat drinks more water" not "Has a faucet spout"
 - Benefits and USPs must be claim-safe: no "clinically proven", "certified", "kills bacteria", "safe for children/pets", "waterproof", "vet/dentist/doctor approved", or specific health outcomes unless the research explicitly verifies them; phrase health/hygiene/safety benefits with softening language ("helps", "designed to", "supports")
 - Use cases must be concrete scenarios, not categories. "Mom is at work all day and worries about hydration" not "Daily use"
-- USPs must be things actually unique to this product vs competitors named in the research — not generic claims
+- USPs are what this product has that the baseline alternative lacks (from Compared to), plus anything the research verifies as genuinely unique against the competitors it names — not generic claims
 - Maximum 1-2 USPs unless the research clearly identifies 3 strong differentiators
 - PRICING IS OUT OF SCOPE: never mention a price, currency figure, cost, or price tier anywhere in the one-pager.
 - Use natural US English spelling by default.

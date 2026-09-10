@@ -31,7 +31,7 @@ PLACEHOLDER EXTRACTION RULES:
 [MARKETING_ANGLE] — The core positioning angle from the offer brief
 [EMOTIONAL_OUTCOME] — How the customer feels after using the product
 [PROBLEM_TO_SOLVE] — The specific problem this product addresses
-[COMMON_ALTERNATIVE] — What customers use today instead (e.g. "plastic water bowl")
+[COMMON_ALTERNATIVE] — The baseline alternative from the one-pager's "Compared to" section: the lesser version in the same category (e.g. "plastic water bowl"), never a competitor brand
 [REVIEW_THEME] — Common positive theme from customer research (if available)
 [BACKGROUND_STYLE] — Specific background description per image type
 [CAMERA_ANGLE] — Specific camera angle per image
