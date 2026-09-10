@@ -656,7 +656,10 @@ async function runStage1(runId: number, run: Run): Promise<void> {
         `\n\n---\n\nOFFER_BRIEF.txt:\n\n${offerBrief}`,
         `\n\n---\n\nNECESSARY_BELIEFS.txt:\n\n${necessaryBeliefs}`,
       ].join(""),
-      maxTokens: 16_000,
+      // Mostly thinking: the review itself is ~4k tokens, but run 130 spent the
+      // whole of a 16k budget before finishing and needed the doubled retry
+      // (12.8k used). Starting at 32k avoids paying for the discarded attempt.
+      maxTokens: 32_000,
       label: "chief final review",
       runId,
     });
