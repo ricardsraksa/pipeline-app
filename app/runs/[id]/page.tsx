@@ -19,6 +19,7 @@ import Stage3HeroFlow from "@/components/Stage3HeroFlow";
 import AdsFlow from "@/components/AdsFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Shopify from "@/components/Stage2Shopify";
+import ShopifyFill from "@/components/ShopifyFill";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
@@ -38,7 +39,7 @@ const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).jo
 
 // Internal keys are one behind the numbers on screen: product = Stage 1,
 // stage1 = Stage 2 (research), stage2 = Stage 3 (copy), stage3 = Stage 4 (images).
-type StageKey = "product" | "stage1" | "stage2" | "stage3" | "ads";
+type StageKey = "product" | "stage1" | "stage2" | "stage3" | "ads" | "done";
 type StageState = "pending" | "running" | "complete" | "error" | "waiting";
 
 const PRODUCT_ACTIVE = ["product", "pending"];
@@ -84,6 +85,10 @@ function getStageState(run: RunStatus, stage: StageKey): StageState {
       if (a.error) return "error";
       return "pending";
     }
+    // Everything the run produced in one place, with the pushes out of the
+    // app. Reachable as soon as there are images to deliver.
+    case "done":
+      return run.status === "completed" || run.stage4.done > 0 ? "complete" : "pending";
   }
 }
 
@@ -166,6 +171,7 @@ const STAGE_DEFS: { key: StageKey; id: string; n: number; title: string }[] = [
   { key: "stage2", id: "v2-stage-2", n: 3, title: "Copy" },
   { key: "stage3", id: "v2-stage-3", n: 4, title: "Images" },
   { key: "ads", id: "v2-stage-ads", n: 5, title: "Ads" },
+  { key: "done", id: "v2-stage-done", n: 6, title: "Done" },
 ];
 
 const stageActionable = (st: StageState) => ["running", "waiting", "error"].includes(st);
@@ -423,6 +429,7 @@ export default function RunPage() {
     stage2: getStageState(run, "stage2"),
     stage3: getStageState(run, "stage3"),
     ads: getStageState(run, "ads"),
+    done: getStageState(run, "done"),
   };
   // The approval gate after research belongs on Stage 2 — that's what needs review.
   if (run.status === "awaiting_stage2_approval") { states.stage1 = "waiting"; states.stage2 = "pending"; }
@@ -437,6 +444,7 @@ export default function RunPage() {
     stage3: Boolean(outputs.stage2Output) ||
       ["awaiting_user", "generating_hero", "awaiting_hero_qc", "generating_remaining", "awaiting_qc", "completed"].includes(run.status),
     ads: run.status === "completed" || Boolean(run.meta.ads?.step),
+    done: run.status === "completed" || run.stage4.done > 0,
   };
 
   // ── Next action ──
@@ -466,7 +474,7 @@ export default function RunPage() {
       if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };
       if (a?.step === "review") return { tone: "amber", icon: "review", title: "Review the 5 ads", cta: "Review ads", onClick: () => openStage("ads") };
       if (a?.step === "generating") return { tone: "accent", running: true, title: "Generating the ads", sub: `${a.done} of 5 done` };
-      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", cta: "Open ads", onClick: () => openStage("ads") };
+      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", cta: "Finish up", onClick: () => openStage("done") };
       return { tone: "green", icon: "check", title: "Run complete", cta: "Write 5 ads", onClick: () => openStage("ads") };
     }
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
@@ -480,7 +488,7 @@ export default function RunPage() {
   // else the furthest one that exists.
   const presentKeys = STAGE_DEFS.map((d) => d.key).filter((k) => present[k]);
   const autoKey: StageKey =
-    (presentKeys.find((k) => stageActionable(states[k])) ?? (run.status === "completed" ? "stage3" : presentKeys[presentKeys.length - 1])) ?? "product";
+    (presentKeys.find((k) => stageActionable(states[k])) ?? (run.status === "completed" ? "done" : presentKeys[presentKeys.length - 1])) ?? "product";
   if (lockedStage.current === null) lockedStage.current = autoKey;
   const activeKey: StageKey = activeOverride && present[activeOverride]
     ? activeOverride
@@ -520,6 +528,7 @@ export default function RunPage() {
     stage2: staleOn(ak?.stage2Key, Boolean(outputs.stage2Output)),
     stage3: staleOn(ak?.stage3Key, (run.stage4?.done ?? 0) > 0 || run.status === "completed"),
     ads: staleOn(ak?.adsKey, Boolean(run.meta.ads?.step)),
+    done: false,
   };
   const rebuildCopyOnAngle = async () => {
     if (!runId || rebuilding) return;
@@ -849,6 +858,113 @@ export default function RunPage() {
             </div>
             <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]"></span>} />
             <AdsFlow runId={Number(runId)} />
+          </>
+        )}
+
+        {/* Stage 6 · Done — everything in one place */}
+        {activeKey === "done" && runId !== null && (
+          <>
+            <div className="flex items-baseline gap-2.5 mb-5">
+              <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Done</h1>
+              <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.meta.productCode ? `${run.meta.productCode} · ` : ""}{displayName}</span>
+              <div className="flex-1" />
+              <div className="flex items-center gap-2">
+                {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
+                <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>
+              </div>
+            </div>
+
+            {/* stage check */}
+            <div className={cx(card, "px-[13px] py-2.5 mb-6 flex flex-wrap gap-x-5 gap-y-1")}>
+              {STAGE_DEFS.filter((d) => d.key !== "done").map((d) => (
+                <button key={d.key} onClick={() => openStage(d.key)} className="cursor-pointer flex items-center gap-1.5 text-[12.5px] hover:underline">
+                  <span className="text-[var(--color-text-2)]">{d.title}</span>
+                  <span className="ff-mono text-[11px]" style={{ color: stateTone[states[d.key]] }}>{stateWord[states[d.key]]}</span>
+                </button>
+              ))}
+              <div className="flex-1" />
+              <RunCost runId={runId} />
+            </div>
+
+            {/* pricing + variants — the same cards as Copy, fully editable */}
+            {run.product.scrape && (
+              <>
+                <PricingCard runId={runId} scrape={run.product.scrape} pricing={run.meta.pricing ?? null} rules={run.meta.pricingRules} />
+                <VariantsCard runId={runId} scrape={run.product.scrape} requestedAt={run.meta.variantsRequestedAt ?? null} edited={run.meta.variantsEdited ?? null} />
+              </>
+            )}
+
+            {/* shopify */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3.5 mb-2.5"><span className={label}>Shopify</span></div>
+              {imagesReady
+                ? <ShopifyFill runId={runId} initialUrl={run.meta.shopifyProductUrl} initialAdminUrl={run.meta.shopifyAdminUrl} />
+                : waiting("After images")}
+            </div>
+
+            {/* docs + drive */}
+            <div className="grid gap-4 mb-6" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div className={cx(card, "px-[13px] py-3 flex flex-col gap-2.5")}>
+                <span className={label}>Google Doc</span>
+                {outputs.stage2Json
+                  ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
+                  : <span className="ff-mono text-[11px] text-[var(--color-text-4)]">after copy</span>}
+              </div>
+              <div className={cx(card, "px-[13px] py-3 flex flex-col gap-2.5")}>
+                <span className={label}>Drive</span>
+                {imagesReady || (run.meta.ads?.done ?? 0) > 0
+                  ? <SendToDrive runId={runId} kind="both" hasImages={imagesReady} hasAds={(run.meta.ads?.done ?? 0) > 0} />
+                  : <span className="ff-mono text-[11px] text-[var(--color-text-4)]">after images</span>}
+              </div>
+            </div>
+
+            {/* images */}
+            {(run.stage4.hero || run.stage4.images.length > 0) && (
+              <div className="mb-6">
+                <div className="flex items-center gap-3.5 mb-2.5">
+                  <span className={label}>Images</span>
+                  <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.stage4.done} / {run.stage4.total || 8}</span>
+                  <div className="flex-1" />
+                  <button onClick={() => openStage("stage3")} className="btn btn-sm">Open</button>
+                </div>
+                <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                  {[...(run.stage4.hero ? [run.stage4.hero] : []), ...run.stage4.images].map((u, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <a key={`${u}-${i}`} href={u} target="_blank" rel="noreferrer" className="block aspect-square rounded-[7px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)]"><img src={u} alt="" className="w-full h-full object-cover" /></a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ads */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3.5 mb-2.5">
+                <span className={label}>Image ads</span>
+                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.meta.ads?.done ?? 0} / 5</span>
+                <div className="flex-1" />
+                <button onClick={() => openStage("ads")} className="btn btn-sm">Open</button>
+              </div>
+              {run.meta.ads?.images?.length ? (
+                <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))" }}>
+                  {run.meta.ads.images.map((u, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <a key={`${u}-${i}`} href={u} target="_blank" rel="noreferrer" className="block aspect-square rounded-[7px] overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface-2)]"><img src={u} alt="" className="w-full h-full object-cover" /></a>
+                  ))}
+                </div>
+              ) : waiting(run.meta.ads?.step ? "Not generated yet" : "After images")}
+            </div>
+
+            {/* store fields — what Shopify receives */}
+            {stage2Json && (
+              <div className="mb-6">
+                <div className="flex items-center gap-3.5 mb-2.5">
+                  <span className={label}>Store fields</span>
+                  <div className="flex-1" />
+                  <button onClick={() => { setStage2View("copy"); openStage("stage2"); }} className="btn btn-sm">Edit</button>
+                </div>
+                <Stage2Shopify json={stage2Json} />
+              </div>
+            )}
           </>
         )}
       </div>

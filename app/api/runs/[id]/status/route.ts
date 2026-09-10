@@ -98,14 +98,18 @@ export async function GET(
     // not on the status word (a lost "completed" write must not block them).
     stage4: (() => {
       let done = 0, total = 0;
+      const images: string[] = [];
       try {
         const arr = JSON.parse(run.stage3_remaining_images ?? "[]");
         if (Array.isArray(arr)) {
           total = arr.length;
-          done = arr.filter((x: { image_url?: string; status?: string }) => x?.image_url && x.status === "done").length;
+          const ok = arr.filter((x: { image_url?: string; status?: string; index?: number }) => x?.image_url && x.status === "done");
+          done = ok.length;
+          ok.sort((a: { index?: number }, b: { index?: number }) => (a.index ?? 0) - (b.index ?? 0));
+          for (const x of ok) images.push(String(x.image_url));
         }
       } catch { /* none */ }
-      return { hero: run.stage3_hero_image_url ?? null, done, total };
+      return { hero: run.stage3_hero_image_url ?? null, done, total, images };
     })(),
     // Stage 1 · Product: the scrape, the analyst text, the operator's edit
     // and photo selection, and when the gate was passed.
@@ -146,12 +150,21 @@ export async function GET(
       variantsRequestedAt: run.variants_refresh_requested ?? null,
       variantsEdited: run.product_variants_edited ?? null,
       // Stage 5 · Image ads
+      shopifyAdminUrl: (() => {
+        try { return (JSON.parse(run.shopify_push_state ?? "null") as { adminUrl?: string } | null)?.adminUrl ?? null; } catch { return null; }
+      })(),
       ads: (() => {
         let prompts = 0, done = 0, failed = 0;
+        const images: string[] = [];
         try { const p = JSON.parse(run.ads_prompts ?? "[]"); if (Array.isArray(p)) prompts = p.length; } catch { /* none */ }
         try {
           const a = JSON.parse(run.ads_images ?? "[]");
-          if (Array.isArray(a)) { done = a.filter((x: { status?: string; image_url?: string }) => x?.status === "done" && x.image_url).length; failed = a.filter((x: { status?: string }) => x?.status === "failed").length; }
+          if (Array.isArray(a)) {
+            const ok = a.filter((x: { status?: string; image_url?: string }) => x?.status === "done" && x.image_url);
+            done = ok.length; failed = a.filter((x: { status?: string }) => x?.status === "failed").length;
+            ok.sort((p: { index?: number }, q: { index?: number }) => (p.index ?? 0) - (q.index ?? 0));
+            for (const x of ok) images.push(String(x.image_url));
+          }
         } catch { /* none */ }
         // A step that has not moved in 15 minutes is stalled, not working:
         // the browser tab that was generating is gone, or the process that was
@@ -160,7 +173,7 @@ export async function GET(
         const working = run.ads_step === "writing" || run.ads_step === "generating";
         const ageMs = run.last_updated_at ? Date.now() - new Date(run.last_updated_at).getTime() : 0;
         const stalled = working && ageMs > 15 * 60 * 1000;
-        return { step: run.ads_step ?? null, error: run.ads_error ?? null, prompts, done, failed, stalled };
+        return { step: run.ads_step ?? null, error: run.ads_error ?? null, prompts, done, failed, stalled, images };
       })(),
     },
     timestamps: {

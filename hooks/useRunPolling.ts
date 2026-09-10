@@ -35,7 +35,7 @@ export interface RunStatus {
     scrapedUrls: string[];
     approvedUrls: string[];
   };
-  stage4: { hero: string | null; done: number; total: number };
+  stage4: { hero: string | null; done: number; total: number; images: string[] };
   /** Stage 1 · Product — scrape JSON (see lib/product.ts), analyst text, gate state. */
   product: {
     scrape: string | null;
@@ -68,7 +68,8 @@ export interface RunStatus {
     marketPosition: MarketPosition | null;
     variantsRequestedAt: string | null;
     variantsEdited: string | null;
-    ads: { step: string | null; error: string | null; prompts: number; done: number; failed: number; stalled: boolean };
+    shopifyAdminUrl: string | null;
+    ads: { step: string | null; error: string | null; prompts: number; done: number; failed: number; stalled: boolean; images: string[] };
   };
   timestamps: {
     startedAt: string | null;
