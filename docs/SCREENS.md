@@ -289,6 +289,18 @@ Problem/Solution. One card per concept:
 
 ---
 
+### Stage 6 · Done
+
+Everything the run produced in one place, opened by default once a run is
+complete (present as soon as there are Stage 4 images). Header: product code
+and name, Download docs, Download images. A stage strip (Product, Research,
+Copy, Images, Ads with their state words, each a link) and the run cost. Then
+the same **Pricing** and **Variants** cards as Copy (fully editable, including
+Set in Shopify), **Shopify** (the push, prefilled with the saved product
+link), **Google Doc** and **Drive** side by side, the hero and eight images
+as thumbnails with an Open button, the five ads the same way, and the **Store
+fields** exactly as Shopify receives them with an Edit link back to Copy.
+
 ## 6. Settings
 
 Three blocks.
