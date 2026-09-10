@@ -28,6 +28,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const [refOverrides, setRefOverrides] = useState<Record<string, string[]>>({});
   const [genBusy, setGenBusy] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [relinking, setRelinking] = useState(false);
   const [openPrompt, setOpenPrompt] = useState<Set<number>>(new Set());
   const [aiIdx, setAiIdx] = useState<number | null>(null);
   const [aiText, setAiText] = useState("");
@@ -190,6 +191,16 @@ export default function AdsFlow({ runId }: { runId: number }) {
       setGenBusy((s) => { const n = new Set(s); n.delete(p.index); return n; });
     }
   };
+  const relink = async () => {
+    setRelinking(true); setErr(null);
+    try {
+      const r = await fetch("/api/ads/recover-from-higgsfield", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) });
+      const d = await r.json().catch(() => ({})) as { success?: boolean; error?: string; recovered?: number; unmatched?: number[] };
+      if (!d.success) { setErr(d.error || `Relink failed (${r.status})`); return; }
+      await fetchRun();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Network error"); }
+    finally { setRelinking(false); }
+  };
   const generateAll = async (onlyMissing: boolean) => {
     if (!drafts) return;
     setErr(null); setGenerating(true); stopRef.current = false;
@@ -302,6 +313,12 @@ export default function AdsFlow({ runId }: { runId: number }) {
         <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / 5 generated{images.some((im) => effVerdict(im) === "fail") ? ` · ${images.filter((im) => effVerdict(im) === "fail").length} flagged` : ""}</span>
         <div className="flex-1" />
         {doneCount > 0 && <button onClick={downloadAll} disabled={zipping} className="btn btn-sm">{zipping ? "Zipping…" : "↓ Download all"}</button>}
+        {images.some((im) => im.status === "failed") && !generating && (
+          <button onClick={relink} disabled={relinking} className="btn btn-sm"
+            title="Failed ads that finished on Higgsfield after the app gave up get their images re-linked from your Higgsfield history, at no extra cost">
+            {relinking ? "Relinking…" : "Relink from Higgsfield"}
+          </button>
+        )}
         {doneCount > 0 && <SendToDrive runId={runId} kind="ads" />}
         {anyBusy
           ? <button onClick={() => { stopRef.current = true; }} className="btn btn-sm">Stop after current</button>
