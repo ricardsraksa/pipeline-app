@@ -96,14 +96,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = await getModel("pricing");
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 8_000,
       system: SYSTEM,
       tools: [TOOL],
       tool_choice: { type: "tool", name: "submit_bundle_quantities" },
       messages: [{ role: "user", content: user }],
-    });
+    }).finalMessage();
     void recordUsage(runId, "pricing: bundle quantities", model, msg.usage);
     const block = msg.content.find((b) => b.type === "tool_use");
     const raw = block && block.type === "tool_use" ? (block.input as { quantities?: unknown }).quantities : null;

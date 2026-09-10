@@ -174,9 +174,13 @@ async function anthropicMessage(args: {
       : typeof args.user === "string"
         ? `${args.user}\n\n${nudge}`
         : [...(args.user as Exclude<Anthropic.MessageParam["content"], string>), { type: "text", text: nudge }];
+    // Streamed, not a plain create: the client timeout only runs until the
+    // response headers arrive, and a non-streamed reply sends none until the
+    // whole document is written — a 149s chief review was being cancelled at
+    // 120s on every attempt. Streamed, the timeout covers the start only.
     const msg = await withRetry(
       () =>
-        anthropic.messages.create(
+        anthropic.messages.stream(
           {
             model,
             max_tokens: budget,
@@ -184,7 +188,7 @@ async function anthropicMessage(args: {
             messages: [{ role: "user", content }],
           },
           args.timeoutMs ? { timeout: args.timeoutMs } : undefined,
-        ),
+        ).finalMessage(),
       { label: args.label },
     );
     void recordUsage(args.runId ?? null, args.label, model, msg.usage);

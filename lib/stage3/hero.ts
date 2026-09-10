@@ -276,7 +276,7 @@ export async function generateHeroPrompt(params: {
   const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<HeroPrompt> {
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 16000,
       // temperature:0 for run-to-run determinism, but only on models that still
@@ -288,7 +288,7 @@ export async function generateHeroPrompt(params: {
       // text can never break parsing (see HERO_TOOL).
       tools: [HERO_TOOL],
       tool_choice: { type: 'tool', name: 'submit_hero_prompt' },
-    })
+    }).finalMessage()
     void recordUsage(params.runId ?? null, 'stage3: hero prompt', model, msg.usage)
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') throw new Error('model did not return a hero prompt tool call')

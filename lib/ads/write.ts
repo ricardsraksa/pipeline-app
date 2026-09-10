@@ -151,14 +151,14 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   ];
 
   const call = async (extra?: string) => {
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 12000,
       system,
       tools: [TOOL],
       tool_choice: { type: "tool", name: "submit_ad_prompts" },
       messages: [{ role: "user", content: extra ? [...content, { type: "text" as const, text: extra }] : content }],
-    });
+    }).finalMessage();
     void recordUsage(runId, "stage5: ad prompts", model, msg.usage);
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return { ads: null as unknown[] | null, why: `no tool call (stop: ${msg.stop_reason})` };

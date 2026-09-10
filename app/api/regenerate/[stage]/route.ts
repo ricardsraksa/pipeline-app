@@ -113,12 +113,12 @@ export async function POST(
 
 async function ask(args: { system: string | Anthropic.TextBlockParam[]; user: string; maxTokens: number; role: ModelRole; runId?: number; label?: string }): Promise<string> {
   const model = await getModel(args.role);
-  const response = await client.messages.create({
+  const response = await client.messages.stream({
     model,
     max_tokens: args.maxTokens,
     system: args.system,
     messages: [{ role: "user", content: args.user }],
-  });
+  }).finalMessage();
   void recordUsage(args.runId ?? null, args.label ?? `regenerate ${args.role}`, model, response.usage);
   // Opus 5 thinks by default, so content[0] can be a thinking block — find the
   // text block instead of assuming it comes first.

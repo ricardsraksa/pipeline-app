@@ -100,14 +100,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = await getModel("mechanical");
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 16_000,
       system: SYSTEM,
       tools: [TOOL],
       tool_choice: { type: "tool", name: "submit_options" },
       messages: [{ role: "user", content: user }],
-    });
+    }).finalMessage();
     void recordUsage(runId, "variants: restructure", model, msg.usage);
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") {

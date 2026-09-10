@@ -138,12 +138,12 @@ export async function POST(req: NextRequest) {
     const model = await getModel("stage3Prompt");
     const call = async (feedback?: string): Promise<Parsed | null> => {
       const msgContent = feedback ? [...content, { type: "text" as const, text: feedback }] : content;
-      const message = await anthropic.messages.create({
+      const message = await anthropic.messages.stream({
         model,
         max_tokens: 16_000,
         system: SYSTEM,
         messages: [{ role: "user", content: msgContent }],
-      });
+      }).finalMessage();
       void recordUsage(Number(runId) || null, "stage3: placement", model, message.usage);
       const raw = message.content.find((b) => b.type === "text")?.text ?? "";
       const jsonMatch = raw.match(/\{[\s\S]*\}/);

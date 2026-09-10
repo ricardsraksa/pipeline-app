@@ -143,7 +143,7 @@ async function createWithRetry(
   let lastErr: unknown
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const msg = await anthropic.messages.create(body, opts?.timeout ? { timeout: opts.timeout } : undefined)
+      const msg = await anthropic.messages.stream(body, opts?.timeout ? { timeout: opts.timeout } : undefined).finalMessage()
       void recordUsage(opts?.runId ?? null, opts?.usageLabel ?? 'stage1: research', body.model, msg.usage)
       return msg
     } catch (err) {

@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     // this is the most-clicked Stage 4 call (single rewrites + bulk fix).
     const model = await getModel("stage3Edit");
     const rules = await rulesFor(category);
-    const msg = await client.messages.create({
+    const msg = await client.messages.stream({
       model,
       max_tokens: 8000,
       system: `${rules}
@@ -122,7 +122,7 @@ ${SYSTEM}`,
           ...referenceImages.map((url) => ({ type: "image" as const, source: { type: "url" as const, url } })),
         ],
       }],
-    });
+    }).finalMessage();
     void recordUsage(typeof body.run_id === "number" ? body.run_id : null, "stage3: prompt rewrite", model, msg.usage);
     const out = msg.content.find((b) => b.type === "text")?.text?.trim() ?? "";
     if (!out) {

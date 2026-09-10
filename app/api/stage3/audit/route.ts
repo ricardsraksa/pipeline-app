@@ -19,7 +19,7 @@ async function createWithRetry(body: Anthropic.MessageCreateParamsNonStreaming) 
   let lastErr: unknown = null
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return await anthropic.messages.create(body)
+      return await anthropic.messages.stream(body).finalMessage()
     } catch (err) {
       lastErr = err
       const msg = err instanceof Error ? err.message : String(err)

@@ -39,14 +39,14 @@ export async function structureStage2Copy(text: string, runId?: number): Promise
   if (!text || text.trim().length < 40) return null;
   try {
     const model = await getModel("mechanical");
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 32_000,
       // No cache_control: at ~290 tokens this prompt is far below Haiku's 4096-token
       // minimum cacheable prefix, so the marker was a silent no-op.
       system: STRUCTURE_SYSTEM,
       messages: [{ role: "user", content: `COPY KIT TO PARSE:\n\n${text}` }],
-    });
+    }).finalMessage();
     void recordUsage(runId ?? null, "stage2: structure copy", model, msg.usage);
     const raw = msg.content.find((b) => b.type === "text")?.text ?? "";
     const start = raw.indexOf("{");

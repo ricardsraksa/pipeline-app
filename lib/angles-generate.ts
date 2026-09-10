@@ -152,14 +152,14 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   // Forced tool call, one corrective retry, then a plain-JSON fallback (no
   // tool) — each failure names its reason so the error is actionable.
   const callTool = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 24000,
       system,
       tools: [ANGLES_TOOL],
       tool_choice: { type: "tool", name: "submit_angles" },
       messages: [{ role: "user", content: text }],
-    });
+    }).finalMessage();
     void recordUsage(runId, "positioning angles", model, msg.usage);
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return { raw: null, why: `no tool call (stop: ${msg.stop_reason})` };
@@ -171,12 +171,12 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
     return { raw: angles, why: "" };
   };
   const callJson = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
-    const msg = await anthropic.messages.create({
+    const msg = await anthropic.messages.stream({
       model,
       max_tokens: 24000,
       system,
       messages: [{ role: "user", content: text + "\n\nReturn ONLY a JSON array of 4 to 6 angle objects with the keys title, problem, consequence, mechanism, who, hook, why_this_angle, competitor_angle, gap. No prose, no markdown fences." }],
-    });
+    }).finalMessage();
     void recordUsage(runId, "positioning angles (json)", model, msg.usage);
     const textOut = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n");
     const m = textOut.match(/\[[\s\S]*\]/);
