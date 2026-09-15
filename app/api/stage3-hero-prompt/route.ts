@@ -1,75 +1,24 @@
-import { NextRequest } from 'next/server'
-import { anglesBlock, parseSelectedAngles } from '@/lib/angles'
-import { getRun, updateRun, recordPromptUsed } from '@/lib/db'
-import { generateHeroPrompt, HERO_SYSTEM } from '@/lib/stage3/hero'
-import { stage3ActiveSourceImages } from '@/lib/stage3/sources'
-import { generateStage3Image } from '@/lib/stage3/higgsfield'
-
+import { NextRequest } from "next/server";
 import { requireSession } from "@/lib/auth";
-// Phase 1 of hero-first Stage 4: generate ONE hero studio shot from the
-// SOURCE product photos, then stop at the hero QC gate.
-// Submit + poll image gen can take ~40s, plus the prompt call — give it room.
-export const maxDuration = 600
+import { getRun, updateRun } from "@/lib/db";
+import { stage3ActiveSourceImages } from "@/lib/stage3/sources";
+import { heroJob } from "@/lib/stage3/jobs";
+import { jobKey, startJob } from "@/lib/jobs";
 
-function safeArr(json: string | null): string[] {
-  if (!json) return []
-  try { const v = JSON.parse(json); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [] } catch { return [] }
-}
-
+// Phase 1 of hero-first Stage 4: write ONE hero prompt from the source photos
+// and generate the hero, then stop at the hero QC gate. The work runs as a
+// server-side job; this returns as soon as it has started and the page polls.
 export async function POST(req: NextRequest) {
   const denied = requireSession(req);
   if (denied) return denied;
-  const { runId } = (await req.json()) as { runId?: number }
-  if (!runId) return Response.json({ success: false, error: 'runId required' }, { status: 400 })
-
-  const run = await getRun(runId)
-  if (!run) return Response.json({ success: false, error: 'Run not found' }, { status: 404 })
-
-  // Source product photos = the references the hero is built from: uploaded +
-  // scraped, minus any the operator excluded in the source-image picker.
-  const sourceImageUrls = stage3ActiveSourceImages(run)
-
-  if (sourceImageUrls.length === 0) {
-    return Response.json({ success: false, error: 'No source product images to build a hero from' }, { status: 400 })
+  const { runId } = (await req.json()) as { runId?: number };
+  if (!runId) return Response.json({ success: false, error: "runId required" }, { status: 400 });
+  const run = await getRun(runId);
+  if (!run) return Response.json({ success: false, error: "Run not found" }, { status: 404 });
+  if (!stage3ActiveSourceImages(run).length) {
+    return Response.json({ success: false, error: "No source product images to build a hero from" }, { status: 400 });
   }
-
-  try {
-    await updateRun(runId, { status: 'generating_hero', current_step: 'Stage 4: Generating hero shot', last_updated_at: new Date().toISOString() })
-
-    const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ''
-    const copy = run.stage2_copy_edited ?? run.stage2_output ?? ''
-    const extraReferenceUrls = safeArr(run.stage3_reference_images)
-    // Audit trail: the system prompt the hero prompt-writer ran with.
-    await recordPromptUsed(runId, 'stage3_hero', HERO_SYSTEM)
-    const { hero, validation } = await generateHeroPrompt({ onePager, copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls, runId })
-
-    await updateRun(runId, {
-      stage3_hero_prompt: JSON.stringify(hero),
-      stage3_hero_validation: JSON.stringify(validation),
-      last_updated_at: new Date().toISOString(),
-    })
-
-    const imageUrl = await generateStage3Image({
-      prompt: hero.prompt,
-      model: hero.model,
-      // The model curates source_image_references (source photos + any scene
-      // extras it chose) — send exactly those to Higgsfield.
-      reference_images: hero.source_image_references.length ? hero.source_image_references : sourceImageUrls,
-      aspect_ratio: hero.aspect_ratio,
-    })
-
-    await updateRun(runId, {
-      stage3_hero_image_url: imageUrl,
-      stage3_hero_approved: 0,
-      status: 'awaiting_hero_qc',
-      current_step: 'Stage 4: Review the hero shot',
-      last_updated_at: new Date().toISOString(),
-    })
-
-    return Response.json({ success: true, hero_image_url: imageUrl, hero_prompt: hero })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    await updateRun(runId, { status: 'failed', error_message: message, last_updated_at: new Date().toISOString() }).catch(() => {})
-    return Response.json({ success: false, error: message }, { status: 500 })
-  }
+  await updateRun(runId, { status: "generating_hero", current_step: "Stage 4: Generating hero shot", error_message: null, last_updated_at: new Date().toISOString() });
+  startJob(jobKey.hero(runId), () => heroJob(runId));
+  return Response.json({ success: true, started: true });
 }

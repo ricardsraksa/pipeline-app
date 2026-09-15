@@ -1037,60 +1037,92 @@ export async function resumePipeline(runId: number): Promise<void> {
 }
 
 // ── Stuck-run watchdog ────────────────────────────────────────────────────────
-// Process-level safety net: every 2 min, find runs that have been in an active
-// status with no DB update for 8+ min — meaning the fire-and-forget pipeline
-// was killed (dev-server restart, crash) — and auto-resume them. Granular
-// resume means no work is lost. resumePipeline's own RUNNING_PIPELINES guard
-// makes this a no-op for runs still genuinely executing in this process.
+// Process-level safety net: every 2 min, find runs whose server-side work
+// stopped moving — the process that drove them died (deploy, crash) — and
+// pick them up again from what the row holds. Granular resume means no work
+// is lost. The in-process guards (RUNNING_PIPELINES, the job registry) make
+// this a no-op for runs still genuinely executing here.
+//
+// Two stale windows: the research/copy pipeline writes the row per sub-step,
+// so 8 minutes of silence means it is dead; the image jobs write per image,
+// and one image is bounded by Higgsfield's 3-minute generation timeout, so 4
+// minutes of silence means the same. The watchdog is started at boot from
+// instrumentation.ts, so a restart resumes runs without anyone opening a page.
 const WATCHDOG_STALE_MS = 8 * 60 * 1000;
+const WATCHDOG_IMAGE_STALE_MS = 4 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 2 * 60 * 1000;
 
 async function watchdogSweep(): Promise<void> {
   try {
     const result = await db.execute(
-      `SELECT id, status, last_updated_at, stage3_hero_image_url, stage3_remaining_prompts
+      `SELECT id, status, last_updated_at, stage3_hero_image_url, stage3_hero_prompt,
+              stage3_remaining_prompts, stage3_remaining_prompts_edited, ads_step, ads_prompts
        FROM runs
        WHERE status IN ('pending', 'product', 'scraping', 'stage1', 'stage2',
-                        'generating_hero', 'generating_remaining')`,
+                        'generating_hero', 'generating_remaining')
+          OR ads_step IN ('writing', 'generating')`,
     );
-    const cutoff = Date.now() - WATCHDOG_STALE_MS;
     const rows = result.rows as unknown as {
       id: number; status: string | null; last_updated_at: string | null;
-      stage3_hero_image_url: string | null; stage3_remaining_prompts: string | null;
+      stage3_hero_image_url: string | null; stage3_hero_prompt: string | null;
+      stage3_remaining_prompts: string | null; stage3_remaining_prompts_edited: string | null;
+      ads_step: string | null; ads_prompts: string | null;
     }[];
+    const nowMs = Date.now();
+    const { startJob, jobKey, jobRunning } = await import("./jobs");
     for (const row of rows) {
       if (!row.last_updated_at) continue;
-      if (new Date(row.last_updated_at).getTime() >= cutoff) continue;
-      if (RUNNING_PIPELINES.has(row.id)) continue; // still running here — leave it
+      const age = nowMs - new Date(row.last_updated_at).getTime();
 
-      // Stage 3 statuses aren't part of resumePipeline (the hero flow is
-      // user-triggered API routes). A run wedged there means the route died
-      // mid-generation — flip it back to the nearest recoverable gate so the
-      // UI offers the next action instead of an eternal spinner.
+      // Stage 4 image jobs.
       if (row.status === "generating_hero" || row.status === "generating_remaining") {
-        const next =
-          row.status === "generating_remaining" && row.stage3_remaining_prompts ? "awaiting_qc"
-          : row.stage3_hero_image_url ? "awaiting_hero_qc"
-          : "awaiting_user";
-        console.warn(`[watchdog] run ${row.id} stale in ${row.status} — flipping to ${next}`);
-        updateRun(row.id, {
-          status: next,
-          current_step: null,
-          error_message: "Stage 4 generation was interrupted (server restart) — pick up from here.",
-          last_updated_at: new Date().toISOString(),
-        }).catch((err) => console.error(`[watchdog] flip ${row.id} failed:`, err));
+        if (age < WATCHDOG_IMAGE_STALE_MS) continue;
+        const key = row.status === "generating_hero" ? jobKey.hero(row.id) : jobKey.remaining(row.id);
+        if (jobRunning(key)) continue;
+        const { heroJob, remainingPromptsJob, remainingBatchJob } = await import("./stage3/jobs");
+        const hasPrompts = Boolean(row.stage3_remaining_prompts_edited ?? row.stage3_remaining_prompts);
+        console.warn(`[watchdog] run ${row.id} stale in ${row.status} — resuming`);
+        if (row.status === "generating_hero") startJob(key, () => heroJob(row.id));
+        else if (hasPrompts) startJob(key, () => remainingBatchJob(row.id));
+        else startJob(key, () => remainingPromptsJob(row.id, !row.stage3_hero_image_url));
         continue;
       }
 
-      console.warn(`[watchdog] run ${row.id} stale — auto-resuming`);
-      resumePipeline(row.id).catch((err) =>
-        console.error(`[watchdog] resume ${row.id} failed:`, err),
-      );
+      // Stage 5 (runs after the pipeline is "completed").
+      if (row.ads_step === "writing" || row.ads_step === "generating") {
+        if (age < WATCHDOG_IMAGE_STALE_MS) continue;
+        const key = jobKey.ads(row.id);
+        if (jobRunning(key)) continue;
+        console.warn(`[watchdog] run ${row.id} stale in ads ${row.ads_step} — resuming`);
+        if (row.ads_step === "generating" && row.ads_prompts) {
+          const { adsBatchJob } = await import("./ads/jobs");
+          startJob(key, () => adsBatchJob(row.id));
+        } else {
+          // The brief writer died: release the claim and take it again.
+          startJob(key, async () => {
+            await updateRun(row.id, { ads_step: null, last_updated_at: new Date().toISOString() });
+            const { maybeStartAds } = await import("./ads/write");
+            await maybeStartAds(row.id);
+          });
+        }
+        if (!["pending", "product", "scraping", "stage1", "stage2"].includes(row.status ?? "")) continue;
+      }
+
+      // The research/copy pipeline.
+      if (["pending", "product", "scraping", "stage1", "stage2"].includes(row.status ?? "")) {
+        if (age < WATCHDOG_STALE_MS) continue;
+        if (RUNNING_PIPELINES.has(row.id)) continue;
+        console.warn(`[watchdog] run ${row.id} stale — auto-resuming`);
+        resumePipeline(row.id).catch((err) => console.error(`[watchdog] resume ${row.id} failed:`, err));
+      }
     }
   } catch (err) {
     console.error("[watchdog] sweep failed:", err);
   }
 }
+
+/** One sweep on demand (boot, tests). */
+export { watchdogSweep };
 
 declare global {
   // eslint-disable-next-line no-var

@@ -419,9 +419,29 @@ export default function Stage3HeroFlow({
     );
   }
 
-  /* ── generating_remaining (writing the 8 prompts) ───────────────────── */
+  /* ── generating_remaining: writing the 8 prompts, or the batch running ── */
   if (status === "generating_remaining") {
-    return <Spinner label="Writing the 8 prompts…" />;
+    const batchPrompts = safeParse<RemainingPrompt[]>(run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts, []);
+    if (!batchPrompts.length) return <Spinner label="Writing the 8 prompts…" />;
+    const batchImages = safeParse<RemImage[]>(run.stage3_remaining_images, []);
+    const grid: (RemImage | null)[] = batchPrompts.map((p) => batchImages.find((im) => im.index === p.index) ?? null);
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Generating the {batchPrompts.length} images…</h3>
+          <button
+            onClick={() => { void fetch("/api/stage3/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }}
+            className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition"
+          >
+            ■ Stop after current
+          </button>
+        </div>
+        <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
+          {grid.filter(Boolean).length} of {grid.length} done · runs on the server, you can leave this page
+        </p>
+        <GenGrid heroUrl={heroUrl} images={grid} />
+      </div>
+    );
   }
 
   /* ── PROMPT QC GATE (awaiting_qc, 8 prompts) ────────────────────────── */
@@ -499,113 +519,23 @@ export default function Stage3HeroFlow({
     const generateAll = async () => {
       setErr(null);
       setBusy("generate-8");
-      const results: (RemImage | null)[] = saved.map((p) => doneByIndex.get(p.index) ?? null);
-      setGenImages(results);
-      // Persist any prompt edits first.
-      await fetch(`/api/runs/${runId}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stage3_remaining_prompts_edited: JSON.stringify(saved) }),
-      }).catch((e) => { console.error("persist prompt edits failed:", e); setErr("Couldn't save your prompt edits — generation continues with the edited text, but a refresh may show stale prompts."); });
-
-      const productDesc = run.product_description ?? run.product_name ?? "";
-      stopRef.current = false;
-
-      // Generate one image: call Higgsfield, audit it, store + persist the
-      // result. Pulled out of the loop so a worker pool can run several at once.
-      const processOne = async (i: number) => {
-        const p = saved[i];
-        try {
-          // Reference the image(s) this prompt was built around — the operator's
-          // per-image selection when set, else the prompt's curated defaults.
-          const refs = refsFor(p, effRefOverrides, heroUrl);
-          const gen = await fetch("/api/stage3/generate", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: p.prompt, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
-          }).then((r) => r.json());
-          if (!gen.success) throw new Error(gen.error || "generation failed");
-
-          let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
-          let issues: string[] = [];
-          try {
-            const audit = await fetch("/api/stage3/audit", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: p.prompt, product_description: productDesc, overlay_text_used: p.overlay_text || null, reference_urls: refs, run_id: runId }),
-            }).then((r) => r.json());
-            if (audit.success) {
-              verdict = audit.result?.verdict === "pass" ? "pass" : "fail";
-              issues = audit.result?.issues ?? [];
-            } else {
-              console.error("audit failed:", audit.error);
-              issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`];
-            }
-          } catch (e) {
-            console.error("audit call failed:", e);
-            issues = ["Audit unavailable"];
-          }
-
-          results[i] = { index: p.index, category: p.category, image_url: gen.image_url, status: "done", verdict, issues };
-        } catch (e) {
-          results[i] = { index: p.index, category: p.category, image_url: "", status: "failed", error: e instanceof Error ? e.message : String(e) };
-        }
-        setGenImages([...results]);
-        // Persist THIS image immediately — a closed tab or crash mid-batch
-        // loses nothing, and the loop resumes from the next missing image. The
-        // server upsert is atomic, so concurrent persists don't clobber.
-        await fetch(`/api/runs/${runId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "stage3_image_upsert", image: results[i] }),
-        }).catch((e) => console.error(`persist image #${p.index} failed:`, e));
-      };
-
-      // Work queue of indices still needing a generation (resume skips the ones
-      // already done). A pool of CONCURRENCY workers drains it, so up to 3
-      // images generate at once. "Stop after current" lets in-flight images
-      // finish but starts no new ones — workers exit when stopRef flips.
-      const CONCURRENCY = 3;
-      const queue = saved.map((_, i) => i).filter((i) => results[i]?.status !== "done");
-      const worker = async () => {
-        for (;;) {
-          if (stopRef.current) break;
-          const i = queue.shift();
-          if (i === undefined) break;
-          await processOne(i);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
-      const allSettled = results.every((r) => r !== null);
-      if (allSettled) {
-        // Authoritative write: persist the full images array alongside the
-        // status flip, so a completed run always has all 8 even if an individual
-        // per-image save was lost to a concurrent-write race mid-generation.
-        await fetch(`/api/runs/${runId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "completed", stage3_remaining_images: JSON.stringify(results) }),
-        }).catch((e) => { console.error("complete status failed:", e); setErr("Images generated, but marking the run complete failed — hit Refresh."); });
+      try {
+        // The batch runs on the server: prompt edits are saved with it, the
+        // page polls while the status is generating_remaining, and closing the
+        // tab changes nothing.
+        const res = await fetch("/api/stage3/generate-batch", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId, prompts: saved }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!data.success) setErr(data.error ?? `Request failed (${res.status})`);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Network error");
+      } finally {
+        setBusy(null);
+        await fetchRun();
       }
-      setBusy(null);
-      await fetchRun();
     };
-
-    // Mid-generation view
-    if (busy === "generate-8") {
-      return (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Generating the 8 images…</h3>
-            <button
-              onClick={() => { stopRef.current = true; }}
-              className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95"
-            >
-              ■ Stop after current
-            </button>
-          </div>
-          <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
-            {genImages.filter(Boolean).length} of {genImages.length} done · up to 3 at a time · {heroUrl ? "all referencing the approved hero" : "all referencing your source product photos"}
-          </p>
-          <GenGrid heroUrl={heroUrl} images={genImages} />
-        </div>
-      );
-    }
 
     return (
       <div className="space-y-4">
@@ -1315,40 +1245,16 @@ function CompletedReview({
       // override; else the prompt's curated defaults.
       const refs = refsExplicit?.length ? refsExplicit : refsFor(p, refOverrides, heroUrl);
       if (refsExplicit?.length) saveRefOverride(p.index, refsExplicit);
-      const gen = await fetch("/api/stage3/generate", {
+      // Generate, audit and store happen server-side in one call, so a tab
+      // that closes mid-way loses nothing; the reply is the stored image.
+      const res = await fetch("/api/stage3/regenerate-one", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: newPromptText, model: p.model, reference_images: refs, aspect_ratio: p.aspect_ratio }),
-      }).then((r) => r.json());
-      if (!gen.success) throw new Error(gen.error || "generation failed");
-
-      let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
-      let issues: string[] = [];
-      try {
-        const audit = await fetch("/api/stage3/audit", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image_url: gen.image_url, category: p.category, prompt_used: newPromptText, product_description: productDesc, overlay_text_used: p.overlay_text || null, reference_urls: refs, run_id: runId }),
-        }).then((r) => r.json());
-        if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
-        else { console.error("audit failed:", audit.error); issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`]; }
-      } catch (e) {
-        console.error("audit call failed:", e);
-        issues = ["Audit unavailable"];
-      }
-
-      // Functional update + per-image persist, so a concurrent regeneration of
-      // another tile can't overwrite this one with a stale snapshot.
-      setImages((prev) => {
-        const cur = prev[i];
-        // Keep the replaced image (and the prompt that produced it) so the
-        // operator can go back to it. Newest first, capped at 5 versions.
-        const history = [
-          ...(cur.image_url ? [{ image_url: cur.image_url, prompt: p.prompt }] : []),
-          ...(cur.history ?? []),
-        ].slice(0, 5);
-        const updated: RemImage = { index: cur.index, category: cur.category, image_url: gen.image_url, status: "done", verdict, issues, user_override: null, history };
-        persistImage(updated);
-        return prev.map((x, j) => (j === i ? updated : x));
+        body: JSON.stringify({ runId, index: p.index, prompt: newPromptText, reference_images: refs }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success || !data.image) throw new Error(data.error || `Request failed (${res.status})`);
+      const updated = data.image as RemImage;
+      setImages((prev) => prev.map((x, j) => (j === i ? updated : x)));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setImages((prev) => {
@@ -1372,18 +1278,26 @@ function CompletedReview({
       const targets = images
         .map((im, i) => ({ im, i }))
         .filter(({ im }) => im.status === "failed" || effVerdict(im) === "fail")
-        .map(({ im, i }) => ({ i, text: drafts[i] ?? promptFor(im)?.prompt ?? "" }))
+        .map(({ im, i }) => ({ i, index: im.index, text: drafts[i] ?? promptFor(im)?.prompt ?? "" }))
         .filter((t) => t.text);
-      const CONCURRENCY = 3;
-      const queue = [...targets];
-      const worker = async () => {
-        for (;;) {
-          const t = queue.shift();
-          if (!t) break;
-          await regenerate(t.i, t.text, productDescription, refsByIdx?.[t.i]);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+      if (!targets.length) return;
+      const promptTexts: Record<number, string> = {};
+      const refs: Record<number, string[]> = {};
+      for (const t of targets) {
+        promptTexts[t.index] = t.text;
+        if (refsByIdx?.[t.i]?.length) refs[t.index] = refsByIdx[t.i];
+      }
+      // One server-side batch over these indices; the page follows it by
+      // polling (the status flips to generating_remaining and back).
+      const res = await fetch("/api/stage3/generate-batch", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, indices: targets.map((t) => t.index), promptTexts, refs }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success) { setPersistErr(data.error ?? `Request failed (${res.status})`); return; }
+      // The parent switches to the generating view on the next poll; reload
+      // so it happens now rather than on the next tick.
+      window.location.reload();
     } finally {
       setBulkRunning(false);
     }

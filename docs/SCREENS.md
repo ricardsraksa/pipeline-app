@@ -228,17 +228,23 @@ Several consecutive states, one after the other:
 
 1. **Start** — choose which source photos may be used as references (click to
    exclude/include), then "Generate hero" or "Skip hero — use source images".
-2. **Generating the hero.**
+2. **Generating the hero** — on the server; the page can be closed.
 3. **Review the hero** — the generated hero shot, fullscreen view, the prompt
    behind it (editable), "Edit with AI" with an instruction box, "Regenerate
    hero", "Approve hero — generate rest".
-4. **Writing the 8 prompts.**
+4. **Writing the 8 prompts** — on the server.
 5. **Review the 8 prompts** — one card per image showing what the image will
    show: a plain summary, the scene, the benefit it communicates, the overlay
    text, and which reference images it uses. Per card: edit the full prompt, or
    rewrite it with an AI instruction. Plus extra reference images (scene/style)
    that the prompt writer may attach. Then "Generate 8 images".
-6. **Generating** — progress per image, with "Stop after current".
+6. **Generating** — a server-side job, three images at a time, each saved
+   the moment it settles; the page shows progress from the run and can be
+   closed. "Stop after current" finishes the in-flight images and starts no
+   more. If the server restarts mid-batch the watchdog resumes it within
+   about four minutes from the images already saved. When the last image
+   lands the run is completed, the sections are placed and the ad briefs
+   start, all without the page.
 7. **Complete** — the hero plus the 8 images in a grid, each openable fullscreen,
    each with a pass/fail verdict from the automatic audit and the reasons, with
    the ability to override a verdict, regenerate one image, or bulk-fix all
@@ -278,8 +284,9 @@ Problem/Solution. One card per concept:
   Stage 4 images, the operator's uploads and every scraped photo; tick to
   include). The writer reuses the Stage 4 scenes so the ads match the product
   page, and picks the relevant one per ad.
-- "Generate 5 ads" runs them two at a time through the same generator and
-  auditor as Stage 4. Each card then shows its 1:1 image with the audit
+- "Generate 5 ads" runs them two at a time on the server through the same
+  generator and auditor as Stage 4 (the page can be closed; a restart
+  resumes the batch). Single regenerations also run server-side end to end. Each card then shows its 1:1 image with the audit
   verdict (click to override), Regenerate (with an instruction, pre-filled
   with the audit issues), download, Previous (last version).
 - Top bar: Download all (zip), Send to Drive · Image Ads (a subfolder named

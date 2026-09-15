@@ -5,6 +5,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 
 import { requireSession } from "@/lib/auth";
 import { validateBundles } from "@/lib/pricing";
+import { upsertAdImage, upsertStage3Image } from "@/lib/stage3/upsert";
 import { validateMarketPosition } from "@/lib/market";
 import { assertPublicUrl } from "@/lib/ssrf";
 // A stage2_copy edit re-derives the structured JSON via a (small) model call,
@@ -214,35 +215,9 @@ export async function PATCH(
     if (!image || typeof image.index !== "number") {
       return Response.json({ error: "image with numeric index required" }, { status: 400 });
     }
-    // Two workers generate ads at once, so this read-modify-write can collide.
-    // Retry on a busy database, the same way the Stage 4 upsert below does; the
-    // batch also writes the whole array at the end, which repairs a lost update.
-    let arr: Array<{ index?: number }> = [];
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const row = await db.execute({ sql: "SELECT ads_images FROM runs WHERE id = ?", args: [Number(id)] });
-        arr = [];
-        try {
-          const raw = (row.rows[0] as unknown as { ads_images: string | null })?.ads_images;
-          const parsed = raw ? JSON.parse(raw) : [];
-          if (Array.isArray(parsed)) arr = parsed;
-        } catch { /* treat unparseable as empty */ }
-        const i = arr.findIndex((x) => x?.index === image.index);
-        if (i >= 0) arr[i] = image;
-        else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
-        const extra: string[] = [];
-        const args: (string | number | null)[] = [JSON.stringify(arr)];
-        if (typeof (body as { ads_step?: unknown }).ads_step === "string") { extra.push("ads_step = ?"); args.push(String((body as { ads_step?: string }).ads_step)); }
-        args.push(new Date().toISOString(), Number(id));
-        await db.execute({ sql: `UPDATE runs SET ads_images = ?${extra.length ? ", " + extra.join(", ") : ""}, last_updated_at = ? WHERE id = ?`, args });
-        break;
-      } catch (e) {
-        const busy = e instanceof Error && /SQLITE_BUSY|database is locked/i.test(e.message);
-        if (!busy || attempt >= 4) throw e;
-        await new Promise((r) => setTimeout(r, 80 * (attempt + 1)));
-      }
-    }
-    return Response.json({ success: true, images: arr });
+    const step = typeof (body as { ads_step?: unknown }).ads_step === "string" ? String((body as { ads_step?: string }).ads_step) : undefined;
+    const images = await upsertAdImage(Number(id), image as { index: number }, step);
+    return Response.json({ success: true, images });
   }
 
   // Merge a single Stage 3 image into stage3_remaining_images server-side.
@@ -254,41 +229,7 @@ export async function PATCH(
     if (!image || typeof image.index !== "number") {
       return Response.json({ error: "image with numeric index required" }, { status: 400 });
     }
-    // Read-modify-write via plain db.execute — the same reliable path every
-    // other write uses. The previous db.transaction("write") (interactive
-    // transaction) proved unreliable against the remote database: writes failed
-    // silently, so generated images never persisted and every run stalled at
-    // awaiting_qc with an empty stage3_remaining_images. Generation runs a few
-    // images at once, so two saves can race and one lost update is possible; the
-    // client's authoritative full-array write on completion self-heals that.
-    let images: Array<{ index?: number }> = [];
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const row = await db.execute({
-          sql: "SELECT stage3_remaining_images FROM runs WHERE id = ?",
-          args: [Number(id)],
-        });
-        let arr: Array<{ index?: number }> = [];
-        try {
-          const raw = (row.rows[0] as unknown as { stage3_remaining_images: string | null })?.stage3_remaining_images;
-          const parsed = raw ? JSON.parse(raw) : [];
-          if (Array.isArray(parsed)) arr = parsed;
-        } catch { /* treat unparseable as empty */ }
-        const i = arr.findIndex((x) => x?.index === image.index);
-        if (i >= 0) arr[i] = image;
-        else { arr.push(image); arr.sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); }
-        await db.execute({
-          sql: "UPDATE runs SET stage3_remaining_images = ?, last_updated_at = ? WHERE id = ?",
-          args: [JSON.stringify(arr), new Date().toISOString(), Number(id)],
-        });
-        images = arr;
-        break;
-      } catch (e) {
-        const busy = e instanceof Error && /SQLITE_BUSY|database is locked/i.test(e.message);
-        if (busy && attempt < 4) { await new Promise((r) => setTimeout(r, 50 * (attempt + 1))); continue; }
-        throw e;
-      }
-    }
+    const images = await upsertStage3Image(Number(id), image as { index: number });
     return Response.json({ success: true, images });
   }
 
@@ -563,20 +504,8 @@ export async function PATCH(
   // is asking for attention on Home instead of sitting silently completed.
   if (body.status === "completed") {
     void (async () => {
-      try {
-        const claim = await db.execute({
-          sql: `UPDATE runs SET ads_step = 'writing', last_updated_at = ?
-                WHERE id = ? AND ads_step IS NULL AND ads_prompts IS NULL AND ads_error IS NULL`,
-          args: [new Date().toISOString(), Number(id)],
-        });
-        if (!claim.rowsAffected) return;
-        const { generateAdPrompts } = await import("@/lib/ads/write");
-        await generateAdPrompts(Number(id));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[ads] auto-write for run ${id} failed:`, message);
-        await updateRun(Number(id), { ads_step: null, ads_error: message, last_updated_at: new Date().toISOString() }).catch(() => {});
-      }
+      const { maybeStartAds } = await import("@/lib/ads/write");
+      await maybeStartAds(Number(id));
     })();
   }
 

@@ -58,8 +58,9 @@ export default function AdsFlow({ runId }: { runId: number }) {
   }, [runId]);
   useEffect(() => { imagesRef.current = images; }, [images]);
   useEffect(() => { void fetchRun(); }, [fetchRun]);
+  // Poll while the server is writing the briefs or generating the ads.
   useEffect(() => {
-    if (run?.ads_step !== "writing") return;
+    if (run?.ads_step !== "writing" && run?.ads_step !== "generating") return;
     const t = setInterval(fetchRun, 4000);
     return () => clearInterval(t);
   }, [run?.ads_step, fetchRun]);
@@ -155,34 +156,17 @@ export default function AdsFlow({ runId }: { runId: number }) {
   /* ── generate ──────────────────────────────────────────────────────── */
   const generateOne = async (p: AdPrompt, promptText: string, keepHistoryOf?: AdImage) => {
     setGenBusy((s) => new Set(s).add(p.index));
-    const refs = refsFor(p);
     try {
-      const gen = await fetch("/api/stage3/generate", {
+      // Generate, audit and store happen server-side in one call, so a tab
+      // that closes mid-way loses nothing; the reply is the stored ad.
+      const res = await fetch("/api/ads/regenerate-one", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptText, model: p.model || "gpt_image_2", reference_images: refs, aspect_ratio: "1:1" }),
-      }).then((r) => r.json());
-      if (!gen.success) throw new Error(gen.error || "generation failed");
-      let verdict: "pass" | "fail" | undefined;   // unset = audit never completed
-      let issues: string[] = [];
-      try {
-        const audit = await fetch("/api/stage3/audit", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          // Fidelity is judged against real product photos only: the picked
-          // references include Stage 4 scenes, and the auditor treats every
-          // reference as "the real product", so a scene with a model in it
-          // corrupted the comparison.
-          body: JSON.stringify({ image_url: gen.image_url, category: `ad_${p.concept}`, prompt_used: promptText, product_description: productDesc, overlay_text_used: p.headline || null, reference_urls: refs.filter((u) => productRefs.has(u)), run_id: runId }),
-        }).then((r) => r.json());
-        if (audit.success) { verdict = audit.result?.verdict === "pass" ? "pass" : "fail"; issues = audit.result?.issues ?? []; }
-        else issues = [`Audit unavailable${audit.error ? `: ${String(audit.error).slice(0, 120)}` : ""}`];
-      } catch { issues = ["Audit unavailable"]; }
-      const history = [
-        ...(keepHistoryOf?.image_url ? [{ image_url: keepHistoryOf.image_url, prompt: p.prompt }] : []),
-        ...(keepHistoryOf?.history ?? []),
-      ].slice(0, 5);
-      const updated: AdImage = { index: p.index, concept: p.concept, image_url: gen.image_url, status: "done", verdict, issues, user_override: null, history };
+        body: JSON.stringify({ runId, index: p.index, prompt: promptText, reference_images: refsFor(p) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success || !data.image) throw new Error(data.error || `Request failed (${res.status})`);
+      const updated = data.image as AdImage;
       setImages((prev) => [...prev.filter((x) => x.index !== p.index), updated].sort((a, b) => a.index - b.index));
-      await persistImage(updated);
     } catch (e) {
       const failed: AdImage = { index: p.index, concept: p.concept, image_url: keepHistoryOf?.image_url ?? "", status: "failed", error: e instanceof Error ? e.message : String(e), history: keepHistoryOf?.history };
       setImages((prev) => [...prev.filter((x) => x.index !== p.index), failed].sort((a, b) => a.index - b.index));
@@ -195,7 +179,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
     setRelinking(true); setErr(null);
     try {
       const r = await fetch("/api/ads/recover-from-higgsfield", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) });
-      const d = await r.json().catch(() => ({})) as { success?: boolean; error?: string; recovered?: number; unmatched?: number[] };
+      const d = await r.json().catch(() => ({})) as { success?: boolean; error?: string };
       if (!d.success) { setErr(d.error || `Relink failed (${r.status})`); return; }
       await fetchRun();
     } catch (e) { setErr(e instanceof Error ? e.message : "Network error"); }
@@ -203,23 +187,23 @@ export default function AdsFlow({ runId }: { runId: number }) {
   };
   const generateAll = async (onlyMissing: boolean) => {
     if (!drafts) return;
-    setErr(null); setGenerating(true); stopRef.current = false;
-    await patch({ ads_prompts_edited: JSON.stringify(drafts), ads_step: "generating" });
-    const targets = drafts.filter((p) => !onlyMissing || !images.some((im) => im.index === p.index && im.status === "done" && im.image_url));
-    const queue = [...targets];
-    const worker = async () => { while (queue.length && !stopRef.current) { const p = queue.shift()!; await generateOne(p, p.prompt); } };
-    await Promise.all([worker(), worker()]);
-    // The step reflects what actually happened. Marking "done" unconditionally
-    // reported a finished stage after a Stop, and after a batch where every
-    // generation failed. An authoritative write of the whole array also repairs
-    // any per-image save lost to two workers upserting at once.
-    const finished = imagesRef.current.filter((im) => im.status === "done" && im.image_url).length;
-    await patch({
-      ads_images: JSON.stringify(imagesRef.current),
-      ads_step: finished > 0 ? "done" : "review",
-    });
-    setGenerating(false);
-    await fetchRun();
+    setErr(null); setGenerating(true);
+    try {
+      // The batch runs on the server; the page polls while ads_step is
+      // "generating". "Regenerate all" names every index so finished ads are
+      // redone too; otherwise only the missing ones are generated.
+      const res = await fetch("/api/ads/generate-batch", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId, prompts: drafts, ...(onlyMissing ? {} : { indices: drafts.map((p) => p.index) }) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success) setErr(data.error ?? `Request failed (${res.status})`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setGenerating(false);
+      await fetchRun();
+    }
   };
   const regenerate = async (p: AdPrompt, useAi: boolean) => {
     const cur = images.find((im) => im.index === p.index);
@@ -290,7 +274,8 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const stalled = (run.ads_step === "writing" || run.ads_step === "generating")
     && !generating && !writing
     && Boolean(run.last_updated_at) && Date.now() - new Date(run.last_updated_at as string).getTime() > 15 * 60 * 1000;
-  const anyBusy = generating || genBusy.size > 0;
+  const serverBatch = run.ads_step === "generating" && !stalled;
+  const anyBusy = generating || genBusy.size > 0 || serverBatch;
 
   if (run.status !== "completed" && !drafts) {
     return <p className="text-[13px] text-[var(--color-text-2)]">After Stage 4.</p>;
@@ -321,7 +306,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
         )}
         {doneCount > 0 && <SendToDrive runId={runId} kind="ads" />}
         {anyBusy
-          ? <button onClick={() => { stopRef.current = true; }} className="btn btn-sm">Stop after current</button>
+          ? <button onClick={() => { void fetch("/api/ads/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }} className="btn btn-sm">Stop after current</button>
           : doneCount === 0
             ? <button onClick={() => generateAll(false)} className="btn btn-primary">Generate 5 ads</button>
             : doneCount < 5

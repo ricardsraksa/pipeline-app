@@ -20,6 +20,7 @@ import AdsFlow from "@/components/AdsFlow";
 import EditableOutput from "@/components/EditableOutput";
 import Stage2Shopify from "@/components/Stage2Shopify";
 import ShopifyFill from "@/components/ShopifyFill";
+import PushAll from "@/components/PushAll";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
@@ -868,9 +869,11 @@ export default function RunPage() {
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Done</h1>
               <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.meta.productCode ? `${run.meta.productCode} · ` : ""}{displayName}</span>
               <div className="flex-1" />
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
                 <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>
+                <PushAll runId={runId} productUrl={shopifyUrl ?? run.meta.shopifyProductUrl ?? null} hasDocs={Boolean(outputs.stage2Json)}
+                  hasImages={imagesReady} hasAds={(run.meta.ads?.done ?? 0) > 0} onDone={() => window.dispatchEvent(new Event("run:changed"))} />
               </div>
             </div>
 

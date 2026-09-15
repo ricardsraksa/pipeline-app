@@ -6,7 +6,7 @@
 // image is generated.
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
-import { getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
+import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
@@ -215,4 +215,23 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     last_updated_at: new Date().toISOString(),
   });
   return prompts;
+}
+
+// Stage 4 finishing is the cue to write the five ad briefs, once per run. The
+// conditional UPDATE is the claim, so the PATCH route and the server-side
+// batch can both call this without writing the briefs twice. Never throws.
+export async function maybeStartAds(runId: number): Promise<void> {
+  try {
+    const claim = await db.execute({
+      sql: `UPDATE runs SET ads_step = 'writing', last_updated_at = ?
+            WHERE id = ? AND ads_step IS NULL AND ads_prompts IS NULL AND ads_error IS NULL`,
+      args: [new Date().toISOString(), runId],
+    });
+    if (!claim.rowsAffected) return;
+    await generateAdPrompts(runId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[ads] auto-write for run ${runId} failed:`, message);
+    await updateRun(runId, { ads_step: null, ads_error: message, last_updated_at: new Date().toISOString() }).catch(() => {});
+  }
 }
