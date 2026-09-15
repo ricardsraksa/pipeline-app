@@ -1,7 +1,10 @@
 // Product codes (P58, P59, …) name the Google Doc tab and the Drive folder, so
 // they must continue the operator's own sequence rather than restart it. The
-// next code is the highest number already in use plus one — counting both the
-// app's runs and the master doc's tabs, since either can be ahead of the other.
+// sequence is the app's runs: the next code is the highest run code plus one.
+// The master doc is consulted only to step over a collision — a tab that
+// already carries that exact number (a product made outside the app) — never
+// to set the number, because one stray tab titled "P92" would otherwise drag
+// every new run up to P93.
 
 import { db } from "@/lib/db";
 import { fetchDocTabs, googleDocConfigured } from "@/lib/google/docs";
@@ -31,23 +34,25 @@ async function highestInRuns(): Promise<number> {
   }
 }
 
-/** Highest product number among the master doc's tabs (0 when unavailable). */
-async function highestInDoc(): Promise<number> {
-  if (!googleDocConfigured()) return 0;
+/** Product numbers already used as tab titles in the master doc (empty when unavailable). */
+async function numbersInDoc(): Promise<Set<number>> {
+  const out = new Set<number>();
+  if (!googleDocConfigured()) return out;
   try {
-    let max = 0;
     for (const t of await fetchDocTabs()) {
       const n = codeNumber(t.tabProperties?.title);
-      if (n && n > max) max = n;
+      if (n) out.add(n);
     }
-    return max;
   } catch {
-    return 0;
+    // The doc is a collision check, not the source of the sequence.
   }
+  return out;
 }
 
-/** The next code in the sequence, e.g. "P68". Never throws. */
+/** The next code in the sequence, e.g. "P75". Never throws. */
 export async function nextProductCode(): Promise<string> {
-  const [runs, doc] = await Promise.all([highestInRuns(), highestInDoc()]);
-  return `P${Math.max(runs, doc) + 1}`;
+  const [runs, taken] = await Promise.all([highestInRuns(), numbersInDoc()]);
+  let n = runs + 1;
+  while (taken.has(n)) n += 1;
+  return `P${n}`;
 }

@@ -41,6 +41,8 @@ The only screen visible when logged out. Everything else redirects here.
 
 ## 3. Home
 
+Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box, New run. The product code on each row is editable in place: type the number, the P is added.
+
 The run inbox. Three groups, each with a count:
 
 - **Needs you** — runs stopped at a gate or failed. Each row carries a short
