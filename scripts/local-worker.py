@@ -34,7 +34,11 @@ import importlib.util
 
 APP_URL = os.environ.get("PIPELINE_APP_URL", "https://pipeline-app-6icd.onrender.com").rstrip("/")
 POLL_SECONDS = 20
-STATE_FILE = Path.home() / "Desktop" / "scraped" / ".worker-state.json"
+# State lives outside ~/Desktop: that folder is iCloud-synced on this Mac, and
+# a background process can be handed an empty file there after a reboot.
+WORKER_HOME = Path.home() / ".pipeline-worker"
+STATE_FILE = WORKER_HOME / "state.json"
+LEGACY_STATE_FILE = Path.home() / "Desktop" / "scraped" / ".worker-state.json"
 # Fail fast: the operator would rather scrape it by hand than have the worker
 # grind for hours. A page gets a couple of quick retries over ~3 minutes and is
 # then left alone, with the manual command already on the run page.
@@ -223,6 +227,11 @@ def run_once(app: App, scraper) -> int:
 
 def main() -> None:
     once = "--once" in sys.argv
+    log("worker starting")
+    WORKER_HOME.mkdir(parents=True, exist_ok=True)
+    if not STATE_FILE.exists() and LEGACY_STATE_FILE.exists():
+        try: STATE_FILE.write_bytes(LEGACY_STATE_FILE.read_bytes())
+        except OSError: pass
     # The scraper file has a hyphen in its name; load it by path.
     spec = importlib.util.spec_from_file_location("supplier_scrape", Path(__file__).resolve().parent / "supplier-scrape.py")
     scraper = importlib.util.module_from_spec(spec)
@@ -231,7 +240,26 @@ def main() -> None:
 
     here = Path(__file__).resolve().parent
     watched = [here / "local-worker.py", here / "supplier-scrape.py"]
-    stamp = [p.stat().st_mtime for p in watched]
+    # Installed copy (launchd runs ~/.pipeline-worker via run-worker.sh): also
+    # watch the repo originals, so an update there restarts the worker and the
+    # launcher copies it in. stat() works on an iCloud placeholder too.
+    src = os.environ.get("PIPELINE_WORKER_SRC")
+    origin = [Path(src) / "local-worker.py", Path(src) / "supplier-scrape.py"] if src else []
+
+    def mtimes(paths):
+        out = []
+        for p in paths:
+            try: out.append(p.stat().st_mtime)
+            except OSError: out.append(None)
+        return out
+    stamp = mtimes(watched)
+    # A fresh install is seeded from the repo, so start from "in sync" only when
+    # the contents match; otherwise the first loop pulls the update in.
+    def same(a, b):
+        try: return a.read_bytes() == b.read_bytes()
+        except OSError: return True     # unreadable right now: do not churn
+    origin_stamp = mtimes(origin) if all(same(a, b) for a, b in zip(watched, origin)) else [None] * len(origin)
+    update_warned = False
 
     app = App()
     while True:
@@ -259,9 +287,30 @@ def main() -> None:
             log(f"poll failed — {e}")
         if once:
             return
-        if [p.stat().st_mtime for p in watched] != stamp:
+        if mtimes(watched) != stamp:
             log("source changed — restarting")
             os.execv(sys.executable, [sys.executable] + sys.argv)
+        if origin and mtimes(origin) != origin_stamp:
+            # The repo copy changed: pull it into this folder and restart. Only
+            # this process can do that — macOS lets python read ~/Desktop but
+            # not the launcher's zsh/cp. A copy that reads back empty or does
+            # not compile is ignored, and the worker keeps running what it has.
+            try:
+                fresh = [(dst, org.read_text()) for dst, org in zip(watched, origin)]
+                for _, text in fresh:
+                    if not text.strip():
+                        raise ValueError("read back empty")
+                    compile(text, "<update>", "exec")
+                for dst, text in fresh:
+                    tmp = dst.with_suffix(".tmp")
+                    tmp.write_text(text)
+                    tmp.replace(dst)
+                log("repo source changed — updated, restarting")
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            except Exception as e:
+                if not update_warned:
+                    log(f"repo source changed but could not be used ({e}) — staying on the current copy")
+                    update_warned = True
         time.sleep(POLL_SECONDS)
 
 

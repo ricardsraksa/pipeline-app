@@ -3,7 +3,10 @@
 <plist version="1.0">
 <dict>
   <!-- Pipeline worker: scrapes supplier pages for the app whenever it asks.
+       Runs from ~/.pipeline-worker, NOT from the repo: ~/Desktop is iCloud-synced
+       and a background process can be handed empty files there after a reboot.
        Install (once):
+         mkdir -p ~/.pipeline-worker && cp scripts/launchd/run-worker.sh scripts/local-worker.py scripts/supplier-scrape.py ~/.pipeline-worker/
          cp scripts/launchd/com.pipeline.worker.plist ~/Library/LaunchAgents/
          launchctl load ~/Library/LaunchAgents/com.pipeline.worker.plist
        Stop:   launchctl unload ~/Library/LaunchAgents/com.pipeline.worker.plist
@@ -11,8 +14,8 @@
   <key>Label</key><string>com.pipeline.worker</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/ricardsraksa/.venvs/scrapling/bin/python</string>
-    <string>/Users/ricardsraksa/Desktop/claude/pipeline-app/scripts/local-worker.py</string>
+    <string>/bin/zsh</string>
+    <string>/Users/ricardsraksa/.pipeline-worker/run-worker.sh</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
