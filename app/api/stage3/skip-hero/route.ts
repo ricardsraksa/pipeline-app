@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getRun, updateRun } from "@/lib/db";
 import { stage3ActiveSourceImages } from "@/lib/stage3/sources";
 import { remainingPromptsJob } from "@/lib/stage3/jobs";
-import { jobKey, startJob } from "@/lib/jobs";
+import { startJob } from "@/lib/jobs";
 
 // Skip the hero: write the 8 prompts straight from the source photos
 // (server-side job), landing at the prompt-review gate.
@@ -18,6 +18,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: "No source product images to generate from" }, { status: 400 });
   }
   await updateRun(runId, { status: "generating_remaining", current_step: "Stage 4: Writing the 8 prompts from source images", error_message: null, last_updated_at: new Date().toISOString() });
-  startJob(jobKey.remaining(runId), () => remainingPromptsJob(runId, true));
+  startJob("remaining", runId, (alive) => remainingPromptsJob(runId, true, alive));
   return Response.json({ success: true, started: true });
 }

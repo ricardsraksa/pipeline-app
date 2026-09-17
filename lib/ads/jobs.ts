@@ -5,7 +5,9 @@ import { parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/li
 import { generateStage3Image } from "@/lib/stage3/higgsfield";
 import { auditImage } from "@/lib/stage3/audit";
 import { upsertAdImage } from "@/lib/stage3/upsert";
-import { jobKey, stopRequested } from "@/lib/jobs";
+import { stopRequested, type Alive } from "@/lib/jobs";
+
+const ALWAYS: Alive = () => true;
 
 const now = () => new Date().toISOString();
 const safeJson = <T,>(json: string | null | undefined, fallback: T): T => {
@@ -47,10 +49,9 @@ async function produceAd(runId: number, run: Run, p: AdPrompt, promptText: strin
 }
 
 /** The batch: every brief without a finished ad (or the given indices), two at a time. Ends at done when anything finished, else review. */
-export async function adsBatchJob(runId: number, opts: { indices?: number[] } = {}): Promise<void> {
-  const key = jobKey.ads(runId);
+export async function adsBatchJob(runId: number, opts: { indices?: number[] } = {}, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
-  if (!run) return;
+  if (!run || !alive()) return;
   const prompts = parseAdPrompts(run.ads_prompts_edited ?? run.ads_prompts);
   if (!prompts.length) { await updateRun(runId, { ads_step: "review", ads_error: "No ad briefs to generate from", last_updated_at: now() }); return; }
   const existing = new Map(parseAdImages(run.ads_images).map((im) => [im.index, im]));
@@ -60,16 +61,18 @@ export async function adsBatchJob(runId: number, opts: { indices?: number[] } = 
   const queue = [...targets];
   const worker = async () => {
     for (;;) {
-      if (stopRequested(key)) break;
+      if (!alive() || stopRequested("ads", runId)) break;
       const p = queue.shift();
       if (!p) break;
       const result = await produceAd(runId, run, p, p.prompt, refsFor(run, p), existing.get(p.index));
+      if (!alive()) break;     // Stage 5 was restarted while this ad rendered
       existing.set(p.index, result);
       await upsertAdImage(runId, result);
     }
   };
   await Promise.all(Array.from({ length: Math.min(2, queue.length) }, () => worker()));
 
+  if (!alive()) return;
   const all = prompts.map((p) => existing.get(p.index)).filter((x): x is AdImage => !!x).sort((a, b) => a.index - b.index);
   const finished = all.filter(isDone).length;
   await updateRun(runId, { ads_images: JSON.stringify(all), ads_step: finished > 0 ? "done" : "review", last_updated_at: now() });

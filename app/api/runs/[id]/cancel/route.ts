@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRun, updateRun } from "@/lib/db";
 import { requestCancel } from "@/lib/pipeline-runner";
+import { invalidateRun } from "@/lib/jobs";
 
 import { requireSession } from "@/lib/auth";
 export const maxDuration = 10;
@@ -29,6 +30,7 @@ export async function POST(
   }
 
   requestCancel(runId);
+  invalidateRun(runId);   // image jobs too: they check this before every write
   await updateRun(runId, {
     status: "cancelled",
     current_step: "Cancelled by user",

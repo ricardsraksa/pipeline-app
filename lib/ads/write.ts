@@ -7,7 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
-import { onePagerForDownstream } from "@/lib/research-edits";
+import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
@@ -210,6 +210,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   await updateRun(runId, {
     ads_prompts: JSON.stringify(prompts),
     ads_angle_key: angleKey(run.product_angle_selected),
+    ads_research_key: researchKey(run),
     ads_prompts_edited: null,
     ads_step: "review",
     ads_error: null,

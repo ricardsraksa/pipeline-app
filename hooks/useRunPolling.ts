@@ -54,7 +54,7 @@ export interface RunStatus {
     stage3Key: string | null;
     adsKey: string | null;
   };
-  research?: { key: string | null; copyStale: boolean; anglesStale: boolean };
+  research?: { key: string | null; copyStale: boolean; anglesStale: boolean; imagesStale: boolean; adsStale: boolean };
   meta: {
     productUrl: string;
     productName: string | null;

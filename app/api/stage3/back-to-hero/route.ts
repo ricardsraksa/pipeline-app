@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getRun, updateRun } from '@/lib/db'
+import { invalidateRun } from '@/lib/jobs'
 
 import { requireSession } from "@/lib/auth";
 // Step back from the 8-prompt review gate (awaiting_qc) to the hero QC gate.
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: 'This run has no hero image to go back to (it was generated from source photos).' }, { status: 400 })
   }
 
+  invalidateRun(runId);
   await updateRun(runId, {
     status: 'awaiting_hero_qc',
     stage3_hero_approved: 0,

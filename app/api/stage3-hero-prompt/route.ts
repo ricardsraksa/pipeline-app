@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getRun, updateRun } from "@/lib/db";
 import { stage3ActiveSourceImages } from "@/lib/stage3/sources";
 import { heroJob } from "@/lib/stage3/jobs";
-import { jobKey, startJob } from "@/lib/jobs";
+import { startJob } from "@/lib/jobs";
 
 // Phase 1 of hero-first Stage 4: write ONE hero prompt from the source photos
 // and generate the hero, then stop at the hero QC gate. The work runs as a
@@ -19,6 +19,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: "No source product images to build a hero from" }, { status: 400 });
   }
   await updateRun(runId, { status: "generating_hero", current_step: "Stage 4: Generating hero shot", error_message: null, last_updated_at: new Date().toISOString() });
-  startJob(jobKey.hero(runId), () => heroJob(runId));
+  startJob("hero", runId, (alive) => heroJob(runId, alive));
   return Response.json({ success: true, started: true });
 }

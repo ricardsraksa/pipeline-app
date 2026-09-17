@@ -12,8 +12,10 @@ import { probeImportUrl } from "@/lib/higgsfield-mcp";
 import { auditImage } from "@/lib/stage3/audit";
 import { upsertStage3Image } from "@/lib/stage3/upsert";
 import { runPlacement } from "@/lib/stage3/placement";
-import { jobKey, stopRequested } from "@/lib/jobs";
-import { onePagerForDownstream } from "@/lib/research-edits";
+import { stopRequested, type Alive } from "@/lib/jobs";
+
+const ALWAYS: Alive = () => true;
+import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
 
 export interface RemImage {
   index: number;
@@ -60,9 +62,9 @@ export function refsFor(p: RemainingPrompt, overrides: Record<string, string[]>,
  * only generates the image. Ends at awaiting_hero_qc; on failure drops back
  * to the Stage 4 entry gate with the reason.
  */
-export async function heroJob(runId: number): Promise<void> {
+export async function heroJob(runId: number, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
-  if (!run) return;
+  if (!run || !alive()) return;
   const sourceImageUrls = stage3ActiveSourceImages(run);
   if (!sourceImageUrls.length) {
     await updateRun(runId, { status: "awaiting_user", error_message: "No source product images to build a hero from", last_updated_at: now() });
@@ -77,6 +79,7 @@ export async function heroJob(runId: number): Promise<void> {
       await recordPromptUsed(runId, "stage3_hero", HERO_SYSTEM);
       const out = await generateHeroPrompt({ onePager, copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
       hero = out.hero;
+      if (!alive()) return;
       await updateRun(runId, { stage3_hero_prompt: JSON.stringify(hero), stage3_hero_validation: JSON.stringify(out.validation), last_updated_at: now() });
     }
     const promptText = run.stage3_hero_prompt_edited?.trim() || hero.prompt;
@@ -86,8 +89,10 @@ export async function heroJob(runId: number): Promise<void> {
       reference_images: hero.source_image_references?.length ? hero.source_image_references : sourceImageUrls,
       aspect_ratio: hero.aspect_ratio,
     });
+    if (!alive()) return;
     await updateRun(runId, { stage3_hero_image_url: imageUrl, stage3_hero_approved: 0, status: "awaiting_hero_qc", current_step: "Stage 4: Review the hero shot", last_updated_at: now() });
   } catch (err) {
+    if (!alive()) return;
     const message = err instanceof Error ? err.message : String(err);
     // Back to the gate the operator can act from: the hero review when an older
     // hero exists, otherwise the Stage 4 entry.
@@ -97,9 +102,9 @@ export async function heroJob(runId: number): Promise<void> {
 }
 
 /** Regenerate the hero, optionally from an edited prompt. A new hero invalidates everything derived from the old one. */
-export async function heroRegenJob(runId: number, editedPrompt?: string): Promise<void> {
+export async function heroRegenJob(runId: number, editedPrompt?: string, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
-  if (!run) return;
+  if (!run || !alive()) return;
   const hero = safeJson<HeroPrompt | null>(run.stage3_hero_prompt, null);
   if (!hero) { await updateRun(runId, { error_message: "No hero prompt to regenerate", last_updated_at: now() }); return; }
   const edited = editedPrompt?.trim() || "";
@@ -109,6 +114,7 @@ export async function heroRegenJob(runId: number, editedPrompt?: string): Promis
     // The edited prompt is stored before generating, so a resume uses it.
     await updateRun(runId, { ...(edited ? { stage3_hero_prompt_edited: edited } : {}), status: "generating_hero", current_step: "Stage 4: Regenerating hero shot", error_message: null, last_updated_at: now() });
     const imageUrl = await generateStage3Image({ prompt: promptText, model: hero.model || "gpt_image_2", reference_images: referenceImages, aspect_ratio: hero.aspect_ratio || "1:1" });
+    if (!alive()) return;
     await updateRun(runId, {
       stage3_hero_image_url: imageUrl,
       stage3_remaining_prompts: null,
@@ -121,6 +127,7 @@ export async function heroRegenJob(runId: number, editedPrompt?: string): Promis
       last_updated_at: now(),
     });
   } catch (err) {
+    if (!alive()) return;
     const message = err instanceof Error ? err.message : String(err);
     await updateRun(runId, { status: "awaiting_hero_qc", error_message: message, last_updated_at: now() }).catch(() => {});
   }
@@ -129,9 +136,9 @@ export async function heroRegenJob(runId: number, editedPrompt?: string): Promis
 // ── The eight prompts ───────────────────────────────────────────────────────
 
 /** Write the eight derivative prompts from the approved hero, or from the source photos when the hero is skipped. Ends at awaiting_qc. */
-export async function remainingPromptsJob(runId: number, fromSource: boolean): Promise<void> {
+export async function remainingPromptsJob(runId: number, fromSource: boolean, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
-  if (!run) return;
+  if (!run || !alive()) return;
   const heroUrl = fromSource ? null : run.stage3_hero_image_url;
   const sourceImageUrls = stage3ActiveSourceImages(run);
   const gateOnError = heroUrl ? "awaiting_hero_qc" : "awaiting_user";
@@ -160,15 +167,18 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean): P
       sections: pageSectionsFromStage2Json(run.stage2_json),
     });
     if (!prompts.length) throw new Error("Prompt generation produced no prompts");
+    if (!alive()) return;
     await updateRun(runId, {
       stage3_remaining_prompts: JSON.stringify(prompts),
       stage3_angle_key: angleKey(run.product_angle_selected),
+      stage3_research_key: researchKey(run),
       stage3_remaining_validation: JSON.stringify(validation),
       status: "awaiting_qc",
       current_step: "Stage 4: Review the 8 prompts before generating",
       last_updated_at: now(),
     });
   } catch (err) {
+    if (!alive()) return;
     const message = err instanceof Error ? err.message : String(err);
     await updateRun(runId, { status: gateOnError, error_message: message, last_updated_at: now() }).catch(() => {});
   }
@@ -206,10 +216,9 @@ async function produceImage(runId: number, run: Run, p: RemainingPrompt, promptT
  * Ends at completed with placement made and the ad briefs started; a stop
  * request or a still-missing image leaves it at the prompt gate.
  */
-export async function remainingBatchJob(runId: number, opts: { indices?: number[]; prompts?: Record<number, string>; refs?: Record<number, string[]> } = {}): Promise<void> {
-  const key = jobKey.remaining(runId);
+export async function remainingBatchJob(runId: number, opts: { indices?: number[]; prompts?: Record<number, string>; refs?: Record<number, string[]> } = {}, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
-  if (!run) return;
+  if (!run || !alive()) return;
   const prompts = storedPrompts(run);
   if (!prompts.length) { await updateRun(runId, { status: run.stage3_hero_image_url ? "awaiting_hero_qc" : "awaiting_user", error_message: "No Stage 4 prompts to generate from", last_updated_at: now() }); return; }
   const heroUrl = run.stage3_hero_image_url ?? null;
@@ -226,20 +235,25 @@ export async function remainingBatchJob(runId: number, opts: { indices?: number[
   const queue = [...targets];
   const worker = async () => {
     for (;;) {
-      if (stopRequested(key)) break;
+      if (!alive() || stopRequested("remaining", runId)) break;
       const p = queue.shift();
       if (!p) break;
       const promptText = opts.prompts?.[p.index] ?? p.prompt;
       const refs = opts.refs?.[p.index]?.length ? opts.refs[p.index] : refsFor(p, overrides, heroUrl);
       const result = await produceImage(runId, run, p, promptText, refs, existing.get(p.index));
+      // Superseded while this image was rendering (stage restarted, run
+      // killed, hero regenerated): the result belongs to a stage that no
+      // longer exists, so it is dropped rather than written over the reset.
+      if (!alive()) break;
       existing.set(p.index, result);
       await upsertStage3Image(runId, result, `Stage 4: Generating the ${total} images (${doneCount()}/${total})`);
     }
   };
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
 
+  if (!alive()) return;
   const settledAll = prompts.every((p) => existing.has(p.index));
-  const stopped = stopRequested(key) && queue.length > 0;
+  const stopped = stopRequested("remaining", runId) && queue.length > 0;
   if (!settledAll || stopped) {
     await updateRun(runId, { status: "awaiting_qc", current_step: "Stage 4: Review the 8 prompts before generating", last_updated_at: now() });
     return;

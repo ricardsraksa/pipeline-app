@@ -162,7 +162,10 @@ At the gate, two halves:
   the research documents beneath it, with the revision notes. When it changes
   after the angles or the copy were built, an amber line offers "New angles
   from the revised research" here and "Rebuild copy on the revised research"
-  on Copy, and the rail reads "research changed".
+  on Copy, and the rail reads "research changed". Images and Ads carry the
+  same line ("Redo images…" / "Rewrite the ads…", disabled until the copy has
+  been rebuilt, since both are built on it). Every such line also has "Keep
+  as is", which accepts the stage as it stands and clears the flag.
 - Also here: regenerate the research from a note, thumbs up/down with a note, the
   exact prompt this run used, download the foundational documents, a note when
   competitor links couldn't be read.

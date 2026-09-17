@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getRun, updateRun } from "@/lib/db";
 import { assertPublicUrl } from "@/lib/ssrf";
 import { remainingBatchJob, storedPrompts } from "@/lib/stage3/jobs";
-import { jobKey, jobRunning, startJob } from "@/lib/jobs";
+import { jobRunning, startJob } from "@/lib/jobs";
 
 // Start (or resume) the eight-image batch as a server-side job. Prompt edits
 // are saved first so the batch and a later page load agree on the text.
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (typeof runId !== "number") return Response.json({ success: false, error: "runId required" }, { status: 400 });
   const run = await getRun(runId);
   if (!run) return Response.json({ success: false, error: "Run not found" }, { status: 404 });
-  if (jobRunning(jobKey.remaining(runId))) return Response.json({ success: true, started: false, already: true });
+  if (jobRunning("remaining", runId)) return Response.json({ success: true, started: false, already: true });
 
   if (Array.isArray(body.prompts) && body.prompts.length) {
     await updateRun(runId, { stage3_remaining_prompts_edited: JSON.stringify(body.prompts), last_updated_at: new Date().toISOString() });
@@ -40,6 +40,6 @@ export async function POST(req: NextRequest) {
   const indices = Array.isArray(body.indices) ? body.indices.filter((n): n is number => Number.isInteger(n)) : undefined;
 
   await updateRun(runId, { status: "generating_remaining", current_step: "Stage 4: Generating the 8 images", error_message: null, last_updated_at: new Date().toISOString() });
-  startJob(jobKey.remaining(runId), () => remainingBatchJob(runId, { indices, prompts, refs }));
+  startJob("remaining", runId, (alive) => remainingBatchJob(runId, { indices, prompts, refs }, alive));
   return Response.json({ success: true, started: true });
 }

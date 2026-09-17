@@ -146,7 +146,13 @@ export async function GET(
       // edit is missing from it, whichever came first.
       const copyStale = hasCopy && !!key && (run.stage2_research_key ? run.stage2_research_key !== key : researchWasEdited(run));
       const anglesStale = hasAngles && !!key && Boolean(run.angles_research_key && run.angles_research_key !== key);
-      return { key, copyStale, anglesStale };
+      // Images and ads are built on the copy, so the same rule applies: a
+      // recorded fingerprint that differs, or none at all on an edited run.
+      const hasImages = Boolean(run.stage3_remaining_prompts || run.stage3_hero_image_url);
+      const hasAds = Boolean(run.ads_prompts);
+      const imagesStale = hasImages && !!key && (run.stage3_research_key ? run.stage3_research_key !== key : researchWasEdited(run));
+      const adsStale = hasAds && !!key && (run.ads_research_key ? run.ads_research_key !== key : researchWasEdited(run));
+      return { key, copyStale, anglesStale, imagesStale, adsStale };
     })(),
     meta: {
       productUrl: run.product_url,

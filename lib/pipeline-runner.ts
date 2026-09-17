@@ -1076,7 +1076,7 @@ async function watchdogSweep(): Promise<void> {
       ads_step: string | null; ads_prompts: string | null;
     }[];
     const nowMs = Date.now();
-    const { startJob, jobKey, jobRunning } = await import("./jobs");
+    const { startJob, jobRunning } = await import("./jobs");
     for (const row of rows) {
       if (!row.last_updated_at) continue;
       const age = nowMs - new Date(row.last_updated_at).getTime();
@@ -1084,29 +1084,28 @@ async function watchdogSweep(): Promise<void> {
       // Stage 4 image jobs.
       if (row.status === "generating_hero" || row.status === "generating_remaining") {
         if (age < WATCHDOG_IMAGE_STALE_MS) continue;
-        const key = row.status === "generating_hero" ? jobKey.hero(row.id) : jobKey.remaining(row.id);
-        if (jobRunning(key)) continue;
+        const kind = row.status === "generating_hero" ? "hero" as const : "remaining" as const;
+        if (jobRunning(kind, row.id)) continue;
         const { heroJob, remainingPromptsJob, remainingBatchJob } = await import("./stage3/jobs");
         const hasPrompts = Boolean(row.stage3_remaining_prompts_edited ?? row.stage3_remaining_prompts);
         console.warn(`[watchdog] run ${row.id} stale in ${row.status} — resuming`);
-        if (row.status === "generating_hero") startJob(key, () => heroJob(row.id));
-        else if (hasPrompts) startJob(key, () => remainingBatchJob(row.id));
-        else startJob(key, () => remainingPromptsJob(row.id, !row.stage3_hero_image_url));
+        if (row.status === "generating_hero") startJob(kind, row.id, (alive) => heroJob(row.id, alive));
+        else if (hasPrompts) startJob(kind, row.id, (alive) => remainingBatchJob(row.id, {}, alive));
+        else startJob(kind, row.id, (alive) => remainingPromptsJob(row.id, !row.stage3_hero_image_url, alive));
         continue;
       }
 
       // Stage 5 (runs after the pipeline is "completed").
       if (row.ads_step === "writing" || row.ads_step === "generating") {
         if (age < WATCHDOG_IMAGE_STALE_MS) continue;
-        const key = jobKey.ads(row.id);
-        if (jobRunning(key)) continue;
+        if (jobRunning("ads", row.id)) continue;
         console.warn(`[watchdog] run ${row.id} stale in ads ${row.ads_step} — resuming`);
         if (row.ads_step === "generating" && row.ads_prompts) {
           const { adsBatchJob } = await import("./ads/jobs");
-          startJob(key, () => adsBatchJob(row.id));
+          startJob("ads", row.id, (alive) => adsBatchJob(row.id, {}, alive));
         } else {
           // The brief writer died: release the claim and take it again.
-          startJob(key, async () => {
+          startJob("ads", row.id, async () => {
             await updateRun(row.id, { ads_step: null, last_updated_at: new Date().toISOString() });
             const { maybeStartAds } = await import("./ads/write");
             await maybeStartAds(row.id);

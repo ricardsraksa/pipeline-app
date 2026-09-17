@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getRun, updateRun } from "@/lib/db";
 import { probeImportUrl } from "@/lib/higgsfield-mcp";
 import { remainingPromptsJob } from "@/lib/stage3/jobs";
-import { jobKey, startJob } from "@/lib/jobs";
+import { startJob } from "@/lib/jobs";
 
 // Approve the hero → write the 8 derivative prompts (server-side job) and land
 // at the prompt-review gate. The approved hero is the reference for all 8.
@@ -29,6 +29,6 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, error: message }, { status: 422 });
   }
   await updateRun(runId, { stage3_hero_approved: 1, status: "generating_remaining", current_step: "Stage 4: Writing the 8 derivative prompts", error_message: null, last_updated_at: new Date().toISOString() });
-  startJob(jobKey.remaining(runId), () => remainingPromptsJob(runId, false));
+  startJob("remaining", runId, (alive) => remainingPromptsJob(runId, false, alive));
   return Response.json({ success: true, started: true });
 }

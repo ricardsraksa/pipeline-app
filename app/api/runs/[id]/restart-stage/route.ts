@@ -3,6 +3,7 @@ import { getRun, updateRun, type Run } from "@/lib/db";
 import { resumePipeline, runStage2Manually } from "@/lib/pipeline-runner";
 
 import { requireSession } from "@/lib/auth";
+import { invalidateRun } from "@/lib/jobs";
 export const maxDuration = 10;
 
 type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images" | "ads";
@@ -70,6 +71,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         ads_error: null,
         ads_ref_overrides: null,
         ads_angle_key: null,
+        ads_research_key: null,
         ads_drive_state: null,
       };
     case "stage3-prompts":
@@ -86,6 +88,7 @@ function fieldsToClear(stage: RestartStage): Partial<Run> {
         stage3_prompt_history: null,
         stage3_placement: null,
         stage3_angle_key: null,
+        stage3_research_key: null,
         // Format-validation results from the previous pass — stale after a
         // restart, and their badges would otherwise show against fresh prompts.
         stage3_hero_validation: null,
@@ -124,6 +127,10 @@ export async function POST(
   if (!run) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
+
+  // Any server-side image job still rendering for this run belongs to the
+  // stage being cleared: supersede it so it cannot write over the reset.
+  invalidateRun(runId);
 
   const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
   if (stage === "ads") {

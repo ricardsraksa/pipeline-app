@@ -5,6 +5,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 
 import { requireSession } from "@/lib/auth";
 import { validateBundles } from "@/lib/pricing";
+import { researchKey } from "@/lib/research-edits";
 import { upsertAdImage, upsertStage3Image } from "@/lib/stage3/upsert";
 import { validateMarketPosition } from "@/lib/market";
 import { assertPublicUrl } from "@/lib/ssrf";
@@ -469,6 +470,14 @@ export async function PATCH(
     }
   }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
+  if ("research_ack" in body) {
+    // "Keep as is": the operator has seen that the research changed and wants
+    // this stage left alone, so it is stamped with the current fingerprint.
+    const col = { angles: "angles_research_key", stage2: "stage2_research_key", stage3: "stage3_research_key", ads: "ads_research_key" }[String((body as { research_ack?: unknown }).research_ack)];
+    if (!col) return Response.json({ error: "research_ack must be angles, stage2, stage3 or ads" }, { status: 400 });
+    const current = await getRun(Number(id));
+    if (current) { fields.push(`${col} = ?`); values.push(researchKey(current)); }
+  }
   if ("product_code" in body) {
     // "58" and "p58" both mean P58 — the P is the app's, the number is the operator's.
     const raw = body.product_code?.toString().trim().toUpperCase() ?? "";

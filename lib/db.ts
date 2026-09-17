@@ -215,6 +215,8 @@ async function migrateDB() {
     "research_edit_notes TEXT",
     "angles_research_key TEXT",
     "stage2_research_key TEXT",
+    "stage3_research_key TEXT",
+    "ads_research_key TEXT",
     "stage3_angle_key TEXT",
     "ads_angle_key TEXT",
     // When stage2_json was last derived from the copy text. The Shopify push
@@ -661,6 +663,8 @@ export interface Run {
   research_edit_notes: string | null;
   angles_research_key: string | null;
   stage2_research_key: string | null;
+  stage3_research_key: string | null;
+  ads_research_key: string | null;
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
   stage2_json_at: string | null;

@@ -567,10 +567,19 @@ export default function RunPage() {
       window.location.reload();
     } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
   };
-  const ResearchStaleFlag = ({ show, text, action }: { show: boolean; text: string; action: React.ReactNode }) => show ? (
+  const imagesResearchStale = Boolean(run.research?.imagesStale);
+  const adsResearchStale = Boolean(run.research?.adsStale);
+  const keepAsIs = async (which: "angles" | "stage2" | "stage3" | "ads") => {
+    try {
+      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research_ack: which }) });
+      window.dispatchEvent(new Event("run:changed"));
+    } catch { push("Couldn't save that"); }
+  };
+  const ResearchStaleFlag = ({ show, text, action, which }: { show: boolean; text: string; action: React.ReactNode; which: "angles" | "stage2" | "stage3" | "ads" }) => show ? (
     <div className="mb-4 flex items-center gap-3 flex-wrap rounded-[8px] border border-[var(--color-amber)]/50 px-3 py-2">
       <span className="text-[12.5px] text-[var(--color-amber)]">{text}</span>
       <div className="flex-1" />
+      <button onClick={() => keepAsIs(which)} className="btn btn-sm">Keep as is</button>
       {action}
     </div>
   ) : null;
@@ -641,7 +650,7 @@ export default function RunPage() {
                 style={{ gridTemplateColumns: "16px 1fr auto" }}>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{def.n}</span>
                 <span className={cx("text-[13px] font-[500]", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
-                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] || (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) ? "research changed" : stateWord[st]}</span>
+                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] || (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) || (def.key === "stage3" && imagesResearchStale) || (def.key === "ads" && adsResearchStale) ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) || (def.key === "stage3" && imagesResearchStale) || (def.key === "ads" && adsResearchStale) ? "research changed" : stateWord[st]}</span>
               </button>
             );
           })}
@@ -774,7 +783,7 @@ export default function RunPage() {
                 {runId !== null && (
                   <div className="mb-[30px]">
                     <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
-                    <ResearchStaleFlag show={anglesResearchStale} text="The research was revised after these angles were proposed." action={
+                    <ResearchStaleFlag which="angles" show={anglesResearchStale} text="The research was revised after these angles were proposed." action={
                       <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "New angles from the revised research"}</button>
                     } />
                     <AnglePicker runId={runId} run={run} editable />
@@ -829,7 +838,7 @@ export default function RunPage() {
                 </div>
               )}
             </div>
-            <ResearchStaleFlag show={copyResearchStale} text="The research was revised after this copy was written." action={
+            <ResearchStaleFlag which="stage2" show={copyResearchStale} text="The research was revised after this copy was written." action={
               <button onClick={rebuildCopyOnResearch} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on the revised research"}</button>
             } />
             <StaleFlag stage="stage2" action={
@@ -883,6 +892,9 @@ export default function RunPage() {
               )}
             </div>
             <StaleFlag stage="stage3" />
+            <ResearchStaleFlag which="stage3" show={imagesResearchStale} text={copyResearchStale ? "The research was revised after these images were made. Rebuild the copy first, then the images." : "The research was revised after these images were made."} action={
+              <button onClick={() => handleRestartStage("stage3-prompts")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Redo images on the revised research"}</button>
+            } />
             <div className="mb-3"><FeedbackAppliedChip stage={3} /></div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
           </>
@@ -897,6 +909,9 @@ export default function RunPage() {
               {runId !== null && <RestartStage stage="ads" />}
             </div>
             <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]"></span>} />
+            <ResearchStaleFlag which="ads" show={adsResearchStale} text={copyResearchStale ? "The research was revised after these ads were written. Rebuild the copy first, then the ads." : "The research was revised after these ads were written."} action={
+              <button onClick={() => handleRestartStage("ads")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Rewrite the ads on the revised research"}</button>
+            } />
             <AdsFlow runId={Number(runId)} />
           </>
         )}
