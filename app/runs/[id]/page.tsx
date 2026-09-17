@@ -211,6 +211,8 @@ export default function RunPage() {
   const [editingCode, setEditingCode] = useState(false);
   // Copy stage: the cheap "rebuild on this angle" revision pass in flight.
   const [rebuilding, setRebuilding] = useState(false);
+  // Research stage: new angles being proposed from a revised one-pager.
+  const [reAngling, setReAngling] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
   // What the rail shows the moment a code is saved, until the next poll
   // confirms it (a poll already in flight can otherwise hand back the old
@@ -541,6 +543,37 @@ export default function RunPage() {
       window.location.reload();
     } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
   };
+  // Same idea for the research: the angles and the copy each remember the
+  // one-pager they were built on. Unknown (older runs) never counts as stale.
+  const anglesResearchStale = Boolean(run.research?.anglesStale);
+  const copyResearchStale = Boolean(run.research?.copyStale);
+  const newAnglesFromResearch = async () => {
+    if (!runId || reAngling) return;
+    setReAngling(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}/angles`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { push(`New angles failed: ${data.error ?? res.status}`); setReAngling(false); return; }
+      window.location.reload();
+    } catch (e) { push(`New angles failed: ${e instanceof Error ? e.message : String(e)}`); setReAngling(false); }
+  };
+  const rebuildCopyOnResearch = async () => {
+    if (!runId || rebuilding) return;
+    setRebuilding(true);
+    try {
+      const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "research" }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) { push(`Rebuild failed: ${data.error ?? res.status}`); setRebuilding(false); return; }
+      window.location.reload();
+    } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
+  };
+  const ResearchStaleFlag = ({ show, text, action }: { show: boolean; text: string; action: React.ReactNode }) => show ? (
+    <div className="mb-4 flex items-center gap-3 flex-wrap rounded-[8px] border border-[var(--color-amber)]/50 px-3 py-2">
+      <span className="text-[12.5px] text-[var(--color-amber)]">{text}</span>
+      <div className="flex-1" />
+      {action}
+    </div>
+  ) : null;
   const StaleFlag = ({ stage, action }: { stage: StageKey; action?: React.ReactNode }) => angleStale[stage] ? (
     <div className="mb-4 flex items-center gap-3 flex-wrap rounded-[8px] border border-[var(--color-amber)]/50 px-3 py-2">
       <span className="text-[12.5px] text-[var(--color-amber)]">Built on a different angle than the one now ticked.</span>
@@ -608,7 +641,7 @@ export default function RunPage() {
                 style={{ gridTemplateColumns: "16px 1fr auto" }}>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{def.n}</span>
                 <span className={cx("text-[13px] font-[500]", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
-                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : stateWord[st]}</span>
+                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] || (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) ? "research changed" : stateWord[st]}</span>
               </button>
             );
           })}
@@ -741,6 +774,9 @@ export default function RunPage() {
                 {runId !== null && (
                   <div className="mb-[30px]">
                     <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
+                    <ResearchStaleFlag show={anglesResearchStale} text="The research was revised after these angles were proposed." action={
+                      <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "New angles from the revised research"}</button>
+                    } />
                     <AnglePicker runId={runId} run={run} editable />
                   </div>
                 )}
@@ -793,6 +829,9 @@ export default function RunPage() {
                 </div>
               )}
             </div>
+            <ResearchStaleFlag show={copyResearchStale} text="The research was revised after this copy was written." action={
+              <button onClick={rebuildCopyOnResearch} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on the revised research"}</button>
+            } />
             <StaleFlag stage="stage2" action={
               <button onClick={rebuildCopyOnAngle} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on this angle"}</button>
             } />

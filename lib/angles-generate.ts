@@ -10,6 +10,7 @@ import { getPrompt } from "./prompts";
 import { parseProductScrape } from "./product";
 import { parseAngles, type Angle } from "./angles";
 import { marketBlock, parseStoredMarketPosition } from "./market";
+import { onePagerForDownstream, researchKey } from "./research-edits";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
 
@@ -79,7 +80,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   const run = await getRun(runId);
   if (!run) throw new Error("Run not found");
   const research = run.step_research_revised ?? run.step_research ?? "";
-  const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "";
+  const onePager = onePagerForDownstream(run);
   if (!research && !onePager) throw new Error("No research on this run yet");
 
   const system = await getPrompt("angles");
@@ -216,6 +217,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
 
   await updateRun(runId, {
     product_angles: JSON.stringify(angles),
+    angles_research_key: researchKey(run),
     // A fresh set invalidates the previous pick.
     product_angle_selected: null,
     last_updated_at: new Date().toISOString(),

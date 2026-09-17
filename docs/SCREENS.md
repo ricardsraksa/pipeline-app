@@ -157,6 +157,12 @@ At the gate, two halves:
   - Any angle's wording can be edited.
   - "Write my own" opens the same fields blank and adds an operator angle.
   - "New angles" regenerates, with an optional steer ("more health-focused").
+- An edited one-pager (by hand or from a note) is what every later stage
+  follows: angles, copy, image prompts and ads receive it marked as overriding
+  the research documents beneath it, with the revision notes. When it changes
+  after the angles or the copy were built, an amber line offers "New angles
+  from the revised research" here and "Rebuild copy on the revised research"
+  on Copy, and the rail reads "research changed".
 - Also here: regenerate the research from a note, thumbs up/down with a note, the
   exact prompt this run used, download the foundational documents, a note when
   competitor links couldn't be read.

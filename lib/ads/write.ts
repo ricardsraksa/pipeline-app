@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
+import { onePagerForDownstream } from "@/lib/research-edits";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
@@ -119,7 +120,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     (run.stage2_copy_edited ?? run.stage2_output ?? "(none)").slice(0, CAP),
     "",
     "RESEARCH ONE-PAGER:",
-    (run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "(none)").slice(0, CAP),
+    (onePagerForDownstream(run) || "(none)").slice(0, CAP),
     "",
     "FULL RESEARCH (the only source for statistics — a number not in here or the one-pager cannot be used):",
     (run.step_research_revised ?? run.step_research ?? "(none)").slice(0, CAP),

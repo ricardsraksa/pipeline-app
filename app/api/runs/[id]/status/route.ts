@@ -1,3 +1,4 @@
+import { researchKey, researchWasEdited } from "@/lib/research-edits";
 import { NextRequest, NextResponse } from "next/server";
 import { getRun, getKV } from "@/lib/db";
 
@@ -133,6 +134,20 @@ export async function GET(
       stage3Key: run.stage3_angle_key ?? null,
       adsKey: run.ads_angle_key ?? null,
     },
+    // The research as the operator has it now vs. what the angles and the copy
+    // were built on (null = unknown / built before this was tracked).
+    research: (() => {
+      const key = researchKey(run);
+      const hasCopy = Boolean(run.stage2_output);
+      const hasAngles = Boolean(run.product_angles);
+      // Built with a recorded fingerprint: stale when it differs.
+      // No fingerprint means the copy predates v2.91: it was written from the
+      // research documents alone and never read the one-pager, so ANY operator
+      // edit is missing from it, whichever came first.
+      const copyStale = hasCopy && !!key && (run.stage2_research_key ? run.stage2_research_key !== key : researchWasEdited(run));
+      const anglesStale = hasAngles && !!key && Boolean(run.angles_research_key && run.angles_research_key !== key);
+      return { key, copyStale, anglesStale };
+    })(),
     meta: {
       productUrl: run.product_url,
       productName: run.product_name,

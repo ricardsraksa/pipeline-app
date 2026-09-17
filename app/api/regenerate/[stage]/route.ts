@@ -14,7 +14,11 @@ import { recordPromptUsed } from "@/lib/db";
 const REBUILD_ON_ANGLE =
   "The positioning angle for this product has changed to the one given under POSITIONING ANGLE. Rebuild the copy around it: the headlines, the benefits, the three sections, the FAQ questions and the Facebook copy must open on THIS problem and mechanism, not the previous one. Keep the section structure, the product name, What's Included and every fact that is not tied to the old angle. Do not mention that the angle changed.";
 
+const REBUILD_ON_RESEARCH =
+  "The research one-pager was revised by the operator AFTER this copy was written. The revised one-pager is given under ONE-PAGER and is authoritative. Rebuild the copy so every part of it agrees with the revised one-pager: correct any claim, audience, use case, benefit or product detail the revision changed or removed, and bring in what it added. Keep the section structure, keep lines that are still accurate, and change nothing the revision does not touch.";
+
 import { requireSession } from "@/lib/auth";
+import { appendResearchNote, onePagerForDownstream, researchKey } from "@/lib/research-edits";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
@@ -43,7 +47,7 @@ export async function POST(
 
   const body = (await req.json()) as { runId?: number; instructions?: string; mode?: string };
   const { runId } = body;
-  const instructions = body.mode === "angle" ? REBUILD_ON_ANGLE : body.instructions;
+  const instructions = body.mode === "angle" ? REBUILD_ON_ANGLE : body.mode === "research" ? REBUILD_ON_RESEARCH : body.instructions;
 
   if (!runId || typeof runId !== "number") {
     return NextResponse.json({ error: "runId required" }, { status: 400 });
@@ -79,6 +83,9 @@ export async function POST(
       [`${result.field}_edited`]: result.output,
       [result.stageTimestamp]: ts,
       last_updated_at: ts,
+      // The instruction behind a research revision travels downstream with the
+      // revised one-pager, so later stages know what was corrected and why.
+      ...(stage === "stage1" ? { research_edit_notes: appendResearchNote(run.research_edit_notes, instructions.trim()) } : {}),
     } as Partial<Run>);
 
     // Regenerated Stage 2 copy → refresh the structured per-field JSON so the
@@ -92,6 +99,10 @@ export async function POST(
       // the angle change.
       if (body.mode === "angle") {
         await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
+      }
+      // Likewise only a rebuild ON the revised research clears that flag.
+      if (body.mode === "research") {
+        await updateRun(runId, { stage2_research_key: researchKey(run) }).catch(() => {});
       }
       try {
         const structured = await structureStage2Copy(result.output, runId);
@@ -232,7 +243,7 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   const currentCopy = run.stage2_copy_edited ?? run.stage2_output ?? "";
   if (!currentCopy) throw new Error("No Stage 2 copy to regenerate yet");
 
-  const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "";
+  const onePager = onePagerForDownstream(run);
   const research = pickRevised(run, "step_research");
   const avatar = pickRevised(run, "step_avatar");
 

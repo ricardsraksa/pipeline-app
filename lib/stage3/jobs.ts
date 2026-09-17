@@ -13,6 +13,7 @@ import { auditImage } from "@/lib/stage3/audit";
 import { upsertStage3Image } from "@/lib/stage3/upsert";
 import { runPlacement } from "@/lib/stage3/placement";
 import { jobKey, stopRequested } from "@/lib/jobs";
+import { onePagerForDownstream } from "@/lib/research-edits";
 
 export interface RemImage {
   index: number;
@@ -71,7 +72,7 @@ export async function heroJob(runId: number): Promise<void> {
     await updateRun(runId, { status: "generating_hero", current_step: "Stage 4: Generating hero shot", error_message: null, last_updated_at: now() });
     let hero = safeJson<HeroPrompt | null>(run.stage3_hero_prompt, null);
     if (!hero) {
-      const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "";
+      const onePager = onePagerForDownstream(run);
       const copy = run.stage2_copy_edited ?? run.stage2_output ?? "";
       await recordPromptUsed(runId, "stage3_hero", HERO_SYSTEM);
       const out = await generateHeroPrompt({ onePager, copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
@@ -144,7 +145,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean): P
       error_message: null,
       last_updated_at: now(),
     });
-    const onePager = run.stage1_one_pager_edited ?? run.stage1_one_pager ?? "";
+    const onePager = onePagerForDownstream(run);
     const copy = run.stage2_copy_edited ?? run.stage2_output ?? "";
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? "";
     const visual = extractVisualSection(run.step_research_revised ?? run.step_research ?? "");

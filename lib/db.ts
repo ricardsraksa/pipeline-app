@@ -210,6 +210,11 @@ async function migrateDB() {
     // Which angle (lib/angles.ts angleKey) each downstream stage was built
     // with — compared with the current pick to flag stale stages.
     "stage2_angle_key TEXT",
+    // Research edits: the operator's revision instructions, and the research
+    // fingerprint the angles / the copy were built on (lib/research-edits.ts).
+    "research_edit_notes TEXT",
+    "angles_research_key TEXT",
+    "stage2_research_key TEXT",
     "stage3_angle_key TEXT",
     "ads_angle_key TEXT",
     // When stage2_json was last derived from the copy text. The Shopify push
@@ -653,6 +658,9 @@ export interface Run {
   product_variants_edited: string | null;
   market_position: string | null;
   stage2_angle_key: string | null;
+  research_edit_notes: string | null;
+  angles_research_key: string | null;
+  stage2_research_key: string | null;
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
   stage2_json_at: string | null;
