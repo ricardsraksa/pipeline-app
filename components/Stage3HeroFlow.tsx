@@ -185,6 +185,14 @@ export default function Stage3HeroFlow({
   // Stop flag for the client-side 8-image loop (the run-page "Kill run" only
   // reaches server stages; this loop runs in the browser).
   const stopRef = useRef(false);
+  // The rail's Continue at the prompt gate runs this page's own "Generate",
+  // so card edits that are on screen but not yet saved go with it.
+  const generateAllRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const onGenerate = () => { if (generateAllRef.current) generateAllRef.current(); };
+    window.addEventListener("stage3:generate", onGenerate);
+    return () => window.removeEventListener("stage3:generate", onGenerate);
+  }, []);
 
   const fetchRun = useCallback(async () => {
     // The rail polls its own status feed — nudge it so Deliver/Next follow.
@@ -536,6 +544,7 @@ export default function Stage3HeroFlow({
         await fetchRun();
       }
     };
+    generateAllRef.current = () => { void generateAll(); };
 
     return (
       <div className="space-y-4">

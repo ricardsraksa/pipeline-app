@@ -38,6 +38,14 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const [lb, setLb] = useState<string | null>(null);
   const [zipping, setZipping] = useState(false);
   const stopRef = useRef(false);
+  // The rail's Continue at the ad review runs this page's own "Generate", so
+  // brief edits that are on screen but not yet saved go with it.
+  const generateRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const onGenerate = () => { if (generateRef.current) generateRef.current(); };
+    window.addEventListener("ads:generate", onGenerate);
+    return () => window.removeEventListener("ads:generate", onGenerate);
+  }, []);
   // Mirrors `images` so the end of a batch can write the real final array
   // rather than the snapshot this closure captured when it started.
   const imagesRef = useRef<AdImage[]>([]);
@@ -205,6 +213,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
       await fetchRun();
     }
   };
+  generateRef.current = () => { void generateAll(true); };
   const regenerate = async (p: AdPrompt, useAi: boolean) => {
     const cur = images.find((im) => im.index === p.index);
     let promptText = p.prompt;

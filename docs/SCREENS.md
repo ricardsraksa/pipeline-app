@@ -102,6 +102,16 @@ stage at a time and the app follows the pipeline to whichever needs attention.
 - Price: the suggested retail price and compare-at from the Pricing card, with
   the multiple of COGS. Opens Stage 3.
 - Downloads: the research and copy documents; the generated images.
+- **Next / Continue**: names the next step, and the button does it — it is a
+  continue button, not a link to a review screen. Approve the product and
+  start the research → pick an angle (the one step that needs a choice) →
+  write the copy → generate the hero → approve the hero and write the 8 image
+  prompts → generate the 8 images (or the missing ones) → write the 5 ad
+  briefs → generate the 5 ads → push to Shopify, Docs and Drive. Each press
+  also opens the stage it belongs to. When that stage is already open with
+  unsaved edits (the description and photos, the 8 prompt cards, the ad
+  briefs), Continue uses what is on screen. A stopped step shows its reason
+  and opens the stage instead.
 - **Restart run** (bottom of the rail): deletes everything the run generated —
   research, angles, copy, images, ads, pricing and every edit made to them —
   keeps the links, the uploaded photos and the product code, and starts again

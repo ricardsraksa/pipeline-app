@@ -32,6 +32,7 @@ import MarketPositionCard from "@/components/MarketPosition";
 import PricingCard from "@/components/PricingCard";
 import VariantsCard from "@/components/VariantsCard";
 import { fmtMoney } from "@/lib/pricing";
+import { defaultSelectedImages, parseProductScrape } from "@/lib/product";
 import JSZip from "jszip";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -213,6 +214,8 @@ export default function RunPage() {
   const [rebuilding, setRebuilding] = useState(false);
   // Research stage: new angles being proposed from a revised one-pager.
   const [reAngling, setReAngling] = useState(false);
+  // The rail's Continue button: the step it is running right now.
+  const [stepping, setStepping] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
   // What the rail shows the moment a code is saved, until the next poll
   // confirms it (a poll already in flight can otherwise hand back the old
@@ -286,6 +289,37 @@ export default function RunPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run, runId]);
+
+  // Continue: do the next step, then show the stage it belongs to, so the
+  // progress (and anything the step needs from the operator) is on screen.
+  async function runStep(url: string, body: Record<string, unknown>, open: StageKey, what: string) {
+    if (!runId || stepping) return;
+    setStepping(true);
+    openStage(open);
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, ...body }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false || data.error) push(`${what}: ${data.error ?? `failed (${res.status})`}`);
+      window.dispatchEvent(new Event("run:changed"));
+    } catch (e) {
+      push(`${what}: ${e instanceof Error ? e.message : "network error"}`);
+    } finally {
+      setTimeout(() => setStepping(false), 1200);
+    }
+  }
+
+  // The product gate approves with what is on screen when it is open (the
+  // operator may have unsaved edits there), otherwise with what is stored.
+  function continueFromProduct() {
+    if (!runId) return;
+    if (activeKey === "product") { window.dispatchEvent(new Event("product:approve")); return; }
+    const scrape = parseProductScrape(run!.product?.scrape ?? null);
+    const uploaded = run!.meta.uploadedSourceImages ?? [];
+    const description = (run!.product?.descriptionEdited ?? run!.product?.descriptionAi ?? "").trim();
+    const photos = run!.product?.selectedImages?.length ? run!.product.selectedImages : defaultSelectedImages(scrape, uploaded);
+    if (description.length < 20 || !photos.length) { openStage("product"); push(description.length < 20 ? "Write a description first" : "Pick at least one photo first"); return; }
+    void runStep(`/api/runs/${runId}/approve-product`, { description, selectedImages: photos }, "stage1", "Couldn't start research");
+  }
 
   async function handleStartStage2() {
     if (!runId || startingStage2) return;
@@ -455,32 +489,43 @@ export default function RunPage() {
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
-    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Review the product", cta: "Review", onClick: () => openStage("product") };
+    const go = stepping ? "Starting…" : "Continue";
+    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Approve the product and start the research", cta: go, onClick: continueFromProduct };
     if (s === "awaiting_stage2_approval") {
       const hasAngle = Boolean(run.angles?.selected);
       return hasAngle
-        ? { tone: "amber", icon: "review", title: "Ready for copy", cta: startingStage2 ? "Starting…" : "Run copy", onClick: handleStartStage2 }
-        : { tone: "amber", icon: "review", title: "Pick an angle", cta: "Pick an angle", onClick: () => openStage("stage1") };
+        ? { tone: "amber", icon: "review", title: "Write the copy on the chosen angle", cta: startingStage2 ? "Starting…" : "Continue", onClick: () => { openStage("stage2"); void handleStartStage2(); } }
+        : { tone: "amber", icon: "review", title: "Pick an angle — the copy is written on it", cta: "Choose angle", onClick: () => openStage("stage1") };
     }
-    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Ready for images", cta: "Go to images", onClick: () => openStage("stage3") };
-    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Review the hero", cta: "Review hero", onClick: () => openStage("stage3") };
-    if ((s === "awaiting_qc" || s === "generating_remaining") && (run.stage4?.done ?? 0) > 0) return { tone: "amber", icon: "image", title: "Images generated", cta: "Open images", onClick: () => openStage("stage3") };
-    if (s === "awaiting_qc") return { tone: "amber", icon: "review", title: "Review the 8 prompts", cta: "Review prompts", onClick: () => openStage("stage3") };
-    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
-    // Several routes write error_message next to a status that is not "failed"
-    // (a refused hero reference, a skip-hero failure, the stall watchdog).
-    // Those explanations were stored and never shown to anyone.
+    // A step that stopped with a reason: show the reason and open the stage.
     if (run.error && ["awaiting_user", "awaiting_hero_qc", "awaiting_qc"].includes(s)) {
       return { tone: "amber", icon: "alert", title: "Stage 4 stopped", sub: run.error, cta: "Open images", onClick: () => openStage("stage3") };
     }
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Generate the hero shot", cta: go, onClick: () => runStep("/api/stage3-hero-prompt", {}, "stage3", "Couldn't start the hero") };
+    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Approve the hero and write the 8 image prompts", cta: go, onClick: () => runStep("/api/stage3/hero-approve", {}, "stage3", "Couldn't approve the hero") };
+    if (s === "generating_remaining") return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
+    if (s === "awaiting_qc") {
+      const done = run.stage4?.done ?? 0;
+      const total = run.stage4?.total || 8;
+      const title = done > 0 ? `Generate the missing ${Math.max(total - done, 1)} image${total - done === 1 ? "" : "s"}` : "Generate the 8 images";
+      return { tone: "amber", icon: "image", title, cta: go, onClick: () => {
+        if (activeKey === "stage3" && done === 0) { window.dispatchEvent(new Event("stage3:generate")); return; }
+        void runStep("/api/stage3/generate-batch", {}, "stage3", "Couldn't start the images");
+      } };
+    }
+    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "completed") {
       const a = run.meta.ads;
       if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };
-      if (a?.step === "review") return { tone: "amber", icon: "review", title: "Review the 5 ads", cta: "Review ads", onClick: () => openStage("ads") };
+      if (a?.error) return { tone: "amber", icon: "alert", title: "Ads stopped", sub: a.error, cta: "Open ads", onClick: () => openStage("ads") };
+      if (a?.step === "review") return { tone: "amber", icon: "review", title: "Generate the 5 ads", cta: go, onClick: () => {
+        if (activeKey === "ads") { window.dispatchEvent(new Event("ads:generate")); return; }
+        void runStep("/api/ads/generate-batch", {}, "ads", "Couldn't start the ads");
+      } };
       if (a?.step === "generating") return { tone: "accent", running: true, title: "Generating the ads", sub: `${a.done} of 5 done` };
-      if (a?.step === "done") return { tone: "green", icon: "check", title: "Run complete", cta: "Finish up", onClick: () => openStage("done") };
-      return { tone: "green", icon: "check", title: "Run complete", cta: "Write 5 ads", onClick: () => openStage("ads") };
+      if (a?.step === "done") return { tone: "green", icon: "check", title: "Push to Shopify, Docs and Drive", cta: "Continue", onClick: () => openStage("done") };
+      return { tone: "amber", icon: "review", title: "Write the 5 ad briefs", cta: go, onClick: () => runStep("/api/ads/write", {}, "ads", "Couldn't start the ad briefs") };
     }
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
@@ -673,7 +718,7 @@ export default function RunPage() {
           <span className={label}>Next</span>
           <p className="text-[13px] leading-[1.4] text-[var(--color-text)]">{a.title}{a.sub ? <span className="text-[var(--color-text-2)]"> — {a.sub}</span> : null}</p>
           {showPrimary && a.cta && (
-            <button onClick={a.onClick} disabled={startingStage2 || resuming}
+            <button onClick={a.onClick} disabled={startingStage2 || resuming || stepping}
               className="cursor-pointer h-[34px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-60 tr">
               {a.cta}
             </button>

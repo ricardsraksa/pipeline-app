@@ -179,8 +179,16 @@ export default function ProductGate({
     } finally { setRegenerating(false); }
   }
 
+  // The rail's Continue approves with what is on screen here.
+  const approveRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const onApprove = () => approveRef.current();
+    window.addEventListener("product:approve", onApprove);
+    return () => window.removeEventListener("product:approve", onApprove);
+  }, []);
+
   async function approve() {
-    if (!canApprove) return;
+    if (!canApprove) { if (!text.trim() || text.trim().length < 20) push("Write a description first"); else if (!selected.length) push("Pick at least one photo first"); return; }
     setApproving(true); setErr(null);
     try {
       const res = await fetch(`/api/runs/${runId}/approve-product`, {
@@ -197,6 +205,8 @@ export default function ProductGate({
       setApproving(false);
     }
   }
+
+  approveRef.current = () => { void approve(); };
 
   // The Mac worker polls every ~20s; anything older than 2 minutes means it
   // isn't running (Mac asleep, agent not installed).
