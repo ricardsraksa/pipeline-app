@@ -11,6 +11,7 @@ import { parseProductScrape } from "./product";
 import { parseAngles, type Angle } from "./angles";
 import { marketBlock, parseStoredMarketPosition } from "./market";
 import { onePagerForDownstream, researchKey } from "./research-edits";
+import { builtOnFor, contextBlock, effectiveDescription } from "./run-context";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
 
@@ -90,10 +91,11 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   const market = marketBlock(parseStoredMarketPosition(run.market_position));
   const user = [
     "Here are the finished research documents for this product. Propose the angles now.",
+    contextBlock(run, "angles"),
     "",
     ...(market ? [market, ""] : []),
     "PRODUCT DESCRIPTION:",
-    run.product_description ?? "(none)",
+    effectiveDescription(run) || "(none)",
     "",
     "ONE-PAGER:",
     onePager || "(none)",
@@ -218,6 +220,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   await updateRun(runId, {
     product_angles: JSON.stringify(angles),
     angles_research_key: researchKey(run),
+    angles_built_on: builtOnFor(run, "angles"),
     // A fresh set invalidates the previous pick.
     product_angle_selected: null,
     last_updated_at: new Date().toISOString(),

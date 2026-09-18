@@ -14,11 +14,15 @@ import { recordPromptUsed } from "@/lib/db";
 const REBUILD_ON_ANGLE =
   "The positioning angle for this product has changed to the one given under POSITIONING ANGLE. Rebuild the copy around it: the headlines, the benefits, the three sections, the FAQ questions and the Facebook copy must open on THIS problem and mechanism, not the previous one. Keep the section structure, the product name, What's Included and every fact that is not tied to the old angle. Do not mention that the angle changed.";
 
+const REBUILD_ON_CONTEXT =
+  "The material this copy was built from has changed since it was written: the research one-pager, the positioning angle, the product description or several of them. What you are given now is the current version, and WHAT THE OPERATOR CHANGED lists the corrections they made. Rebuild the copy so all of it agrees with what you have now: correct every claim, audience, use case, benefit or product detail that the changes contradict, bring in what they added, and open on the angle you are given. Keep the section structure, and keep the lines that are still accurate.";
+
 const REBUILD_ON_RESEARCH =
   "The research one-pager was revised by the operator AFTER this copy was written. The revised one-pager is given under ONE-PAGER and is authoritative. Rebuild the copy so every part of it agrees with the revised one-pager: correct any claim, audience, use case, benefit or product detail the revision changed or removed, and bring in what it added. Keep the section structure, keep lines that are still accurate, and change nothing the revision does not touch.";
 
 import { requireSession } from "@/lib/auth";
 import { appendResearchNote, onePagerForDownstream, researchKey } from "@/lib/research-edits";
+import { appendEdit, builtOnFor, contextBlock } from "@/lib/run-context";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
@@ -47,7 +51,7 @@ export async function POST(
 
   const body = (await req.json()) as { runId?: number; instructions?: string; mode?: string };
   const { runId } = body;
-  const instructions = body.mode === "angle" ? REBUILD_ON_ANGLE : body.mode === "research" ? REBUILD_ON_RESEARCH : body.instructions;
+  const instructions = body.mode === "angle" ? REBUILD_ON_ANGLE : body.mode === "research" ? REBUILD_ON_RESEARCH : body.mode === "context" ? REBUILD_ON_CONTEXT : body.instructions;
 
   if (!runId || typeof runId !== "number") {
     return NextResponse.json({ error: "runId required" }, { status: 400 });
@@ -86,6 +90,8 @@ export async function POST(
       // The instruction behind a research revision travels downstream with the
       // revised one-pager, so later stages know what was corrected and why.
       ...(stage === "stage1" ? { research_edit_notes: appendResearchNote(run.research_edit_notes, instructions.trim()) } : {}),
+      // The shared log every later stage reads (lib/run-context.ts).
+      run_edits: appendEdit(run.run_edits, { kind: stage === "stage1" ? "research" : "copy", how: "ai", note: instructions.trim() }),
     } as Partial<Run>);
 
     // Regenerated Stage 2 copy → refresh the structured per-field JSON so the
@@ -100,9 +106,17 @@ export async function POST(
       if (body.mode === "angle") {
         await updateRun(runId, { stage2_angle_key: angleKey(run.product_angle_selected) }).catch(() => {});
       }
+      // A rebuild on the current context brings every fingerprint up to date.
+      if (body.mode === "context") {
+        await updateRun(runId, {
+          stage2_built_on: builtOnFor(run, "stage2"),
+          stage2_angle_key: angleKey(run.product_angle_selected),
+          stage2_research_key: researchKey(run),
+        }).catch(() => {});
+      }
       // Likewise only a rebuild ON the revised research clears that flag.
       if (body.mode === "research") {
-        await updateRun(runId, { stage2_research_key: researchKey(run) }).catch(() => {});
+        await updateRun(runId, { stage2_research_key: researchKey(run), stage2_built_on: builtOnFor(run, "stage2") }).catch(() => {});
       }
       try {
         const structured = await structureStage2Copy(result.output, runId);
@@ -243,7 +257,7 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   const currentCopy = run.stage2_copy_edited ?? run.stage2_output ?? "";
   if (!currentCopy) throw new Error("No Stage 2 copy to regenerate yet");
 
-  const onePager = onePagerForDownstream(run);
+  const onePager = onePagerForDownstream(run) + contextBlock(run, "stage2");
   const research = pickRevised(run, "step_research");
   const avatar = pickRevised(run, "step_avatar");
 

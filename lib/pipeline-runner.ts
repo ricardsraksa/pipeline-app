@@ -9,6 +9,7 @@ import type { Run } from "./db";
 import { getModel } from "./models";
 import { marketBlock, parseMarketPosition, parseStoredMarketPosition } from "./market";
 import { onePagerForDownstream, researchKey } from "./research-edits";
+import { builtOnFor, contextBlock } from "./run-context";
 import {
   runIdentify,
   runMarket,
@@ -787,6 +788,8 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   // nothing here; it now leads the brief and, when edited, overrides them.
   const onePager = onePagerForDownstream(run);
   const onePagerSection = onePager ? `\n\nRESEARCH ONE-PAGER:\n${onePager}` : "";
+  // What the operator has changed by hand anywhere upstream of the copy.
+  const editsSection = contextBlock(run, "stage2");
   const angle = anglesBlock(parseSelectedAngles(run.product_angle_selected));
   const angleSection = angle
     ? `\n\nPOSITIONING ANGLE(S) (chosen by the operator — build the ENTIRE copy kit around the PRIMARY angle's problem and mechanism; the headline, hero benefit and first section serve it; supporting angles, if any, appear in later benefits, sections, FAQs and objections; never drift back to a generic "best X" or "only Y" pitch):\n${angle}`
@@ -797,7 +800,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
 
   const output = await anthropicMessage({
     system: stage2System,
-    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}${onePagerSection}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${marketSection}${angleSection}\n\nProduce the complete copy kit now.`,
+    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}${onePagerSection}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${marketSection}${angleSection}${editsSection}\n\nProduce the complete copy kit now.`,
     maxTokens: 32_000,
     label: "stage 2 copy",
       runId,
@@ -812,6 +815,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
     stage2_output: output,
     stage2_angle_key: angleKey(run.product_angle_selected),
     stage2_research_key: researchKey(run),
+    stage2_built_on: builtOnFor(run, "stage2"),
     current_step: "Stage 3: Saving output",
     last_updated_at: now(),
   });

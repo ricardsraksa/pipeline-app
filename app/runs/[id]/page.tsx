@@ -545,8 +545,15 @@ export default function RunPage() {
   };
   // Same idea for the research: the angles and the copy each remember the
   // one-pager they were built on. Unknown (older runs) never counts as stale.
-  const anglesResearchStale = Boolean(run.research?.anglesStale);
-  const copyResearchStale = Boolean(run.research?.copyStale);
+  // What changed upstream of each generated stage since it was built.
+  const PART_LABEL: Record<string, string> = { product: "the product description", research: "the research", angles: "the angle", copy: "the copy", images: "the images" };
+  const changedFor = (stage: "angles" | "stage2" | "stage3" | "ads"): string[] => run.context?.changed?.[stage] ?? [];
+  const partsSentence = (parts: string[]) => {
+    const labels = parts.map((p) => PART_LABEL[p] ?? p);
+    return labels.length <= 1 ? (labels[0] ?? "") : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+  };
+  const anglesResearchStale = changedFor("angles").length > 0;
+  const copyResearchStale = changedFor("stage2").length > 0;
   const newAnglesFromResearch = async () => {
     if (!runId || reAngling) return;
     setReAngling(true);
@@ -561,17 +568,17 @@ export default function RunPage() {
     if (!runId || rebuilding) return;
     setRebuilding(true);
     try {
-      const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "research" }) });
+      const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "context" }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) { push(`Rebuild failed: ${data.error ?? res.status}`); setRebuilding(false); return; }
       window.location.reload();
     } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
   };
-  const imagesResearchStale = Boolean(run.research?.imagesStale);
-  const adsResearchStale = Boolean(run.research?.adsStale);
+  const imagesResearchStale = changedFor("stage3").length > 0;
+  const adsResearchStale = changedFor("ads").length > 0;
   const keepAsIs = async (which: "angles" | "stage2" | "stage3" | "ads") => {
     try {
-      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ research_ack: which }) });
+      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context_ack: which }) });
       window.dispatchEvent(new Event("run:changed"));
     } catch { push("Couldn't save that"); }
   };
@@ -650,7 +657,11 @@ export default function RunPage() {
                 style={{ gridTemplateColumns: "16px 1fr auto" }}>
                 <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{def.n}</span>
                 <span className={cx("text-[13px] font-[500]", on ? "text-[var(--color-text)]" : "text-[var(--color-text-2)]")}>{def.title}</span>
-                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] || (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) || (def.key === "stage3" && imagesResearchStale) || (def.key === "ads" && adsResearchStale) ? "var(--color-amber)" : stateTone[st] }}>{angleStale[def.key] ? "angle changed" : (def.key === "stage2" && copyResearchStale) || (def.key === "stage1" && anglesResearchStale) || (def.key === "stage3" && imagesResearchStale) || (def.key === "ads" && adsResearchStale) ? "research changed" : stateWord[st]}</span>
+                <span className="ff-mono text-[11px]" style={{ color: angleStale[def.key] || (def.key === "stage1" && anglesResearchStale) || (def.key === "stage2" && copyResearchStale) || (def.key === "stage3" && imagesResearchStale) || (def.key === "ads" && adsResearchStale) ? "var(--color-amber)" : stateTone[st] }}>{(() => {
+                  const ch = def.key === "stage1" ? changedFor("angles") : def.key === "stage2" ? changedFor("stage2") : def.key === "stage3" ? changedFor("stage3") : def.key === "ads" ? changedFor("ads") : [];
+                  if (!ch.length) return angleStale[def.key] ? "angle changed" : stateWord[st];
+                  return ch.length === 1 ? `${PART_LABEL[ch[0]]?.replace(/^the /, "") ?? ch[0]} changed` : `${ch.length} changes`;
+                })()}</span>
               </button>
             );
           })}
@@ -783,8 +794,8 @@ export default function RunPage() {
                 {runId !== null && (
                   <div className="mb-[30px]">
                     <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
-                    <ResearchStaleFlag which="angles" show={anglesResearchStale} text="The research was revised after these angles were proposed." action={
-                      <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "New angles from the revised research"}</button>
+                    <ResearchStaleFlag which="angles" show={anglesResearchStale} text={`${partsSentence(changedFor("angles"))} changed since these angles were proposed.`} action={
+                      <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "Propose new angles"}</button>
                     } />
                     <AnglePicker runId={runId} run={run} editable />
                   </div>
@@ -838,8 +849,8 @@ export default function RunPage() {
                 </div>
               )}
             </div>
-            <ResearchStaleFlag which="stage2" show={copyResearchStale} text="The research was revised after this copy was written." action={
-              <button onClick={rebuildCopyOnResearch} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on the revised research"}</button>
+            <ResearchStaleFlag which="stage2" show={copyResearchStale} text={`${partsSentence(changedFor("stage2"))} changed since this copy was written.`} action={
+              <button onClick={rebuildCopyOnResearch} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild the copy"}</button>
             } />
             <StaleFlag stage="stage2" action={
               <button onClick={rebuildCopyOnAngle} disabled={rebuilding} className="btn btn-sm btn-primary">{rebuilding ? "Rebuilding…" : "Rebuild copy on this angle"}</button>
@@ -892,8 +903,9 @@ export default function RunPage() {
               )}
             </div>
             <StaleFlag stage="stage3" />
-            <ResearchStaleFlag which="stage3" show={imagesResearchStale} text={copyResearchStale ? "The research was revised after these images were made. Rebuild the copy first, then the images." : "The research was revised after these images were made."} action={
-              <button onClick={() => handleRestartStage("stage3-prompts")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Redo images on the revised research"}</button>
+            <ResearchStaleFlag which="stage3" show={imagesResearchStale}
+              text={`${partsSentence(changedFor("stage3"))} changed since these images were made.${copyResearchStale ? " Rebuild the copy first, then the images." : ""}`} action={
+              <button onClick={() => handleRestartStage("stage3-prompts")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Redo the images"}</button>
             } />
             <div className="mb-3"><FeedbackAppliedChip stage={3} /></div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
@@ -909,8 +921,9 @@ export default function RunPage() {
               {runId !== null && <RestartStage stage="ads" />}
             </div>
             <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]"></span>} />
-            <ResearchStaleFlag which="ads" show={adsResearchStale} text={copyResearchStale ? "The research was revised after these ads were written. Rebuild the copy first, then the ads." : "The research was revised after these ads were written."} action={
-              <button onClick={() => handleRestartStage("ads")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Rewrite the ads on the revised research"}</button>
+            <ResearchStaleFlag which="ads" show={adsResearchStale}
+              text={`${partsSentence(changedFor("ads"))} changed since these ads were written.${copyResearchStale ? " Rebuild the copy first, then the ads." : ""}`} action={
+              <button onClick={() => handleRestartStage("ads")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Rewrite the ads"}</button>
             } />
             <AdsFlow runId={Number(runId)} />
           </>

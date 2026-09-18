@@ -6,6 +6,7 @@ import { generateStage3Image } from "@/lib/stage3/higgsfield";
 import { auditImage } from "@/lib/stage3/audit";
 import { upsertAdImage } from "@/lib/stage3/upsert";
 import { stopRequested, type Alive } from "@/lib/jobs";
+import { effectiveDescription } from "@/lib/run-context";
 
 const ALWAYS: Alive = () => true;
 
@@ -27,7 +28,7 @@ function productRefs(run: Run, refs: string[]): string[] {
 }
 
 async function produceAd(runId: number, run: Run, p: AdPrompt, promptText: string, refs: string[], prior: AdImage | undefined): Promise<AdImage> {
-  const productDesc = run.product_description_edited ?? run.product_description_ai ?? run.product_description ?? run.product_name ?? "";
+  const productDesc = effectiveDescription(run);
   const history = [
     ...(prior?.image_url ? [{ image_url: prior.image_url, prompt: p.prompt }] : []),
     ...(prior?.history ?? []),

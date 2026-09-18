@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
 import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
+import { builtOnFor, contextBlock, effectiveCopy, effectiveDescription } from "@/lib/run-context";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
@@ -105,9 +106,10 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
 
   const user = [
     `PRODUCT NAME: ${productName}`,
+    contextBlock(run, "ads"),
     "",
     "PRODUCT DESCRIPTION (what it physically is):",
-    run.product_description ?? "(none)",
+    effectiveDescription(run) || "(none)",
     "",
     ...(() => {
       const mb = marketBlock(parseStoredMarketPosition(run.market_position));
@@ -117,7 +119,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     anglesBlock(parseSelectedAngles(run.product_angle_selected)) || "(none chosen)",
     "",
     "STAGE 3 COPY KIT (reuse lines verbatim where they fit):",
-    (run.stage2_copy_edited ?? run.stage2_output ?? "(none)").slice(0, CAP),
+    (effectiveCopy(run) || "(none)").slice(0, CAP),
     "",
     "RESEARCH ONE-PAGER:",
     (onePagerForDownstream(run) || "(none)").slice(0, CAP),
@@ -211,6 +213,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
     ads_prompts: JSON.stringify(prompts),
     ads_angle_key: angleKey(run.product_angle_selected),
     ads_research_key: researchKey(run),
+    ads_built_on: builtOnFor(run, "ads"),
     ads_prompts_edited: null,
     ads_step: "review",
     ads_error: null,

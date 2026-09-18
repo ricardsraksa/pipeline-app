@@ -1,4 +1,4 @@
-import { researchKey, researchWasEdited } from "@/lib/research-edits";
+import { contextStatus, parseEdits } from "@/lib/run-context";
 import { NextRequest, NextResponse } from "next/server";
 import { getRun, getKV } from "@/lib/db";
 
@@ -136,24 +136,9 @@ export async function GET(
     },
     // The research as the operator has it now vs. what the angles and the copy
     // were built on (null = unknown / built before this was tracked).
-    research: (() => {
-      const key = researchKey(run);
-      const hasCopy = Boolean(run.stage2_output);
-      const hasAngles = Boolean(run.product_angles);
-      // Built with a recorded fingerprint: stale when it differs.
-      // No fingerprint means the copy predates v2.91: it was written from the
-      // research documents alone and never read the one-pager, so ANY operator
-      // edit is missing from it, whichever came first.
-      const copyStale = hasCopy && !!key && (run.stage2_research_key ? run.stage2_research_key !== key : researchWasEdited(run));
-      const anglesStale = hasAngles && !!key && Boolean(run.angles_research_key && run.angles_research_key !== key);
-      // Images and ads are built on the copy, so the same rule applies: a
-      // recorded fingerprint that differs, or none at all on an edited run.
-      const hasImages = Boolean(run.stage3_remaining_prompts || run.stage3_hero_image_url);
-      const hasAds = Boolean(run.ads_prompts);
-      const imagesStale = hasImages && !!key && (run.stage3_research_key ? run.stage3_research_key !== key : researchWasEdited(run));
-      const adsStale = hasAds && !!key && (run.ads_research_key ? run.ads_research_key !== key : researchWasEdited(run));
-      return { key, copyStale, anglesStale, imagesStale, adsStale };
-    })(),
+    // What has changed upstream of each generated stage since it was built,
+    // and every operator edit in order (lib/run-context.ts).
+    context: { changed: contextStatus(run), edits: parseEdits(run.run_edits) },
     meta: {
       productUrl: run.product_url,
       productName: run.product_name,

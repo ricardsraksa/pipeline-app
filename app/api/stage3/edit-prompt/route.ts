@@ -5,7 +5,8 @@ import { recordUsage } from "@/lib/db";
 import { assertPublicUrl } from "@/lib/ssrf";
 
 import { requireSession } from "@/lib/auth";
-import { getRun } from "@/lib/db";
+import { appendEdit } from "@/lib/run-context";
+import { getRun, updateRun } from "@/lib/db";
 import { getPrompt } from "@/lib/prompts";
 import { HERO_SYSTEM, REMAINING_SYSTEM } from "@/lib/stage3/hero";
 // POST { prompt, instructions, category? }  →  { success, prompt }
@@ -130,6 +131,11 @@ ${SYSTEM}`,
         { success: false, error: "Empty response from Claude" },
         { status: 502 }
       );
+    }
+    if (typeof body.run_id === "number") {
+      // Recorded on the run's shared log so later stages see the instruction.
+      const r = await getRun(body.run_id);
+      if (r) await updateRun(body.run_id, { run_edits: appendEdit(r.run_edits, { kind: String(body.category ?? "").startsWith("ad_") ? "ads_briefs" : "image_prompts", how: "ai", note: String(body.instructions ?? "") }) });
     }
     return NextResponse.json({ success: true, prompt: out });
   } catch (err) {

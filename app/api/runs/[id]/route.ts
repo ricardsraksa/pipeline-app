@@ -6,6 +6,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 import { requireSession } from "@/lib/auth";
 import { validateBundles } from "@/lib/pricing";
 import { researchKey } from "@/lib/research-edits";
+import { appendEdit, builtOnFor, type BuiltStage, type EditKind } from "@/lib/run-context";
 import { upsertAdImage, upsertStage3Image } from "@/lib/stage3/upsert";
 import { validateMarketPosition } from "@/lib/market";
 import { assertPublicUrl } from "@/lib/ssrf";
@@ -21,6 +22,17 @@ async function assertImageUrls(urls: unknown[]): Promise<void> {
     if (typeof u !== "string" || u.length > 2048) throw new Error("Image URLs must be strings");
     if (!u.startsWith("https://")) throw new Error(`Image URL must be https: ${u.slice(0, 80)}`);
     await assertPublicUrl(u);
+  }
+}
+
+/** Record one operator edit on the run's shared log (lib/run-context.ts). */
+async function noteEdit(runId: number, kind: EditKind, how: "hand" | "ai", note?: string): Promise<void> {
+  try {
+    const row = await db.execute({ sql: "SELECT run_edits FROM runs WHERE id = ?", args: [runId] });
+    const raw = (row.rows[0] as unknown as { run_edits: string | null })?.run_edits ?? null;
+    await db.execute({ sql: "UPDATE runs SET run_edits = ? WHERE id = ?", args: [appendEdit(raw, { kind, how, note }), runId] });
+  } catch (e) {
+    console.error("[run-edits] could not record an edit:", e);
   }
 }
 
@@ -279,6 +291,9 @@ export async function PATCH(
       sql: `UPDATE runs SET ${editedCol} = ?, ${editedAtCol} = ? WHERE id = ?`,
       args: [value, ts, Number(id)],
     });
+    // The rest of the run needs to know this was changed by hand.
+    const editKind: EditKind | null = field === "stage1_one_pager" ? "research" : field === "stage2_copy" ? "copy" : field === "stage3_image_prompts" ? "image_prompts" : null;
+    if (editKind && !stage2TextUnchanged) await noteEdit(Number(id), editKind, "hand");
 
     // Editing the Stage 2 copy must also refresh the structured JSON — it's what
     // the per-field Copy tab renders, and it was previously derived once at
@@ -307,6 +322,9 @@ export async function PATCH(
 
   const fields: string[] = [];
   const values: (string | number | null)[] = [];
+  // Operator edits in this request, recorded on the run's shared log once the
+  // write lands so every later stage knows what was changed by hand.
+  const edited: EditKind[] = [];
 
   if ("feedback_stage1" in body)  { fields.push("feedback_stage1 = ?");  values.push(body.feedback_stage1 ?? null); }
   if ("feedback_stage2" in body)  { fields.push("feedback_stage2 = ?");  values.push(body.feedback_stage2 ?? null); }
@@ -349,8 +367,10 @@ export async function PATCH(
   if ("step_avatar_revised" in body)          { fields.push("step_avatar_revised = ?");          values.push(body.step_avatar_revised ?? null); }
   if ("step_offer_brief_revised" in body)     { fields.push("step_offer_brief_revised = ?");     values.push(body.step_offer_brief_revised ?? null); }
   if ("step_necessary_beliefs_revised" in body){ fields.push("step_necessary_beliefs_revised = ?");values.push(body.step_necessary_beliefs_revised ?? null); }
+  if ("product_angle_selected" in body || "product_angles" in body) edited.push("angles");
   if ("stage3_hero_prompt_edited" in body)        { fields.push("stage3_hero_prompt_edited = ?");        values.push(body.stage3_hero_prompt_edited ?? null); }
   if ("stage3_remaining_prompts" in body)         { fields.push("stage3_remaining_prompts = ?");         values.push(body.stage3_remaining_prompts ?? null); }
+  if ("stage3_hero_prompt_edited" in body || "stage3_remaining_prompts_edited" in body) edited.push("image_prompts");
   if ("stage3_remaining_prompts_edited" in body)  { fields.push("stage3_remaining_prompts_edited = ?");  values.push(body.stage3_remaining_prompts_edited ?? null); }
   if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
   if ("stage3_reference_images" in body) {
@@ -379,6 +399,7 @@ export async function PATCH(
       values.push(JSON.stringify({ ...(v as object), at: new Date().toISOString() }).slice(0, 200_000));
     }
   }
+  if ("ads_prompts_edited" in body && body.ads_prompts_edited) edited.push("ads_briefs");
   if ("ads_prompts_edited" in body) { fields.push("ads_prompts_edited = ?"); values.push(typeof body.ads_prompts_edited === "string" ? body.ads_prompts_edited.slice(0, 400_000) : null); }
   if ("ads_images" in body)         { fields.push("ads_images = ?");         values.push(typeof body.ads_images === "string" ? body.ads_images.slice(0, 400_000) : null); }
   if ("ads_ref_overrides" in body)  { fields.push("ads_ref_overrides = ?");  values.push(typeof body.ads_ref_overrides === "string" ? body.ads_ref_overrides.slice(0, 100_000) : null); }
@@ -470,13 +491,24 @@ export async function PATCH(
     }
   }
   if ("stage3_ref_overrides" in body)             { fields.push("stage3_ref_overrides = ?");             values.push(body.stage3_ref_overrides ?? null); }
-  if ("research_ack" in body) {
-    // "Keep as is": the operator has seen that the research changed and wants
-    // this stage left alone, so it is stamped with the current fingerprint.
-    const col = { angles: "angles_research_key", stage2: "stage2_research_key", stage3: "stage3_research_key", ads: "ads_research_key" }[String((body as { research_ack?: unknown }).research_ack)];
-    if (!col) return Response.json({ error: "research_ack must be angles, stage2, stage3 or ads" }, { status: 400 });
+  if ("context_ack" in body || "research_ack" in body) {
+    // "Keep as is": the operator has seen what changed upstream and wants this
+    // stage left as it stands, so it is re-stamped with the context as it is
+    // now and stops reporting itself out of date.
+    const stage = String((body as { context_ack?: unknown; research_ack?: unknown }).context_ack ?? (body as { research_ack?: unknown }).research_ack) as BuiltStage;
+    const cols: Record<BuiltStage, { built: string; research: string }> = {
+      angles: { built: "angles_built_on", research: "angles_research_key" },
+      stage2: { built: "stage2_built_on", research: "stage2_research_key" },
+      stage3: { built: "stage3_built_on", research: "stage3_research_key" },
+      ads: { built: "ads_built_on", research: "ads_research_key" },
+    };
+    const col = cols[stage];
+    if (!col) return Response.json({ error: "context_ack must be angles, stage2, stage3 or ads" }, { status: 400 });
     const current = await getRun(Number(id));
-    if (current) { fields.push(`${col} = ?`); values.push(researchKey(current)); }
+    if (current) {
+      fields.push(`${col.built} = ?`); values.push(builtOnFor(current, stage));
+      fields.push(`${col.research} = ?`); values.push(researchKey(current));
+    }
   }
   if ("product_code" in body) {
     // "58" and "p58" both mean P58 — the P is the app's, the number is the operator's.
@@ -506,6 +538,7 @@ export async function PATCH(
     sql: `UPDATE runs SET ${fields.join(", ")} WHERE id = ?`,
     args: [...values, Number(id)],
   });
+  for (const kind of [...new Set(edited)]) await noteEdit(Number(id), kind, "hand");
 
   // Stage 4 finishing is the cue to write the five ad briefs. Fire-and-forget,
   // once per run: the operator still approves every premise and prompt before

@@ -157,15 +157,19 @@ At the gate, two halves:
   - Any angle's wording can be edited.
   - "Write my own" opens the same fields blank and adds an operator angle.
   - "New angles" regenerates, with an optional steer ("more health-focused").
-- An edited one-pager (by hand or from a note) is what every later stage
-  follows: angles, copy, image prompts and ads receive it marked as overriding
-  the research documents beneath it, with the revision notes. When it changes
-  after the angles or the copy were built, an amber line offers "New angles
-  from the revised research" here and "Rebuild copy on the revised research"
-  on Copy, and the rail reads "research changed". Images and Ads carry the
-  same line ("Redo images…" / "Rewrite the ads…", disabled until the copy has
-  been rebuilt, since both are built on it). Every such line also has "Keep
-  as is", which accepts the stage as it stands and clears the flag.
+- **Edits travel.** Anything the operator changes — the product description,
+  the research one-pager, the angle, the copy, an image prompt, an ad brief —
+  is recorded on the run and handed to every stage built afterwards, together
+  with what was asked for ("it is olive wood, not teak"). The edited text
+  always wins over the generated text beneath it.
+- **Stages say when they are behind.** Each generated stage remembers the
+  context it was built from (product description, research, angle, copy,
+  images). When any of those changes, that stage shows one amber line naming
+  it — "the research and the copy changed since these images were made" — with
+  the button to redo it ("Propose new angles", "Rebuild the copy", "Redo the
+  images", "Rewrite the ads") and "Keep as is" to accept it as it stands. The
+  rail says "copy changed" or "2 changes". Images and Ads wait for the copy to
+  be rebuilt first, since both are built on it.
 - Also here: regenerate the research from a note, thumbs up/down with a note, the
   exact prompt this run used, download the foundational documents, a note when
   competitor links couldn't be read.

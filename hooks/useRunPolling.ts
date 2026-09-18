@@ -54,7 +54,11 @@ export interface RunStatus {
     stage3Key: string | null;
     adsKey: string | null;
   };
-  research?: { key: string | null; copyStale: boolean; anglesStale: boolean; imagesStale: boolean; adsStale: boolean };
+  /** lib/run-context.ts: what changed upstream of each stage, and the edit log. */
+  context?: {
+    changed: { angles: string[]; stage2: string[]; stage3: string[]; ads: string[] };
+    edits: Array<{ at: string; kind: string; how: "hand" | "ai"; note?: string }>;
+  };
   meta: {
     productUrl: string;
     productName: string | null;

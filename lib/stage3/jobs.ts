@@ -16,6 +16,7 @@ import { stopRequested, type Alive } from "@/lib/jobs";
 
 const ALWAYS: Alive = () => true;
 import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
+import { builtOnFor, contextBlock, effectiveDescription } from "@/lib/run-context";
 
 export interface RemImage {
   index: number;
@@ -77,7 +78,7 @@ export async function heroJob(runId: number, alive: Alive = ALWAYS): Promise<voi
       const onePager = onePagerForDownstream(run);
       const copy = run.stage2_copy_edited ?? run.stage2_output ?? "";
       await recordPromptUsed(runId, "stage3_hero", HERO_SYSTEM);
-      const out = await generateHeroPrompt({ onePager, copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
+      const out = await generateHeroPrompt({ onePager: onePager + contextBlock(run, "stage3"), copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
       hero = out.hero;
       if (!alive()) return;
       await updateRun(runId, { stage3_hero_prompt: JSON.stringify(hero), stage3_hero_validation: JSON.stringify(out.validation), last_updated_at: now() });
@@ -158,7 +159,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
     const visual = extractVisualSection(run.step_research_revised ?? run.step_research ?? "");
     await recordPromptUsed(runId, "stage3_remaining", REMAINING_SYSTEM);
     const { prompts, validation } = await generateRemainingPrompts({
-      onePager, copy, avatar, visual,
+      onePager: onePager + contextBlock(run, "stage3"), copy, avatar, visual,
       angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)),
       referenceImageUrls: heroUrl ? [heroUrl] : sourceImageUrls,
       extraReferenceUrls: safeArr(run.stage3_reference_images),
@@ -172,6 +173,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
       stage3_remaining_prompts: JSON.stringify(prompts),
       stage3_angle_key: angleKey(run.product_angle_selected),
       stage3_research_key: researchKey(run),
+      stage3_built_on: builtOnFor(run, "stage3"),
       stage3_remaining_validation: JSON.stringify(validation),
       status: "awaiting_qc",
       current_step: "Stage 4: Review the 8 prompts before generating",
@@ -188,7 +190,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
 
 /** Generate, audit and store one image for a prompt. Keeps the replaced image in history. */
 async function produceImage(runId: number, run: Run, p: RemainingPrompt, promptText: string, refs: string[], prior: RemImage | undefined): Promise<RemImage> {
-  const productDesc = run.product_description_edited ?? run.product_description_ai ?? run.product_description ?? run.product_name ?? "";
+  const productDesc = effectiveDescription(run);
   const history = [
     ...(prior?.image_url ? [{ image_url: prior.image_url, prompt: p.prompt }] : []),
     ...(prior?.history ?? []),
