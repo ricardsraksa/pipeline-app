@@ -102,6 +102,10 @@ stage at a time and the app follows the pipeline to whichever needs attention.
 - Price: the suggested retail price and compare-at from the Pricing card, with
   the multiple of COGS. Opens Stage 3.
 - Downloads: the research and copy documents; the generated images.
+- **Restart run** (bottom of the rail): deletes everything the run generated —
+  research, angles, copy, images, ads, pricing and every edit made to them —
+  keeps the links, the uploaded photos and the product code, and starts again
+  from the scrape. Confirms first.
 - Links: the source listing and each competitor link the run was built from,
   each opening in a new tab.
 - Deliver rows: Google Doc, Shopify and Drive. One Drive click sends whatever

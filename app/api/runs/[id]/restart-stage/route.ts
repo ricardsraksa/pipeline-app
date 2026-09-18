@@ -6,12 +6,50 @@ import { requireSession } from "@/lib/auth";
 import { invalidateRun } from "@/lib/jobs";
 export const maxDuration = 10;
 
-type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images" | "ads";
+type RestartStage = "run" | "product" | "stage1" | "stage2" | "stage3-prompts" | "stage3-images" | "ads";
 
 // Map a stage label to the DB columns that need to be cleared so the pipeline
 // runner picks the stage back up from scratch on the next resume.
 function fieldsToClear(stage: RestartStage): Partial<Run> {
   switch (stage) {
+    case "run":
+      // Everything this run generated, back to the links and photos it was
+      // started from. The product code, the URLs and the operator's own
+      // uploads stay; every generated artefact, every edit made to one, and
+      // the delivery state go, so the rerun starts from a clean sheet.
+      return {
+        ...fieldsToClear("product"),
+        ...fieldsToClear("stage2"),
+        ...fieldsToClear("stage3-prompts"),
+        ...fieldsToClear("ads"),
+        product_pricing: null,
+        product_variants_edited: null,
+        variants_refresh_requested: null,
+        stage3_source_blacklist: null,
+        stage3_reference_images: null,
+        market_position: null,
+        run_edits: null,
+        research_edit_notes: null,
+        angles_built_on: null,
+        stage2_built_on: null,
+        stage3_built_on: null,
+        ads_built_on: null,
+        angles_research_key: null,
+        stage2_research_key: null,
+        stage3_research_key: null,
+        ads_research_key: null,
+        stage2_angle_key: null,
+        stage3_angle_key: null,
+        ads_angle_key: null,
+        stage1_edited_at: null,
+        stage1_one_pager_edited_at: null,
+        prompts_used: null,
+        // Delivery state: what was sent where no longer describes this run.
+        gdoc_appended_at: null,
+        shopify_push_state: null,
+        ads_drive_state: null,
+        snoozed_at: null,
+      };
     case "product":
       // Re-scrape + re-describe. Research depends on the description and the
       // photo selection, so it is cleared too (it re-runs after the gate).
@@ -118,7 +156,7 @@ export async function POST(
 
   const body = (await req.json().catch(() => ({}))) as { stage?: string };
   const stage = body.stage as RestartStage | undefined;
-  const validStages: RestartStage[] = ["product", "stage1", "stage2", "stage3-prompts", "stage3-images", "ads"];
+  const validStages: RestartStage[] = ["run", "product", "stage1", "stage2", "stage3-prompts", "stage3-images", "ads"];
   if (!stage || !validStages.includes(stage)) {
     return NextResponse.json({ error: `stage must be one of ${validStages.join(", ")}` }, { status: 400 });
   }
@@ -133,6 +171,7 @@ export async function POST(
   invalidateRun(runId);
 
   const isStage3 = stage === "stage3-prompts" || stage === "stage3-images";
+  // A whole-run restart goes back to the very beginning, exactly like "product".
   if (stage === "ads") {
     await updateRun(runId, { ...fieldsToClear(stage), last_updated_at: new Date().toISOString() });
     return NextResponse.json({ success: true });

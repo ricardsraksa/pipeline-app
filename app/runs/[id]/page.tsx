@@ -179,7 +179,7 @@ const stageActionable = (st: StageState) => ["running", "waiting", "error"].incl
 
 // ── Stage actions (back / restart) ────────────────────────────────────────────
 
-type RestartStage = "product" | "stage1" | "stage2" | "stage3-prompts" | "ads";
+type RestartStage = "run" | "product" | "stage1" | "stage2" | "stage3-prompts" | "ads";
 
 // ── Next action (bottom bar content) ──────────────────────────────────────────
 
@@ -302,7 +302,9 @@ export default function RunPage() {
   async function handleRestartStage(stage: RestartStage) {
     if (!runId || restarting) return;
     const isStage3 = stage === "stage3-prompts";
-    if (!window.confirm(isStage3
+    if (!window.confirm(stage === "run"
+      ? "Restart the whole run? Deletes the research, angles, copy, images, ads, pricing and every edit you made to them. Keeps the links, your uploaded photos and the product code, and starts again from the scrape."
+      : isStage3
       ? "Restart Stage 4? Deletes the hero, the 8 images and the placement."
       : stage === "ads"
       ? "Restart Stage 5? Deletes the five ad briefs and images."
@@ -758,6 +760,7 @@ export default function RunPage() {
           {a.running && !isTerminal && (
             <button onClick={handleKill} disabled={killing} className="btn btn-sm btn-danger">{killing ? "Killing…" : "Kill run"}</button>
           )}
+          <button onClick={() => handleRestartStage("run")} disabled={restarting} className="btn btn-sm btn-danger">{restarting ? "Restarting…" : "Restart run"}</button>
         </div>
       </aside>
 

@@ -49,6 +49,16 @@ async function numbersInDoc(): Promise<Set<number>> {
   return out;
 }
 
+/** Where the next number comes from — for the new-run form and for diagnosis. */
+export async function productCodeDiagnostics(): Promise<{ highestInRuns: number; docConfigured: boolean; docNumbers: number[] }> {
+  const [runs, taken] = await Promise.all([highestInRuns(), numbersInDoc()]);
+  return {
+    highestInRuns: runs,
+    docConfigured: googleDocConfigured(),
+    docNumbers: [...taken].sort((a, b) => a - b).slice(-40),
+  };
+}
+
 /** The next code in the sequence, e.g. "P75". Never throws. */
 export async function nextProductCode(): Promise<string> {
   const [runs, taken] = await Promise.all([highestInRuns(), numbersInDoc()]);
