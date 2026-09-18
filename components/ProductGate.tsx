@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/Toasts";
+import AIRegenerate from "@/components/AIRegenerate";
 import {
   parseProductScrape,
   productCandidateImages,
@@ -262,6 +263,10 @@ export default function ProductGate({
           <div className="flex-1" />
           <span className="ff-mono text-[10.5px] text-[var(--color-text-3)]">{words} words</span>
           {waiting && <button onClick={regenerate} disabled={regenerating || approving || !scrape?.pages.some((p) => p.ok)} className={textBtn}>{regenerating ? "Rewriting…" : "Regenerate"}</button>}
+          {waiting && (
+            <AIRegenerate runId={runId} stage="product" triggerLabel="Edit with AI"
+              onRegenerated={(next) => { setText(next); onChanged(); }} />
+          )}
           {waiting && product?.descriptionAi && text.trim() !== product.descriptionAi.trim() && (
             <button onClick={() => setText(product.descriptionAi ?? "")} className={textBtn}>Restore</button>
           )}

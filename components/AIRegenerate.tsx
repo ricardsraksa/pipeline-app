@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 
 interface AIRegenerateProps {
   runId: number;
-  stage: "stage1" | "stage2" | "stage3-prompts";
+  stage: "product" | "stage1" | "stage2" | "stage3-prompts";
   /** Called with the new output once regeneration succeeds */
   onRegenerated: (newOutput: string) => void;
   /** Label override for the trigger button (defaults to "Edit with AI") */
@@ -17,6 +17,8 @@ interface AIRegenerateProps {
 }
 
 const STAGE_HINTS: Record<AIRegenerateProps["stage"], string> = {
+  product:
+    "e.g. It is olive wood, not teak — the listing is wrong. Or: say it fits a standard 60cm shelf.",
   stage1:
     "e.g. Add more technical detail about the filtration system, or focus the benefits on long-term health outcomes.",
   stage2:

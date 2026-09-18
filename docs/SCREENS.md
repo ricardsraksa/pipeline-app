@@ -125,7 +125,10 @@ At the gate, two halves:
   number of option groups, photo counts). Failed rows show why.
 - **The description** — the model's ~200-word plain-prose description of what the
   product physically is and does, editable in place, with a word count,
-  "Regenerate description" and "Restore original".
+  "Edit with AI" (an instruction like "it is olive wood, not teak" — the
+  description is rewritten under the same Stage 1 rules, and the instruction
+  goes on the run's edit log so every later stage sees it), "Regenerate
+  description" and "Restore original".
 - **The photos** — every photo the run has, grouped: your photos, listing photos,
   description images, competitor photos. Each is tickable (max 10). "Add my
   photos" uploads more.

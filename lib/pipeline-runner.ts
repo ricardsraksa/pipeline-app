@@ -9,7 +9,7 @@ import type { Run } from "./db";
 import { getModel } from "./models";
 import { marketBlock, parseMarketPosition, parseStoredMarketPosition } from "./market";
 import { onePagerForDownstream, researchKey } from "./research-edits";
-import { builtOnFor, contextBlock } from "./run-context";
+import { builtOnFor, contextBlock, effectiveDescription } from "./run-context";
 import {
   runIdentify,
   runMarket,
@@ -481,7 +481,7 @@ async function runStage1(runId: number, run: Run): Promise<void> {
   const inputs: ResearchInputs = {
     runId,
     product_url: run.product_url,
-    product_description: run.product_description ?? undefined,
+    product_description: effectiveDescription(run) || undefined,
     scraped_text: scraperData.scraped_text ?? "",
     competitor_urls: safeJson<string[]>(run.competitor_urls, []),
     competitor_scraped: scraperData.competitor_scraped ?? [],

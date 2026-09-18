@@ -21,21 +21,22 @@ const REBUILD_ON_RESEARCH =
   "The research one-pager was revised by the operator AFTER this copy was written. The revised one-pager is given under ONE-PAGER and is authoritative. Rebuild the copy so every part of it agrees with the revised one-pager: correct any claim, audience, use case, benefit or product detail the revision changed or removed, and bring in what it added. Keep the section structure, keep lines that are still accurate, and change nothing the revision does not touch.";
 
 import { requireSession } from "@/lib/auth";
+import { parseProductScrape } from "@/lib/product";
 import { appendResearchNote, onePagerForDownstream, researchKey } from "@/lib/research-edits";
-import { appendEdit, builtOnFor, contextBlock } from "@/lib/run-context";
+import { appendEdit, builtOnFor, contextBlock, effectiveDescription } from "@/lib/run-context";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
 // rewrite plus the mechanical re-structuring for the Copy tab) — give it room.
 export const maxDuration = 300;
 
-type Stage = "stage1" | "stage2" | "stage3-prompts";
+type Stage = "product" | "stage1" | "stage2" | "stage3-prompts";
 
 interface RegenResult {
   /** logical field name — maps to {field}_edited DB column */
-  field: "stage1_one_pager" | "stage2_copy" | "stage3_image_prompts";
-  /** which {stage}_edited_at column to bump */
-  stageTimestamp: "stage1_edited_at" | "stage2_edited_at" | "stage3_edited_at";
+  field: "product_description" | "stage1_one_pager" | "stage2_copy" | "stage3_image_prompts";
+  /** which {stage}_edited_at column to bump — the product gate has none */
+  stageTimestamp?: "stage1_edited_at" | "stage2_edited_at" | "stage3_edited_at";
   output: string;
   /** The system prompt this rewrite ran with, for the audit trail. */
   systemUsed: string;
@@ -68,7 +69,9 @@ export async function POST(
 
   try {
     let result: RegenResult;
-    if (stage === "stage1") {
+    if (stage === "product") {
+      result = await regenerateProduct(run, instructions.trim());
+    } else if (stage === "stage1") {
       result = await regenerateStage1(run, instructions.trim());
     } else if (stage === "stage2") {
       result = await regenerateStage2(run, instructions.trim());
@@ -82,16 +85,16 @@ export async function POST(
 
     const ts = new Date().toISOString();
     // Audit trail: every other model call records the prompt it ran with.
-    void recordPromptUsed(runId, stage === "stage1" ? "stage1" : "stage2", result.systemUsed).catch(() => {});
+    void recordPromptUsed(runId, stage === "product" ? "product" : stage === "stage1" ? "stage1" : "stage2", result.systemUsed).catch(() => {});
     await updateRun(runId, {
       [`${result.field}_edited`]: result.output,
-      [result.stageTimestamp]: ts,
+      ...(result.stageTimestamp ? { [result.stageTimestamp]: ts } : {}),
       last_updated_at: ts,
       // The instruction behind a research revision travels downstream with the
       // revised one-pager, so later stages know what was corrected and why.
       ...(stage === "stage1" ? { research_edit_notes: appendResearchNote(run.research_edit_notes, instructions.trim()) } : {}),
       // The shared log every later stage reads (lib/run-context.ts).
-      run_edits: appendEdit(run.run_edits, { kind: stage === "stage1" ? "research" : "copy", how: "ai", note: instructions.trim() }),
+      run_edits: appendEdit(run.run_edits, { kind: stage === "product" ? "product" : stage === "stage1" ? "research" : "copy", how: "ai", note: instructions.trim() }),
     } as Partial<Run>);
 
     // Regenerated Stage 2 copy → refresh the structured per-field JSON so the
@@ -250,6 +253,60 @@ Return ONLY the regenerated markdown one-pager. No preamble, no explanation, no 
 
   const output = await ask({ system, user, maxTokens: 32_000, role: "stage1", runId: run.id, label: "stage1: edit with AI" });
   return { field: "stage1_one_pager", stageTimestamp: "stage1_edited_at", output, systemUsed: system.map((b) => b.text).join("\n\n") };
+}
+
+// ── Stage 1: revise the product description ──────────────────────────────────
+async function regenerateProduct(run: Run, instructions: string): Promise<RegenResult> {
+  const current = effectiveDescription(run);
+  if (!current) throw new Error("No product description to revise yet");
+
+  // The description is held to the same standard it was written under — the
+  // operator's own Stage 1 prompt, live from Settings — so a revision can't
+  // quietly drop the rules (length, what may be claimed, no invented specs).
+  const rules = await getPrompt("product");
+  const scrape = parseProductScrape(run.product_scrape);
+  const page = scrape?.pages.find((p) => p.role === "product" && p.ok);
+  const listing = [
+    page?.title ? `TITLE: ${page.title}` : "",
+    page?.specs ? `SPECS: ${page.specs}` : "",
+    page?.long_description ? `SELLER DESCRIPTION: ${page.long_description}` : "",
+    page?.image_text ? `TEXT IN THE LISTING IMAGES: ${page.image_text}` : "",
+  ].filter(Boolean).join("\n").slice(0, 12_000);
+
+  const system: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: `${rules}
+
+════════════════════════════════════════════════════════════════════
+YOU ARE REVISING A DESCRIPTION THAT ALREADY EXISTS
+════════════════════════════════════════════════════════════════════
+
+Everything above is the standard this description is held to and applies in full to your rewrite.
+
+YOUR TASK:
+Rewrite the description following the operator's instruction. Keep everything the instruction does not touch, word for word where you can. The operator knows this product better than the listing does: when their instruction contradicts the listing, THEY are right — correct it and carry the correction through the whole description.
+
+Return the revised description as plain text and nothing else. No preamble, no explanation, no markdown fences.`,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+    },
+  ];
+  const user = [
+    "CURRENT DESCRIPTION:",
+    current,
+    "",
+    listing ? `THE SUPPLIER LISTING IT WAS WRITTEN FROM (may be wrong where the operator says so):\n${listing}` : "",
+    "",
+    `OPERATOR INSTRUCTION: ${instructions}`,
+    "",
+    "Write the revised description now.",
+  ].filter((l) => l !== "").join("\n");
+
+  const model = await getModel("product");
+  const msg = await client.messages.stream({ model, max_tokens: 8000, system, messages: [{ role: "user", content: user }] }).finalMessage();
+  void recordUsage(run.id, "product: description rewrite", model, msg.usage);
+  const output = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n").trim();
+  return { field: "product_description", output, systemUsed: system.map((b) => b.text).join("\n\n") };
 }
 
 // ── Stage 2: regenerate the copy ──────────────────────────────────────────────
