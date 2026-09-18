@@ -9,6 +9,7 @@ import { jsonrepair } from "jsonrepair";
 import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
 import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { builtOnFor, contextBlock, effectiveCopy, effectiveDescription } from "@/lib/run-context";
+import { audienceBlock, ensureAudience } from "@/lib/audience";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
 import { getModel } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
@@ -104,8 +105,10 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   const listing = scrape?.pages.find((p) => p.role === "product" && p.ok);
   const listingText = [listing?.scraped_text ?? "", listing?.image_text ? `\nCOPY FROM LISTING IMAGES\n${listing.image_text}` : ""].join("").slice(0, 8000);
 
+  const who = audienceBlock(await ensureAudience(run));
   const user = [
     `PRODUCT NAME: ${productName}`,
+    who,
     contextBlock(run, "ads"),
     "",
     "PRODUCT DESCRIPTION (what it physically is):",

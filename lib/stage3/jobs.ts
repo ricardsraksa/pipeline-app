@@ -17,6 +17,7 @@ import { stopRequested, type Alive } from "@/lib/jobs";
 const ALWAYS: Alive = () => true;
 import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { builtOnFor, contextBlock, effectiveDescription } from "@/lib/run-context";
+import { audienceBlock, ensureAudience } from "@/lib/audience";
 
 export interface RemImage {
   index: number;
@@ -78,7 +79,8 @@ export async function heroJob(runId: number, alive: Alive = ALWAYS): Promise<voi
       const onePager = onePagerForDownstream(run);
       const copy = run.stage2_copy_edited ?? run.stage2_output ?? "";
       await recordPromptUsed(runId, "stage3_hero", HERO_SYSTEM);
-      const out = await generateHeroPrompt({ onePager: onePager + contextBlock(run, "stage3"), copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
+      const who = audienceBlock(await ensureAudience(run));
+      const out = await generateHeroPrompt({ onePager: onePager + (who ? `\n\n${who}` : "") + contextBlock(run, "stage3"), copy, angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)), sourceImageUrls, extraReferenceUrls: safeArr(run.stage3_reference_images), runId });
       hero = out.hero;
       if (!alive()) return;
       await updateRun(runId, { stage3_hero_prompt: JSON.stringify(hero), stage3_hero_validation: JSON.stringify(out.validation), last_updated_at: now() });
@@ -158,8 +160,9 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
     const avatar = run.step_avatar_revised ?? run.step_avatar ?? "";
     const visual = extractVisualSection(run.step_research_revised ?? run.step_research ?? "");
     await recordPromptUsed(runId, "stage3_remaining", REMAINING_SYSTEM);
+    const who = audienceBlock(await ensureAudience(run));
     const { prompts, validation } = await generateRemainingPrompts({
-      onePager: onePager + contextBlock(run, "stage3"), copy, avatar, visual,
+      onePager: onePager + (who ? `\n\n${who}` : "") + contextBlock(run, "stage3"), copy, avatar, visual,
       angle: anglesBlock(parseSelectedAngles(run.product_angle_selected)),
       referenceImageUrls: heroUrl ? [heroUrl] : sourceImageUrls,
       extraReferenceUrls: safeArr(run.stage3_reference_images),

@@ -8,23 +8,25 @@
 import type { Run } from "@/lib/db";
 import { onePagerForDownstream, researchWasEdited } from "@/lib/research-edits";
 import { parseSelectedAngles } from "@/lib/angles";
+import { parseStoredAudience } from "@/lib/audience";
 
 /** The parts of a run's context that anything downstream can depend on. */
-export type ContextPart = "product" | "research" | "angles" | "copy" | "images";
+export type ContextPart = "product" | "audience" | "research" | "angles" | "copy" | "images";
 
 /** Stages that are generated from that context. */
 export type BuiltStage = "angles" | "stage2" | "stage3" | "ads";
 
 /** What each stage is built from. Editing any of these makes it out of date. */
 export const DEPENDS: Record<BuiltStage, ContextPart[]> = {
-  angles: ["product", "research"],
-  stage2: ["product", "research", "angles"],
-  stage3: ["product", "research", "angles", "copy"],
-  ads: ["product", "research", "angles", "copy", "images"],
+  angles: ["product", "audience", "research"],
+  stage2: ["product", "audience", "research", "angles"],
+  stage3: ["product", "audience", "research", "angles", "copy"],
+  ads: ["product", "audience", "research", "angles", "copy", "images"],
 };
 
 export const PART_LABEL: Record<ContextPart, string> = {
   product: "the product description",
+  audience: "who it's for",
   research: "the research",
   angles: "the angle",
   copy: "the copy",
@@ -51,6 +53,7 @@ export interface RunEdit {
 
 const EDIT_LABEL: Record<EditKind, string> = {
   product: "Product description",
+  audience: "Who it's for (buyer and user)",
   research: "Research one-pager",
   angles: "Positioning angle",
   copy: "Copy kit",
@@ -132,6 +135,10 @@ export function contextKeys(run: Run): ContextKeys {
   } catch { images = null; }
   return {
     product: keyOf(effectiveDescription(run)),
+    audience: (() => {
+      const a = parseStoredAudience(run.audience);
+      return a ? hash(JSON.stringify([a.buyer, a.same, a.same ? "" : a.user, a.same ? "" : a.relation ?? ""])) : null;
+    })(),
     research: keyOf(run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ""),
     angles: angles.length ? hash(JSON.stringify(angles.map((a) => [a.id, a.title, a.problem, a.mechanism, a.hook]))) : null,
     copy: keyOf(effectiveCopy(run)),

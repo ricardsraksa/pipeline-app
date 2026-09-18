@@ -56,6 +56,8 @@ Square 1:1 ecommerce-ready image, high-resolution, clean product-first compositi
 END GOLD STANDARD EXAMPLE
 ========================================================================
 
+OVERLAY TEXT VOICE: overlay text speaks to the viewer in the second person ("your hands", "you"). When the Stage 2 line you take is written in the third person ("her hands", "she"), convert it to the second person; change nothing else in it. Never give the product's user a gender in text, so the words cannot contradict whoever the scene shows.
+
 PER-PROMPT ADAPTATION — generate these 8 image types, in this order:
 
 2 — IMAGE TYPE: Lifestyle use-case image

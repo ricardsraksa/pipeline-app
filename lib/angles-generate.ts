@@ -12,6 +12,7 @@ import { parseAngles, type Angle } from "./angles";
 import { marketBlock, parseStoredMarketPosition } from "./market";
 import { onePagerForDownstream, researchKey } from "./research-edits";
 import { builtOnFor, contextBlock, effectiveDescription } from "./run-context";
+import { audienceBlock, ensureAudience } from "./audience";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
 
@@ -91,6 +92,7 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   const market = marketBlock(parseStoredMarketPosition(run.market_position));
   const user = [
     "Here are the finished research documents for this product. Propose the angles now.",
+    audienceBlock(await ensureAudience(run)),
     contextBlock(run, "angles"),
     "",
     ...(market ? [market, ""] : []),

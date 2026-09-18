@@ -10,6 +10,7 @@ import { getModel } from "./models";
 import { marketBlock, parseMarketPosition, parseStoredMarketPosition } from "./market";
 import { onePagerForDownstream, researchKey } from "./research-edits";
 import { builtOnFor, contextBlock, effectiveDescription } from "./run-context";
+import { audienceBlock, ensureAudience, parseAudienceLines, parseStoredAudience } from "./audience";
 import {
   runIdentify,
   runMarket,
@@ -524,6 +525,12 @@ async function runStage1(runId: number, run: Run): Promise<void> {
         last_updated_at: now(),
       });
     }
+    // Who buys and who uses it — the decision every later stage follows.
+    const who = parseAudienceLines(research);
+    if (who && parseStoredAudience(run.audience)?.source !== "manual") {
+      await updateRun(runId, { audience: JSON.stringify({ ...who, source: "research", at: now() }), last_updated_at: now() });
+      run.audience = JSON.stringify({ ...who, source: "research", at: now() });
+    }
 
     const productName = extractProductName(research);
     // Only persist a name we actually extracted. Don't fall back to product_url
@@ -790,6 +797,9 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
   const onePagerSection = onePager ? `\n\nRESEARCH ONE-PAGER:\n${onePager}` : "";
   // What the operator has changed by hand anywhere upstream of the copy.
   const editsSection = contextBlock(run, "stage2");
+  // Who the copy is written to, and who the product is for.
+  const who = audienceBlock(await ensureAudience(run));
+  const audienceSection = who ? `\n\n${who}` : "";
   const angle = anglesBlock(parseSelectedAngles(run.product_angle_selected));
   const angleSection = angle
     ? `\n\nPOSITIONING ANGLE(S) (chosen by the operator — build the ENTIRE copy kit around the PRIMARY angle's problem and mechanism; the headline, hero benefit and first section serve it; supporting angles, if any, appear in later benefits, sections, FAQs and objections; never drift back to a generic "best X" or "only Y" pitch):\n${angle}`
@@ -800,7 +810,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
 
   const output = await anthropicMessage({
     system: stage2System,
-    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}${onePagerSection}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${marketSection}${angleSection}${editsSection}\n\nProduce the complete copy kit now.`,
+    user: `PRODUCT NAME: ${productName || "(not provided — choose the best name from the research)"}${onePagerSection}\n\nRESEARCH BRIEF (Stage 1 output):\n${stage1Output}${audienceSection}${marketSection}${angleSection}${editsSection}\n\nProduce the complete copy kit now.`,
     maxTokens: 32_000,
     label: "stage 2 copy",
       runId,

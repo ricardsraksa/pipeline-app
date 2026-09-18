@@ -71,6 +71,7 @@ export interface RunStatus {
     pricing: ProductPricing | null;
     pricingRules: PricingRules;
     marketPosition: MarketPosition | null;
+    audience: { buyer: string; user: string; same: boolean; relation?: string; source: "research" | "derived" | "manual"; at: string } | null;
     variantsRequestedAt: string | null;
     variantsEdited: string | null;
     shopifyAdminUrl: string | null;

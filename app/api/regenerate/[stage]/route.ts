@@ -24,6 +24,7 @@ import { requireSession } from "@/lib/auth";
 import { parseProductScrape } from "@/lib/product";
 import { appendResearchNote, onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { appendEdit, builtOnFor, contextBlock, effectiveDescription } from "@/lib/run-context";
+import { audienceBlock, ensureAudience } from "@/lib/audience";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
@@ -314,7 +315,8 @@ async function regenerateStage2(run: Run, instructions: string): Promise<RegenRe
   const currentCopy = run.stage2_copy_edited ?? run.stage2_output ?? "";
   if (!currentCopy) throw new Error("No Stage 2 copy to regenerate yet");
 
-  const onePager = onePagerForDownstream(run) + contextBlock(run, "stage2");
+  const who = audienceBlock(await ensureAudience(run));
+  const onePager = onePagerForDownstream(run) + (who ? `\n\n${who}` : "") + contextBlock(run, "stage2");
   const research = pickRevised(run, "step_research");
   const avatar = pickRevised(run, "step_avatar");
 

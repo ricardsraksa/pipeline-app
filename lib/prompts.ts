@@ -41,6 +41,7 @@ HARD RULES
 - Angle: Concepts 1, 3 and 5 open on the operator's chosen angle — its specific problem, not a generic one. Concept 2 leads with the mechanism. Concept 4 lands the angle's payoff.
 - Comparisons: anything the ads set the product against is the baseline alternative from the one-pager's "Compared to" section (the lesser version in the same category), on its criteria. Never a competitor brand or a rival version of the same good product.
 - Copy: reuse lines from the copy kit verbatim where they fit (benefits, section headlines, one-liners). Overlay text is flat, functional benefit language, never slogans or wordplay.
+- Voice: on-image text speaks to the viewer in the second person ("your hands", "you"). A copy-kit line written in the third person ("her hands", "she") is converted when reused. Never give the product's user a gender in words: the person in the scene may be anyone, and the words must not contradict the picture.
 - Real sources only: a customer quote may ONLY be taken from the supplier listing text or the research (a real review, lightly trimmed, no name unless the source has one). A statistic may ONLY be used if it appears in the research. If there is no usable quote, Concept 4 shows a pull-quote of one benefit line from the copy kit with NO name, NO "Verified Customer" tag and NO star row. If there is no usable statistic, Concept 1 has no stat callout at all. Never fabricate reviews, names, ratings, percentages or review counts.
 - Brand: where a template shows a brand wordmark, render the product name given as PRODUCT NAME as plain text. No logos, no icons that imitate a logo, no third-party brand marks anywhere.
 - Claim safety: no medical, cure, diagnosis or guaranteed-outcome claims. Soften ("helps", "designed to", "may").
@@ -181,6 +182,13 @@ export const STAGE2_PROMPT = `You are a senior DTC copywriter who writes high-co
 You will receive a product research brief (Stage 1 output) and a working product name. Your task is to produce a complete English-language copy kit for this product.
 
 Write ONLY in English, using US spelling by default (color, customize, moms). All copy must be customer-facing. Write with the tone of a knowledgeable, honest brand: direct, specific, no fluff, no vague superlatives.
+
+VOICE — WRITE TO THE READER:
+Every customer-facing line speaks to the person reading it, in the second person: "you", "your". Never describe the customer, or the person who uses the product, in the third person: no "she", "her", "he", "him", and no "moms who…" or "anyone who…" where "you" works.
+- The research and the angle describe the customer as "her". That is their shorthand, not the voice of the copy. "The handle holds when her hands don't" becomes "The handle holds when your hands don't".
+- When the buyer is usually buying for someone else (a parent, a child, a gift), still write to the buyer as "you", and name the other person by their relationship without giving them a gender: "your parent", "your mom or dad", "whoever you're buying for". Never "her" or "him": the photos may show anyone.
+- A real customer quote, when one is used, keeps its own wording.
+This applies to every field: headlines, benefits, sections, both FAQ answers, the Facebook ad and the one-liners.
 
 ========================================================================
 HARD CONSTRAINTS — APPLY BEFORE AND DURING WRITING (stop-slop skill)

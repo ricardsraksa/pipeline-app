@@ -1,3 +1,4 @@
+import { parseStoredAudience } from "@/lib/audience";
 import { contextStatus, parseEdits } from "@/lib/run-context";
 import { NextRequest, NextResponse } from "next/server";
 import { getRun, getKV } from "@/lib/db";
@@ -153,6 +154,7 @@ export async function GET(
       pricingRules,
       // Schwartz coordinates: what the angles, copy and ads open on.
       marketPosition: safeJson(run.market_position) ?? null,
+      audience: parseStoredAudience(run.audience),
       variantsRequestedAt: run.variants_refresh_requested ?? null,
       variantsEdited: run.product_variants_edited ?? null,
       // Stage 5 · Image ads

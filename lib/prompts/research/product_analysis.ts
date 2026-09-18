@@ -49,10 +49,22 @@ Apply Eugene Schwartz's 5 levels to this product in the US-led English-speaking 
 Primary target segment: [which level to target and why — based on market size and conversion opportunity]
 Secondary target segment: [which level and why]
 
+8B. WHO BUYS AND WHO USES
+The store's default buyer is a middle-aged mother, but she does not always buy for herself. Decide, from what this product does and what the research shows:
+- The buyer: who pays and reads the product page — one phrase with age and situation.
+- The user: who the product is for. Either the buyer herself, or someone else she buys it for (an ageing parent, a child, a partner, a gift recipient) — one phrase with age and situation.
+- When the user is someone else: the name copy written to the buyer should use for that person. Gender-neutral unless the product itself is gendered ("your mom or dad", "your child", "whoever you're buying for").
+Every later stage writes to the buyer and shows the user, so pick one of each; don't hedge. The user is the buyer herself by default, including for anything she might also give as a gift. Choose someone else only when the product is mainly used by one other person she buys it for (a care or mobility aid for an ageing parent, a child's product, a pet's).
+
+Then, before the last two lines, write these three lines in exactly this form (the pipeline reads them directly):
+BUYER: [one phrase]
+USER: [one phrase, or "same" when the buyer uses it herself]
+CALL THE USER: [what the copy calls the user, or "you" when same]
+
 Then, as the last two lines of your output, restate the primary diagnosis in exactly this form and nothing else on those lines. The pipeline reads these two lines directly, so the wording must match:
 AWARENESS: [Unaware | Problem Aware | Solution Aware | Product Aware | Most Aware]
 SOPHISTICATION: [1 | 2 | 3 | 4 | 5]
 
 The awareness value is the PRIMARY target segment you named above, not the largest segment and not a range. The sophistication value is the stage you diagnosed in section 7.
 
-Output plain text. Headers: "6. PRODUCT ANALYSIS", "6B. THE BASELINE ALTERNATIVE", "7. MARKET SOPHISTICATION", "8. LEVELS OF CONSCIOUSNESS". No preamble. No other sections.`;
+Output plain text. Headers: "6. PRODUCT ANALYSIS", "6B. THE BASELINE ALTERNATIVE", "7. MARKET SOPHISTICATION", "8. LEVELS OF CONSCIOUSNESS", "8B. WHO BUYS AND WHO USES". No preamble. No other sections.`;

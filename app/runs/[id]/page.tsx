@@ -22,6 +22,7 @@ import Stage2Shopify from "@/components/Stage2Shopify";
 import ShopifyFill from "@/components/ShopifyFill";
 import PushAll from "@/components/PushAll";
 import AskAssistant from "@/components/AskAssistant";
+import AudienceCard from "@/components/AudienceCard";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
@@ -842,6 +843,7 @@ export default function RunPage() {
               <>
                 {runId !== null && (
                   <div className="mb-[30px]">
+                    <AudienceCard runId={runId} audience={run.meta.audience ?? null} />
                     <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
                     <ResearchStaleFlag which="angles" show={anglesResearchStale} text={`${partsSentence(changedFor("angles"))} changed since these angles were proposed.`} action={
                       <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "Propose new angles"}</button>

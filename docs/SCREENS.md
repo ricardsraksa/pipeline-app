@@ -182,6 +182,15 @@ At the gate, two halves:
   - Any angle's wording can be edited.
   - "Write my own" opens the same fields blank and adds an operator angle.
   - "New angles" regenerates, with an optional steer ("more health-focused").
+- **Who it's for** (card above Market position): the buyer every word is
+  written to, whether she uses the product herself or buys it for someone
+  else, and — when someone else — who that person is (the user the images
+  show) and what the copy calls them ("your parent"). Decided by the research
+  (section 8B), worked out once for older runs ("Work it out"), editable.
+  Every stage follows it: the copy writes to "you" and names the user the
+  agreed way, the image and ad scenes show the user, and nothing says "her"
+  or "him" about someone the reader can't place. Changing it flags the angles,
+  copy, images and ads built before.
 - **Edits travel.** Anything the operator changes — the product description,
   the research one-pager, the angle, the copy, an image prompt, an ad brief —
   is recorded on the run and handed to every stage built afterwards, together

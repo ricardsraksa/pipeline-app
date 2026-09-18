@@ -226,6 +226,9 @@ async function migrateDB() {
     "ads_built_on TEXT",
     // The run's question assistant: [{ q, a, at }] (lib/assistant).
     "assistant_thread TEXT",
+    // Who the product is for: buyer, user, what the copy calls the user
+    // (lib/audience.ts). Every stage writes to and shows these people.
+    "audience TEXT",
     "stage3_angle_key TEXT",
     "ads_angle_key TEXT",
     // When stage2_json was last derived from the copy text. The Shopify push
@@ -680,6 +683,7 @@ export interface Run {
   stage3_built_on: string | null;
   ads_built_on: string | null;
   assistant_thread: string | null;
+  audience: string | null;
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
   stage2_json_at: string | null;

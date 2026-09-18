@@ -9,6 +9,7 @@ import { parseStoredMarketPosition, marketBlock } from "@/lib/market";
 import { effectiveCopy, effectiveDescription, editsBlock } from "@/lib/run-context";
 import { onePagerForDownstream } from "@/lib/research-edits";
 import type { ProductPricing } from "@/lib/pricing";
+import { audienceBlock, parseStoredAudience } from "@/lib/audience";
 
 const cap = (s: string | null | undefined, n: number) => {
   const t = (s ?? "").trim();
@@ -72,6 +73,7 @@ export function buildProductContext(run: Run): string {
 
   return [
     `# ${run.product_code ? `${run.product_code} · ` : ""}${name}`,
+    section("Who it is for", audienceBlock(parseStoredAudience(run.audience))),
     section("Product description (as the operator has it)", effectiveDescription(run)),
     section("Supplier listing", listing),
     section("Pricing", pricingText),

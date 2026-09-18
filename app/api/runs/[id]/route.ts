@@ -6,6 +6,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 import { requireSession } from "@/lib/auth";
 import { validateBundles } from "@/lib/pricing";
 import { researchKey } from "@/lib/research-edits";
+import { validateAudience } from "@/lib/audience";
 import { appendEdit, builtOnFor, type BuiltStage, type EditKind } from "@/lib/run-context";
 import { upsertAdImage, upsertStage3Image } from "@/lib/stage3/upsert";
 import { validateMarketPosition } from "@/lib/market";
@@ -427,6 +428,19 @@ export async function PATCH(
       }
       fields.push("product_pricing = ?");
       values.push(JSON.stringify({ ...pr, competitors, at: new Date().toISOString() }));
+    }
+  }
+  if ("audience" in body) {
+    if ((body as { audience?: unknown }).audience == null) {
+      fields.push("audience = ?"); values.push(null);
+    } else {
+      let a: unknown = null;
+      try { a = JSON.parse(String((body as { audience?: unknown }).audience)); } catch { a = null; }
+      const err = validateAudience(a);
+      if (err) return Response.json({ error: `audience: ${err}` }, { status: 400 });
+      fields.push("audience = ?");
+      values.push(JSON.stringify({ ...(a as object), at: new Date().toISOString() }));
+      edited.push("audience");
     }
   }
   if ("market_position" in body) {
