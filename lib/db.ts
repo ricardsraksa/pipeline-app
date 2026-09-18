@@ -224,6 +224,8 @@ async function migrateDB() {
     "stage2_built_on TEXT",
     "stage3_built_on TEXT",
     "ads_built_on TEXT",
+    // The run's question assistant: [{ q, a, at }] (lib/assistant).
+    "assistant_thread TEXT",
     "stage3_angle_key TEXT",
     "ads_angle_key TEXT",
     // When stage2_json was last derived from the copy text. The Shopify push
@@ -677,6 +679,7 @@ export interface Run {
   stage2_built_on: string | null;
   stage3_built_on: string | null;
   ads_built_on: string | null;
+  assistant_thread: string | null;
   stage3_angle_key: string | null;
   ads_angle_key: string | null;
   stage2_json_at: string | null;

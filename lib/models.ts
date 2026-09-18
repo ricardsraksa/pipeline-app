@@ -9,7 +9,7 @@
 
 import { getKV, setKV } from "./db";
 
-export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "pricing" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "mechanical";
+export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "pricing" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "assistant" | "mechanical";
 
 export interface ModelOption {
   id: string;
@@ -90,6 +90,12 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     description: "The five image-ad concepts and their prompts.",
     env: "ADS_MODEL",
     default: "claude-opus-5",
+  },
+  assistant: {
+    label: "Assistant",
+    description: "Answers questions about one product, from everything its run knows.",
+    env: "ASSISTANT_MODEL",
+    default: "claude-sonnet-5",
   },
   mechanical: {
     label: "Mechanical",

@@ -112,6 +112,14 @@ stage at a time and the app follows the pipeline to whichever needs attention.
   unsaved edits (the description and photos, the 8 prompt cards, the ad
   briefs), Continue uses what is on screen. A stopped step shows its reason
   and opens the stage instead.
+- **Ask** (button bottom-right, on every stage): a panel for questions about
+  this product — "what's the better way to add sizing", "which colours should
+  I lead with", "is this safe to call dishwasher-safe". Answers come from
+  everything the run knows (the listing's options, SKUs and size-chart text,
+  the description, pricing, research, angle, copy, images, ads and the
+  operator's edits), can search the web for outside facts, stream in, and are
+  kept on the run. Clear empties it. Read-only: it answers, it changes
+  nothing. Model: Settings → Models → Assistant.
 - **Restart run** (bottom of the rail): deletes everything the run generated —
   research, angles, copy, images, ads, pricing and every edit made to them —
   keeps the links, the uploaded photos and the product code, and starts again

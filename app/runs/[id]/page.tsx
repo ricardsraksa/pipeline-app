@@ -21,6 +21,7 @@ import EditableOutput from "@/components/EditableOutput";
 import Stage2Shopify from "@/components/Stage2Shopify";
 import ShopifyFill from "@/components/ShopifyFill";
 import PushAll from "@/components/PushAll";
+import AskAssistant from "@/components/AskAssistant";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import PromptUsed from "@/components/PromptUsed";
 import RunCost from "@/components/RunCost";
@@ -1086,6 +1087,7 @@ export default function RunPage() {
           </>
         )}
       </div>
+      {runId !== null && <AskAssistant runId={runId} code={run.meta.productCode ?? null} />}
     </div>
   );
 }
