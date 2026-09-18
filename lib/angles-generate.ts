@@ -37,8 +37,9 @@ const ANGLES_TOOL: Anthropic.Tool = {
             why_this_angle: { type: "string", description: "Why this beats generic 'best X / only Y' framing for this product. One sentence." },
             competitor_angle: { type: "string", description: "What the competitors in the research currently lead with on this same ground. Say 'not visible in the research' if it isn't there. One or two sentences." },
             gap: { type: "string", description: "The gap being taken: why this angle is unclaimed, under-served or said badly by them. One or two sentences." },
+            problem_happens: { type: "string", enum: ["at home, using it", "while shopping"], description: "Where the problem happens. Would a woman who already owns a good one still have it at home? Yes → 'at home, using it'. Distrust of listings or photos, sizing before delivery, proof, returns → 'while shopping'." },
           },
-          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle", "competitor_angle", "gap"],
+          required: ["title", "problem", "consequence", "mechanism", "who", "hook", "why_this_angle", "competitor_angle", "gap", "problem_happens"],
         },
       },
     },
@@ -202,7 +203,11 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   }
 
   const str = (v: unknown, max = 1200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-  const angles: Angle[] = raw.slice(0, 6).map((a, i) => {
+  // An angle the writer itself files under shopping friction is dropped: the
+  // prompt forbids it, and the self-check catches the ones that slip through.
+  const kept = raw.filter((a) => ((a ?? {}) as Record<string, unknown>).problem_happens !== "while shopping");
+  if (kept.length < raw.length) console.warn(`[angles ${runId}] dropped ${raw.length - kept.length} shopping-friction angle(s)`);
+  const angles: Angle[] = (kept.length ? kept : raw).slice(0, 6).map((a, i) => {
     const o = (a ?? {}) as Record<string, unknown>;
     return {
       id: `a${i + 1}`,

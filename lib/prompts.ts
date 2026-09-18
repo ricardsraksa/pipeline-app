@@ -41,6 +41,7 @@ HARD RULES
 - Angle: Concepts 1, 3 and 5 open on the operator's chosen angle — its specific problem, not a generic one. Concept 2 leads with the mechanism. Concept 4 lands the angle's payoff.
 - Comparisons: anything the ads set the product against is the baseline alternative from the one-pager's "Compared to" section (the lesser version in the same category), on its criteria. Never a competitor brand or a rival version of the same good product.
 - Copy: reuse lines from the copy kit verbatim where they fit (benefits, section headlines, one-liners). Overlay text is flat, functional benefit language, never slogans or wordplay.
+- Never open on doubt: no ad opens on distrust of other sellers, a photo that looked better than what arrived, or a past purchase that disappointed. If the angle you are given is about that, open on the product's truth instead (what it is made of, what it does at home).
 - Voice: on-image text speaks to the viewer in the second person ("your hands", "you"). A copy-kit line written in the third person ("her hands", "she") is converted when reused. Never give the product's user a gender in words: the person in the scene may be anyone, and the words must not contradict the picture.
 - Real sources only: a customer quote may ONLY be taken from the supplier listing text or the research (a real review, lightly trimmed, no name unless the source has one). A statistic may ONLY be used if it appears in the research. If there is no usable quote, Concept 4 shows a pull-quote of one benefit line from the copy kit with NO name, NO "Verified Customer" tag and NO star row. If there is no usable statistic, Concept 1 has no stat callout at all. Never fabricate reviews, names, ratings, percentages or review counts.
 - Brand: where a template shows a brand wordmark, render the product name given as PRODUCT NAME as plain text. No logos, no icons that imitate a logo, no third-party brand marks anywhere.
@@ -127,6 +128,10 @@ Example of the standard: for a cat water fountain the angle is not "the quietest
 
 THE PROBLEM MUST BE HERS, NOT THE CATEGORY'S. A competitor's product breaking, a listing being vague, a spec sheet contradicting itself, a rival brand overpromising: none of these are problems. They are differentiation notes, and they belong in the gap field, never in the problem. Apply this test to every angle before you submit it: if every competitor were well made and honestly described, would this problem still exist in her life? If it disappears, it was a complaint about the category. Replace it.
 
+THE PROBLEM HAPPENS WHILE SHE LIVES WITH IT, NEVER WHILE SHE SHOPS. Distrust of listings, a photo that looked better than the thing that arrived, being burned by a past purchase, not knowing the size before it lands, wondering whether it will work, wanting proof, returns: all of that is buying friction. It is real, and the copy handles it with specifics, proof and a size chart, but it is never an angle, and an ad that opens on it opens on doubt. Test every angle: would a woman who already owns a good one of these still have this problem at home? If the answer is no, it is about shopping. Replace it.
+
+THE MARKET POSITION DECIDES HOW AN ANGLE IS SAID, NEVER WHAT IT IS ABOUT. A market that has stopped believing claims is answered by leading with the mechanism or with her situation; it is not a reason to make her distrust the subject of the angle.
+
 Rules for every angle:
 - Lead with a problem the customer already recognises or would immediately recognise once named. Name it concretely, in her world, not in marketing language.
 - State the consequence honestly. Real stakes (health, money, time, sleep, safety, relationships), never invented or exaggerated ones. If the research does not support a consequence, do not claim it.
@@ -182,6 +187,9 @@ export const STAGE2_PROMPT = `You are a senior DTC copywriter who writes high-co
 You will receive a product research brief (Stage 1 output) and a working product name. Your task is to produce a complete English-language copy kit for this product.
 
 Write ONLY in English, using US spelling by default (color, customize, moms). All copy must be customer-facing. Write with the tone of a knowledgeable, honest brand: direct, specific, no fluff, no vague superlatives.
+
+NEVER OPEN ON DOUBT:
+No headline, section, ad or one-liner opens on the reader's distrust of other sellers, a photo that looked better than what arrived, or a past purchase that let her down. Answer those doubts with specifics where they come up — named materials, real measurements, the size chart, the guarantee — never by making them the subject.
 
 VOICE — WRITE TO THE READER:
 Every customer-facing line speaks to the person reading it, in the second person: "you", "your". Never describe the customer, or the person who uses the product, in the third person: no "she", "her", "he", "him", and no "moms who…" or "anyone who…" where "you" works.
