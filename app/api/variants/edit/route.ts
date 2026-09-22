@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
-import { getModel } from "@/lib/models";
+import { getModel, streamToolCall } from "@/lib/models";
 import { parseProductScrape } from "@/lib/product";
 
 export const maxDuration = 120;
@@ -100,15 +100,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = await getModel("mechanical");
-    const msg = await anthropic.messages.stream({
+    const msg = await streamToolCall(anthropic, {
       model,
       max_tokens: 16_000,
       system: SYSTEM,
       tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_options" },
       messages: [{ role: "user", content: user }],
-    }).finalMessage();
-    void recordUsage(runId, "variants: restructure", model, msg.usage);
+    }, "submit_options", (u) => void recordUsage(runId, "variants: restructure", model, u));
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") {
       return Response.json({ success: false, error: `The model returned no options (stop: ${msg.stop_reason})` }, { status: 502 });

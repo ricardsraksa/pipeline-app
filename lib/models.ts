@@ -7,6 +7,7 @@
 // keeps model choice in one place and lets it be changed from the UI without a
 // redeploy.
 
+import type Anthropic from "@anthropic-ai/sdk";
 import { getKV, setKV } from "./db";
 
 export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "pricing" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "assistant" | "mechanical";
@@ -21,9 +22,10 @@ export interface ModelOption {
 // keep in sync with the Claude model catalog.
 export const MODEL_CATALOG: ModelOption[] = [
   { id: "claude-fable-5", label: "Fable 5", hint: "Most powerful · $10 / $50 per 1M" },
-  { id: "claude-opus-5", label: "Opus 5", hint: "Top Opus · $5 / $25 per 1M" },
-  { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Prior Opus · $5 / $25 per 1M" },
-  { id: "claude-sonnet-5", label: "Sonnet 5", hint: "Newest Sonnet · $3 / $15 per 1M" },
+  { id: "claude-opus-5-5", label: "Opus 5.5", hint: "Newest Opus · $4 / $20 per 1M" },
+  { id: "claude-opus-5", label: "Opus 5", hint: "Prior Opus · $5 / $25 per 1M" },
+  { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Older Opus · $5 / $25 per 1M" },
+  { id: "claude-sonnet-5", label: "Sonnet 5", hint: "Newest Sonnet · $2 / $10 per 1M" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "Balanced · $3 / $15 per 1M" },
   { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hint: "Fast & cheap · $1 / $5 per 1M" },
 ];
@@ -53,13 +55,13 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 2 · Angles",
     description: "The positioning angles the whole page is built on.",
     env: "ANGLES_MODEL",
-    default: "claude-opus-5",
+    default: "claude-opus-5-5",
   },
   stage2: {
     label: "Stage 3 · Copy",
     description: "The copy kit.",
     env: "STAGE2_MODEL",
-    default: "claude-opus-5",
+    default: "claude-opus-5-5",
   },
   pricing: {
     label: "Stage 3 · Bundle quantities",
@@ -71,7 +73,7 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 4 · Prompts",
     description: "Hero and image prompts, placement.",
     env: "STAGE3_PROMPT_MODEL",
-    default: "claude-opus-5",
+    default: "claude-opus-5-5",
   },
   stage3Edit: {
     label: "Stage 4 · Rewrites",
@@ -89,7 +91,7 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     label: "Stage 5 · Ad briefs",
     description: "The five image-ad concepts and their prompts.",
     env: "ADS_MODEL",
-    default: "claude-opus-5",
+    default: "claude-opus-5-5",
   },
   assistant: {
     label: "Assistant",
@@ -118,13 +120,15 @@ const SAMPLING_PARAM_MODELS = new Set<string>([
 ]);
 
 // Per-1M-token pricing for the cost tracker. Cache reads bill at 0.1× the
-// input rate; writes bill 1.25× (5m TTL) or 2× (1h TTL) — the tracker prices
-// all writes at 2× so it never understates (the big static prefixes use 1h).
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+// input rate unless `cacheRead` says otherwise (Opus 5.5 reads at $0.20);
+// writes bill 1.25× (5m TTL) or 2× (1h TTL) — the tracker prices all writes at
+// 2× so it never understates (the big static prefixes use 1h).
+const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead?: number }> = {
   "claude-fable-5": { input: 10, output: 50 },
+  "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
-  "claude-sonnet-5": { input: 3, output: 15 },
+  "claude-sonnet-5": { input: 2, output: 10 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
   "claude-haiku-4-5": { input: 1, output: 5 },
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
@@ -144,7 +148,7 @@ export function costOfUsage(modelId: string, u: UsageTokens): number {
   return (
     (u.input_tokens * p.input +
       u.output_tokens * p.output +
-      u.cache_read_tokens * p.input * 0.1 +
+      u.cache_read_tokens * (p.cacheRead ?? p.input * 0.1) +
       u.cache_write_tokens * p.input * 2.0) /
     1_000_000
   );
@@ -153,6 +157,49 @@ export function costOfUsage(modelId: string, u: UsageTokens): number {
 /** Whether it's safe to send temperature/top_p/top_k to this model id. */
 export function modelSupportsSamplingParams(modelId: string): boolean {
   return SAMPLING_PARAM_MODELS.has(modelId);
+}
+
+// Models that reject a forced tool call (`tool_choice` "tool" / "any" is a 400):
+// Opus 5.5 thinks on every turn and only takes "auto".
+const NO_FORCED_TOOL_MODELS = new Set<string>(["claude-opus-5-5"]);
+
+/**
+ * Stream a call whose answer must come back through one tool, on any model.
+ * Models that accept it get the forced `tool_choice`; the others get "auto" plus
+ * a line naming the tool, and if the reply still has no call of it, one more
+ * attempt that says so. `onUsage` sees every attempt, so the cost log is whole.
+ */
+export async function streamToolCall(
+  client: Anthropic,
+  params: Omit<Anthropic.MessageStreamParams, "tool_choice" | "stream">,
+  toolName: string,
+  onUsage?: (usage: Anthropic.Usage) => void,
+): Promise<Anthropic.Message> {
+  if (!NO_FORCED_TOOL_MODELS.has(params.model)) {
+    const msg = await client.messages.stream({ ...params, tool_choice: { type: "tool", name: toolName } }).finalMessage();
+    onUsage?.(msg.usage);
+    return msg;
+  }
+  const ask = (line: string): Anthropic.MessageParam[] => {
+    const msgs = [...params.messages];
+    const last = msgs[msgs.length - 1];
+    const extra = { type: "text" as const, text: line };
+    msgs[msgs.length - 1] = {
+      ...last,
+      content: typeof last.content === "string" ? [{ type: "text" as const, text: last.content }, extra] : [...last.content, extra],
+    };
+    return msgs;
+  };
+  let msg: Anthropic.Message | null = null;
+  for (const line of [
+    `Submit your answer by calling the ${toolName} tool.`,
+    `Your previous reply did not call the ${toolName} tool. Call ${toolName} now with the complete answer — no other text.`,
+  ]) {
+    msg = await client.messages.stream({ ...params, tool_choice: { type: "auto" }, messages: ask(line) }).finalMessage();
+    onUsage?.(msg.usage);
+    if (msg.content.some((b) => b.type === "tool_use" && b.name === toolName) || msg.stop_reason === "max_tokens") break;
+  }
+  return msg!;
 }
 
 const KV_PREFIX = "model_"; // app_kv key per role, e.g. model_stage1

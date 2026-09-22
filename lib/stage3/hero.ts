@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { jsonrepair } from 'jsonrepair'
-import { getModel, modelSupportsSamplingParams } from '@/lib/models'
+import { getModel, modelSupportsSamplingParams, streamToolCall } from '@/lib/models'
 import { recordUsage } from '@/lib/db'
 import { validateHeroObject, validateRemainingArray, type Stage3Validation } from '@/lib/stage3-validation'
 import { getPrompt } from '@/lib/prompts'
@@ -276,7 +276,7 @@ export async function generateHeroPrompt(params: {
   const model = await getModel('stage3Prompt')
 
   async function callOnce(text: string): Promise<HeroPrompt> {
-    const msg = await anthropic.messages.stream({
+    const msg = await streamToolCall(anthropic, {
       model,
       max_tokens: 16000,
       // temperature:0 for run-to-run determinism, but only on models that still
@@ -287,9 +287,7 @@ export async function generateHeroPrompt(params: {
       // Forced tool call → the API serialises the JSON, so quote-heavy prompt
       // text can never break parsing (see HERO_TOOL).
       tools: [HERO_TOOL],
-      tool_choice: { type: 'tool', name: 'submit_hero_prompt' },
-    }).finalMessage()
-    void recordUsage(params.runId ?? null, 'stage3: hero prompt', model, msg.usage)
+    }, 'submit_hero_prompt', (u) => void recordUsage(params.runId ?? null, 'stage3: hero prompt', model, u))
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') throw new Error('model did not return a hero prompt tool call')
     return toolUse.input as HeroPrompt
@@ -442,8 +440,7 @@ export async function generateRemainingPrompts(params: {
     // prompt text can't break parsing (the whole point — see REMAINING_TOOL).
     // Streaming + a generous budget: 8 full gold-standard prompts are large, and
     // the SDK requires streaming above ~16k max_tokens; finalMessage() collects it.
-    const msg = await anthropic.messages
-      .stream({
+    const msg = await streamToolCall(anthropic, {
         model,
         max_tokens: 32000,
         // temperature:0 for determinism, but only on models that still accept
@@ -452,10 +449,7 @@ export async function generateRemainingPrompts(params: {
         system: [{ type: 'text', text: remainingSystem + imageFeedback, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages: [{ role: 'user', content: [{ type: 'text', text }, ...attachments] }],
         tools: [REMAINING_TOOL],
-        tool_choice: { type: 'tool', name: 'submit_image_prompts' },
-      })
-      .finalMessage()
-    void recordUsage(params.runId ?? null, 'stage3: remaining prompts', model, msg.usage)
+      }, 'submit_image_prompts', (u) => void recordUsage(params.runId ?? null, 'stage3: remaining prompts', model, u))
     if (msg.stop_reason === 'max_tokens') return null // truncated — retry
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
     if (!toolUse || toolUse.type !== 'tool_use') return null

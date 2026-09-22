@@ -11,7 +11,7 @@ import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { builtOnFor, contextBlock, effectiveCopy, effectiveDescription } from "@/lib/run-context";
 import { audienceBlock, ensureAudience } from "@/lib/audience";
 import { marketBlock, parseStoredMarketPosition } from "@/lib/market";
-import { getModel } from "@/lib/models";
+import { getModel, streamToolCall } from "@/lib/models";
 import { getPrompt } from "@/lib/prompts";
 import { anglesBlock, parseSelectedAngles, angleKey } from "@/lib/angles";
 import { parseProductScrape } from "@/lib/product";
@@ -157,15 +157,13 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   ];
 
   const call = async (extra?: string) => {
-    const msg = await anthropic.messages.stream({
+    const msg = await streamToolCall(anthropic, {
       model,
       max_tokens: 12000,
       system,
       tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_ad_prompts" },
       messages: [{ role: "user", content: extra ? [...content, { type: "text" as const, text: extra }] : content }],
-    }).finalMessage();
-    void recordUsage(runId, "stage5: ad prompts", model, msg.usage);
+    }, "submit_ad_prompts", (u) => void recordUsage(runId, "stage5: ad prompts", model, u));
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return { ads: null as unknown[] | null, why: `no tool call (stop: ${msg.stop_reason})` };
     const ads = extractAds(block.input);

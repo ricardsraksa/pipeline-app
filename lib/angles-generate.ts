@@ -5,7 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "./db";
-import { getModel } from "./models";
+import { getModel, streamToolCall } from "./models";
 import { getPrompt } from "./prompts";
 import { parseProductScrape } from "./product";
 import { parseAngles, type Angle } from "./angles";
@@ -158,15 +158,13 @@ export async function generateAngles(runId: number, note?: string): Promise<Angl
   // Forced tool call, one corrective retry, then a plain-JSON fallback (no
   // tool) — each failure names its reason so the error is actionable.
   const callTool = async (text: string): Promise<{ raw: unknown[] | null; why: string }> => {
-    const msg = await anthropic.messages.stream({
+    const msg = await streamToolCall(anthropic, {
       model,
       max_tokens: 24000,
       system,
       tools: [ANGLES_TOOL],
-      tool_choice: { type: "tool", name: "submit_angles" },
       messages: [{ role: "user", content: text }],
-    }).finalMessage();
-    void recordUsage(runId, "positioning angles", model, msg.usage);
+    }, "submit_angles", (u) => void recordUsage(runId, "positioning angles", model, u));
     const block = msg.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return { raw: null, why: `no tool call (stop: ${msg.stop_reason})` };
     const angles = extractAngles(block.input);

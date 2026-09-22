@@ -8,7 +8,7 @@
 // the ads mixed the two. The buyer is who every word is written to; the user
 // is who the product is for and who the pictures show.
 import Anthropic from "@anthropic-ai/sdk";
-import { getModel } from "@/lib/models";
+import { getModel, streamToolCall } from "@/lib/models";
 import { getRun, recordUsage, updateRun, type Run } from "@/lib/db";
 
 export interface Audience {
@@ -100,10 +100,9 @@ export async function deriveAudience(run: Run): Promise<Audience | null> {
   if (!onePager && !avatar && !description) return null;
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
   const model = await getModel("mechanical");
-  const msg = await client.messages.stream({
+  const msg = await streamToolCall(client, {
     model,
     max_tokens: 4000,
-    tool_choice: { type: "tool", name: "submit_audience" },
     tools: [TOOL],
     system: `You decide who a DTC product is for. The store's default buyer is a middle-aged mother in the US.
 Pick ONE answer, never a list:
@@ -111,8 +110,7 @@ Pick ONE answer, never a list:
 - "Someone else" only when the product is mainly used by one other person and she is buying it for them: a mobility or care aid for an ageing parent, a product for a child, for a partner, for a pet.
 When someone else uses it, give the ONE gender-neutral name copy written to her should use for that person: "your parent", "your mom or dad", "your child", "your partner". Never a list of options.`,
     messages: [{ role: "user", content: `PRODUCT:\n${description}\n\nONE-PAGER:\n${onePager}\n\nCUSTOMER AVATAR:\n${avatar}\n\nSubmit who buys it and who uses it.` }],
-  }).finalMessage();
-  void recordUsage(run.id, "audience: derive", model, msg.usage);
+  }, "submit_audience", (u) => void recordUsage(run.id, "audience: derive", model, u));
   const input = msg.content.find((b) => b.type === "tool_use")?.input as { buyer?: unknown; same?: unknown; user?: unknown; relation?: unknown } | undefined;
   const buyer = clean(input?.buyer);
   if (!buyer) return null;

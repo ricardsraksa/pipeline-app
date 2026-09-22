@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
-import { getModel } from "@/lib/models";
+import { getModel, streamToolCall } from "@/lib/models";
 import { parseProductScrape } from "@/lib/product";
 import { buildBundles, defaultQtys, type Bundles, type ProductPricing } from "@/lib/pricing";
 import { getPricingRules } from "@/lib/pricing-store";
@@ -96,15 +96,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const model = await getModel("pricing");
-    const msg = await anthropic.messages.stream({
+    const msg = await streamToolCall(anthropic, {
       model,
       max_tokens: 8_000,
       system: SYSTEM,
       tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_bundle_quantities" },
       messages: [{ role: "user", content: user }],
-    }).finalMessage();
-    void recordUsage(runId, "pricing: bundle quantities", model, msg.usage);
+    }, "submit_bundle_quantities", (u) => void recordUsage(runId, "pricing: bundle quantities", model, u));
     const block = msg.content.find((b) => b.type === "tool_use");
     const raw = block && block.type === "tool_use" ? (block.input as { quantities?: unknown }).quantities : null;
     const qtys = Array.isArray(raw) ? raw.map((q) => Math.round(Number(q))) : [];
