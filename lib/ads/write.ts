@@ -159,7 +159,9 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   const call = async (extra?: string) => {
     const msg = await streamToolCall(anthropic, {
       model,
-      max_tokens: 12000,
+      // Room for the thinking as well as ~6k tokens of briefs: Opus 5.5 thinks
+      // longer than Opus 5 and ran out at 12k on its first attempt.
+      max_tokens: 24000,
       system,
       tools: [TOOL],
       messages: [{ role: "user", content: extra ? [...content, { type: "text" as const, text: extra }] : content }],
