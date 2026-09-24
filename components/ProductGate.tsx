@@ -218,6 +218,14 @@ export default function ProductGate({
   // back-off; "Try again" resets its attempts so it retries within a poll.
   const scrapedAgoMs = scrape?.scraped_at ? Date.now() - new Date(scrape.scraped_at).getTime() : 0;
   const gaveUp = workerOnline && scrapedAgoMs > 5 * 60 * 1000;
+  // What the worker actually hit on the product page (it reports each failure),
+  // so the banner can name it instead of assuming AliExpress throttling.
+  const failure = (product?.workerFailures ?? []).find((f) => f.url === productPage?.url) ?? product?.workerFailures?.[0] ?? null;
+  const throttled = !!failure && /rate-limit|throttl|anti-bot|captcha/i.test(failure.error);
+  const retryMin = failure?.retryAt ? Math.max(1, Math.round((new Date(failure.retryAt).getTime() - Date.now()) / 60_000)) : null;
+  const failureLine = failure
+    ? `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "it has stopped retrying; press Try again."}`
+    : null;
   const [retrying, setRetrying] = useState<string | null>(null);
   const tryAgain = async () => {
     setRetrying("…");
@@ -245,12 +253,17 @@ export default function ProductGate({
           style={{ borderColor: "color-mix(in srgb, var(--color-amber) 40%, var(--color-border))", background: "var(--color-amber-bg)" }}>
           <p className="text-[12.5px] font-[600] text-[var(--color-text)]">
             {productPage.deferred
-              ? (gaveUp ? "AliExpress is throttling your Mac's IP. It retries on a schedule, or press Try again." : workerOnline ? "Your Mac is scraping this page." : "Mac worker offline.")
+              ? (!workerOnline ? "Mac worker offline."
+                : failure ? (throttled ? "AliExpress is throttling your Mac's IP." : "Your Mac couldn't read this page.")
+                : gaveUp ? "Your Mac hasn't read this page yet. It retries on a schedule, or press Try again."
+                : "Your Mac is scraping this page.")
               : productPage.rateLimited ? "The supplier site is rate-limiting the server." : "The app couldn't read the product page."}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <p className="text-[12px] text-[var(--color-text-2)]">
-              {productPage.deferred && !gaveUp && workerOnline ? `Checked in ${workerAgo}.` : "Or run this on your Mac, or write the description yourself."}
+              {productPage.deferred && workerOnline && failureLine ? failureLine
+                : productPage.deferred && !gaveUp && workerOnline ? `Checked in ${workerAgo}.`
+                : "Or run this on your Mac, or write the description yourself."}
             </p>
             {productPage.deferred && workerOnline && (
               <button onClick={tryAgain} disabled={retrying === "…"} className="btn btn-sm">{retrying === "…" ? "Requesting…" : "Try again"}</button>

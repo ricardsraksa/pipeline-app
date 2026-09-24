@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { db, setKV } from "@/lib/db";
+import { db, getKV, setKV } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { parseProductScrape } from "@/lib/product";
 
@@ -41,4 +41,36 @@ export async function GET(req: NextRequest) {
     jobs.push({ runId: Number(row.id), urls: [{ url: row.product_url, role: "product" }], mode: "variants" });
   }
   return Response.json({ jobs, now: new Date().toISOString() });
+}
+
+export interface WorkerFailure { url: string; error: string; attempts: number; retryAt: string | null; at: string }
+
+// The worker reports each failed page (and clears it once the page lands), so
+// the Stage 1 banner can say what actually went wrong. Stored per run in
+// app_kv as { [url]: WorkerFailure }.
+export async function POST(req: NextRequest) {
+  const denied = requireSession(req);
+  if (denied) return denied;
+  const b = (await req.json().catch(() => ({}))) as { runId?: unknown; url?: unknown; error?: unknown; attempts?: unknown; retryInSec?: unknown };
+  const runId = Number(b.runId);
+  const url = typeof b.url === "string" ? b.url.slice(0, 2000) : "";
+  if (!Number.isInteger(runId) || runId <= 0 || !url) return Response.json({ success: false, error: "runId and url are required" }, { status: 400 });
+  const key = `worker_fail_${runId}`;
+  let map: Record<string, WorkerFailure> = {};
+  try { map = JSON.parse((await getKV(key)) ?? "{}") ?? {}; } catch { map = {}; }
+  if (typeof b.error === "string" && b.error.trim()) {
+    const now = Date.now();
+    const retry = Number(b.retryInSec);
+    map[url] = {
+      url,
+      error: b.error.trim().slice(0, 300),
+      attempts: Number.isInteger(Number(b.attempts)) ? Number(b.attempts) : 1,
+      retryAt: Number.isFinite(retry) && retry > 0 ? new Date(now + retry * 1000).toISOString() : null,
+      at: new Date(now).toISOString(),
+    };
+  } else {
+    delete map[url];
+  }
+  await setKV(key, JSON.stringify(map));
+  return Response.json({ success: true });
 }

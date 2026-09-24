@@ -84,10 +84,10 @@ class App:
         if not self.cookie:
             raise RuntimeError("login returned no session cookie")
 
-    def post(self, path: str) -> dict:
+    def post(self, path: str, body: dict | None = None) -> dict:
         if not self.cookie:
             self.login()
-        req = urllib.request.Request(f"{APP_URL}{path}", method="POST", data=b"{}",
+        req = urllib.request.Request(f"{APP_URL}{path}", method="POST", data=json.dumps(body or {}).encode(),
                                      headers={"Cookie": self.cookie, "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=180) as r:
             return json.loads(r.read().decode())
@@ -140,7 +140,7 @@ def due(state: dict, key: str) -> bool:
     return time.time() - e.get("at", 0) >= retry_after(attempts)
 
 
-def note_failure(state: dict, key: str, run_id: int, msg: str) -> None:
+def note_failure(state: dict, key: str, run_id: int, msg: str, app: "App | None" = None, url: str | None = None) -> None:
     st = state.get(key, {"attempts": 0})
     attempts = st["attempts"] + 1
     state[key] = {"attempts": attempts, "at": time.time(), "error": msg[:300]}
@@ -149,6 +149,18 @@ def note_failure(state: dict, key: str, run_id: int, msg: str) -> None:
     tail = (f"retrying in {wait // 60} min ({left} attempt{'s' if left != 1 else ''} left)"
             if left > 0 else "giving up on this URL — press “Try again” on the run page to restart the attempts")
     log(f"run #{run_id}: failed — {msg[:140]} | {tail}")
+    if app and url:
+        report(app, run_id, url, msg, attempts, wait if left > 0 else None)
+
+
+def report(app: "App", run_id: int, url: str, error: str | None, attempts: int = 0, retry_in: int | None = None) -> None:
+    """Tell the run page why a page failed (or that it no longer does), so its
+    banner shows the real reason instead of guessing. Best-effort."""
+    try:
+        app.post("/api/worker/queue", {"runId": run_id, "url": url, "error": error[:300] if error else None,
+                                       "attempts": attempts, "retryInSec": retry_in})
+    except Exception as e:
+        log(f"run #{run_id}: could not report to the app — {type(e).__name__}: {e}")
 
 
 def run_once(app: App, scraper) -> int:
@@ -203,14 +215,16 @@ def run_once(app: App, scraper) -> int:
                 folder = scraper.scrape(u["url"], refresh=fresh)
                 # describe=0 on every push; one analyst call per run comes after the loop
                 scraper.push_to_app(APP_URL, str(run_id), folder, describe=False, password=app.password)
+                if key in state:
+                    report(app, run_id, u["url"], None)
                 state.pop(key, None)
                 done += 1
                 pushed_any = True
                 log(f"run #{run_id}: pushed")
             except SystemExit as e:      # the scraper reports hard failures via sys.exit
-                note_failure(state, key, run_id, str(e).strip() or f"exit {e.code!r}")
+                note_failure(state, key, run_id, str(e).strip() or f"exit {e.code!r}", app, u["url"])
             except Exception as e:
-                note_failure(state, key, run_id, f"{type(e).__name__}: {e}")
+                note_failure(state, key, run_id, f"{type(e).__name__}: {e}", app, u["url"])
             save_state(state)
         # Write the description from whatever pages the run now has — even if
         # the supplier page failed this round, the brand pages are enough for a
@@ -237,6 +251,11 @@ def main() -> None:
     scraper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(scraper)
     scraper.JSON_MODE = True    # keep the scraper's chatter off stdout formatting; we log ourselves
+    # The scraper's own cache and state default to ~/Desktop/scraped. iCloud
+    # evicts files there ("dataless"), and reading one from launchd fails with
+    # "Resource deadlock avoided" — every scrape failed that way on Sep 24.
+    scraper.OUT_ROOT = WORKER_HOME / "scraped"
+    scraper.STATE_FILE = scraper.OUT_ROOT / ".scrape-state.json"
 
     here = Path(__file__).resolve().parent
     watched = [here / "local-worker.py", here / "supplier-scrape.py"]

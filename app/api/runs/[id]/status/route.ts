@@ -52,6 +52,12 @@ export async function GET(
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
+  // Why the Mac worker failed on this run's pages, while the gate waits on it.
+  let workerFailures: unknown[] = [];
+  if (run.status === "awaiting_product_approval" && !run.product_approved_at) {
+    try { workerFailures = Object.values(JSON.parse((await getKV(`worker_fail_${run.id}`)) ?? "{}") ?? {}); } catch { /* optional */ }
+  }
+
   const safeJson = (s: string | null) => {
     if (!s) return null;
     try { return JSON.parse(s); } catch { return null; }
@@ -124,6 +130,7 @@ export async function GET(
       // Last time the Mac worker polled the queue (ISO) — the gate shows
       // whether it is online while a page is waiting on it.
       workerLastSeen,
+      workerFailures,
     },
     // Angles gate (after research): proposals + the operator's pick.
     angles: {
