@@ -595,7 +595,7 @@ export default function RunPage() {
   // Same idea for the research: the angles and the copy each remember the
   // one-pager they were built on. Unknown (older runs) never counts as stale.
   // What changed upstream of each generated stage since it was built.
-  const PART_LABEL: Record<string, string> = { product: "the product description", research: "the research", angles: "the angle", copy: "the copy", images: "the images" };
+  const PART_LABEL: Record<string, string> = { product: "the product description", research: "the research", angles: "the angle", copy: "the copy", name: "the product name", images: "the images" };
   const changedFor = (stage: "angles" | "stage2" | "stage3" | "ads"): string[] => run.context?.changed?.[stage] ?? [];
   const partsSentence = (parts: string[]) => {
     const labels = parts.map((p) => PART_LABEL[p] ?? p);

@@ -8,6 +8,7 @@ import { validateBundles } from "@/lib/pricing";
 import { researchKey } from "@/lib/research-edits";
 import { validateAudience } from "@/lib/audience";
 import { appendEdit, builtOnFor, type BuiltStage, type EditKind } from "@/lib/run-context";
+import { nameFromCopy, renameInCopy } from "@/lib/stage2/name";
 import { upsertAdImage, upsertStage3Image } from "@/lib/stage3/upsert";
 import { validateMarketPosition } from "@/lib/market";
 import { assertPublicUrl } from "@/lib/ssrf";
@@ -277,13 +278,15 @@ export async function PATCH(
     // Snapshot the pre-save Stage 2 text so the re-structuring below can skip
     // its (billed) Haiku call when a Save click didn't actually change anything.
     let stage2TextUnchanged = false;
+    let prevStage2Json: string | null = null;
     if (field === "stage2_copy" && typeof value === "string") {
       try {
         const prev = await db.execute({
-          sql: "SELECT stage2_copy_edited, stage2_output FROM runs WHERE id = ?",
+          sql: "SELECT stage2_copy_edited, stage2_output, stage2_json FROM runs WHERE id = ?",
           args: [Number(id)],
         });
-        const prevRow = prev.rows[0] as unknown as { stage2_copy_edited: string | null; stage2_output: string | null } | undefined;
+        const prevRow = prev.rows[0] as unknown as { stage2_copy_edited: string | null; stage2_output: string | null; stage2_json: string | null } | undefined;
+        prevStage2Json = prevRow?.stage2_json ?? null;
         const prevText = prevRow?.stage2_copy_edited ?? prevRow?.stage2_output ?? "";
         stage2TextUnchanged = prevText.trim() === value.trim();
       } catch { /* on any doubt, re-structure */ }
@@ -312,6 +315,9 @@ export async function PATCH(
             sql: "UPDATE runs SET stage2_json = ?, stage2_json_at = ? WHERE id = ?",
             args: [JSON.stringify(structured), new Date().toISOString(), Number(id)],
           });
+          // The copy renamed the product: the run takes the new name.
+          const renamed = nameFromCopy(prevStage2Json, structured);
+          if (renamed.brand_name) await db.execute({ sql: "UPDATE runs SET brand_name = ? WHERE id = ?", args: [renamed.brand_name, Number(id)] });
         }
       } catch (err) {
         structuredOk = false;
@@ -563,6 +569,22 @@ export async function PATCH(
     args: [...values, Number(id)],
   });
   for (const kind of [...new Set(edited)]) await noteEdit(Number(id), kind, "hand");
+
+  // Renaming the run renames the product in the copy, so there is one name.
+  if (typeof body.brand_name === "string" && body.brand_name.trim()) {
+    const current = await getRun(Number(id));
+    const next = current ? renameInCopy(current, body.brand_name) : null;
+    if (next) {
+      const at = new Date().toISOString();
+      await updateRun(Number(id), {
+        stage2_json: next.json,
+        stage2_json_at: at,
+        ...(next.copy !== null ? { stage2_copy_edited: next.copy, stage2_edited_at: at } : {}),
+      });
+      if (next.copy !== null) await noteEdit(Number(id), "copy", "hand");
+    }
+    await noteEdit(Number(id), "name", "hand", `renamed the product to "${body.brand_name.trim()}"`);
+  }
 
   // Stage 4 finishing is the cue to write the five ad briefs. Fire-and-forget,
   // once per run: the operator still approves every premise and prompt before

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { nameFromCopy } from "@/lib/stage2/name";
 import Anthropic from "@anthropic-ai/sdk";
 import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
@@ -124,7 +125,7 @@ export async function POST(
       }
       try {
         const structured = await structureStage2Copy(result.output, runId);
-        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), stage2_json_at: new Date().toISOString(), gdoc_appended_at: null });
+        if (structured) await updateRun(runId, { stage2_json: JSON.stringify(structured), stage2_json_at: new Date().toISOString(), gdoc_appended_at: null, ...nameFromCopy(run.stage2_json, structured) });
       } catch (e) {
         console.error("[stage2 structure] regen:", e);
       }

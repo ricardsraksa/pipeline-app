@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth";
+import { nameFromCopy } from "@/lib/stage2/name";
 import { getRun, updateRun } from "@/lib/db";
 import { shopifyConfigured } from "@/lib/shopify";
 import { parseProductRef } from "@/lib/shopify/resolve";
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
         json = fresh;
         restructured = true;
         const at = new Date().toISOString();
-        await updateRun(runId, { stage2_json: JSON.stringify(fresh), stage2_json_at: at, last_updated_at: at }).catch(() => {});
+        await updateRun(runId, { stage2_json: JSON.stringify(fresh), stage2_json_at: at, last_updated_at: at, ...nameFromCopy(run.stage2_json, fresh) }).catch(() => {});
       } else if (json) {
         restructureWarning = "Couldn't re-derive the fields from your edited copy — pushed the previous structure.";
       }

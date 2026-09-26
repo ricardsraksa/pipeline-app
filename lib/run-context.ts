@@ -11,7 +11,7 @@ import { parseSelectedAngles } from "@/lib/angles";
 import { parseStoredAudience } from "@/lib/audience";
 
 /** The parts of a run's context that anything downstream can depend on. */
-export type ContextPart = "product" | "audience" | "research" | "angles" | "copy" | "images";
+export type ContextPart = "product" | "audience" | "research" | "angles" | "copy" | "name" | "images";
 
 /** Stages that are generated from that context. */
 export type BuiltStage = "angles" | "stage2" | "stage3" | "ads";
@@ -20,8 +20,10 @@ export type BuiltStage = "angles" | "stage2" | "stage3" | "ads";
 export const DEPENDS: Record<BuiltStage, ContextPart[]> = {
   angles: ["product", "audience", "research"],
   stage2: ["product", "audience", "research", "angles"],
-  stage3: ["product", "audience", "research", "angles", "copy"],
-  ads: ["product", "audience", "research", "angles", "copy", "images"],
+  // The name is on the images and in every ad (the wordmark), so a rename
+  // dates both even when the copy text already says it.
+  stage3: ["product", "audience", "research", "angles", "copy", "name"],
+  ads: ["product", "audience", "research", "angles", "copy", "name", "images"],
 };
 
 export const PART_LABEL: Record<ContextPart, string> = {
@@ -30,6 +32,7 @@ export const PART_LABEL: Record<ContextPart, string> = {
   research: "the research",
   angles: "the angle",
   copy: "the copy",
+  name: "the product name",
   images: "the images",
 };
 
@@ -57,6 +60,7 @@ const EDIT_LABEL: Record<EditKind, string> = {
   research: "Research one-pager",
   angles: "Positioning angle",
   copy: "Copy kit",
+  name: "Product name",
   images: "Images",
   image_prompts: "Image prompts",
   ads_briefs: "Ad briefs",
@@ -142,6 +146,7 @@ export function contextKeys(run: Run): ContextKeys {
     research: keyOf(run.stage1_one_pager_edited ?? run.stage1_one_pager ?? ""),
     angles: angles.length ? hash(JSON.stringify(angles.map((a) => [a.id, a.title, a.problem, a.mechanism, a.hook]))) : null,
     copy: keyOf(effectiveCopy(run)),
+    name: run.brand_name?.trim() ? hash(run.brand_name.trim()) : null,
     images,
   };
 }
