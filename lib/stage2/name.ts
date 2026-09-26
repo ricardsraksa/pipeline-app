@@ -30,7 +30,31 @@ export function renameInCopy(run: Pick<Run, "stage2_json" | "stage2_copy_edited"
   try { json = JSON.parse(run.stage2_json) as Stage2Json; } catch { return null; }
   const text = run.stage2_copy_edited ?? run.stage2_output ?? "";
   // The copy is the source the structure is re-read from, so it must say the
-  // new name too — or the next copy edit would bring the old one back.
-  const copy = old && text.includes(old) ? text.split(old).join(name) : null;
-  return { copy, json: JSON.stringify({ ...json, product_name: name }) };
+  // new name too — or the next copy edit would bring the old one back. It also
+  // uses the brand word alone ("Tethra keeps it tied down"): swap that too when
+  // both names start with a real brand word.
+  const [ob, nb] = [brandWord(old), brandWord(name)];
+  const brandRe = ob && nb && ob !== nb ? new RegExp(`\\b${ob.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g") : null;
+  const rename = (s: string) => {
+    let out = old ? s.split(old).join(name) : s;
+    if (brandRe && nb) out = out.replace(brandRe, nb);
+    return out;
+  };
+  const copy = rename(text);
+  // The fields (sections, FAQs, ad text) say the name as well.
+  let fields: Stage2Json = json;
+  try { fields = JSON.parse(rename(run.stage2_json)) as Stage2Json; } catch { /* a name with quotes: keep the fields, set the title */ }
+  return { copy: copy !== text ? copy : null, json: JSON.stringify({ ...fields, product_name: name }) };
+}
+
+const ARTICLES = new Set(["the", "a", "an"]);
+const NOT_BRANDS = new Set(["our", "your", "my", "new", "original", "premium", "classic"]);
+/** "Tethra Anchored Safe Box" → "Tethra", "The Pouchbook Pill Organizer" →
+ *  "Pouchbook"; null when there's no clear brand word (it must be capitalised
+ *  and appear once in the name, so "The Board Co Cutting Board" has none). */
+function brandWord(name: string): string | null {
+  const words = name.trim().split(/\s+/);
+  const w = (ARTICLES.has((words[0] ?? "").toLowerCase()) ? words[1] : words[0]) ?? "";
+  if (!/^[A-Z][A-Za-z0-9+'-]{2,}$/.test(w) || NOT_BRANDS.has(w.toLowerCase())) return null;
+  return words.filter((x) => x.toLowerCase() === w.toLowerCase()).length === 1 ? w : null;
 }
