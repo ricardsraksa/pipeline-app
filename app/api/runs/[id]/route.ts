@@ -533,8 +533,18 @@ export async function PATCH(
   }
   if ("product_description_edited" in body)       { fields.push("product_description_edited = ?");       values.push(typeof body.product_description_edited === "string" ? body.product_description_edited.slice(0, 20_000) : null); }
   if ("product_selected_images" in body)          { fields.push("product_selected_images = ?");          values.push(body.product_selected_images ?? null); }
-  if ("product_angles" in body)                   { fields.push("product_angles = ?");                   values.push(typeof body.product_angles === "string" ? body.product_angles.slice(0, 40_000) : null); }
-  if ("product_angle_selected" in body)           { fields.push("product_angle_selected = ?");           values.push(typeof body.product_angle_selected === "string" ? body.product_angle_selected.slice(0, 8000) : null); }
+  // Angle lists are JSON: store them whole or refuse them. Cutting them to a
+  // length broke the JSON — five picked angles passed the old 8,000 cap and
+  // Copy then read "no angle picked" (run 165, Sep 26).
+  for (const key of ["product_angles", "product_angle_selected"] as const) {
+    if (!(key in body)) continue;
+    const v = body[key];
+    if (typeof v !== "string") { fields.push(`${key} = ?`); values.push(null); continue; }
+    let ok = v.length <= 100_000;
+    try { ok = ok && Array.isArray(JSON.parse(v)); } catch { ok = false; }
+    if (!ok) return Response.json({ error: `${key} must be a JSON list of angles under 100,000 characters` }, { status: 400 });
+    fields.push(`${key} = ?`); values.push(v);
+  }
   if ("uploaded_source_images" in body)           { fields.push("uploaded_source_images = ?");           values.push(body.uploaded_source_images ? JSON.stringify(body.uploaded_source_images.slice(0, 20)) : null); }
 
   if (fields.length === 0) {
