@@ -64,6 +64,18 @@ export function refsFor(p: RemainingPrompt, overrides: Record<string, string[]>,
  * only generates the image. Ends at awaiting_hero_qc; on failure drops back
  * to the Stage 4 entry gate with the reason.
  */
+// What Stage 4 was built from, stored the moment any of it exists. Stage 4
+// counts as built once the hero does; without this stamp until the 8 prompts
+// landed, the banner fell back to the edit log — which holds the angle pick
+// itself — and said "the angle changed" right after the hero was approved.
+function stage3Stamp(run: Run) {
+  return {
+    stage3_angle_key: angleKey(run.product_angle_selected),
+    stage3_research_key: researchKey(run),
+    stage3_built_on: builtOnFor(run, "stage3"),
+  };
+}
+
 export async function heroJob(runId: number, alive: Alive = ALWAYS): Promise<void> {
   const run = await getRun(runId);
   if (!run || !alive()) return;
@@ -93,7 +105,7 @@ export async function heroJob(runId: number, alive: Alive = ALWAYS): Promise<voi
       aspect_ratio: hero.aspect_ratio,
     });
     if (!alive()) return;
-    await updateRun(runId, { stage3_hero_image_url: imageUrl, stage3_hero_approved: 0, status: "awaiting_hero_qc", current_step: "Stage 4: Review the hero shot", last_updated_at: now() });
+    await updateRun(runId, { stage3_hero_image_url: imageUrl, stage3_hero_approved: 0, ...stage3Stamp(run), status: "awaiting_hero_qc", current_step: "Stage 4: Review the hero shot", last_updated_at: now() });
   } catch (err) {
     if (!alive()) return;
     const message = err instanceof Error ? err.message : String(err);
@@ -120,6 +132,7 @@ export async function heroRegenJob(runId: number, editedPrompt?: string, alive: 
     if (!alive()) return;
     await updateRun(runId, {
       stage3_hero_image_url: imageUrl,
+      ...stage3Stamp(run),
       stage3_remaining_prompts: null,
       stage3_remaining_prompts_edited: null,
       stage3_remaining_images: null,
@@ -150,6 +163,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
     if (fromSource && !sourceImageUrls.length) throw new Error("No source product images to generate from");
     await updateRun(runId, {
       ...(fromSource ? { stage3_hero_prompt: null, stage3_hero_prompt_edited: null, stage3_hero_image_url: null, stage3_hero_approved: 0 } : { stage3_hero_approved: 1 }),
+      ...stage3Stamp(run),
       status: "generating_remaining",
       current_step: fromSource ? "Stage 4: Writing the 8 prompts from source images" : "Stage 4: Writing the 8 derivative prompts",
       error_message: null,
@@ -174,9 +188,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
     if (!alive()) return;
     await updateRun(runId, {
       stage3_remaining_prompts: JSON.stringify(prompts),
-      stage3_angle_key: angleKey(run.product_angle_selected),
-      stage3_research_key: researchKey(run),
-      stage3_built_on: builtOnFor(run, "stage3"),
+      ...stage3Stamp(run),
       stage3_remaining_validation: JSON.stringify(validation),
       status: "awaiting_qc",
       current_step: "Stage 4: Review the 8 prompts before generating",
