@@ -140,6 +140,13 @@ export default function Stage3HeroFlow({
   async function rewriteHeroWithAi() {
     const instr = heroAiInstr.trim();
     if (instr.length < 5) { setHeroAiErr("Too short"); return; }
+    // A new hero discards everything built on the old one (hero-regenerate
+    // nulls the 8 prompts, edits, images and placement) — say so first.
+    const builtImages = safeParse<RemImage[]>(run?.stage3_remaining_images, []).filter((im) => im?.image_url).length;
+    if (run?.stage3_remaining_prompts) {
+      const lost = builtImages > 0 ? `the 8 prompts, ${builtImages} image${builtImages === 1 ? "" : "s"} and placement` : "the 8 prompts";
+      if (!confirm(`Deletes ${lost}. Regenerate hero?`)) return;
+    }
     setHeroAiLoading(true);
     setHeroAiErr(null);
     try {
@@ -454,10 +461,11 @@ export default function Stage3HeroFlow({
 
   /* ── PROMPT QC GATE (awaiting_qc, 8 prompts) ────────────────────────── */
   if (status === "awaiting_qc" && run.stage3_remaining_prompts) {
-    const saved = promptDrafts ?? safeParse<RemainingPrompt[]>(
+    const serverPrompts = safeParse<RemainingPrompt[]>(
       run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts,
       [],
     );
+    const saved = promptDrafts ?? serverPrompts;
     // Prompt history per card, newest first. The version the writer produced
     // is always the last entry, so "restore" can always get back to it.
     const history = safeParse<Record<string, PromptVersion[]>>(run.stage3_prompt_history, {});
@@ -483,6 +491,15 @@ export default function Stage3HeroFlow({
     const setDraft = (i: number, prompt: string) => {
       const next = saved.map((p, j) => (j === i ? { ...p, prompt } : p));
       setPromptDrafts(next);
+      return next;
+    };
+    // Edits live on the server, not just in this tab — a reload or another
+    // device must see them (generation reads the same column).
+    const persistDrafts = (next: RemainingPrompt[]) => {
+      void fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage3_remaining_prompts_edited: JSON.stringify(next) }),
+      }).catch((e) => console.error("persist prompt edit failed:", e));
     };
     const restoreVersion = (i: number, v: PromptVersion) => {
       pushHistory(saved[i], "edited");
@@ -514,7 +531,7 @@ export default function Stage3HeroFlow({
         const data = await res.json();
         if (!data.success || !data.prompt) { setAiCardErr(data.error ?? `HTTP ${res.status}`); return; }
         pushHistory(saved[i], "ai");
-        setDraft(i, data.prompt as string);
+        persistDrafts(setDraft(i, data.prompt as string));
         setAiCardIdx(null);
         setAiCardText("");
       } catch (e) {
@@ -620,6 +637,7 @@ export default function Stage3HeroFlow({
                   <textarea
                     value={p.prompt}
                     onChange={(e) => setDraft(i, e.target.value)}
+                    onBlur={() => { if (p.prompt !== serverPrompts[i]?.prompt) persistDrafts(saved); }}
                     rows={10}
                     className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
                   />

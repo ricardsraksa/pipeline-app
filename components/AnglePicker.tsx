@@ -106,11 +106,18 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
       const res = await fetch(`/api/runs/${runId}/angles`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
-      const own = proposed.filter((a) => a.id.startsWith("custom-"));
-      const nextProposed = [...(data.angles as Angle[]), ...own];
-      const nextSelected = selected.filter((a) => a.id.startsWith("custom-"));
-      await patch({ product_angles: JSON.stringify(nextProposed), product_angle_selected: nextSelected.length ? JSON.stringify(nextSelected) : null });
-      setProposed(nextProposed); setSelected(nextSelected); setNote(""); setOpenId(null);
+      // New proposals never cost the operator a pick: your own angles and the
+      // picked ones (with any wording edits) stay, picks stay picked.
+      const fresh = data.angles as Angle[];
+      const keepIds = new Set(selected.map((a) => a.id));
+      const kept = [
+        ...selected,
+        ...proposed.filter((a) => a.id.startsWith("custom-") && !keepIds.has(a.id)),
+      ];
+      const nextProposed = [...fresh.filter((f) => !keepIds.has(f.id)), ...kept];
+      // (the server clears the pick on a fresh set — put it back)
+      await patch({ product_angles: JSON.stringify(nextProposed), product_angle_selected: selected.length ? JSON.stringify(selected) : null });
+      setProposed(nextProposed); setNote(""); setOpenId(null);
       push(`${data.angles.length} angles`, "success");
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't generate"); }
     finally { setBusy(null); }

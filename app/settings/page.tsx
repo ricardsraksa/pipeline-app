@@ -53,7 +53,7 @@ export default function SettingsPage() {
   const [prompts, setPrompts] = useState<Record<Stage, PromptState> | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function refresh(preserveEdits = false) {
+  async function refresh(preserveEdits = false, reloadStage?: Stage) {
     const data = await fetch("/api/prompts").then((r) => r.json());
     setPrompts((prev) => {
       const state: Record<Stage, PromptState> = {} as Record<Stage, PromptState>;
@@ -63,7 +63,7 @@ export default function SettingsPage() {
           current: data[stage],
           default: data.defaults[stage],
           savedAt: data.saved_at?.[stage] ?? null,
-          editing: preserveEdits && prevS ? prevS.editing : data[stage],
+          editing: preserveEdits && prevS && stage !== reloadStage ? prevS.editing : data[stage],
           saving: false,
           saved: false,
           resetting: false,
@@ -133,8 +133,10 @@ export default function SettingsPage() {
         body: JSON.stringify({ stage, index }),
       });
       const data = await res.json();
+      // Only the restored prompt takes the server text; unsaved edits in the
+      // other prompts stay on screen.
       if (data.success) {
-        await refresh(false);
+        await refresh(true, stage);
       }
     } finally {
       update(stage, { restoringIndex: null });

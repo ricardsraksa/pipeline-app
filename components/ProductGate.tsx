@@ -107,9 +107,26 @@ export default function ProductGate({
 
   const initialText = product?.descriptionEdited ?? product?.descriptionAi ?? run.meta.productDescription ?? "";
   const [text, setText] = useState(initialText);
-  const [selected, setSelected] = useState<string[]>(
-    product?.selectedImages?.length ? product.selectedImages : defaultSelectedImages(scrape, uploaded),
+  // Ticks are only sent on approve, and Regenerate / Edit with AI reload the
+  // page — so unsaved ticks wait in sessionStorage until then.
+  const ticksKey = `product-ticks-${runId}`;
+  const draftTicks = (): string[] | null => {
+    if (!waiting) return null;
+    try {
+      const v = JSON.parse(sessionStorage.getItem(ticksKey) ?? "null");
+      if (!Array.isArray(v)) return null;
+      const ok = new Set(candidates.map((c) => c.url));
+      const kept = v.filter((u): u is string => typeof u === "string" && ok.has(u));
+      return kept.length ? kept : null;
+    } catch { return null; }
+  };
+  const [selected, setSelected] = useState<string[]>(() =>
+    draftTicks() ?? (product?.selectedImages?.length ? product.selectedImages : defaultSelectedImages(scrape, uploaded)),
   );
+  useEffect(() => {
+    if (!waiting) return;
+    try { sessionStorage.setItem(ticksKey, JSON.stringify(selected)); } catch { /* private mode */ }
+  }, [selected, waiting, ticksKey]);
   const [regenerating, setRegenerating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -118,7 +135,9 @@ export default function ProductGate({
   // When a regenerate / local push lands a new description, adopt it.
   useEffect(() => { setText(product?.descriptionEdited ?? product?.descriptionAi ?? ""); }, [product?.descriptionAi, product?.descriptionEdited]);
   useEffect(() => {
-    if (product?.selectedImages?.length) setSelected(product.selectedImages);
+    const draft = draftTicks();
+    if (draft) setSelected(draft);
+    else if (product?.selectedImages?.length) setSelected(product.selectedImages);
     else setSelected(defaultSelectedImages(scrape, uploaded));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.scrape]);
@@ -198,6 +217,7 @@ export default function ProductGate({
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
+      try { sessionStorage.removeItem(ticksKey); } catch { /* private mode */ }
       push("Approved — research is running", "success");
       onChanged();
     } catch (e) {
