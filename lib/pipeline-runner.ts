@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { getRun, updateRun, recordPromptUsed, recordUsage, db } from "./db";
 import { scraplingScrape } from "./scrapling";
 import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
@@ -34,7 +35,7 @@ import {
 // timeout: a hung Anthropic request fails within 2 min instead of the SDK's
 // 10-min default, so a stalled Stage 1 call surfaces as a resumable failure
 // rather than an indefinitely "stuck" run.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
+const anthropic = anthropicClient({ timeout: 120_000 });
 // Models are resolved per logical role via getModel() (lib/models.ts) — DB
 // selection → env override → default. Stage 1 reasoning is the default role for
 // anthropicMessage; mechanical chores and Stage 2 pass their roles explicitly.

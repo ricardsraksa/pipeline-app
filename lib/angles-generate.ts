@@ -3,6 +3,7 @@
 // call (structured output, no JSON-in-prose parsing).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { jsonrepair } from "jsonrepair";
 import { getRun, updateRun, recordUsage, recordPromptUsed } from "./db";
 import { getModel, streamToolCall } from "./models";
@@ -14,7 +15,7 @@ import { onePagerForDownstream, researchKey } from "./research-edits";
 import { builtOnFor, contextBlock, effectiveDescription } from "./run-context";
 import { audienceBlock, ensureAudience } from "./audience";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
+const anthropic = anthropicClient({ timeout: 180_000 });
 
 const ANGLES_TOOL: Anthropic.Tool = {
   name: "submit_angles",

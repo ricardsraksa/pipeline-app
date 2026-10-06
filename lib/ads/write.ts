@@ -5,6 +5,7 @@
 // tool call and lands in runs.ads_prompts; the operator reviews before any
 // image is generated.
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { jsonrepair } from "jsonrepair";
 import { db, getRun, updateRun, recordUsage, recordPromptUsed } from "@/lib/db";
 import { onePagerForDownstream, researchKey } from "@/lib/research-edits";
@@ -18,7 +19,7 @@ import { parseProductScrape } from "@/lib/product";
 import { stage3ActiveSourceImages } from "@/lib/stage3/sources";
 import { AD_CONCEPTS, type AdConcept, type AdPrompt } from "@/lib/ads/shape";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 180_000 });
+const anthropic = anthropicClient({ timeout: 180_000 });
 const CAP = 14_000;
 
 const TOOL: Anthropic.Tool = {

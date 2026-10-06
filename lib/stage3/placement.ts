@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel } from "@/lib/models";
 import { parseSelectedAngles } from "@/lib/angles";
@@ -7,7 +8,7 @@ import type { Stage2Json } from "@/lib/stage2/shape";
 // Section placement — which of the finished Stage 4 images sits next to body
 // sections 2 and 3. Called by the placement route and, once a batch finishes,
 // by the Stage 4 job itself so a run closes with its placement already made.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+const anthropic = anthropicClient({ timeout: 90_000 });
 
 type RemImage = { index: number; category: string; image_url: string; status?: string; verdict?: "pass" | "fail"; user_override?: "pass" | "fail" | null };
 type RemPrompt = { index: number; prompt?: string; overlay_text?: string; intended_section?: number | null };

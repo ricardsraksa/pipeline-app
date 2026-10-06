@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nameFromCopy } from "@/lib/stage2/name";
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { getRun, updateRun, type Run, recordUsage } from "@/lib/db";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { getModel, type ModelRole } from "@/lib/models";
@@ -26,7 +27,7 @@ import { parseProductScrape } from "@/lib/product";
 import { appendResearchNote, onePagerForDownstream, researchKey } from "@/lib/research-edits";
 import { appendEdit, builtOnFor, contextBlock, effectiveDescription } from "@/lib/run-context";
 import { audienceBlock, ensureAudience } from "@/lib/audience";
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = anthropicClient();
 
 // Stage 2 regeneration now awaits two model calls in sequence (the Opus-tier
 // rewrite plus the mechanical re-structuring for the Copy tab) — give it room.

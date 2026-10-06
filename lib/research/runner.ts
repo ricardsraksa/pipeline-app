@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
 import { IDENTIFY_PROMPT } from "@/lib/prompts/research/identify";
@@ -9,7 +10,7 @@ import { VISUAL_PROMPT } from "@/lib/prompts/research/visual";
 
 // timeout: a hung research call fails within 2 min instead of the SDK's
 // 10-min default, so a stalled Stage 1 step can't freeze the pipeline.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
+const anthropic = anthropicClient({ timeout: 120_000 });
 
 // Server-side web search tool. Anthropic runs the searches itself and feeds
 // the results back to the model within a single create() call.

@@ -8,6 +8,7 @@
 // the ads mixed the two. The buyer is who every word is written to; the user
 // is who the product is for and who the pictures show.
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { getModel, streamToolCall } from "@/lib/models";
 import { getRun, recordUsage, updateRun, type Run } from "@/lib/db";
 
@@ -98,7 +99,7 @@ export async function deriveAudience(run: Run): Promise<Audience | null> {
   const avatar = (run.step_avatar_revised ?? run.step_avatar ?? "").slice(0, 6000);
   const description = (run.product_description_edited ?? run.product_description_ai ?? run.product_description ?? "").slice(0, 3000);
   if (!onePager && !avatar && !description) return null;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+  const client = anthropicClient({ timeout: 90_000 });
   const model = await getModel("mechanical");
   const msg = await streamToolCall(client, {
     model,

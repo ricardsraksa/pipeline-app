@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { anthropicClient } from '@/lib/anthropic-client'
 import { jsonrepair } from 'jsonrepair'
 import { getModel, modelSupportsSamplingParams, streamToolCall } from '@/lib/models'
 import { recordUsage } from '@/lib/db'
@@ -19,7 +20,7 @@ import { getPrompt } from '@/lib/prompts'
 // timeout: a hung prompt-writing call fails within 2 min instead of the SDK's
 // 10-min default — the route-level maxDuration would otherwise cut it off with
 // no useful error.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 })
+const anthropic = anthropicClient({ timeout: 120_000 })
 // Stage 3 prompt writing (hero + the 8 derivatives) resolves via the
 // "stage3Prompt" role (lib/models.ts) — selectable in Settings.
 

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel, streamToolCall } from "@/lib/models";
@@ -9,7 +10,7 @@ import { getPricingRules } from "@/lib/pricing-store";
 
 export const maxDuration = 120;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+const anthropic = anthropicClient({ timeout: 90_000 });
 
 // Picks the quantity for each bundle tier from how the product is used. The
 // discounts come from the pricing rules; the model only returns quantities.

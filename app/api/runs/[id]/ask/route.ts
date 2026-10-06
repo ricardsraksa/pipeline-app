@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel } from "@/lib/models";
@@ -10,7 +11,7 @@ import { buildProductContext } from "@/lib/assistant/context";
 // not lose it.
 export const maxDuration = 300;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000 });
+const anthropic = anthropicClient({ timeout: 120_000 });
 
 interface Turn { q: string; a: string; at: string }
 

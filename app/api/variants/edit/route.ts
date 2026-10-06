@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel, streamToolCall } from "@/lib/models";
@@ -7,7 +8,7 @@ import { parseProductScrape } from "@/lib/product";
 
 export const maxDuration = 120;
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+const anthropic = anthropicClient({ timeout: 90_000 });
 
 type Variant = { title: string | null; price: string | null; available?: boolean };
 

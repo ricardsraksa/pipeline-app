@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { jsonrepair } from "jsonrepair";
 import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
@@ -7,7 +8,7 @@ import { recordUsage } from "@/lib/db";
 // (the Anthropic SDK and the DB-backed model resolver).
 import type { Stage2Json } from "./shape";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+const anthropic = anthropicClient({ timeout: 90_000 });
 
 const STRUCTURE_SYSTEM = `You convert an already-written DTC copy kit into structured JSON. You are a parser, not a writer.
 

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicClient } from "@/lib/anthropic-client";
 import { IMAGE_AUDIT_SYSTEM, buildAuditUserMessage } from "@/lib/prompts/image_audit";
 import { getModel } from "@/lib/models";
 import { recordUsage } from "@/lib/db";
@@ -7,7 +8,7 @@ import { assertPublicUrl } from "@/lib/ssrf";
 // The image auditor, callable from routes and from the server-side batches.
 // timeout: a hung vision call (usually Anthropic struggling to download the
 // image URL) fails in 90s instead of the SDK's 10-min default.
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 90_000 });
+const anthropic = anthropicClient({ timeout: 90_000 });
 
 export interface AuditArgs {
   image_url: string;
