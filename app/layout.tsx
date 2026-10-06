@@ -22,9 +22,16 @@ export const metadata: Metadata = {
   description: "Product research and copy pipeline for DTC brands",
 };
 
+// Applies the saved theme (TopBar stores it under "pipeline-theme") before
+// first paint, so a light-theme user never sees the dark default flash.
+const themeScript = `try{if(localStorage.getItem("pipeline-theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" className={`${libreFranklin.variable} ${spaceMono.variable}`}>
+    <html lang="en" data-theme="dark" className={`${libreFranklin.variable} ${spaceMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-screen" style={{ background: "var(--color-bg)", color: "var(--color-text)", fontFamily: "var(--font-libre-franklin), system-ui, sans-serif", fontSize: 14, lineHeight: 1.5, WebkitFontSmoothing: "antialiased", fontVariantNumeric: "tabular-nums" }}>
         <ToastProvider>
           <AuthWatch />

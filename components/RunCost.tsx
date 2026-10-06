@@ -29,6 +29,7 @@ function fmtCost(n: number): string {
 
 export default function RunCost({ runId }: { runId: number }) {
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<{ total_cost: number; calls: number; breakdown: BreakdownRow[] } | null>(null);
@@ -78,15 +79,18 @@ export default function RunCost({ runId }: { runId: number }) {
           )}
           {data && data.breakdown.length > 0 && (
             <div className="overflow-x-auto">
+              <button onClick={() => setDetails((v) => !v)} className="cursor-pointer mb-1 text-[11px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr">
+                {details ? "Less" : "Details"}
+              </button>
               <table className="w-full text-[11.5px]">
                 <thead>
                   <tr className="text-left text-[var(--color-text-3)]">
                     <th className="py-1 pr-3 font-[500]">Call</th>
-                    <th className="py-1 pr-3 font-[500]">Model</th>
+                    {details && <th className="py-1 pr-3 font-[500]">Model</th>}
                     <th className="py-1 pr-3 font-[500] text-right">Calls</th>
                     <th className="py-1 pr-3 font-[500] text-right">In</th>
                     <th className="py-1 pr-3 font-[500] text-right">Out</th>
-                    <th className="py-1 pr-3 font-[500] text-right">Cache r/w</th>
+                    {details && <th className="py-1 pr-3 font-[500] text-right">Cache r/w</th>}
                     <th className="py-1 font-[500] text-right">Cost</th>
                   </tr>
                 </thead>
@@ -94,11 +98,11 @@ export default function RunCost({ runId }: { runId: number }) {
                   {data.breakdown.map((r) => (
                     <tr key={`${r.label}|${r.model}`} className="border-t border-[var(--color-border)] text-[var(--color-text-2,var(--color-text))]">
                       <td className="py-1 pr-3">{r.label}</td>
-                      <td className="py-1 pr-3 text-[var(--color-text-3)]">{r.model.replace("claude-", "")}</td>
+                      {details && <td className="py-1 pr-3 text-[var(--color-text-3)]">{r.model.replace("claude-", "")}</td>}
                       <td className="py-1 pr-3 text-right">{r.calls}</td>
                       <td className="py-1 pr-3 text-right">{fmtTokens(r.input_tokens)}</td>
                       <td className="py-1 pr-3 text-right">{fmtTokens(r.output_tokens)}</td>
-                      <td className="py-1 pr-3 text-right">{fmtTokens(r.cache_read_tokens)}/{fmtTokens(r.cache_write_tokens)}</td>
+                      {details && <td className="py-1 pr-3 text-right">{fmtTokens(r.cache_read_tokens)}/{fmtTokens(r.cache_write_tokens)}</td>}
                       <td className="py-1 text-right font-[600]">{fmtCost(r.cost)}</td>
                     </tr>
                   ))}

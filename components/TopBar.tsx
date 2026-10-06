@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
@@ -17,7 +18,7 @@ function Tab({ href, label, active, badge }: { href: string; label: string; acti
         active ? "text-[var(--color-text)]" : "text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]")}>
       <span>{label}</span>
       {badge ? (
-        <span className="ff-mono text-[10px] px-[5px] py-px rounded-full bg-[var(--color-red-bg)] text-[var(--color-red)]">{badge}</span>
+        <span className="ff-mono text-[10px] px-[5px] py-px rounded-full bg-[var(--color-amber-bg)] text-[var(--color-amber)]">{badge}</span>
       ) : null}
       {active && <span className="absolute left-[10px] right-[10px] -bottom-px h-[2px] rounded-[2px] bg-[var(--color-accent)]" />}
     </Link>
@@ -31,7 +32,8 @@ export default function TopBar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
-    const saved = (localStorage.getItem("pipeline-theme") as "dark" | "light" | null) ?? "dark";
+    let saved: "dark" | "light" = "dark";
+    try { if (localStorage.getItem("pipeline-theme") === "light") saved = "light"; } catch { /* private mode */ }
     setTheme(saved);
     document.documentElement.setAttribute("data-theme", saved);
   }, []);
@@ -71,11 +73,12 @@ export default function TopBar() {
         <Tab href="/" label="Home" active={isRun} badge={needs} />
         <Tab href="/new" label="New run" active={path === "/new"} />
         <Tab href="/settings" label="Settings" active={path === "/settings"} />
+        <Tab href="/changes" label="Changes" active={path === "/changes"} />
       </nav>
       <div className="flex-1" />
       <button onClick={toggle} title="Light / dark" aria-label="Toggle theme"
-        className="cursor-pointer h-7 px-[9px] rounded-[6px] grid place-items-center text-[12px] text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] tr">
-        {theme === "dark" ? "☾" : "☀"}
+        className="cursor-pointer h-8 w-8 rounded-[6px] grid place-items-center text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)] tr">
+        {theme === "dark" ? <Icon.Moon className="w-4 h-4" /> : <Icon.Sun className="w-4 h-4" />}
       </button>
       <button onClick={signOut} className="cursor-pointer text-[12px] text-[var(--color-text-3)] hover:text-[var(--color-text)] tr">Sign out</button>
     </header>

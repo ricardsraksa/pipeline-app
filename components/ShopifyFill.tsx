@@ -43,11 +43,17 @@ const STATUS_UI: Record<FieldRow["status"], { label: string; cls: string }> = {
 };
 
 export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { runId: number; initialAdminUrl: string | null; initialUrl?: string | null }) {
-  // Prefilled from the link saved on the run (rail → Deliver); edits here are
-  // saved back so the two never disagree.
+  // The one place the run's Shopify product link is set; saved on blur so
+  // Push to all uses the same link.
   const [url, setUrl] = useState(initialUrl ?? "");
-  const saveUrl = (v: string) => {
-    void fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopify_product_url: v.trim() || null }) }).catch(() => undefined);
+  const [urlErr, setUrlErr] = useState(false);
+  const saveUrl = async (v: string) => {
+    if (v.trim() === (initialUrl ?? "")) return;
+    try {
+      const res = await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopify_product_url: v.trim() || null }) });
+      setUrlErr(!res.ok);
+      if (res.ok) window.dispatchEvent(new Event("run:changed"));
+    } catch { setUrlErr(true); }
   };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -68,6 +74,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       setReport(data.report as Report);
       if (data.warning) setErr(String(data.warning));
       setNote(data.restructured ? "Re-derived from your edits." : null);
+      window.dispatchEvent(new Event("run:changed"));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -82,9 +89,13 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          onBlur={(e) => saveUrl(e.target.value)}
-          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Product URL (admin or storefront)"}
-          className="flex-1 min-w-[260px] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--color-accent)]"
+          onBlur={(e) => void saveUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          spellCheck={false}
+          aria-label="Shopify product link"
+          aria-invalid={urlErr}
+          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Shopify product link"}
+          className={`flex-1 min-w-[260px] border ${urlErr ? "border-[var(--color-red)]" : "border-[var(--color-border-strong)]"} bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--color-accent)]`}
         />
         <button
           onClick={push}

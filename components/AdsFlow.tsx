@@ -3,13 +3,13 @@
 // Stage 5 · Image ads. Write five briefs (premise + headline + prompt, one per
 // concept) → operator edits/approves → generate 1:1 images through the same
 // Higgsfield + auditor path as Stage 4 → review, regenerate per ad, send to
-// the product's "Image Ads" Drive folder.
+// the Done page (delivery lives there).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
-import { parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
-import SendToDrive from "@/components/SendToDrive";
+import { AD_CONCEPTS, parseAdImages, parseAdPrompts, type AdImage, type AdPrompt } from "@/lib/ads/shape";
+import { isStalled } from "@/lib/stage3/stall";
 
 type Cand = { url: string; tag: string };
 
@@ -37,6 +37,8 @@ export default function AdsFlow({ runId }: { runId: number }) {
   const [regenText, setRegenText] = useState("");
   const [lb, setLb] = useState<string | null>(null);
   const [zipping, setZipping] = useState(false);
+  // "Stop after current" was clicked; cleared once the batch leaves "generating".
+  const [stopping, setStopping] = useState(false);
   const stopRef = useRef(false);
   // The rail's Continue at the ad review runs this page's own "Generate", so
   // brief edits that are on screen but not yet saved go with it.
@@ -72,6 +74,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
     const t = setInterval(fetchRun, 4000);
     return () => clearInterval(t);
   }, [run?.ads_step, fetchRun]);
+  useEffect(() => { if (run?.ads_step !== "generating") setStopping(false); }, [run?.ads_step]);
 
   const patch = (body: Record<string, unknown>) => {
     chain.current = chain.current.catch(() => {}).then(() =>
@@ -244,15 +247,11 @@ export default function AdsFlow({ runId }: { runId: number }) {
     await persistImage(updated);
     if (prev.prompt) updateDraft(p.index, { prompt: prev.prompt }, true);
   };
-  const toggleVerdict = (p: AdPrompt) => {
+  // "Mark OK" / "Mark bad"; matching the auditor clears the override.
+  const setVerdict = (p: AdPrompt, target: "pass" | "fail") => {
     const cur = images.find((im) => im.index === p.index);
     if (!cur) return;
-    const auto = cur.verdict ?? "pass";
-    const o = cur.user_override ?? null;
-    let next: "pass" | "fail" | null;
-    if (o === null) next = auto === "pass" ? "fail" : "pass";
-    else { const flip = o === "pass" ? "fail" : "pass"; next = flip === auto ? null : flip; }
-    const updated = { ...cur, user_override: next };
+    const updated = { ...cur, user_override: cur.verdict === target ? null : target };
     setImages((prev) => prev.map((x) => (x.index === p.index ? updated : x)));
     void persistImage(updated);
   };
@@ -282,7 +281,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
   // the UI spins on "Writing…" or "generating" for good.
   const stalled = (run.ads_step === "writing" || run.ads_step === "generating")
     && !generating && !writing
-    && Boolean(run.last_updated_at) && Date.now() - new Date(run.last_updated_at as string).getTime() > 15 * 60 * 1000;
+    && isStalled(run.last_updated_at, Date.now());
   const serverBatch = run.ads_step === "generating" && !stalled;
   const anyBusy = generating || genBusy.size > 0 || serverBatch;
 
@@ -293,34 +292,41 @@ export default function AdsFlow({ runId }: { runId: number }) {
     return (
       <div className="space-y-3">
         {(step === "writing" || writing) && !stalled
-          ? <p className="ff-mono text-[11px] text-[var(--color-text-3)]">Writing the five briefs…</p>
-          : <button onClick={write} disabled={writing} className="btn btn-primary">{stalled ? "Write 5 ads again" : "Write 5 ads"}</button>}
+          ? <p className="ff-mono text-[11px] text-[var(--color-text-3)]">Writing the briefs…</p>
+          : <button onClick={write} disabled={writing} className="btn btn-primary">{stalled ? `Write ${AD_CONCEPTS.length} ads again` : `Write ${AD_CONCEPTS.length} ads`}</button>}
         {stalled && <p className="text-[12px] text-[var(--color-amber)]">Stopped part-way.</p>}
         {(err || run.ads_error) && <p className="text-[12px] text-[var(--color-red)]">{err ?? run.ads_error}</p>}
       </div>
     );
   }
 
+  const total = drafts.length;
+  const flaggedCount = images.filter((im) => im.status === "done" && effVerdict(im) === "fail").length;
+  const anyMissing = images.some((im) => im.status === "failed") || (images.length > 0 && doneCount < total);
+  // While the server batch runs (two at a time, in index order), the first two
+  // unfinished cards are in flight and the rest wait.
+  const pendingIdx = serverBatch
+    ? drafts.filter((p) => { const x = images.find((im) => im.index === p.index); return !(x?.status === "done" && x.image_url); }).map((p) => p.index)
+    : [];
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / 5 generated{images.some((im) => effVerdict(im) === "fail") ? ` · ${images.filter((im) => effVerdict(im) === "fail").length} flagged` : ""}</span>
+        <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / {total} generated{flaggedCount ? ` · ${flaggedCount} flagged` : ""}</span>
         <div className="flex-1" />
         {doneCount > 0 && <button onClick={downloadAll} disabled={zipping} className="btn btn-sm">{zipping ? "Zipping…" : "↓ Download all"}</button>}
-        {images.some((im) => im.status === "failed") && !generating && (
-          <button onClick={relink} disabled={relinking} className="btn btn-sm"
-            title="Failed ads that finished on Higgsfield after the app gave up get their images re-linked from your Higgsfield history, at no extra cost">
-            {relinking ? "Relinking…" : "Relink from Higgsfield"}
+        {anyMissing && !anyBusy && (
+          <button onClick={relink} disabled={relinking} className="btn btn-sm">
+            {relinking ? "Recovering…" : "Recover images"}
           </button>
         )}
-        {doneCount > 0 && <SendToDrive runId={runId} kind="ads" />}
         {anyBusy
-          ? <button onClick={() => { void fetch("/api/ads/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }} className="btn btn-sm">Stop after current</button>
+          ? <button disabled={stopping} onClick={() => { setStopping(true); void fetch("/api/ads/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }} className="btn btn-sm">{stopping ? "Stopping…" : "Stop after current"}</button>
           : doneCount === 0
-            ? <button onClick={() => generateAll(false)} className="btn btn-primary">Generate 5 ads</button>
-            : doneCount < 5
-              ? <button onClick={() => generateAll(true)} className="btn btn-primary">Generate the missing {5 - doneCount}</button>
-              : <button onClick={() => { if (window.confirm("Regenerate all five ads from the current briefs?")) void generateAll(false); }} className="btn btn-sm">Regenerate all 5</button>}
+            ? <button onClick={() => generateAll(false)} className="btn btn-primary">Generate {total} ads</button>
+            : doneCount < total
+              ? <button onClick={() => generateAll(true)} className="btn btn-primary">Generate the missing {total - doneCount}</button>
+              : <button onClick={() => { if (window.confirm(`Replaces all ${total} ads. Regenerate?`)) void generateAll(false); }} className="btn btn-sm">Regenerate all {total}</button>}
       </div>
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
@@ -336,9 +342,17 @@ export default function AdsFlow({ runId }: { runId: number }) {
                 <span className="ff-mono text-[10px] text-[var(--color-text-4)]">{p.index}</span>
                 <span className="text-[13px] font-[600] text-[var(--color-text)]">{p.concept_label}</span>
                 <div className="flex-1" />
-                {im && im.status === "done" && v && (
-                  <button onClick={() => toggleVerdict(p)} title={`Auditor: ${im.verdict ?? "not run"}`}
-                    className={`ff-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{v}{im.user_override ? "•" : ""}</button>
+                {im?.status === "failed" && (
+                  <span className="ff-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full text-white bg-[var(--color-red)]">Failed</span>
+                )}
+                {im && im.status === "done" && (
+                  <>
+                    <span className={`ff-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full ${v === "pass" ? "text-white bg-[var(--color-green)]" : v === "fail" ? "text-white bg-[var(--color-red)]" : "bg-[var(--color-surface-3)] text-[var(--color-text-2)]"}`}>
+                      {v === "pass" ? "OK" : v === "fail" ? "Flagged" : "Not checked"}
+                    </span>
+                    {v !== "pass" && <button onClick={() => setVerdict(p, "pass")} className="btn btn-sm">Mark OK</button>}
+                    {v !== "fail" && <button onClick={() => setVerdict(p, "fail")} className="btn btn-sm">Mark bad</button>}
+                  </>
                 )}
               </div>
 
@@ -354,7 +368,11 @@ export default function AdsFlow({ runId }: { runId: number }) {
                     {im?.image_url
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={im.image_url} alt={p.concept_label} onClick={() => setLb(im.image_url)} className="w-full h-full object-cover cursor-zoom-in" />
-                      : <div className="w-full h-full grid place-items-center ff-mono text-[10px] text-[var(--color-text-4)]">{im?.status === "failed" ? "failed" : "not generated"}</div>}
+                      : <div className="w-full h-full grid place-items-center ff-mono text-[10px] text-[var(--color-text-4)]">
+                          {pendingIdx.includes(p.index)
+                            ? (pendingIdx.indexOf(p.index) < 2 ? "Generating…" : "Queued")
+                            : im?.status === "failed" ? "Failed" : "Not generated"}
+                        </div>}
                   </div>
                   {im?.status === "failed" && im.error && <p className="mt-1 text-[10.5px] text-[var(--color-red)] leading-snug" title={im.error}>{im.error}</p>}
                   {im?.status === "done" && v === "fail" && im.issues?.length ? (
@@ -375,7 +393,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                       <textarea value={regenText} onChange={(e) => setRegenText(e.target.value)} rows={3} placeholder="What to change"
                         className="w-full px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[11.5px] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]" />
                       <div className="flex gap-1.5">
-                        <button onClick={() => regenerate(p, regenText.trim().length >= 5)} className="btn btn-sm btn-primary">{regenText.trim().length >= 5 ? "Rewrite & regenerate" : "Regenerate as is"}</button>
+                        <button onClick={() => regenerate(p, regenText.trim().length >= 5)} className="btn btn-sm btn-primary">{regenText.trim().length >= 5 ? "Regenerate with changes" : "Regenerate as is"}</button>
                         <button onClick={() => setRegenIdx(null)} className="btn btn-sm">Cancel</button>
                       </div>
                     </div>
@@ -394,7 +412,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
                     <input value={p.headline} onChange={(e) => updateDraft(p.index, { headline: e.target.value })} onBlur={saveDrafts}
                       className="mt-1 w-full px-2.5 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[13px] font-[500] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]" />
                   </div>
-                  <p className="ff-mono text-[10.5px] text-[var(--color-text-3)]">proof: {p.proof || "none"}</p>
+                  {p.proof && p.proof.trim().toLowerCase() !== "none" && <p className="ff-mono text-[10.5px] text-[var(--color-text-3)]">proof: {p.proof}</p>}
                   <div>
                     <button onClick={() => setOpenPrompt((s) => { const n = new Set(s); if (n.has(p.index)) n.delete(p.index); else n.add(p.index); return n; })} className="eyebrow cursor-pointer hover:text-[var(--color-text)]">
                       Prompt {openPrompt.has(p.index) ? "▾" : "▸"}

@@ -33,8 +33,9 @@ The only screen visible when logged out. Everything else redirects here.
 
 - App name and version of the deployed build.
 - Three destinations: Home, New run, Settings.
-- A badge showing how many runs currently need the operator.
-- Light/dark toggle.
+- An amber badge showing how many runs currently need the operator.
+- Light/dark toggle (sun/moon icon); the saved theme is applied before first
+  paint.
 - Toast messages appear here for saves, failures and completions.
 
 ---
@@ -43,7 +44,7 @@ The only screen visible when logged out. Everything else redirects here.
 
 Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box, New run. The product code on each row is editable in place: type the number, the P is added.
 
-The run inbox. Three groups, each with a count:
+The run inbox. Four groups, each with a count:
 
 - **Needs you** — runs stopped at a gate or failed. Each row carries a short
   reason: "Review the product / Description and photos", "Pick an angle /
@@ -55,17 +56,19 @@ The run inbox. Three groups, each with a count:
   out of "Needs you" and out of the header count until brought back.
 - **Recent** — completed and cancelled runs.
 
-Each row has a moon button to set a run aside for later, or bring it back.
+Each row has a clock button to set a run aside for later (or bring it back) and
+a trash button to delete it; both are always faintly visible.
 
 Each row: thumbnail (generated hero if there is one, else a source photo, else a
 generated pattern), product code in its own column (e.g. "P58"), product/brand
-name, run number, status, relative time, product URL, delete. The code is
+name (run number on hover), status, relative time, product URL, snooze, delete. The code is
 assigned when the run is created, continuing the sequence from the highest
 number already used by a run or by a tab in the master doc; it stays editable
 in the run's rail.
 
 Also: a search field filtering by name, code or run number; an empty state
-("No runs yet" / "Nothing matches …"); a link to start a new run.
+("No runs yet" / "Nothing matches …"); "Couldn't load runs." + Retry when the
+database read fails.
 
 ---
 
@@ -74,12 +77,12 @@ Also: a search field filtering by name, code or run number; an empty state
 Three inputs and one button. Nothing is generated here — submitting creates the
 run and the work starts in the background.
 
-1. **Product link** (required, https). Hint: AliExpress, Alibaba, Shopify. Error
-   when it isn't a full link.
-2. **Competitor / brand links** (optional, up to 5, one per line). Note: read for
-   positioning only.
-3. **Your own photos** (optional, up to 10, drag or click; the scraped listing
-   photos are added automatically).
+1. **Product link** (required, https). Error when it isn't a full link.
+2. **Competitor links** (optional, up to 5, one per line; read for positioning
+   only). Inline errors: "Line N isn't a full https:// link", "Max 5".
+3. **Your own photos** (optional, up to 10, drag or click; each has an
+   always-visible remove button; the scraped listing photos are added
+   automatically).
 
 Submit is "Run pipeline" (also ⌘↵). It can show "Starting…" and an error box.
 
@@ -339,7 +342,7 @@ Problem/Solution. One card per concept:
 - Top bar: Download all (zip), Send to Drive · Image Ads (a subfolder named
   for the ISO week they were sent, e.g. "Image Ads W37", next to Images and
   Videos), Stop after current, Generate the missing N / Regenerate all 5.
-- Rules the writer follows (Settings → Stage 5 — Image ads): square 1:1,
+- Rules the writer follows (Settings → Prompts → Stage 5 · Image ads): square 1:1,
   product exactly as in the hero, quotes and stats only from real sources or
   omitted, product name as plain-text wordmark, no logos.
 
@@ -359,21 +362,27 @@ fields** exactly as Shopify receives them with an Edit link back to Copy.
 
 ## 6. Settings
 
-Three blocks.
+Three tabs — Prompts / Models / Pricing — with the last one remembered per
+browser and a dot on any tab holding unsaved changes. When anything differs
+from what's saved, a sticky bar shows "N unsaved" with Save all / Discard, and
+leaving the page asks first.
 
-- **Models** — one row per pipeline role (Stage 1 product, Stage 2 research,
-  Stage 2 angles, Stage 3 copy, Stage 4 prompts, Stage 4 rewrites, Stage 4
-  auditor, Stage 3 bundle quantities, Stage 5 ad briefs, mechanical),
-  each with a one-line description, the current model, a picker with price per
-  million tokens, and what the default is.
-- **Pricing rules** — minimum multiple of COGS, price ending, compare-at
-  min/max above price, bundle discounts per item (`0, 20, 25`); default
-  markers; save.
-- **Prompts** — one block per stage (Stage 1 Product, Stage 2 Research, Stage 2
-  Angles, Stage 3 Copy, Stage 4 Images, Stage 5 Image ads). Each: a large editable prompt, a
-  "modified" marker when it differs from the built-in default, when it was saved,
-  save / reset to default, and a version history that can be previewed and
-  restored.
+- **Prompts** — one collapsed card per stage (Stage 1 · Product, Stage 2 ·
+  Research, Stage 2 · Angles, Stage 3 · Copy, Stage 4 · Images, Stage 5 · Image
+  ads). The header shows the name, an "Edited" badge when the *saved* prompt
+  differs from the built-in default, and when it was saved; click it to open a
+  large editable prompt with Save, Discard (back to the saved text, only while
+  it differs), Reset to default (confirmed), and a version history that can be
+  previewed and restored. Load failure shows "Couldn't load." + Retry; save,
+  reset and restore failures show inline.
+- **Models** — eleven rows, one per role (Stage 1 · Product, Stage 2 ·
+  Research, Stage 2 · Angles, Stage 3 · Copy, Stage 3 · Bundle quantities,
+  Stage 4 · Prompts, Stage 4 · Rewrites, Stage 4 · Auditor, Stage 5 · Ad briefs,
+  Assistant, Mechanical), each with a default/custom marker, the default model
+  and a picker with price per million tokens; Save / Discard.
+- **Pricing** — minimum multiple of COGS, price ending, compare-at min/max
+  above price, bundle discounts per item (`0, 20, 25`); default markers;
+  Save / Discard.
 
 ---
 

@@ -5,9 +5,7 @@ import type { Run } from "@/lib/db";
 import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
 import Stage3SourcePicker from "@/components/Stage3SourcePicker";
 import { parseProductScrape, productCandidateImages } from "@/lib/product";
-import ShopifyFill from "@/components/ShopifyFill";
-import SendToDrive from "@/components/SendToDrive";
-import VariantsCard from "@/components/VariantsCard";
+import { fmtElapsed, isStalled } from "@/lib/stage3/stall";
 
 /* ── types mirrored from lib/stage3/hero.ts (kept local so this stays a
       pure client component without importing server code) ──────────────── */
@@ -128,6 +126,9 @@ export default function Stage3HeroFlow({
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Bumped after a server-side change to the finished images (relink), so the
+  // review remounts from the refetched run instead of a hard page reload.
+  const [reviewKey, setReviewKey] = useState(0);
 
   // Hero QC local edit state
   const [heroEditing, setHeroEditing] = useState(false);
@@ -137,16 +138,27 @@ export default function Stage3HeroFlow({
   const [heroAiLoading, setHeroAiLoading] = useState(false);
   const [heroAiErr, setHeroAiErr] = useState<string | null>(null);
 
+  // A new hero discards everything built on the old one (hero-regenerate
+  // nulls the prompts, edits, images and placement) — say so first. Used by
+  // every hero-regenerate path.
+  function confirmHeroRegen(): boolean {
+    if (!run?.stage3_remaining_prompts) return true;
+    const nPrompts = safeParse<unknown[]>(run.stage3_remaining_prompts, []).length || 8;
+    const builtImages = safeParse<RemImage[]>(run.stage3_remaining_images, []).filter((im) => im?.image_url).length;
+    const lost = builtImages > 0 ? `the ${nPrompts} prompts, ${builtImages} image${builtImages === 1 ? "" : "s"} and placement` : `the ${nPrompts} prompts`;
+    return confirm(`Deletes ${lost}. Regenerate hero?`);
+  }
+
+  async function regenerateHero(promptText: string) {
+    if (!confirmHeroRegen()) return;
+    setHeroEditing(false);
+    await trigger("/api/stage3/hero-regenerate", { runId, editedPrompt: promptText.trim() || undefined }, "regen-hero");
+  }
+
   async function rewriteHeroWithAi() {
     const instr = heroAiInstr.trim();
     if (instr.length < 5) { setHeroAiErr("Too short"); return; }
-    // A new hero discards everything built on the old one (hero-regenerate
-    // nulls the 8 prompts, edits, images and placement) — say so first.
-    const builtImages = safeParse<RemImage[]>(run?.stage3_remaining_images, []).filter((im) => im?.image_url).length;
-    if (run?.stage3_remaining_prompts) {
-      const lost = builtImages > 0 ? `the 8 prompts, ${builtImages} image${builtImages === 1 ? "" : "s"} and placement` : "the 8 prompts";
-      if (!confirm(`Deletes ${lost}. Regenerate hero?`)) return;
-    }
+    if (!confirmHeroRegen()) return;
     setHeroAiLoading(true);
     setHeroAiErr(null);
     try {
@@ -220,6 +232,27 @@ export default function Stage3HeroFlow({
     pollRef.current = setInterval(fetchRun, 4000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [status, fetchRun]);
+
+  // Elapsed clock + stall check while a server step runs (same 15-min rule as
+  // Stage 5, lib/stage3/stall.ts).
+  const serverActive = status === "generating_hero" || status === "generating_remaining";
+  const [now, setNow] = useState(() => Date.now());
+  const [activeSince, setActiveSince] = useState<{ status: string; t: number } | null>(null);
+  const [stopping, setStopping] = useState(false);
+  const lastUpdatedAt = run?.last_updated_at ?? null;
+  useEffect(() => {
+    if (!serverActive) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [serverActive]);
+  useEffect(() => {
+    if (!serverActive) { setActiveSince(null); setStopping(false); return; }
+    setActiveSince((prev) => {
+      if (prev?.status === status) return prev;
+      const t = lastUpdatedAt ? new Date(lastUpdatedAt).getTime() : NaN;
+      return { status, t: Number.isFinite(t) ? Math.min(t, Date.now()) : Date.now() };
+    });
+  }, [serverActive, status, lastUpdatedAt]);
 
   // Self-heal: every one of the 8 has a finished (or failed) image on the
   // server, but the final "completed" write never landed (tab closed, network
@@ -353,9 +386,49 @@ export default function Stage3HeroFlow({
     );
   }
 
+  /* ── stall: a server step that stopped moving ───────────────────────── */
+  const elapsed = serverActive && activeSince ? fmtElapsed(now - activeSince.t) : null;
+  const stalled = serverActive && busy === null && isStalled(run.last_updated_at, now);
+  const retryStalled = async () => {
+    if (status === "generating_hero") {
+      if (heroPrompt) await regenerateHero(heroPromptText);
+      else await trigger("/api/stage3-hero-prompt", { runId }, "hero");
+    } else if (run.stage3_remaining_prompts) {
+      await trigger("/api/stage3/generate-batch", { runId }, "retry");
+    } else {
+      await trigger(heroUrl ? "/api/stage3/hero-approve" : "/api/stage3/skip-hero", { runId }, "retry");
+    }
+  };
+  const stopStalled = async () => {
+    setBusy("stop-stalled");
+    try {
+      if (status === "generating_remaining") {
+        await fetch("/api/stage3/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }).catch(() => {});
+      }
+      const back = status === "generating_remaining" && run.stage3_remaining_prompts ? "awaiting_qc" : heroUrl ? "awaiting_hero_qc" : "awaiting_user";
+      await fetch(`/api/runs/${runId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: back }),
+      }).catch(() => {});
+    } finally { setBusy(null); await fetchRun(); }
+  };
+  const stallBar = stalled ? (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[12px] text-[var(--color-amber)]">Stalled</span>
+      <button disabled={busy !== null} onClick={retryStalled} className={btnPrimary}>{busy === "retry" || busy === "regen-hero" || busy === "hero" ? "Retrying…" : "Retry"}</button>
+      <button disabled={busy !== null} onClick={stopStalled} className={btnSecondary}>{busy === "stop-stalled" ? "Stopping…" : "Stop"}</button>
+    </div>
+  ) : null;
+
   /* ── generating_hero ─────────────────────────────────────────────────── */
   if (status === "generating_hero") {
-    return <Spinner label="Generating the hero…" />;
+    return (
+      <div className="space-y-2">
+        <Spinner label="Generating the hero…" elapsed={elapsed} />
+        {err && <ErrBox msg={err} />}
+        {stallBar}
+      </div>
+    );
   }
 
   /* ── HERO QC GATE ────────────────────────────────────────────────────── */
@@ -398,19 +471,32 @@ export default function Stage3HeroFlow({
             onClick={() => { setHeroEditing((v) => !v); setHeroDraft(heroPromptText); }}
             className={btnSecondary}
           >
-            {heroEditing ? "Cancel edit" : "Regenerate Hero"}
+            {heroEditing ? "Cancel" : "Regenerate Hero"}
           </button>
         </div>
 
         {heroEditing && (
           <div className="space-y-3 max-w-2xl">
+            <div className="space-y-1.5">
+              <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt</label>
+              <textarea
+                value={heroDraft}
+                onChange={(e) => setHeroDraft(e.target.value)}
+                rows={8}
+                disabled={heroAiLoading}
+                className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[11px] font-[var(--font-ibm-plex-mono)] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+              />
+              <button disabled={busy !== null || heroAiLoading || !heroDraft.trim()} onClick={() => regenerateHero(heroDraft)} className={btnPrimary}>
+                {busy === "regen-hero" ? "Starting…" : heroDraft.trim() === heroPromptText.trim() ? "Regenerate as is" : "Regenerate with changes"}
+              </button>
+            </div>
             {/* AI-assisted edit: describe a change, Claude rewrites the prompt. */}
             <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
               <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-accent-text)]">Edit with AI</label>
               <textarea
                 value={heroAiInstr}
                 onChange={(e) => setHeroAiInstr(e.target.value)}
-                placeholder="e.g. warmer lighting"
+                placeholder="What to change"
                 rows={2}
                 disabled={heroAiLoading}
                 className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
@@ -418,8 +504,8 @@ export default function Stage3HeroFlow({
               {heroAiErr && <p className="text-[11px] text-[var(--color-red)]">{heroAiErr}</p>}
               <button
                 onClick={rewriteHeroWithAi}
-                disabled={heroAiLoading || heroAiInstr.trim().length < 5}
-                className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] border border-transparent transition-all hover:brightness-105 disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={heroAiLoading || busy !== null || heroAiInstr.trim().length < 5}
+                className={btnSecondary}
               >
                 {heroAiLoading ? "Rewriting…" : "Rewrite & regenerate"}
               </button>
@@ -437,7 +523,15 @@ export default function Stage3HeroFlow({
   /* ── generating_remaining: writing the 8 prompts, or the batch running ── */
   if (status === "generating_remaining") {
     const batchPrompts = safeParse<RemainingPrompt[]>(run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts, []);
-    if (!batchPrompts.length) return <Spinner label="Writing the 8 prompts…" />;
+    if (!batchPrompts.length) {
+      return (
+        <div className="space-y-2">
+          <Spinner label="Writing the prompts…" elapsed={elapsed} />
+          {err && <ErrBox msg={err} />}
+          {stallBar}
+        </div>
+      );
+    }
     const batchImages = safeParse<RemImage[]>(run.stage3_remaining_images, []);
     const grid: (RemImage | null)[] = batchPrompts.map((p) => batchImages.find((im) => im.index === p.index) ?? null);
     return (
@@ -445,15 +539,18 @@ export default function Stage3HeroFlow({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Generating the {batchPrompts.length} images…</h3>
           <button
-            onClick={() => { void fetch("/api/stage3/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }}
-            className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition"
+            disabled={stopping}
+            onClick={() => { setStopping(true); void fetch("/api/stage3/stop-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) }); }}
+            className="cursor-pointer inline-flex items-center gap-[6px] rounded-lg px-3 py-[7px] text-[12.5px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            ■ Stop after current
+            {stopping ? "Stopping…" : "■ Stop after current"}
           </button>
         </div>
         <p className="font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">
-          {grid.filter(Boolean).length} of {grid.length} done · runs on the server, you can leave this page
+          {grid.filter(Boolean).length} of {grid.length} done{elapsed ? ` · ${elapsed}` : ""}
         </p>
+        {err && <ErrBox msg={err} />}
+        {stallBar}
         <GenGrid heroUrl={heroUrl} images={grid} />
       </div>
     );
@@ -565,10 +662,7 @@ export default function Stage3HeroFlow({
 
     return (
       <div className="space-y-4">
-        <div>
-          <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the 8 prompts</h3>
-          <p className="text-[12px] text-[var(--color-text-3)]"></p>
-        </div>
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the {saved.length} prompts</h3>
         <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
         <div className="space-y-3">
@@ -601,7 +695,7 @@ export default function Stage3HeroFlow({
                     <textarea
                       value={aiCardText}
                       onChange={(e) => setAiCardText(e.target.value)}
-                      placeholder="Change the premise — e.g. “set this in a bathroom instead of the kitchen”, “no people, product only”, “make it winter”"
+                      placeholder="What to change"
                       rows={2}
                       autoFocus
                       disabled={aiCardBusy}
@@ -683,14 +777,9 @@ export default function Stage3HeroFlow({
             );
           })}
         </div>
-        {doneByIndex.size > 0 && (
-          <p className="text-[12px] text-[var(--color-amber)]">
-            {doneByIndex.size} of {saved.length} images were already generated in an interrupted pass — generation resumes from the rest.
-          </p>
-        )}
         <div className="flex gap-3 flex-wrap items-center">
           <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
-            {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : "Generate 8 Images →"}
+            {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : `Generate ${saved.length} Images →`}
           </button>
           {/* Step back to the hero QC gate (only meaningful when a hero exists —
               skip-hero runs generated straight from source photos). */}
@@ -699,13 +788,14 @@ export default function Stage3HeroFlow({
               {busy === "back-hero" ? "Going back…" : "← Back to hero"}
             </button>
           )}
-          {/* Recover images that already generated on Higgsfield but never
-              persisted (the pre-fix persistence bug) — no re-generation. */}
-          <button disabled={busy !== null} onClick={() => trigger("/api/stage3/recover-from-higgsfield", { runId }, "recover-hf")} className={btnSecondary}>
-            {busy === "recover-hf" ? "Recovering…" : "Recover from Higgsfield"}
-          </button>
+          {/* Pull images that finished on Higgsfield but never persisted —
+              only offered once a pass has run and left gaps. */}
+          {existing.length > 0 && doneByIndex.size < saved.length && (
+            <button disabled={busy !== null} onClick={() => trigger("/api/stage3/recover-from-higgsfield", { runId }, "recover-hf")} className={btnSecondary}>
+              {busy === "recover-hf" ? "Recovering…" : "Recover images"}
+            </button>
+          )}
         </div>
-        <p className="text-[11px] text-[var(--color-text-3)]">&ldquo;Recover from Higgsfield&rdquo; pulls images already generated in your Higgsfield history.</p>
       </div>
     );
   }
@@ -729,15 +819,10 @@ export default function Stage3HeroFlow({
     const referenceImages = safeParse<string[]>(run.stage3_reference_images, []);
     return (
       <div className="space-y-4">
-        <SendToDrive runId={runId} kind="images" />
-        <VariantsCard runId={runId} requestedAt={run.variants_refresh_requested ?? null} edited={run.product_variants_edited ?? null} scrape={run.product_scrape ?? null} />
-        <ShopifyFill runId={runId} initialUrl={run.shopify_product_url} initialAdminUrl={(() => { try { return run.shopify_push_state ? (JSON.parse(run.shopify_push_state) as { adminUrl?: string }).adminUrl ?? null : null; } catch { return null; } })()} />
-        <details>
-          <summary className="cursor-pointer text-[11px] text-[var(--color-text-4)]">Create a brand-new draft product instead (old flow)</summary>
-          <div className="pt-2"><ShopifyPush runId={runId} /></div>
-        </details>
         <CompletedReview
+          key={reviewKey}
           runId={runId}
+          onChanged={async () => { await fetchRun(); setReviewKey((k) => k + 1); }}
           heroUrl={heroUrl}
           initialImages={imgs}
           initialPrompts={prompts}
@@ -764,7 +849,6 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-3">
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Stage 4 images ({imgs.length})</h3>
-        <p className="text-[11px] text-[var(--color-text-3)]">Generated on the previous Stage 4 flow.</p>
         <GenGrid heroUrl={null} images={imgs} />
       </div>
     );
@@ -773,7 +857,7 @@ export default function Stage3HeroFlow({
   // Dead-end recovery: states that should have data but don't (the generating
   // route died before writing it). Offer the restart instead of a blank wall.
   if ((status === "awaiting_hero_qc" && !heroUrl) || (status === "awaiting_qc" && !run.stage3_remaining_prompts)) {
-    const what = status === "awaiting_hero_qc" ? "The hero image failed to save" : "The 8 prompts failed to generate";
+    const what = status === "awaiting_hero_qc" ? "Hero image not saved." : "Prompts not generated.";
     const restart = async () => {
       setBusy("recover");
       try {
@@ -785,7 +869,7 @@ export default function Stage3HeroFlow({
     };
     return (
       <div className="space-y-3">
-        <ErrBox msg={`${what} — the generation step was interrupted. Restart Stage 4 to try again from the start.`} />
+        <ErrBox msg={what} />
         <div className="flex gap-3 flex-wrap">
           <button disabled={busy !== null} onClick={restart} className={btnPrimary}>
             {busy === "recover" ? "Restarting…" : "Restart Stage 4"}
@@ -812,7 +896,7 @@ export default function Stage3HeroFlow({
         <button
           disabled={busy !== null}
           onClick={async () => {
-            if (!window.confirm("Start Stage 4 over? Deletes the hero, the 8 images and the placement.")) return;
+            if (!window.confirm("Start Stage 4 over? Deletes the hero, the images and the placement.")) return;
             setBusy("restart");
             try {
               await fetch(`/api/runs/${runId}/restart-stage`, {
@@ -941,7 +1025,7 @@ function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
             type="button"
             onClick={() => onToggle(c.url)}
             disabled={disabled}
-            title={`${c.label} — ${on ? "referenced; click to remove" : "not referenced; click to add"}`}
+            title={c.label}
             className={`relative w-[96px] h-[96px] rounded-[7px] overflow-hidden border-2 cursor-pointer tr bg-[var(--color-bg)] ${on ? "border-[var(--color-accent)]" : "border-[var(--color-border)] opacity-50 hover:opacity-90"}`}
           >
             {/* whole photo, never cropped — the operator is choosing by what's IN it */}
@@ -958,6 +1042,7 @@ function RefPicker({ candidates, selected, onToggle, disabled, collapsible }: {
 /* ── Completed review: per-image verdict override, fail reason, regenerate ── */
 function CompletedReview({
   runId,
+  onChanged,
   heroUrl,
   initialImages,
   initialPrompts,
@@ -969,6 +1054,8 @@ function CompletedReview({
   sections,
 }: {
   runId: number;
+  /** Refetch the run and remount this review from it. */
+  onChanged: () => Promise<void>;
   heroUrl: string | null;
   initialImages: RemImage[];
   initialPrompts: RemainingPrompt[];
@@ -1019,6 +1106,8 @@ function CompletedReview({
   const [relinking, setRelinking] = useState(false);
   const [relinkErr, setRelinkErr] = useState<string | null>(null);
   const [lb, setLb] = useState<number | null>(null);
+  // Tile whose secondary-actions menu is open (index into images).
+  const [menuIdx, setMenuIdx] = useState<number | null>(null);
 
   // Re-link images that finished on Higgsfield but read "failed" here (e.g. the
   // 180s polling timeout hit while Higgsfield kept rendering). Pulls from the
@@ -1032,8 +1121,8 @@ function CompletedReview({
         body: JSON.stringify({ runId }),
       });
       const data = await res.json();
-      if (!data.success) { setRelinkErr(data.error || `Relink failed (${res.status})`); return; }
-      window.location.reload();
+      if (!data.success) { setRelinkErr(data.error || `Recover failed (${res.status})`); return; }
+      await onChanged();
     } catch (e) {
       setRelinkErr(e instanceof Error ? e.message : "Network error");
     } finally {
@@ -1062,6 +1151,10 @@ function CompletedReview({
       setPlaceErr(e instanceof Error ? e.message : "Network error");
     } finally { setPlacing(false); }
   }, [runId]);
+
+  // Re-placing overwrites the operator's own section picks — confirm first.
+  const confirmReplace = () => placement?.source !== "manual" || confirm("Replaces your Section 2/3 picks. Re-place?");
+  const replaceAll = () => { if (confirmReplace()) void runPlacement(); };
 
   // Auto-run placement once when a completed run has enough images but no
   // saved placement yet (covers runs finished before this feature existed).
@@ -1122,9 +1215,9 @@ function CompletedReview({
   const staleFor = (n: 2 | 3): string | null => {
     if (!placement) return null;
     const im = images.find((x) => x.index === placement[`section_${n}`]);
-    if (!im || im.status !== "done" || !im.image_url) return "Image failed.";
+    if (!im || im.status !== "done" || !im.image_url) return "Image failed";
     const placed = placement.placed_urls?.[String(n)];
-    if (placed && placed !== im.image_url) return "Image changed since it was placed.";
+    if (placed && placed !== im.image_url) return "Image changed";
     return null;
   };
 
@@ -1150,7 +1243,7 @@ function CompletedReview({
       )
       .catch((e) => {
         console.error(`persist image #${image.index} failed:`, e);
-        setPersistErr(`Saving image #${image.index} failed — your last change may not stick. Check your connection and retry.`);
+        setPersistErr(`Saving image #${image.index} failed.`);
       });
     return persistChain.current;
   }, [runId]);
@@ -1203,7 +1296,7 @@ function CompletedReview({
         return updated;
       }));
     } catch {
-      setImages((prev) => prev.map((x, j) => (j === i ? { ...x, issues: ["Audit failed — review manually."] } : x)));
+      setImages((prev) => prev.map((x, j) => (j === i ? { ...x, issues: ["Audit failed"] } : x)));
     } finally {
       setAuditIdxs((prev) => { const n = new Set(prev); n.delete(i); return n; });
     }
@@ -1237,16 +1330,12 @@ function CompletedReview({
     }
   };
 
-  // Toggle the operator override pass ↔ fail ↔ (clear).
-  const toggleVerdict = (i: number) => {
+  // Operator verdict: "Mark OK" / "Mark bad". Matching the auditor clears the
+  // override so the auditor's verdict stands.
+  const setVerdict = (i: number, target: "pass" | "fail") => {
     setImages((prev) => {
       const im = prev[i];
-      const cur = im.user_override ?? null;
-      const auto = im.verdict ?? "pass";
-      // null → opposite of auto ; then flip ; flipping back to auto clears.
-      let nextOverride: "pass" | "fail" | null;
-      if (cur === null) nextOverride = auto === "pass" ? "fail" : "pass";
-      else { const flip = cur === "pass" ? "fail" : "pass"; nextOverride = flip === auto ? null : flip; }
+      const nextOverride = im.verdict === target ? null : target;
       const next = prev.map((x, j) => (j === i ? { ...x, user_override: nextOverride } : x));
       persistImage(next[i]);
       return next;
@@ -1322,9 +1411,9 @@ function CompletedReview({
       });
       const data = await res.json().catch(() => ({}));
       if (!data.success) { setPersistErr(data.error ?? `Request failed (${res.status})`); return; }
-      // The parent switches to the generating view on the next poll; reload
-      // so it happens now rather than on the next tick.
-      window.location.reload();
+      // The status is now generating_remaining — refetching switches the
+      // parent to the generating view.
+      await onChanged();
     } finally {
       setBulkRunning(false);
     }
@@ -1360,15 +1449,18 @@ function CompletedReview({
           await new Promise((r) => setTimeout(r, 350));
         } catch (e) { console.error(`download failed for ${t.name}:`, e); }
       }
-      if (ok === 0) { setZipNote("Couldn't fetch any images — check your connection."); return; }
-      setZipNote(ok < targets.length ? `Downloaded ${ok} of ${targets.length} images — ${targets.length - ok} couldn't be fetched.` : null);
+      if (ok === 0) { setZipNote("Download failed."); return; }
+      setZipNote(ok < targets.length ? `Downloaded ${ok} of ${targets.length}.` : null);
     } finally {
       setZipping(false);
     }
   };
 
-  const passed = images.filter((im) => effVerdict(im) === "pass").length;
-  const failed = images.filter((im) => effVerdict(im) === "fail").length;
+  const passed = images.filter((im) => im.status === "done" && effVerdict(im) === "pass").length;
+  const flagged = images.filter((im) => im.status === "done" && effVerdict(im) === "fail").length;
+  const genFailed = images.filter((im) => im.status === "failed").length;
+  // Recover is only useful when something is failed or missing.
+  const anyMissing = images.some((im) => im.status === "failed" || !im.image_url) || images.length < prompts.length;
   // Images that need fixing: a hard generation failure (Higgsfield rejected /
   // errored — often a content-guideline block) or an auditor "fail".
   const fixable = images
@@ -1404,86 +1496,99 @@ function CompletedReview({
 
   // Render one interactive image tile (verdict badge, regenerate, fail banner,
   // generating overlay). Index `i` is the position in the `images` array so
-  // toggleVerdict/regenerate stay correct after regrouping.
+  // setVerdict/regenerate stay correct after regrouping.
   const renderTile = (im: RemImage, i: number, ctx?: { section?: number }) => {
     const v = effVerdict(im);
-    const failReason = im.status === "failed" ? (im.error || "generation failed") : (im.issues?.filter(Boolean)[0] || "");
-    const overridden = im.user_override != null;
+    const genFail = im.status === "failed";
+    const bad = genFail || v === "fail";
+    const failReason = genFail ? (im.error || "") : (im.issues?.filter(Boolean)[0] || "");
     const regenerating = busyIdxs.has(i);
     const auditing = auditIdxs.has(i);
     const promptText = prompts.find((p) => p.index === im.index)?.prompt ?? "";
+    const badge = genFail
+      ? { text: "Failed", cls: "bg-[var(--color-red)] text-white" }
+      : v === "fail"
+        ? { text: "Flagged", cls: "bg-[var(--color-red)] text-white" }
+        : v === "pass"
+          ? { text: "OK", cls: "bg-[var(--color-green)] text-white" }
+          : im.image_url
+            ? { text: "Not checked", cls: "bg-[var(--color-surface-3)] text-[var(--color-text-2)]" }
+            : null;
+    const menuItem = "w-full text-left px-3 py-2 text-[12px] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] cursor-pointer disabled:opacity-50";
+    const menuOpen = menuIdx === i;
     return (
-      <div className={`aspect-square rounded-[11px] border overflow-hidden relative group ${v === "fail" || im.status === "failed" ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
-        {(regenerating || auditing) && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
-            <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
-            <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">{regenerating ? "Generating…" : "Auditing…"}</span>
-          </div>
-        )}
-        {im.image_url ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className={`w-full h-full object-cover cursor-zoom-in ${v === "fail" ? "opacity-80" : ""}`} />
-            {!v && !auditing && (
-              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)}
-               
-                className="absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full cursor-pointer bg-[var(--color-surface-3)] text-[var(--color-text-2)]">
-                not audited
-              </button>
-            )}
-            {v && (
-              <button
-                onClick={() => toggleVerdict(i)}
-                title={`Auditor: ${im.verdict ?? "not run"}`}
-                className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white cursor-pointer ${v === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"} ${overridden ? "ring-1 ring-white/60" : ""}`}
-              >
-                {v}{overridden ? "•" : ""}
-              </button>
-            )}
-            <div className="absolute bottom-0 left-0 right-0 z-20 p-2 flex items-center justify-end gap-1 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-              {placement && im.status === "done" && ([2, 3] as const).filter((n) => n !== ctx?.section).map((n) => (
-                <button key={n} onClick={() => assignToSection(im.index, n)}
-                  title={ctx?.section ? `Swap with section ${n}` : `Use this image for section ${n}`}
-                  className="px-2 py-1 bg-[var(--color-accent)]/70 hover:bg-[var(--color-accent)] text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">
-                  → S{n}
-                </button>
-              ))}
-              <button onClick={() => openLb(im.image_url)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">⤢</button>
-              <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer disabled:opacity-50">Re-audit</button>
-              <button onClick={() => setRegenIdx(i)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">Regenerate</button>
-              <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className="px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-[var(--font-ibm-plex-mono)] rounded cursor-pointer">↓</button>
+      <>
+        <div className={`aspect-square rounded-[11px] border overflow-hidden relative ${bad ? "border-[var(--color-red)]/60" : "border-[var(--color-border)]"} bg-[var(--color-surface)]`}>
+          {(regenerating || auditing) && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-black/65 backdrop-blur-[2px]">
+              <div className="w-4 h-4 rounded-full bg-white animate-pulse" />
+              <span className="text-[10px] text-white font-[var(--font-ibm-plex-mono)] uppercase tracking-wide">{regenerating ? "Generating…" : "Auditing…"}</span>
             </div>
-            {v === "fail" && failReason && (
-              <button onClick={() => setRegenIdx(i)} className="absolute bottom-0 left-0 right-0 z-10 text-left px-2 py-1.5 bg-[var(--color-red)]/90 text-white cursor-pointer hover:bg-[var(--color-red)]">
-                <span className="block text-[8.5px] font-[700] uppercase tracking-wide">Failed · tap to fix</span>
-                <span className="block text-[9px] opacity-90 leading-snug line-clamp-2">{failReason}</span>
-              </button>
-            )}
-          </>
-        ) : (
-          <button onClick={() => setRegenIdx(i)} className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 cursor-pointer bg-[var(--color-red-bg)] text-center">
-            <span className="text-[var(--color-red)] font-[700] text-[11px]">Failed</span>
-            <span className="text-[var(--color-text-2)] text-[10px] line-clamp-3">{failReason}</span>
-            <span className="mt-1 text-[9px] font-[700] uppercase tracking-wide text-[var(--color-red)]">Tap to regenerate</span>
+          )}
+          {im.image_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className={`w-full h-full object-cover cursor-zoom-in ${bad ? "opacity-80" : ""}`} />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-3 gap-1.5 bg-[var(--color-red-bg)] text-center">
+              <span className="text-[var(--color-text-2)] text-[10px] line-clamp-4">{failReason}</span>
+            </div>
+          )}
+          {badge && (
+            <span className={`absolute top-2 left-2 z-10 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.text}</span>
+          )}
+          {im.image_url && bad && failReason && (
+            <div className="absolute bottom-0 left-0 right-0 z-10 px-2 py-1.5 bg-[var(--color-red)]/90 text-white">
+              <span className="block text-[9px] opacity-90 leading-snug line-clamp-2" title={failReason}>{failReason}</span>
+            </div>
+          )}
+        </div>
+        <div className="relative flex items-center gap-1.5">
+          <button onClick={() => setRegenIdx(i)} disabled={regenerating}
+            className="flex-1 min-h-[32px] cursor-pointer rounded-md px-2 py-1 text-[11.5px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] transition-colors disabled:opacity-50">
+            Regenerate
           </button>
-        )}
-      </div>
+          <button onClick={() => setMenuIdx(menuOpen ? null : i)} aria-label="More actions"
+            className="min-h-[32px] min-w-[32px] cursor-pointer rounded-md px-2 py-1 text-[13px] leading-none border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-2)] hover:bg-[var(--color-surface-2)] transition-colors">
+            ⋯
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuIdx(null)} />
+              <div className="absolute right-0 top-full mt-1 z-50 w-[170px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_4px_16px_rgba(20,20,18,.12)] py-1" onClick={() => setMenuIdx(null)}>
+                {placement && im.status === "done" && ([2, 3] as const).filter((n) => n !== ctx?.section).map((n) => (
+                  <button key={n} onClick={() => assignToSection(im.index, n)} className={menuItem}>Section {n}</button>
+                ))}
+                {im.image_url && v !== "pass" && !genFail && <button onClick={() => setVerdict(i, "pass")} className={menuItem}>Mark OK</button>}
+                {im.image_url && v !== "fail" && !genFail && <button onClick={() => setVerdict(i, "fail")} className={menuItem}>Mark bad</button>}
+                {im.image_url && (
+                  <button onClick={() => auditImage(i, im.image_url, promptText, im.category, im.index)} disabled={auditing} className={menuItem}>{v ? "Re-audit" : "Audit"}</button>
+                )}
+                {im.image_url && <button onClick={() => openLb(im.image_url)} className={menuItem}>Open</button>}
+                {im.image_url && <button onClick={() => dlImg(im.image_url, `${String(im.index).padStart(2, "0")}_${im.category}.png`)} className={menuItem}>Download</button>}
+              </div>
+            </>
+          )}
+        </div>
+      </>
     );
   };
+
+  const placeBtn = "cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap";
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? "Stage 4 complete · hero + 8" : "Stage 4 images"}</h3>
-        <span className="text-[11px] text-[var(--color-green)]">{passed} pass</span>
-        {failed > 0 && <span className="text-[11px] text-[var(--color-red)]">{failed} fail</span>}
+        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{heroUrl ? `Hero + ${images.length}` : `${images.length} images`}</h3>
+        <span className="text-[11px] text-[var(--color-green)]">{passed} OK</span>
+        {flagged > 0 && <span className="text-[11px] text-[var(--color-red)]">{flagged} flagged</span>}
+        {genFailed > 0 && <span className="text-[11px] text-[var(--color-red)]">{genFailed} failed</span>}
         {fixable.length > 0 && (
           <button
             onClick={() => setBulkOpen(true)}
             disabled={bulkRunning || busyIdxs.size > 0}
             className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-red)]/50 bg-[var(--color-red-bg)] text-[var(--color-red)] transition-all hover:brightness-95 disabled:opacity-50 whitespace-nowrap"
           >
-            {bulkRunning ? "Regenerating failed…" : `Fix all ${fixable.length} failed →`}
+            {bulkRunning ? "Regenerating…" : `Fix all ${fixable.length} →`}
           </button>
         )}
         <button
@@ -1493,47 +1598,25 @@ function CompletedReview({
         >
           {zipping ? "Downloading…" : "↓ Download all"}
         </button>
-        <button
-          onClick={relinkFromHiggsfield}
-          disabled={relinking || bulkRunning || busyIdxs.size > 0}
-          title="Failed tiles that actually finished on Higgsfield (e.g. a timeout while it was still rendering) get their images re-linked from your Higgsfield history — no re-generation, no extra cost."
-          className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
-        >
-          {relinking ? "Relinking…" : "Relink from Higgsfield"}
-        </button>
+        {anyMissing && (
+          <button
+            onClick={relinkFromHiggsfield}
+            disabled={relinking || bulkRunning || busyIdxs.size > 0}
+            className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[6px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
+          >
+            {relinking ? "Recovering…" : "Recover images"}
+          </button>
+        )}
       </div>
       {relinkErr && <ErrBox msg={relinkErr} />}
-      {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
-      <div className="flex items-center justify-between gap-3 flex-wrap -mt-2">
-        <p className="text-[11px] text-[var(--color-text-3)]">
-          {placement?.source === "manual" && <span className="text-[var(--color-text-4)]">placed by you</span>}
-          {placement?.fallback && <span className="text-[var(--color-amber)]">fallback picks — check them</span>}
-        </p>
-        <div className="flex items-center gap-2">
-          {placement && (
-            <button onClick={swapSections} disabled={placing} className="btn btn-sm">Swap 2 ↔ 3</button>
-          )}
-          <button
-            onClick={runPlacement}
-            disabled={placing}
-            className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3 py-[7px] text-[12px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] transition-all hover:bg-[var(--color-surface-2)] disabled:opacity-50 whitespace-nowrap"
-          >
-            {placing ? "Placing…" : placement ? "↺ Re-run auto-placement" : "Auto-place images"}
-          </button>
-        </div>
-      </div>
-      {placeErr && <ErrBox msg={placeErr} />}
       {persistErr && <ErrBox msg={persistErr} />}
       {zipNote && <p className="text-[12px] text-[var(--color-amber)]">{zipNote}</p>}
-
-      <div className="max-w-xl">
-        <Stage3ReferenceImages runId={Number(runId)} initial={initialReferenceImages} />
-      </div>
+      {lb !== null && <Lightbox items={lbItems} index={lb} onClose={() => setLb(null)} onIndex={setLb} />}
 
       {/* ── Product shots — top of the page ────────────────────────────── */}
       <div className="space-y-2">
         <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
-          Top of page · product shots <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {productEntries.length + (heroUrl ? 1 : 0)} images</span>
+          Top of page <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {productEntries.length + (heroUrl ? 1 : 0)}</span>
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
           {heroUrl && (
@@ -1547,32 +1630,39 @@ function CompletedReview({
                   <button onClick={() => dlImg(heroUrl, "01_hero.png")} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">↓</button>
                 </div>
               </div>
-              <div className="px-0.5">
-                <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">Hero shot</p>
-                
-              </div>
+              <p className="px-0.5 text-[10px] font-[680] uppercase tracking-wide text-[var(--color-green)]">Hero shot</p>
             </div>
           )}
           {productEntries.map(({ im, i }) => (
             <div key={i} className="flex flex-col gap-1.5">
               {renderTile(im, i)}
-              <div className="px-0.5">
-                <p className="text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{catLabel(im.category)}</p>
-                
-              </div>
+              <p className="px-0.5 text-[10px] font-[680] uppercase tracking-wide text-[var(--color-text-2)]">{catLabel(im.category)}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Body sections — AI-placed, one image each ──────────────────── */}
-      {placing && !placement ? (
-        <Spinner label="Placing images…" />
-      ) : sectionEntries.length > 0 ? (
-        <div className="space-y-2">
+      {/* ── Body sections — one image each, plus the placement controls ── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-[11px] font-[700] uppercase tracking-[0.08em] text-[var(--color-text-2)]">
-            Body sections · one image each <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— problem → solution → proof</span>
+            Body sections
+            {placement?.source === "manual" && <span className="ml-2 text-[var(--color-text-4)] font-[500] normal-case tracking-normal">manual</span>}
+            {placement?.fallback && <span className="ml-2 text-[var(--color-amber)] font-[500] normal-case tracking-normal">fallback picks</span>}
           </p>
+          <div className="flex items-center gap-2">
+            {placement && (
+              <button onClick={swapSections} disabled={placing} className="btn btn-sm">Swap 2 ↔ 3</button>
+            )}
+            <button onClick={placement ? replaceAll : runPlacement} disabled={placing} className={placeBtn}>
+              {placing ? "Placing…" : placement ? "↺ Re-run auto-placement" : "Auto-place images"}
+            </button>
+          </div>
+        </div>
+        {placeErr && <ErrBox msg={placeErr} />}
+        {placing && !placement ? (
+          <Spinner label="Placing images…" />
+        ) : sectionEntries.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-3">
             {sectionEntries.map(({ section, entry }) => {
               const { im, i } = entry;
@@ -1596,7 +1686,8 @@ function CompletedReview({
                         <p className="text-[10px] text-[var(--color-amber)] leading-snug">{stale}</p>
                         <div className="flex gap-1.5 mt-1">
                           {im.status === "done" && im.image_url && <button onClick={() => keepCurrent(section)} className="btn btn-sm">Keep</button>}
-                          <button onClick={runPlacement} disabled={placing} className="btn btn-sm">Re-place</button>
+                          {/* The placement API re-places both sections at once. */}
+                          <button onClick={replaceAll} disabled={placing} className="btn btn-sm">Re-place</button>
                         </div>
                       </div>
                     )}
@@ -1605,8 +1696,12 @@ function CompletedReview({
               );
             })}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
+
+      <div className="max-w-xl">
+        <Stage3ReferenceImages runId={Number(runId)} initial={initialReferenceImages} />
+      </div>
 
       {regenIdx != null && images[regenIdx] && (
         <RegenImageModal
@@ -1690,7 +1785,7 @@ function BulkFixModal({
 
   async function rewriteAll() {
     const text = instr.trim();
-    if (text.length < 5) { setAiErr("Add an instruction first."); return; }
+    if (text.length < 5) { setAiErr("Too short"); return; }
     setAiBusy(true); setAiErr(null);
     try {
       const results = await Promise.all(
@@ -1719,7 +1814,7 @@ function BulkFixModal({
       if (failedCount) {
         // Partial rewrite: stay open so the operator can fix the stragglers —
         // auto-regenerating here would burn credits on unchanged prompts.
-        setAiErr(`${failedCount} prompt(s) couldn't be rewritten — edit those manually below, then hit Regenerate all.`);
+        setAiErr(`${failedCount} prompt${failedCount === 1 ? "" : "s"} not rewritten.`);
       } else {
         // Every prompt rewritten — hand straight off to regeneration (closes
         // the modal and runs the batch), no second click needed.
@@ -1734,10 +1829,7 @@ function BulkFixModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.06)] p-6 max-w-3xl w-full space-y-4 max-h-[90vh] overflow-y-auto">
-        <div>
-          <h3 className="text-[15px] font-[640] text-[var(--color-text)]">Fix {failed.length} failed image{failed.length > 1 ? "s" : ""}</h3>
-          <p className="text-[11px] text-[var(--color-text-3)] mt-0.5">One instruction for all, or edit each, then regenerate.</p>
-        </div>
+        <h3 className="text-[15px] font-[640] text-[var(--color-text)]">Fix {failed.length} image{failed.length > 1 ? "s" : ""}</h3>
 
         {/* Shared AI instruction */}
         <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
@@ -1757,7 +1849,7 @@ function BulkFixModal({
             <div key={i} className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">#{im.index} · {im.category}</span>
-                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">{im.status === "failed" ? "gen failed" : "QC fail"}</span>
+                <span className="font-[var(--font-ibm-plex-mono)] text-[9px] uppercase tracking-widest text-[var(--color-text-4)]">{im.status === "failed" ? "Failed" : "Flagged"}</span>
               </div>
               {reasonsFor(im).length > 0 && (
                 <ul className="rounded-md bg-[var(--color-red-bg)] border border-[var(--color-red)]/25 px-2.5 py-1.5 space-y-0.5">
@@ -1823,6 +1915,7 @@ function RegenImageModal({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiErr, setAiErr] = useState<string | null>(null);
   const [updated, setUpdated] = useState(false); // prompt was changed since open
+  const [showVersions, setShowVersions] = useState(false);
   // Which reference images this regeneration will send to Higgsfield.
   const [refs, setRefs] = useState<string[]>(initialRefs);
   const [refErr, setRefErr] = useState<string | null>(null);
@@ -1863,6 +1956,13 @@ function RegenImageModal({
     finally { setAiLoading(false); }
   }
 
+  // One primary action: with an AI instruction it rewrites then regenerates;
+  // otherwise it regenerates from the prompt box (edited or not).
+  const useAi = aiInstr.trim().length >= 5;
+  const changed = useAi || draft !== lastUsedPrompt;
+  const versions = image.history ?? [];
+  const go = () => { if (useAi) void runAi(); else onRegenerate(draft, refs); };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -1874,56 +1974,17 @@ function RegenImageModal({
             {issues.map((iss, k) => <p key={k} className="text-[11px] text-[var(--color-red)]">• {iss}</p>)}
           </div>
         )}
-        {/* Previous versions — go back to an earlier generation: use it as-is,
-            or load its prompt and edit from there. */}
-        {(image.history?.length ?? 0) > 0 && (
-          <div className="space-y-1.5">
-            <p className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Previous versions</p>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {image.history!.map((h, k) => (
-                <div key={k} className="shrink-0 w-[104px] space-y-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={h.image_url} alt={`Version ${k + 1} back`} loading="lazy" className="w-[104px] h-[104px] object-cover rounded-[8px] border border-[var(--color-border)]" />
-                  <button onClick={() => onUseVersion(h)} disabled={busy}
-                    className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] disabled:opacity-40">
-                    Use this image
-                  </button>
-                  {h.prompt?.trim() && (
-                    <button onClick={() => { setDraft(h.prompt!); setUpdated(true); }} disabled={busy || aiLoading}
-                     
-                      className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border)] text-[var(--color-text-2)] hover:text-[var(--color-text)] disabled:opacity-40">
-                      Edit from this
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {/* AI edit */}
         <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-accent-weak)] p-3 space-y-2">
           <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-accent-text)]">Edit with AI</label>
-          <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} rows={2} disabled={aiLoading}
-            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
+          <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} rows={2} disabled={aiLoading} placeholder="What to change"
+            className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-2 text-[12px] resize-y placeholder:text-[var(--color-text-4)] focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]" />
           {aiErr && <p className="text-[11px] text-[var(--color-red)]">{aiErr}</p>}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={runAi} disabled={aiLoading || busy || aiInstr.trim().length < 5}
-             
-              className="cursor-pointer inline-flex items-center gap-[6px] rounded-md px-[12px] py-[7px] text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40 disabled:cursor-not-allowed">
-              {aiLoading ? "Rewriting…" : "Rewrite prompt & regenerate"}
-            </button>
-            {updated && !aiLoading && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-[620] text-[var(--color-green)]">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                Prompt updated by AI
-              </span>
-            )}
-          </div>
         </div>
         {/* manual prompt */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt <span className="normal-case tracking-normal text-[var(--color-text-4)]">· last used</span> {updated && <span className="text-[var(--color-green)] normal-case tracking-normal">· edited</span>}</label>
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Prompt {updated && <span className="text-[var(--color-green)] normal-case tracking-normal">· edited</span>}</label>
             {updated && (
               <button onClick={() => { setDraft(lastUsedPrompt); setUpdated(false); }} className="text-[10px] text-[var(--color-text-3)] hover:text-[var(--color-text)] underline cursor-pointer">Revert</button>
             )}
@@ -1933,16 +1994,45 @@ function RegenImageModal({
         </div>
         {candidates.length > 0 && (
           <div className="space-y-1.5">
-            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Reference images <span className="normal-case tracking-normal text-[var(--color-text-4)]">· what Higgsfield copies the product from</span></label>
+            <label className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Reference images</label>
             <RefPicker candidates={candidates} selected={refs} onToggle={toggleModalRef} disabled={busy} />
             {refErr && <p className="text-[11px] text-[var(--color-red)]">{refErr}</p>}
           </div>
         )}
+        {/* Previous versions — use one as-is, or load its prompt to edit. */}
+        {versions.length > 0 && (
+          <div className="space-y-1.5">
+            <button onClick={() => setShowVersions((x) => !x)}
+              className="cursor-pointer font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)] hover:text-[var(--color-text)]">
+              Versions ({versions.length}) {showVersions ? "▾" : "▸"}
+            </button>
+            {showVersions && (
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {versions.map((h, k) => (
+                  <div key={k} className="shrink-0 w-[104px] space-y-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={h.image_url} alt={`Version ${k + 1} back`} loading="lazy" className="w-[104px] h-[104px] object-cover rounded-[8px] border border-[var(--color-border)]" />
+                    <button onClick={() => onUseVersion(h)} disabled={busy}
+                      className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-surface-2)] disabled:opacity-40">
+                      Use this image
+                    </button>
+                    {h.prompt?.trim() && (
+                      <button onClick={() => { setDraft(h.prompt!); setUpdated(true); }} disabled={busy || aiLoading}
+                        className="w-full cursor-pointer rounded px-1.5 py-1 text-[10px] font-[620] border border-[var(--color-border)] text-[var(--color-text-2)] hover:text-[var(--color-text)] disabled:opacity-40">
+                        Edit from this
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-3">
-          <button onClick={() => onRegenerate(draft, refs)} disabled={busy} className={btnPrimary}>
-            {busy ? "Starting…" : updated ? "Regenerate with new prompt" : "Regenerate this image"}
+          <button onClick={go} disabled={busy || aiLoading || !draft.trim()} className={btnPrimary}>
+            {aiLoading ? "Rewriting…" : busy ? "Starting…" : changed ? "Regenerate with changes" : "Regenerate as is"}
           </button>
-          <button onClick={onClose} disabled={busy} className={btnSecondary}>Cancel</button>
+          <button onClick={onClose} disabled={busy || aiLoading} className={btnSecondary}>Cancel</button>
         </div>
       </div>
     </div>
@@ -1958,73 +2048,17 @@ async function dlImg(url: string, name: string) {
 }
 
 /* ── small presentational helpers ──────────────────────────────────────── */
-function Spinner({ label }: { label: string }) {
+function Spinner({ label, elapsed }: { label: string; elapsed?: string | null }) {
   return (
     <div className="flex items-center gap-3 py-6">
       <div className="w-3 h-3 rounded-full bg-[var(--color-accent)] animate-pulse" />
-      <p className="text-[13px] text-[var(--color-text-2)]">{label}</p>
+      <p className="text-[13px] text-[var(--color-text-2)]">
+        {label}
+        {elapsed && <span className="ml-2 font-[var(--font-ibm-plex-mono)] text-[11px] text-[var(--color-text-3)]">{elapsed}</span>}
+      </p>
     </div>
   );
 }
-/* ── Push a finished run to Shopify as a DRAFT product ───────────────────── */
-function ShopifyPush({ runId }: { runId: number }) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [done, setDone] = useState<{ adminUrl: string; imageCount: number } | null>(null);
-
-  const push = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await fetch("/api/shopify/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId }),
-      });
-      const data = await res.json();
-      if (!data.success) { setErr(data.error || `Push failed (${res.status})`); return; }
-      setDone({ adminUrl: data.adminUrl, imageCount: data.imageCount });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Network error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (done) {
-    return (
-      <div className="rounded-lg border border-[var(--color-green)] bg-[var(--color-green-bg)] px-3 py-2.5 space-y-1">
-        <p className="text-[12.5px] font-[600] text-[var(--color-text)]">
-          Draft product created in Shopify · {done.imageCount} images
-        </p>
-        <a
-          href={done.adminUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[12px] underline text-[var(--color-text-2)] hover:text-[var(--color-text)]"
-        >
-          Open in Shopify admin →
-        </a>
-        <p className="text-[11px] text-[var(--color-text-3)]">Draft — set the price and publish in Shopify.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={push} disabled={busy} className={btnSecondary}>
-          {busy ? "Pushing to Shopify…" : "Push to Shopify (draft)"}
-        </button>
-        <span className="text-[11px] text-[var(--color-text-3)]">
-          Copy becomes the product description; hero + the 8 images become product media.
-        </span>
-      </div>
-      {err && <ErrBox msg={err} />}
-    </div>
-  );
-}
-
 /* ── Fullscreen lightbox for Stage 4 images ──────────────────────────────
    Opened from any image tile. Esc or backdrop click closes; ←/→ (keys or the
    on-screen arrows) cycle through every image in the current grid. */
@@ -2114,17 +2148,11 @@ function ValidationBadge({ raw }: { raw: string | null | undefined }) {
   let v: { passed?: boolean; errors?: string[]; retried?: boolean } | null = null;
   try { v = JSON.parse(raw); } catch { return null; }
   if (!v || typeof v.passed !== "boolean") return null;
-  if (v.passed) {
-    return (
-      <p className="text-[11px] text-[var(--color-green)]">
-        ✓ Format checks passed{v.retried ? " (after one retry)" : ""}
-      </p>
-    );
-  }
+  if (v.passed) return null;
   return (
     <div className="rounded-lg border border-[var(--color-amber)] bg-[var(--color-amber-bg)] px-3 py-2 space-y-1">
       <p className="text-[12px] font-[600] text-[var(--color-text)]">
-        Format checks failed{v.retried ? " (after one retry)" : ""} — review carefully before approving
+        Format checks failed
       </p>
       <ul className="list-disc list-inside space-y-0.5">
         {(v.errors ?? []).map((e, i) => (
@@ -2171,7 +2199,7 @@ function GenGrid({ heroUrl, images }: { heroUrl: string | null; images: (RemImag
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={im.image_url} alt={im.category} loading="lazy" decoding="async" onClick={() => openLb(im.image_url)} className="w-full h-full object-cover cursor-zoom-in" />
               {im.verdict && (
-                <span className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white ${im.verdict === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{im.verdict}</span>
+                <span className={`absolute top-2 left-2 text-[9px] font-[700] uppercase tracking-wide px-2 py-0.5 rounded-full text-white ${im.verdict === "pass" ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`}>{im.verdict === "pass" ? "OK" : "Flagged"}</span>
               )}
               <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => openLb(im.image_url)} className="text-[10px] bg-white/15 hover:bg-white/25 text-white px-2 py-1 rounded font-[var(--font-ibm-plex-mono)] cursor-pointer">⤢</button>

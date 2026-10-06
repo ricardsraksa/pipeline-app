@@ -58,7 +58,6 @@ export default function Stage3SourcePicker({
           Source images — {activeCount} of {candidates.length} in use
         </h4>
       </div>
-      <p className="text-[11px] text-[var(--color-text-3)]"></p>
       <div className="flex flex-wrap gap-2">
         {candidates.map((url) => {
           const off = excluded.has(url);
@@ -67,7 +66,7 @@ export default function Stage3SourcePicker({
               key={url}
               onClick={() => toggle(url)}
               disabled={saving !== null}
-              title={off ? "Excluded — click to use again" : "In use — click to exclude"}
+              title={off ? "Excluded" : "In use"}
               className={`relative w-[72px] h-[72px] rounded-[9px] overflow-hidden border cursor-pointer tr ${
                 off
                   ? "border-[var(--color-border)] opacity-35 grayscale"

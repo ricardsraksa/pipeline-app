@@ -11,14 +11,14 @@ import type { RunStatus } from "@/hooks/useRunPolling";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
-const FIELDS: { key: keyof Angle; label: string; rows: number; hint: string }[] = [
-  { key: "problem", label: "Problem", rows: 2, hint: "The specific problem, in the customer's world" },
-  { key: "consequence", label: "Stakes", rows: 2, hint: "What happens if it stays unsolved" },
-  { key: "mechanism", label: "Why it works", rows: 2, hint: "Cause and effect, not features" },
-  { key: "who", label: "Who", rows: 1, hint: "A specific person" },
-  { key: "hook", label: "Hook", rows: 1, hint: "One opening line" },
-  { key: "competitor_angle", label: "Competitors say", rows: 2, hint: "What they lead with" },
-  { key: "gap", label: "Gap", rows: 2, hint: "Why this ground is open" },
+const FIELDS: { key: keyof Angle; label: string; rows: number }[] = [
+  { key: "problem", label: "Problem", rows: 2 },
+  { key: "consequence", label: "Stakes", rows: 2 },
+  { key: "mechanism", label: "Why it works", rows: 2 },
+  { key: "who", label: "Who", rows: 1 },
+  { key: "hook", label: "Hook", rows: 1 },
+  { key: "competitor_angle", label: "Competitors say", rows: 2 },
+  { key: "gap", label: "Gap", rows: 2 },
 ];
 
 const EMPTY: Angle = { id: "", title: "", problem: "", consequence: "", mechanism: "", who: "", hook: "", why_this_angle: "" };
@@ -33,7 +33,7 @@ function AngleForm({ value, onChange }: { value: Angle; onChange: (a: Angle) => 
       {FIELDS.map((f) => (
         <label key={f.key} className={cx("block", f.rows > 1 && "col-span-2")}>
           <span className="ff-mono text-[9.5px] uppercase tracking-widest text-[var(--color-text-4)]">{f.label}</span>
-          <textarea value={String(value[f.key] ?? "")} rows={f.rows} placeholder={f.hint}
+          <textarea value={String(value[f.key] ?? "")} rows={f.rows}
             onChange={(e) => onChange({ ...value, [f.key]: e.target.value })} className={cx(inputCls, "mt-1")} />
         </label>
       ))}
@@ -64,7 +64,7 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
   }
   async function saveSelection(next: Angle[]) {
     setBusy("save"); setErr(null);
-    try { await patch({ product_angle_selected: next.length ? JSON.stringify(next) : null }); setSelected(next); }
+    try { await patch({ product_angle_selected: next.length ? JSON.stringify(next) : null }); setSelected(next); window.dispatchEvent(new Event("run:changed")); }
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save"); }
     finally { setBusy(null); }
   }
@@ -96,6 +96,7 @@ export default function AnglePicker({ runId, run, editable }: { runId: number; r
     try {
       await patch({ product_angles: JSON.stringify(nextProposed), product_angle_selected: JSON.stringify(nextSelected) });
       setProposed(nextProposed); setSelected(nextSelected); setCustom(null);
+      window.dispatchEvent(new Event("run:changed"));
       push("Angle added", "success");
     } catch (e) { setErr(e instanceof Error ? e.message : "Couldn't save"); }
     finally { setBusy(null); }

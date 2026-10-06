@@ -1,12 +1,13 @@
 {
   "name": "pipeline-app",
-  "version": "2.103.0",
+  "version": "2.104.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "eslint . --max-warnings 0 && tsc --noEmit && next build",
     "start": "node server.mjs",
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --max-warnings 0",
+    "changelog": "node scripts/changelog.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

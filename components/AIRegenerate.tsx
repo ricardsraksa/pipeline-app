@@ -14,18 +14,9 @@ interface AIRegenerateProps {
    *  saved 👎/👍 note for this stage, so they don't have to retype what
    *  they already told the feedback loop. */
   initialFeedback?: string | null;
+  /** The output has hand edits that a regenerate overwrites. */
+  hasEdits?: boolean;
 }
-
-const STAGE_HINTS: Record<AIRegenerateProps["stage"], string> = {
-  product:
-    "e.g. It is olive wood, not teak — the listing is wrong. Or: say it fits a standard 60cm shelf.",
-  stage1:
-    "e.g. Add more technical detail about the filtration system, or focus the benefits on long-term health outcomes.",
-  stage2:
-    "e.g. Make the tone warmer and less technical, or shorten the hero headline.",
-  "stage3-prompts":
-    "e.g. Use darker backgrounds and add rim lighting to all contextual shots.",
-};
 
 export default function AIRegenerate({
   runId,
@@ -33,6 +24,7 @@ export default function AIRegenerate({
   onRegenerated,
   triggerLabel = "Edit with AI",
   initialFeedback = null,
+  hasEdits = false,
 }: AIRegenerateProps) {
   const [open, setOpen] = useState(false);
   const [instructions, setInstructions] = useState(initialFeedback ?? "");
@@ -51,6 +43,7 @@ export default function AIRegenerate({
       setError("Instructions must be at least 5 characters");
       return;
     }
+    if (hasEdits && !window.confirm("Replaces your edits. Continue?")) return;
     setRegenerating(true);
     setError(null);
     try {
@@ -98,7 +91,7 @@ export default function AIRegenerate({
         <div className="flex items-center gap-1.5">
           <Icon.Spark className="w-3.5 h-3.5 text-[var(--color-accent)]" />
           <span className="text-[11px] font-[650] uppercase tracking-[0.1em] text-[var(--color-accent-text)]">
-            Tell Claude what to change
+            Edit with AI
           </span>
         </div>
         <button
@@ -114,7 +107,6 @@ export default function AIRegenerate({
       <textarea
         value={instructions}
         onChange={(e) => setInstructions(e.target.value)}
-        placeholder={STAGE_HINTS[stage]}
         rows={3}
         autoFocus
         disabled={regenerating}
@@ -153,9 +145,6 @@ export default function AIRegenerate({
         >
           Cancel
         </button>
-        <p className="ml-auto font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] hidden sm:block">
-          Replaces current edits · inline editing still works after
-        </p>
       </div>
     </div>
   );

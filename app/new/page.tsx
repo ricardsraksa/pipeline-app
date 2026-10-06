@@ -29,7 +29,14 @@ export default function NewRunPage() {
 
   const competitorList = useMemo(() => competitors.split("\n").map((u) => u.trim()).filter(Boolean), [competitors]);
   const urlOk = looksLikeUrl(productUrl.trim());
-  const competitorsValid = competitorList.every(looksLikeUrl) && competitorList.length <= 5;
+  // First bad competitor line (1-based, counting the textarea's own lines).
+  const competitorError = useMemo(() => {
+    const lines = competitors.split("\n");
+    const bad = lines.findIndex((l) => l.trim() && !looksLikeUrl(l.trim()));
+    if (bad >= 0) return `Line ${bad + 1} isn't a full https:// link`;
+    return competitorList.length > 5 ? "Max 5" : null;
+  }, [competitors, competitorList]);
+  const competitorsValid = !competitorError;
   const canStart = urlOk && competitorsValid && !submitting && !uploading;
 
   async function uploadFiles(files: File[]) {
@@ -40,11 +47,11 @@ export default function NewRunPage() {
       const fd = new FormData();
       files.forEach((f) => fd.append("images", f));
       const res = await fetch("/api/upload-source-images", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || !data.urls) { setUploadError(data.error ?? `Upload failed (HTTP ${res.status})`); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.urls) { setUploadError(data.error ?? "Upload failed"); return; }
       setSourceImages((p) => [...p, ...(data.urls as string[])].slice(0, MAX_IMG));
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload error");
+      setUploadError("Upload failed");
     } finally { setUploading(false); }
   }
 
@@ -79,10 +86,10 @@ export default function NewRunPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productUrl, competitors, sourceImages, submitting, uploading]);
 
-  const Label = ({ children, hint }: { children: React.ReactNode; hint: string }) => (
+  const Label = ({ children, hint }: { children: React.ReactNode; hint?: string }) => (
     <div className="flex items-baseline gap-2">
       <label className="text-[13px] font-[500] text-[var(--color-text)]">{children}</label>
-      <span className="text-[11.5px] text-[var(--color-text-3)]">{hint}</span>
+      {hint && <span className="text-[11.5px] text-[var(--color-text-3)]">{hint}</span>}
     </div>
   );
 
@@ -91,16 +98,17 @@ export default function NewRunPage() {
       <h1 className="text-[19px] font-[600] tracking-[-0.02em] mb-[26px] text-[var(--color-text)]">New run</h1>
       <div className="flex flex-col gap-[22px]">
         <div className="flex flex-col gap-1.5">
-          <Label hint="AliExpress, Alibaba, Shopify">Product link</Label>
+          <Label>Product link</Label>
           <input ref={urlRef} value={productUrl} onChange={(e) => setProductUrl(e.target.value)} spellCheck={false} disabled={submitting}
             placeholder="https://" className={cx(inputCls, "h-[38px] ff-mono", productUrl && !urlOk && "border-[var(--color-red)]")} />
-          {productUrl && !urlOk && <span className="text-[11.5px] text-[var(--color-red)]">Needs a full https:// link</span>}
+          {productUrl && !urlOk && <span className="text-[11.5px] text-[var(--color-red)]">Not a full https:// link</span>}
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label hint="Optional · up to 5, one per line">Competitor links</Label>
+          <Label hint="Optional">Competitor links</Label>
           <textarea value={competitors} onChange={(e) => setCompetitors(e.target.value)} rows={4} spellCheck={false} disabled={submitting}
-            className={cx(inputCls, "py-[9px] ff-mono resize-y", competitorList.length > 0 && !competitorsValid && "border-[var(--color-red)]")} />
+            className={cx(inputCls, "py-[9px] ff-mono resize-y", competitorError && "border-[var(--color-red)]")} />
+          {competitorError && <span className="text-[11.5px] text-[var(--color-red)]">{competitorError}</span>}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -110,7 +118,7 @@ export default function NewRunPage() {
               isDragActive ? "border-[var(--color-accent)] text-[var(--color-text)]" : "border-[var(--color-border-strong)] text-[var(--color-text-2)]",
               sourceImages.length >= MAX_IMG || submitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-[var(--color-accent)] hover:text-[var(--color-text)]")}>
             <input {...getInputProps()} />
-            {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : sourceImages.length ? `${sourceImages.length} added — drop more, or click` : "Drop up to 10 files, or click"}
+            {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : sourceImages.length ? `${sourceImages.length} / ${MAX_IMG}` : "Add photos"}
           </div>
           {uploadError && <span className="text-[11.5px] text-[var(--color-red)]">{uploadError}</span>}
           {sourceImages.length > 0 && (
@@ -119,8 +127,10 @@ export default function NewRunPage() {
                 <div key={url + i} className="relative aspect-square rounded-[6px] overflow-hidden border border-[var(--color-border)] group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                  <button onClick={() => setSourceImages((p) => p.filter((_, idx) => idx !== i))} aria-label="Remove"
-                    className="cursor-pointer absolute top-1 right-1 w-4 h-4 rounded-full bg-black/60 text-white text-[10px] grid place-items-center opacity-0 group-hover:opacity-100 tr">×</button>
+                  <button onClick={() => setSourceImages((p) => p.filter((_, idx) => idx !== i))} aria-label="Remove photo"
+                    className="cursor-pointer absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white grid place-items-center tr">
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+                  </button>
                 </div>
               ))}
             </div>

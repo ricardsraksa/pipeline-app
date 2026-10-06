@@ -11,6 +11,19 @@ interface Item {
   created_at: string;
 }
 
+const ThumbUp = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="useful">
+    <path d="M7 10v12" />
+    <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l5-8 2 1.06A2 2 0 0 1 15 5.88z" />
+  </svg>
+);
+const ThumbDown = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="not useful">
+    <path d="M17 14V2" />
+    <path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-5 8-2-1.06A2 2 0 0 1 9 18.12z" />
+  </svg>
+);
+
 /**
  * Small chip that shows how many past feedback notes are being applied to a
  * stage's next generation. Click to expand and see exactly which notes — the
@@ -56,17 +69,14 @@ export default function FeedbackAppliedChip({
         <span className="text-[var(--color-text-4)] text-[10px]">{open ? "▴" : "▾"}</span>
       </button>
       {open && (
-        <div className="absolute right-0 mt-1.5 z-40 w-[min(360px,90vw)] border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] shadow-[0_2px_8px_rgba(20,20,18,.08)] p-3 space-y-2">
-          <p className="font-[var(--font-ibm-plex-mono)] text-[10px] text-[var(--color-text-3)] uppercase tracking-widest">
-            Steering the next run
-          </p>
+        <div className="mt-1.5 border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] p-3 space-y-2">
           <ul className="space-y-1.5">
             {items.map((it) => {
               const name = (it.brand_name ?? it.product_name ?? "previous run").trim();
-              const v = it.vote === "up" ? "👍" : it.vote === "down" ? "👎" : "—";
+              const v = it.vote === "up" ? <ThumbUp /> : it.vote === "down" ? <ThumbDown /> : "—";
               return (
                 <li key={it.id} className="text-[12px] leading-relaxed text-[var(--color-text-2)]">
-                  <span className="font-[600] text-[var(--color-text)]">{v}</span>{" "}
+                  <span className="inline-flex align-[-2px] font-[600] text-[var(--color-text)]">{v}</span>{" "}
                   <span className="text-[var(--color-text-3)]">{name}</span>
                   {it.note ? (
                     <>
@@ -78,9 +88,6 @@ export default function FeedbackAppliedChip({
               );
             })}
           </ul>
-          <p className="text-[10px] text-[var(--color-text-4)] pt-1 border-t border-[var(--color-border)]">
-            
-          </p>
         </div>
       )}
     </div>

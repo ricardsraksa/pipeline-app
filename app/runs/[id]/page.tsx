@@ -10,7 +10,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
-import { elapsedTime, statusLabel } from "@/components/ui/run-ui";
+import { Elapsed, OverflowMenu, elapsedTime, shortDate, statusLabel } from "@/components/ui/run-ui";
 import { useToast } from "@/components/Toasts";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
@@ -194,6 +194,18 @@ type NextAction = {
   cta?: string;
   running?: boolean;
   onClick?: () => void;
+  /** The stage whose main column already shows this action; the rail button hides there. */
+  here?: StageKey;
+};
+
+// What each restart deletes (app/api/runs/[id]/restart-stage).
+const RESTART_CONFIRM: Record<RestartStage, string> = {
+  run: "Deletes the research, angles, copy, images, ads, pricing and all edits. Keeps the links, uploaded photos and product code. Restart the run?",
+  product: "Deletes the scrape, the description and your edits, the photo picks, pricing, the research, angles and audience. Restart Product?",
+  stage1: "Deletes the research, your research edits, the angles, the angle pick and the audience. Restart Research?",
+  stage2: "Deletes the copy and your copy edits. Restart Copy?",
+  "stage3-prompts": "Deletes the hero, the 8 images, their prompts and prompt edits, and the placement. Restart Images?",
+  ads: "Deletes the ad briefs, your brief edits and the ad images. Restart Ads?",
 };
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -242,19 +254,6 @@ export default function RunPage() {
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameOverride, setNameOverride] = useState<string | null>(null);
-  const [shopifyUrl, setShopifyUrl] = useState<string | null>(null);
-  const [shopifySaved, setShopifySaved] = useState<"saved" | "error" | null>(null);
-  async function saveShopifyUrl(v: string) {
-    if (!runId) return;
-    const clean = v.trim();
-    setShopifySaved(null);
-    try {
-      const res = await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ shopify_product_url: clean || null }) });
-      if (!res.ok) throw new Error();
-      setShopifySaved("saved");
-    } catch { setShopifySaved("error"); }
-    setTimeout(() => setShopifySaved(null), 1500);
-  }
 
   // When the pipeline moves on, follow it to the stage that needs attention.
   useEffect(() => { setActiveOverride(null); }, [run?.status]);
@@ -330,6 +329,7 @@ export default function RunPage() {
       const res = await fetch(`/api/runs/${runId}/start-stage2`, { method: "POST" });
       const data = await res.json();
       if (!data.success) push(`Couldn't start copy: ${data.error ?? "unknown error"}`);
+      window.dispatchEvent(new Event("run:changed"));
     } catch (err) {
       push(`Couldn't start copy: ${err instanceof Error ? err.message : String(err)}`);
     } finally { setTimeout(() => setStartingStage2(false), 1200); }
@@ -337,16 +337,7 @@ export default function RunPage() {
 
   async function handleRestartStage(stage: RestartStage) {
     if (!runId || restarting) return;
-    const isStage3 = stage === "stage3-prompts";
-    if (!window.confirm(stage === "run"
-      ? "Restart the whole run? Deletes the research, angles, copy, images, ads, pricing and every edit you made to them. Keeps the links, your uploaded photos and the product code, and starts again from the scrape."
-      : isStage3
-      ? "Restart Stage 4? Deletes the hero, the 8 images and the placement."
-      : stage === "ads"
-      ? "Restart Stage 5? Deletes the five ad briefs and images."
-      : stage === "product"
-      ? "Restart Stage 1? Re-scrapes the links and clears the research."
-      : `Restart ${stage === "stage1" ? "Stage 2" : "Stage 3"}? Clears its output and runs it again.`)) return;
+    if (!window.confirm(RESTART_CONFIRM[stage])) return;
     setRestarting(true);
     try {
       const res = await fetch(`/api/runs/${runId}/restart-stage`, {
@@ -355,7 +346,9 @@ export default function RunPage() {
       });
       const data = await res.json();
       if (!data.success) { push(`Restart failed: ${data.error ?? "unknown error"}`); setRestarting(false); return; }
-      window.location.reload();
+      if (stage === "run") { lockedStage.current = "product"; setActiveOverride("product"); }
+      window.dispatchEvent(new Event("run:changed"));
+      setTimeout(() => setRestarting(false), 1200);
     } catch (err) {
       push(`Restart failed: ${err instanceof Error ? err.message : String(err)}`);
       setRestarting(false);
@@ -376,30 +369,50 @@ export default function RunPage() {
     } catch { push("Rename failed — try again"); }
   }
 
+  // Download names: the product code (P87) when set, else the run name.
+  function filePrefix(): string {
+    if (run?.meta.productCode) return run.meta.productCode;
+    const base = run?.meta.brandName ?? run?.meta.productName ?? "";
+    return base.replace(/[^\w-]+/g, "_").replace(/^_+|_+$/g, "") || `run_${runId}`;
+  }
+
   async function handleDownloadDocs() {
     if (!run) return;
-    const slug = run.meta.brandName ?? run.meta.productName ?? `run_${runId}`;
+    const slug = filePrefix();
     const zip = new JSZip();
     const { outputs } = run;
     const files: [string | null, string][] = [
-      [run.meta.productDescription, `${slug}_PRODUCT_DESCRIPTION.txt`],
-      [outputs.onePagerEdited ?? outputs.onePager, `${slug}_STAGE1_ONE_PAGER.md`],
-      [outputs.research, `${slug}_RESEARCH.txt`],
-      [outputs.avatar, `${slug}_AVATAR.txt`],
-      [outputs.avatarRevised, `${slug}_AVATAR_REVISED.txt`],
-      [outputs.offerBrief, `${slug}_OFFER_BRIEF.txt`],
-      [outputs.offerBriefRevised, `${slug}_OFFER_BRIEF_REVISED.txt`],
-      [outputs.necessaryBeliefs, `${slug}_NECESSARY_BELIEFS.txt`],
-      [outputs.necessaryBeliefsRevised, `${slug}_NECESSARY_BELIEFS_REVISED.txt`],
-      [outputs.chiefFinal, `${slug}_CHIEF_FINAL.txt`],
-      [outputs.stage2Output, `${slug}_STAGE2_COPY.txt`],
+      [run.meta.productDescription, `${slug}_Product.txt`],
+      [outputs.onePagerEdited ?? outputs.onePager, `${slug}_Research.md`],
+      [outputs.research, `${slug}_Research_notes.txt`],
+      [outputs.avatar, `${slug}_Avatar.txt`],
+      [outputs.avatarRevised, `${slug}_Avatar_revised.txt`],
+      [outputs.offerBrief, `${slug}_Offer_brief.txt`],
+      [outputs.offerBriefRevised, `${slug}_Offer_brief_revised.txt`],
+      [outputs.necessaryBeliefs, `${slug}_Beliefs.txt`],
+      [outputs.necessaryBeliefsRevised, `${slug}_Beliefs_revised.txt`],
+      [outputs.chiefFinal, `${slug}_Research_final.txt`],
+      [outputs.stage2Output, `${slug}_Copy.md`],
     ];
     for (const [content, name] of files) if (content) zip.file(name, content);
     const blob = await zip.generateAsync({ type: "blob" });
-    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${slug}_docs.zip` });
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${slug}_Docs.zip` });
     a.click();
     URL.revokeObjectURL(a.href);
-    push("Bundled research + copy → docs.zip", "success");
+    push(`Downloaded ${slug}_Docs.zip`, "success");
+  }
+
+  // The server names this file itself; fetch it so it lands under our name.
+  async function handleDownloadResearchDocs() {
+    if (!runId) return;
+    try {
+      const res = await fetch(`/api/runs/${runId}/stage1-docs`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const href = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement("a"), { href, download: `${filePrefix()}_Research_documents.md` });
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(href);
+    } catch (e) { push(`Download failed: ${e instanceof Error ? e.message : "network error"}`); }
   }
 
   async function handleDownloadImages() {
@@ -488,23 +501,25 @@ export default function RunPage() {
     done: run.status === "completed" || run.stage4.done > 0,
   };
 
+  const writeCopy = () => { openStage("stage2"); void handleStartStage2(); };
+
   // ── Next action ──
   const nextAction = (): NextAction => {
     const s = run.status;
     const go = stepping ? "Starting…" : "Continue";
-    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Approve the product and start the research", cta: go, onClick: continueFromProduct };
+    if (s === "awaiting_product_approval") return { tone: "amber", icon: "review", title: "Approve the product and start the research", cta: go, onClick: continueFromProduct, here: "product" };
     if (s === "awaiting_stage2_approval") {
       const hasAngle = Boolean(run.angles?.selected);
       return hasAngle
-        ? { tone: "amber", icon: "review", title: "Write the copy on the chosen angle", cta: startingStage2 ? "Starting…" : "Continue", onClick: () => { openStage("stage2"); void handleStartStage2(); } }
-        : { tone: "amber", icon: "review", title: "Pick an angle — the copy is written on it", cta: "Choose angle", onClick: () => openStage("stage1") };
+        ? { tone: "amber", icon: "review", title: "Write the copy on the chosen angle", cta: startingStage2 ? "Starting…" : "Continue", onClick: writeCopy, here: "stage1" }
+        : { tone: "amber", icon: "review", title: "Pick an angle", cta: "Choose angle", onClick: () => openStage("stage1"), here: "stage1" };
     }
     // A step that stopped with a reason: show the reason and open the stage.
     if (run.error && ["awaiting_user", "awaiting_hero_qc", "awaiting_qc"].includes(s)) {
-      return { tone: "amber", icon: "alert", title: "Stage 4 stopped", sub: run.error, cta: "Open images", onClick: () => openStage("stage3") };
+      return { tone: "amber", icon: "alert", title: "Stage 4 stopped", sub: run.error, cta: "Open images", onClick: () => openStage("stage3"), here: "stage3" };
     }
-    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Generate the hero shot", cta: go, onClick: () => runStep("/api/stage3-hero-prompt", {}, "stage3", "Couldn't start the hero") };
-    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Approve the hero and write the 8 image prompts", cta: go, onClick: () => runStep("/api/stage3/hero-approve", {}, "stage3", "Couldn't approve the hero") };
+    if (s === "awaiting_user") return { tone: "amber", icon: "image", title: "Generate the hero shot", cta: go, onClick: () => runStep("/api/stage3-hero-prompt", {}, "stage3", "Couldn't start the hero"), here: "stage3" };
+    if (s === "awaiting_hero_qc") return { tone: "amber", icon: "review", title: "Approve the hero and write the 8 image prompts", cta: go, onClick: () => runStep("/api/stage3/hero-approve", {}, "stage3", "Couldn't approve the hero"), here: "stage3" };
     if (s === "generating_remaining") return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
     if (s === "awaiting_qc") {
       const done = run.stage4?.done ?? 0;
@@ -513,28 +528,27 @@ export default function RunPage() {
       return { tone: "amber", icon: "image", title, cta: go, onClick: () => {
         if (activeKey === "stage3" && done === 0) { window.dispatchEvent(new Event("stage3:generate")); return; }
         void runStep("/api/stage3/generate-batch", {}, "stage3", "Couldn't start the images");
-      } };
+      }, here: "stage3" };
     }
-    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || "Resume from the last step.", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
+    if (s === "failed") return { tone: "red", icon: "alert", title: "Run failed" + (run.currentStep ? ` at ${run.currentStep}` : ""), sub: run.error || undefined, cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "cancelled") return { tone: "amber", icon: "alert", title: "Run cancelled", cta: resuming ? "Resuming…" : "Resume", onClick: handleResume };
     if (s === "completed") {
       const a = run.meta.ads;
       if (a?.step === "writing") return { tone: "accent", running: true, title: "Writing the five ad briefs" };
-      if (a?.error) return { tone: "amber", icon: "alert", title: "Ads stopped", sub: a.error, cta: "Open ads", onClick: () => openStage("ads") };
+      if (a?.error) return { tone: "amber", icon: "alert", title: "Ads stopped", sub: a.error, cta: "Open ads", onClick: () => openStage("ads"), here: "ads" };
       if (a?.step === "review") return { tone: "amber", icon: "review", title: "Generate the 5 ads", cta: go, onClick: () => {
         if (activeKey === "ads") { window.dispatchEvent(new Event("ads:generate")); return; }
         void runStep("/api/ads/generate-batch", {}, "ads", "Couldn't start the ads");
-      } };
+      }, here: "ads" };
       if (a?.step === "generating") return { tone: "accent", running: true, title: "Generating the ads", sub: `${a.done} of 5 done` };
-      if (a?.step === "done") return { tone: "green", icon: "check", title: "Push to Shopify, Docs and Drive", cta: "Continue", onClick: () => openStage("done") };
-      return { tone: "amber", icon: "review", title: "Write the 5 ad briefs", cta: go, onClick: () => runStep("/api/ads/write", {}, "ads", "Couldn't start the ad briefs") };
+      if (a?.step === "done") return { tone: "green", icon: "check", title: "Push to Shopify, Docs and Drive", cta: "Continue", onClick: () => openStage("done"), here: "done" };
+      return { tone: "amber", icon: "review", title: "Write the 5 ad briefs", cta: go, onClick: () => runStep("/api/ads/write", {}, "ads", "Couldn't start the ad briefs"), here: "ads" };
     }
     return { tone: "accent", running: true, title: statusLabel(s), sub: run.currentStep || "Working…" };
   };
   const a = nextAction();
   const toneBar = { amber: "var(--color-amber)", red: "var(--color-red)", green: "var(--color-green)", accent: "var(--color-accent)" }[a.tone];
   const hasDocs = Boolean(outputs.onePager || outputs.stage2Output);
-  const showPrimary = !a.running && Boolean(a.cta);
 
   // The stage on screen: the operator's pick, else the one that needs them,
   // else the furthest one that exists.
@@ -545,27 +559,31 @@ export default function RunPage() {
   const activeKey: StageKey = activeOverride && present[activeOverride]
     ? activeOverride
     : (lockedStage.current && present[lockedStage.current] ? lockedStage.current : autoKey);
-  const active = STAGE_DEFS.find((d) => d.key === activeKey)!;
+  // The main column already shows this action: no second button in the rail.
+  const showPrimary = !a.running && Boolean(a.cta) && a.here !== activeKey;
 
   const stateTone: Record<StageState, string> = {
     complete: "var(--color-text-3)", running: "var(--color-accent)", waiting: "var(--color-amber)",
     error: "var(--color-red)", pending: "var(--color-text-4)",
   };
   const stateWord: Record<StageState, string> = { complete: "done", running: "running", waiting: "needs you", error: "failed", pending: "—" };
-  const textBtn = "btn btn-sm";
   const deliverRow = "w-full grid items-center gap-2.5 px-2.5 h-[34px] rounded-[6px] text-left cursor-pointer hover:bg-[var(--color-surface-2)] tr disabled:cursor-default disabled:hover:bg-transparent";
   const deliverCols = { gridTemplateColumns: "minmax(0,1fr) auto" } as const;
-  const DeliverRow = ({ name, state }: { name: string; state: string }) => (
-    <div className={cx(deliverRow, "cursor-default opacity-45")} style={deliverCols}>
+  // Status only; delivering happens on Done.
+  const deliverStatus = (name: string, state: string, done: boolean) => (
+    <button key={name} onClick={() => openStage("done")} disabled={!present.done} className={cx(deliverRow, !present.done && "opacity-45")} style={deliverCols}>
       <span className="text-[13px] font-[500] text-[var(--color-text)]">{name}</span>
-      <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{state}</span>
-    </div>
-  );
-  const RestartStage = ({ stage }: { stage: RestartStage }) => (
-    <button onClick={() => handleRestartStage(stage)} disabled={restarting} className="btn btn-sm">
-      {restarting ? "Restarting…" : "Restart stage"}
+      <span className="ff-mono text-[11px]" style={{ color: done ? "var(--color-green)" : "var(--color-text-3)" }}>{state}</span>
     </button>
   );
+  const menuItem = "cursor-pointer w-full text-left text-[12.5px] px-2 py-1.5 rounded-[5px] hover:bg-[var(--color-surface-2)] transition-colors duration-150 disabled:opacity-50 disabled:cursor-default";
+  const restartItem = (stage: RestartStage, text = "Restart stage") => (
+    <button onClick={() => handleRestartStage(stage)} disabled={restarting} className={cx(menuItem, "text-[var(--color-red)] border-t border-[var(--color-border)] rounded-none pt-2.5")}>
+      {restarting ? "Restarting…" : text}
+    </button>
+  );
+  // Plain function, not a component: the menu keeps its open state across polls.
+  const stageMenu = (items: React.ReactNode) => <OverflowMenu label="Stage options">{items}</OverflowMenu>;
   const label = "eyebrow";
   const card = "border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)]";
   // Finished images exist — enough for Shopify and Drive, whatever the status word says.
@@ -589,7 +607,8 @@ export default function RunPage() {
       const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "angle" }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) { push(`Rebuild failed: ${data.error ?? res.status}`); setRebuilding(false); return; }
-      window.location.reload();
+      window.dispatchEvent(new Event("run:changed"));
+      setRebuilding(false);
     } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
   };
   // Same idea for the research: the angles and the copy each remember the
@@ -610,7 +629,8 @@ export default function RunPage() {
       const res = await fetch(`/api/runs/${runId}/angles`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) { push(`New angles failed: ${data.error ?? res.status}`); setReAngling(false); return; }
-      window.location.reload();
+      window.dispatchEvent(new Event("run:changed"));
+      setReAngling(false);
     } catch (e) { push(`New angles failed: ${e instanceof Error ? e.message : String(e)}`); setReAngling(false); }
   };
   const rebuildCopyOnResearch = async () => {
@@ -620,7 +640,8 @@ export default function RunPage() {
       const res = await fetch("/api/regenerate/stage2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId, mode: "context" }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) { push(`Rebuild failed: ${data.error ?? res.status}`); setRebuilding(false); return; }
-      window.location.reload();
+      window.dispatchEvent(new Event("run:changed"));
+      setRebuilding(false);
     } catch (e) { push(`Rebuild failed: ${e instanceof Error ? e.message : String(e)}`); setRebuilding(false); }
   };
   const imagesResearchStale = changedFor("stage3").length > 0;
@@ -646,9 +667,14 @@ export default function RunPage() {
       {action}
     </div>
   ) : null;
-  const waiting = (text: string) => (
+  // live: a step is running — spinner and time on the current step.
+  const waiting = (text: string, live = false) => (
     <div className={cx(card, "px-5 py-10 grid place-items-center")}>
-      <p className="ff-mono text-[12px] text-[var(--color-text-2)]">{text}</p>
+      <div className="flex items-center gap-2.5" role={live ? "status" : undefined}>
+        {live && <Icon.Loader className="w-4 h-4 text-[var(--color-accent)]" />}
+        <p className="ff-mono text-[12px] text-[var(--color-text-2)]">{text}</p>
+        {live && <Elapsed since={run.timestamps.lastUpdatedAt ?? run.timestamps.startedAt} />}
+      </div>
     </div>
   );
 
@@ -684,7 +710,7 @@ export default function RunPage() {
                   placeholder="58" aria-label="Product code" inputMode="numeric"
                   className="ff-mono w-[58px] text-[10.5px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[4px] px-1.5 py-px outline-none focus:border-[var(--color-accent)]" />
               ) : (
-                <button onClick={() => { setCodeDraft((codeOverride ?? run.meta.productCode ?? "").replace(/^P/i, "")); setEditingCode(true); }} title="Product code — names the Google Doc tab and the Drive folder"
+                <button onClick={() => { setCodeDraft((codeOverride ?? run.meta.productCode ?? "").replace(/^P/i, "")); setEditingCode(true); }} title="Product code"
                   className={`cursor-pointer rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)] ${(codeOverride ?? run.meta.productCode) ? "text-[var(--color-text-2)]" : "text-[var(--color-amber)]"}`}>
                   {(codeOverride ?? run.meta.productCode) || "set code"}
                 </button>
@@ -733,7 +759,7 @@ export default function RunPage() {
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Price</span>
             <button onClick={() => openStage("stage2")} className={deliverRow} style={deliverCols}>
-              <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· cmp {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
+              <span className="ff-mono text-[13px] text-[var(--color-text)]">{fmtMoney(run.meta.pricing.price, run.meta.pricing.cogs_currency)} <span className="text-[var(--color-text-3)]">· compare {fmtMoney(run.meta.pricing.compare_at, run.meta.pricing.cogs_currency)}</span></span>
               <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{(run.meta.pricing.price / run.meta.pricing.cogs).toFixed(1)}×</span>
             </button>
             {run.meta.pricing.bundles && run.meta.pricing.bundles.tiers.length > 1 && (
@@ -766,48 +792,31 @@ export default function RunPage() {
           </div>
         )}
 
-        {/* deliver: the pushes out of the app, visible from every stage */}
+        {/* deliver: where each push stands; the pushes themselves are on Done */}
         {runId !== null && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Deliver</span>
             <div className="flex flex-col gap-px">
-              {outputs.stage2Json
-                ? <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} variant="row" />
-                : <DeliverRow name="Google Doc" state="after copy" />}
-              <button onClick={() => openStage("stage3")} disabled={!imagesReady} className={deliverRow} style={deliverCols}
-                title={undefined}>
-                <span className="text-[13px] font-[500] text-[var(--color-text)]">Shopify</span>
-                <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{imagesReady ? "push →" : "after images"}</span>
-              </button>
-              {imagesReady || (run.meta.ads?.done ?? 0) > 0
-                ? <SendToDrive runId={runId} variant="row" hasImages={imagesReady} hasAds={(run.meta.ads?.done ?? 0) > 0} />
-                : <DeliverRow name="Drive" state="after images" />}
+              {deliverStatus("Google Doc", outputs.gdocAppendedAt ? `sent ${shortDate(outputs.gdocAppendedAt)}` : "not sent", Boolean(outputs.gdocAppendedAt))}
+              {deliverStatus("Shopify", run.meta.shopifyAdminUrl ? "pushed" : "not sent", Boolean(run.meta.shopifyAdminUrl))}
+              {deliverStatus("Drive", "—", false)}
             </div>
-            <input
-              value={shopifyUrl ?? run.meta.shopifyProductUrl ?? ""}
-              onChange={(e) => setShopifyUrl(e.target.value)}
-              onBlur={(e) => saveShopifyUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              placeholder="Shopify product link"
-              spellCheck={false}
-              title={shopifySaved === "error" ? "Needs an https:// link" : "The product this run fills — saved when you leave the field"}
-              className={cx("mt-1 h-[30px] px-2.5 rounded-[6px] bg-transparent border text-[11.5px] ff-mono text-[var(--color-text-2)] outline-none focus:text-[var(--color-text)] focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-4)]",
-                shopifySaved === "error" ? "border-[var(--color-red)]" : "border-[var(--color-border)]")}
-            />
           </div>
         )}
 
         <div className="flex-1" />
 
-        {runId !== null && <RunCost runId={runId} />}
-
-        <div className="flex gap-2 flex-wrap">
-          {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
-          <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>
+        <div className="flex gap-2 flex-wrap items-center">
+          {activeKey !== "done" && hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
+          {activeKey !== "done" && <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>}
           {a.running && !isTerminal && (
             <button onClick={handleKill} disabled={killing} className="btn btn-sm btn-danger">{killing ? "Killing…" : "Kill run"}</button>
           )}
-          <button onClick={() => handleRestartStage("run")} disabled={restarting} className="btn btn-sm btn-danger">{restarting ? "Restarting…" : "Restart run"}</button>
+          <div className="flex-1" />
+          <OverflowMenu label="Run options" up width="w-[236px]">
+            {runId !== null && <RunCost runId={runId} />}
+            {restartItem("run", "Restart run")}
+          </OverflowMenu>
         </div>
       </aside>
 
@@ -817,19 +826,17 @@ export default function RunPage() {
         {/* Stage 1 · Product */}
         {activeKey === "product" && (
           <>
-            <div className="flex items-baseline gap-2.5 mb-5">
+            <div className="flex items-center gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Product</h1>
               <div className="flex-1" />
-              {runId !== null && (
-                <div className="flex items-center gap-3.5">
-                  <PromptUsed promptsUsed={run.promptsUsed} stage="product" />
-                  <RestartStage stage="product" />
-                </div>
-              )}
+              {runId !== null && stageMenu(<>
+                <PromptUsed promptsUsed={run.promptsUsed} stage="product" />
+                {restartItem("product")}
+              </>)}
             </div>
             {PRODUCT_ACTIVE.includes(run.status)
-              ? waiting(run.currentStep ?? "Reading the product page…")
-              : runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.location.reload()} />}
+              ? waiting(run.currentStep ?? "Reading the product page…", true)
+              : runId !== null && <ProductGate runId={runId} run={run} onChanged={() => window.dispatchEvent(new Event("run:changed"))} onApproved={() => openStage("stage1")} />}
           </>
         )}
 
@@ -849,6 +856,14 @@ export default function RunPage() {
                       <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "Propose new angles"}</button>
                     } />
                     <AnglePicker runId={runId} run={run} editable />
+                    {run.status === "awaiting_stage2_approval" && (
+                      <div className="mt-3">
+                        <button onClick={writeCopy} disabled={!run.angles?.selected || startingStage2}
+                          className="cursor-pointer h-[34px] px-4 rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed tr">
+                          {startingStage2 ? "Starting…" : "Write copy"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div>
@@ -856,12 +871,15 @@ export default function RunPage() {
                     <span className={label}>One-pager</span>
                     <div className="flex-1" />
                     {runId !== null && (
-                      <div className="flex gap-3.5 items-center">
-                        <a href={`/api/runs/${runId}/stage1-docs`} download className="btn btn-sm">Download documents</a>
-                        <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
-                        <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage1Note ?? null} />
-                        <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
-                        <RestartStage stage="stage1" />
+                      <div className="flex gap-2.5 items-center">
+                        <button onClick={handleDownloadResearchDocs} className="btn btn-sm">Download documents</button>
+                        <AIRegenerate runId={runId} stage="stage1" onRegenerated={() => window.dispatchEvent(new Event("run:changed"))} initialFeedback={run.feedback?.stage1Note ?? null} hasEdits={Boolean(outputs.onePagerEdited)} />
+                        {stageMenu(<>
+                          <PromptUsed promptsUsed={run.promptsUsed} stage="stage1" />
+                          <FeedbackButtons runId={runId} stage="stage1" initialVote={run.feedback?.stage1 ?? null} initialNote={run.feedback?.stage1Note ?? null} />
+                          <FeedbackAppliedChip stage={1} />
+                          {restartItem("stage1")}
+                        </>)}
                       </div>
                     )}
                   </div>
@@ -873,11 +891,10 @@ export default function RunPage() {
                   {run.scrapeErrors && run.scrapeErrors.length > 0 && (
                     <p className="mt-3 text-[11.5px] text-[var(--color-amber)]">{run.scrapeErrors.length} competitor link{run.scrapeErrors.length === 1 ? "" : "s"} couldn&rsquo;t be read.</p>
                   )}
-                  <div className="mt-3"><FeedbackAppliedChip stage={1} /></div>
                 </div>
               </>
             ) : ["stage1", "scraping"].includes(run.status) || outputs.research
-              ? waiting(run.currentStep ?? "Researching…")
+              ? waiting(run.currentStep ?? "Researching…", true)
               : waiting("After the product gate")}
           </>
         )}
@@ -915,15 +932,17 @@ export default function RunPage() {
             {outputs.stage2Output ? (
               <>
                 <div className="flex items-center gap-3.5 mb-2.5">
-                  <span className={label}>{stage2View === "copy" ? "Store fields" : "Copy kit"}</span>
+                  <span className={label}>{stage2View === "copy" ? "Fields" : "Full text"}</span>
                   <div className="flex-1" />
                   {runId !== null && (
-                    <div className="flex gap-3.5 items-center">
-                      <SendToDoc runId={runId} sentAt={run.outputs.gdocAppendedAt ?? null} />
-                      <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
-                      <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.location.reload()} initialFeedback={run.feedback?.stage2Note ?? null} />
-                      <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
-                      <RestartStage stage="stage2" />
+                    <div className="flex gap-2.5 items-center">
+                      <AIRegenerate runId={runId} stage="stage2" onRegenerated={() => window.dispatchEvent(new Event("run:changed"))} initialFeedback={run.feedback?.stage2Note ?? null} hasEdits={Boolean(outputs.stage2OutputEdited)} />
+                      {stageMenu(<>
+                        <PromptUsed promptsUsed={run.promptsUsed} stage="stage2" />
+                        <FeedbackButtons runId={runId} stage="stage2" initialVote={run.feedback?.stage2 ?? null} initialNote={run.feedback?.stage2Note ?? null} />
+                        <FeedbackAppliedChip stage={2} />
+                        {restartItem("stage2")}
+                      </>)}
                     </div>
                   )}
                 </div>
@@ -931,34 +950,31 @@ export default function RunPage() {
                   <Stage2Shopify json={stage2Json} />
                 ) : (
                   <EditableOutput runId={Number(runId)} field="stage2_copy" stage="stage2" originalValue={outputs.stage2Output}
-                    editedValue={outputs.stage2OutputEdited} editedAt={outputs.stage2EditedAt} label="Copy kit" monospace={false} downloadFilename="STAGE2_COPY.txt" />
+                    editedValue={outputs.stage2OutputEdited} editedAt={outputs.stage2EditedAt} label="Full text" monospace={false} downloadFilename={`${filePrefix()}_Copy.md`} />
                 )}
-                <div className="mt-3"><FeedbackAppliedChip stage={2} /></div>
               </>
-            ) : run.status === "stage2" ? waiting("Writing the copy…") : waiting("After an angle is picked")}
+            ) : run.status === "stage2" ? waiting(run.currentStep ?? "Writing the copy…", true) : waiting("After an angle is picked")}
           </>
         )}
 
         {/* Stage 4 · Images */}
         {activeKey === "stage3" && (
           <>
-            <div className="flex items-baseline gap-2.5 mb-5">
+            <div className="flex items-center gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Images</h1>
               <div className="flex-1" />
-              {runId !== null && (
-                <div className="flex items-center gap-3.5">
-                  <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
-                  <FeedbackButtons runId={runId} stage="stage3" initialVote={run.feedback?.stage3 ?? null} initialNote={run.feedback?.stage3Note ?? null} />
-                  <RestartStage stage="stage3-prompts" />
-                </div>
-              )}
+              {runId !== null && stageMenu(<>
+                <PromptUsed promptsUsed={run.promptsUsed} stage="stage3" />
+                <FeedbackButtons runId={runId} stage="stage3" initialVote={run.feedback?.stage3 ?? null} initialNote={run.feedback?.stage3Note ?? null} />
+                <FeedbackAppliedChip stage={3} />
+                {restartItem("stage3-prompts")}
+              </>)}
             </div>
             <StaleFlag stage="stage3" />
             <ResearchStaleFlag which="stage3" show={imagesResearchStale}
-              text={`${partsSentence(changedFor("stage3"))} changed since these images were made.${copyResearchStale ? " Rebuild the copy first, then the images." : ""}`} action={
+              text={`${partsSentence(changedFor("stage3"))} changed since these images were made.`} action={
               <button onClick={() => handleRestartStage("stage3-prompts")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Redo the images"}</button>
             } />
-            <div className="mb-3"><FeedbackAppliedChip stage={3} /></div>
             <Stage3HeroFlow runId={Number(runId)} stage2Ready={Boolean(outputs.stage2Output)} />
           </>
         )}
@@ -966,14 +982,14 @@ export default function RunPage() {
         {/* Stage 5 · Image ads */}
         {activeKey === "ads" && (
           <>
-            <div className="flex items-baseline gap-2.5 mb-5">
+            <div className="flex items-center gap-2.5 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Image ads</h1>
               <div className="flex-1" />
-              {runId !== null && <RestartStage stage="ads" />}
+              {runId !== null && stageMenu(restartItem("ads"))}
             </div>
             <StaleFlag stage="ads" action={<span className="ff-mono text-[11px] text-[var(--color-text-3)]"></span>} />
             <ResearchStaleFlag which="ads" show={adsResearchStale}
-              text={`${partsSentence(changedFor("ads"))} changed since these ads were written.${copyResearchStale ? " Rebuild the copy first, then the ads." : ""}`} action={
+              text={`${partsSentence(changedFor("ads"))} changed since these ads were written.`} action={
               <button onClick={() => handleRestartStage("ads")} disabled={restarting || copyResearchStale} className="btn btn-sm btn-primary">{restarting ? "Restarting…" : "Rewrite the ads"}</button>
             } />
             <AdsFlow runId={Number(runId)} />
@@ -990,7 +1006,7 @@ export default function RunPage() {
               <div className="flex items-start gap-2">
                 {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}
                 <button onClick={handleDownloadImages} disabled={zippingImages} className="btn btn-sm">{zippingImages ? "Downloading…" : "Download images"}</button>
-                <PushAll runId={runId} productUrl={shopifyUrl ?? run.meta.shopifyProductUrl ?? null} hasDocs={Boolean(outputs.stage2Json)}
+                <PushAll runId={runId} productUrl={run.meta.shopifyProductUrl ?? null} hasDocs={Boolean(outputs.stage2Json)}
                   hasImages={imagesReady} hasAds={(run.meta.ads?.done ?? 0) > 0} onDone={() => window.dispatchEvent(new Event("run:changed"))} />
               </div>
             </div>
@@ -1017,10 +1033,12 @@ export default function RunPage() {
 
             {/* shopify */}
             <div className="mb-6">
-              <div className="flex items-center gap-3.5 mb-2.5"><span className={label}>Shopify</span></div>
               {imagesReady
                 ? <ShopifyFill runId={runId} initialUrl={run.meta.shopifyProductUrl} initialAdminUrl={run.meta.shopifyAdminUrl} />
-                : waiting("After images")}
+                : <>
+                  <div className="flex items-center gap-3.5 mb-2.5"><span className={label}>Shopify</span></div>
+                  {waiting("After images")}
+                </>}
             </div>
 
             {/* docs + drive */}
@@ -1075,11 +1093,11 @@ export default function RunPage() {
               ) : waiting(run.meta.ads?.step ? "Not generated yet" : "After images")}
             </div>
 
-            {/* store fields — what Shopify receives */}
+            {/* fields — what Shopify receives */}
             {stage2Json && (
               <div className="mb-6">
                 <div className="flex items-center gap-3.5 mb-2.5">
-                  <span className={label}>Store fields</span>
+                  <span className={label}>Fields</span>
                   <div className="flex-1" />
                   <button onClick={() => { setStage2View("copy"); openStage("stage2"); }} className="btn btn-sm">Edit</button>
                 </div>

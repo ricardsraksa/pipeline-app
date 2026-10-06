@@ -4,6 +4,7 @@
 // Single source of truth — previously duplicated across HistoryList and the
 // run page.
 
+import { useEffect, useRef, useState } from "react";
 import type { RunSummary } from "@/lib/db";
 
 export const ACTIVE_STATUSES = new Set(["pending", "product", "scraping", "stage1", "stage2", "generating_hero", "generating_remaining"]);
@@ -17,9 +18,62 @@ export const STATUS_LABEL: Record<string, string> = {
   awaiting_stage2_approval: "Pick an angle", stage2: "Stage 3 · Copy",
   awaiting_user: "Ready for images", awaiting_qc: "Review prompts",
   generating_hero: "Stage 4 · Hero", awaiting_hero_qc: "Review hero",
-  generating_remaining: "Stage 4 · Prompts", completed: "Complete", failed: "Failed", cancelled: "Cancelled",
+  generating_remaining: "Stage 4 · Images", completed: "Complete", failed: "Failed", cancelled: "Cancelled",
 };
-export const statusLabel = (s: string | null | undefined) => (s ? STATUS_LABEL[s] ?? s : "");
+export const statusLabel = (s: string | null | undefined) => (s ? STATUS_LABEL[s] ?? "Working…" : "");
+
+/** "2026-10-06T…" → "6 Oct". */
+export function shortDate(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/** Live "1m 5s" since an ISO time, ticking every second. */
+export function Elapsed({ since }: { since?: string | null }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const e = elapsedTime(since);
+  return e ? <span className="ff-mono text-[11px] text-[var(--color-text-3)] tabular-nums">{e}</span> : null;
+}
+
+/** "⋯" button with a small popover. Closes on outside click and Escape. */
+export function OverflowMenu({ children, label = "More", up = false, align = "right", width = "w-[min(440px,calc(100vw-32px))]" }: {
+  children: React.ReactNode;
+  label?: string;
+  /** Open above the button (bottom of the rail). */
+  up?: boolean;
+  align?: "left" | "right";
+  width?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={label} aria-haspopup="true" aria-expanded={open} title={label}
+        className={`cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-[6px] border text-[var(--color-text-2)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] transition-colors duration-150 ${open ? "border-[var(--color-border-strong)] bg-[var(--color-surface-2)]" : "border-[var(--color-border)]"}`}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </button>
+      {open && (
+        <div role="menu"
+          className={`absolute z-50 ${up ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${align === "right" ? "right-0" : "left-0"} ${width} max-h-[70vh] overflow-auto rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)] p-2.5 flex flex-col gap-2.5 items-stretch fade-in`}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const MESH: [string, string][] = [
   ["#5b86b8", "#2a3a52"], ["#43c98a", "#16402c"], ["#d6a84f", "#3a2e12"],

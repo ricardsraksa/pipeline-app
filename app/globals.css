@@ -113,6 +113,11 @@ html, body {
 
 .ff-display { font-family: var(--font-libre-franklin), "Libre Franklin", system-ui, sans-serif; }
 .ff-mono    { font-family: var(--font-space-mono), "Space Mono", ui-monospace, monospace; }
+/* Legacy mono labels. Tailwind v4 reads `font-[var(--font-ibm-plex-mono)]` as a
+   font-WEIGHT (an untyped var() defaults to weight), so they rendered sans.
+   Give every element carrying that class the mono family; unlayered, so it
+   beats the utility layer. */
+[class~="font-[var(--font-ibm-plex-mono)]"] { font-family: var(--font-space-mono), "Space Mono", ui-monospace, monospace; }
 
 /* Buttons — every pressable action on a run looks like one */
 .btn {

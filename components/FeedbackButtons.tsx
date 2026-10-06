@@ -74,9 +74,9 @@ export default function FeedbackButtons({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
+    <div className="flex flex-col items-stretch gap-1.5">
       <div className="flex items-center gap-1.5">
-        <span className="text-[12px] text-[var(--color-text-3)] mr-1">Was this useful?</span>
+        <span className="text-[12px] text-[var(--color-text-3)] mr-auto">Feedback</span>
         <button
           onClick={() => setVoteAndPersist(vote === "up" ? null : "up")}
           aria-label="Mark useful"
@@ -111,7 +111,7 @@ export default function FeedbackButtons({
         </button>
       </div>
       {(vote !== null || note) && (
-        <div className="w-full max-w-xs">
+        <div className="w-full">
           <textarea
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}

@@ -71,12 +71,12 @@ export default function AudienceCard({ runId, audience }: { runId: number; audie
       </div>
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] px-[13px] py-3 space-y-3">
         <label className="flex flex-col gap-1">
-          <span className="eyebrow">Buyer — every word is written to her</span>
+          <span className="eyebrow">Buyer</span>
           <input value={draft.buyer} onChange={(e) => setDraft({ ...draft, buyer: e.target.value })} onBlur={() => save(draft)}
-            placeholder="Middle-aged mom buying for her ageing parent" className={inputCls} />
+            placeholder="Adult buying for an ageing parent" className={inputCls} />
         </label>
         <div className="flex items-center gap-2" role="radiogroup" aria-label="Who uses it">
-          {[{ v: true, l: "Uses it herself" }, { v: false, l: "Buys it for someone else" }].map((o) => (
+          {[{ v: true, l: "Uses it themselves" }, { v: false, l: "Buys it for someone else" }].map((o) => (
             <button key={String(o.v)} role="radio" aria-checked={draft.same === o.v} onClick={() => save({ ...draft, same: o.v })}
               className={`cursor-pointer min-h-[36px] px-3 rounded-[7px] border text-[12.5px] transition-colors duration-150 ${draft.same === o.v ? "border-[var(--color-border-strong)] bg-[var(--color-surface-2)] text-[var(--color-text)]" : "border-[var(--color-border)] text-[var(--color-text-2)] hover:text-[var(--color-text)]"}`}>
               {o.l}
@@ -86,7 +86,7 @@ export default function AudienceCard({ runId, audience }: { runId: number; audie
         {!draft.same && (
           <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)" }}>
             <label className="flex flex-col gap-1 min-w-0">
-              <span className="eyebrow">User — who the pictures show</span>
+              <span className="eyebrow">User</span>
               <input value={draft.user} onChange={(e) => setDraft({ ...draft, user: e.target.value })} onBlur={() => save(draft)}
                 placeholder="Parent in their 70s, unsteady getting up" className={inputCls} />
             </label>

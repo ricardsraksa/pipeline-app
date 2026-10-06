@@ -6,9 +6,8 @@
 // description (editable in place), and every photo the run has (scraped
 // gallery, seller description images, competitor photos, own uploads) as
 // tickable tiles. "Approve" writes the final text + selection onto the run and
-// starts research. When the hosted scraper couldn't read the product page,
-// the same card explains the local fallback (the Mac script with --push) and
-// still lets the operator describe the product by hand.
+// starts research. When the product page couldn't be read, the card shows the
+// scraper's status and still lets the operator describe the product by hand.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
@@ -81,10 +80,12 @@ export default function ProductGate({
   runId,
   run,
   onChanged,
+  onApproved,
 }: {
   runId: number;
   run: RunStatus;
   onChanged: () => void;
+  onApproved?: () => void;
 }) {
   const { push } = useToast();
   const product = run.product;
@@ -107,8 +108,8 @@ export default function ProductGate({
 
   const initialText = product?.descriptionEdited ?? product?.descriptionAi ?? run.meta.productDescription ?? "";
   const [text, setText] = useState(initialText);
-  // Ticks are only sent on approve, and Regenerate / Edit with AI reload the
-  // page — so unsaved ticks wait in sessionStorage until then.
+  // Ticks are only sent on approve, and Regenerate / Edit with AI refetch the
+  // run — so unsaved ticks wait in sessionStorage until then.
   const ticksKey = `product-ticks-${runId}`;
   const draftTicks = (): string[] | null => {
     if (!waiting) return null;
@@ -130,7 +131,6 @@ export default function ProductGate({
   const [regenerating, setRegenerating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // When a regenerate / local push lands a new description, adopt it.
   useEffect(() => { setText(product?.descriptionEdited ?? product?.descriptionAi ?? ""); }, [product?.descriptionAi, product?.descriptionEdited]);
@@ -218,8 +218,9 @@ export default function ProductGate({
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? `HTTP ${res.status}`);
       try { sessionStorage.removeItem(ticksKey); } catch { /* private mode */ }
-      push("Approved — research is running", "success");
+      push("Approved", "success");
       onChanged();
+      onApproved?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't approve");
       setApproving(false);
@@ -244,7 +245,7 @@ export default function ProductGate({
   const throttled = !!failure && /rate-limit|throttl|anti-bot|captcha/i.test(failure.error);
   const retryMin = failure?.retryAt ? Math.max(1, Math.round((new Date(failure.retryAt).getTime() - Date.now()) / 60_000)) : null;
   const failureLine = failure
-    ? `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "it has stopped retrying; press Try again."}`
+    ? `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "stopped retrying."}`
     : null;
   const [retrying, setRetrying] = useState<string | null>(null);
   const tryAgain = async () => {
@@ -252,10 +253,9 @@ export default function ProductGate({
     try {
       const r = await fetch(`/api/runs/${runId}/scrape-retry`, { method: "POST" });
       const d = await r.json().catch(() => ({}));
-      setRetrying(r.ok && d.success ? "requested — your Mac retries within a minute; a browser window may open, complete any check it shows" : (d.error || `Failed (${r.status})`));
+      setRetrying(r.ok && d.success ? "Requested" : (d.error || `Failed (${r.status})`));
     } catch { setRetrying("Network error"); }
   };
-  const pushCmd = `scrapling-py ~/Desktop/supplier-scrape.py --push ${typeof window !== "undefined" ? window.location.origin : ""} --run ${runId} ${run.meta.productUrl || "<product url>"}`;
 
   const grouped = (["uploaded", "product", "description", "competitor"] as const)
     .map((g) => ({ g, items: candidates.filter((c) => c.group === g) }))
@@ -275,26 +275,20 @@ export default function ProductGate({
             {productPage.deferred
               ? (!workerOnline ? "Mac worker offline."
                 : failure ? (throttled ? "AliExpress is throttling your Mac's IP." : "Your Mac couldn't read this page.")
-                : gaveUp ? "Your Mac hasn't read this page yet. It retries on a schedule, or press Try again."
+                : gaveUp ? "Not read yet."
                 : "Your Mac is scraping this page.")
               : productPage.rateLimited ? "The supplier site is rate-limiting the server." : "The app couldn't read the product page."}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-[12px] text-[var(--color-text-2)]">
-              {productPage.deferred && workerOnline && failureLine ? failureLine
-                : productPage.deferred && !gaveUp && workerOnline ? `Checked in ${workerAgo}.`
-                : "Or run this on your Mac, or write the description yourself."}
-            </p>
+            {productPage.deferred && workerOnline && (failureLine || !gaveUp) && (
+              <p className="text-[12px] text-[var(--color-text-2)]">
+                {failureLine ?? `Checked in ${workerAgo}.`}
+              </p>
+            )}
             {productPage.deferred && workerOnline && (
               <button onClick={tryAgain} disabled={retrying === "…"} className="btn btn-sm">{retrying === "…" ? "Requesting…" : "Try again"}</button>
             )}
             {retrying && retrying !== "…" && <span className="text-[11.5px] text-[var(--color-text-3)]">{retrying}</span>}
-          </div>
-          <div className="flex items-center gap-2">
-            <code className="ff-mono text-[11px] flex-1 min-w-0 overflow-x-auto whitespace-nowrap rounded-[6px] border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-[var(--color-text)]">{pushCmd}</code>
-            <button onClick={() => { navigator.clipboard.writeText(pushCmd).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }} className={textBtn}>
-              {copied ? "Copied" : "Copy"}
-            </button>
           </div>
         </div>
       )}
@@ -308,6 +302,7 @@ export default function ProductGate({
           {waiting && <button onClick={regenerate} disabled={regenerating || approving || !scrape?.pages.some((p) => p.ok)} className={textBtn}>{regenerating ? "Rewriting…" : "Regenerate"}</button>}
           {waiting && (
             <AIRegenerate runId={runId} stage="product" triggerLabel="Edit with AI"
+              hasEdits={Boolean(product?.descriptionEdited) || (Boolean(product?.descriptionAi) && text.trim() !== (product?.descriptionAi ?? "").trim())}
               onRegenerated={(next) => { setText(next); onChanged(); }} />
           )}
           {waiting && product?.descriptionAi && text.trim() !== product.descriptionAi.trim() && (

@@ -215,7 +215,7 @@ export default function PricingCard({ runId, scrape, pricing, rules }: {
         <span className="eyebrow">Pricing</span>
         {p?.source === "manual" && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">edited</span>}
         <div className="flex-1" />
-        {p && <button onClick={reset} className="btn btn-sm cursor-pointer">Reset to rules</button>}
+        {p && <button onClick={() => { if (window.confirm("Replaces your prices. Reset?")) reset(); }} className="btn btn-sm cursor-pointer">Reset to rules</button>}
       </div>
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] px-[13px] py-3 space-y-3">
         <div className="grid grid-cols-3 gap-3">
@@ -258,7 +258,7 @@ export default function PricingCard({ runId, scrape, pricing, rules }: {
               {suggesting && <span className="ff-mono text-[10.5px] text-[var(--color-text-4)]">…</span>}
               <div className="flex-1" />
               <button onClick={() => setNoteOpen((o) => !o)} disabled={suggesting} className="btn btn-sm cursor-pointer">Suggest again</button>
-              <button onClick={resetBundles} disabled={suggesting} className="btn btn-sm cursor-pointer">Reset</button>
+              <button onClick={() => { if (window.confirm("Replaces your prices. Reset?")) resetBundles(); }} disabled={suggesting} className="btn btn-sm cursor-pointer">Reset</button>
             </div>
             {noteOpen && (
               <input

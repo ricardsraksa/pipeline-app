@@ -1,11 +1,12 @@
 "use client";
 
-// Run inbox: Needs you → Running → Recent, each a bordered group of rows.
+// Run inbox: Needs you → Running → For later → Recent, each a bordered group of rows.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RunSummary } from "@/lib/db";
 import { useToast } from "@/components/Toasts";
+import { HistoryRefresher } from "./history/HistoryRefresher";
 import { ACTIVE_STATUSES, WAITING_STATUSES, relativeTime, statusLabel, truncateUrl } from "@/components/ui/run-ui";
 
 const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
@@ -50,7 +51,12 @@ const toneOf = (s: string | null) =>
   : s === "completed" ? "var(--color-green)"
   : "var(--color-text-4)";
 
-export default function HomeV2({ runs }: { runs: RunSummary[] }) {
+// Lucide-style row action icons.
+const svgProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true, className: "w-4 h-4" };
+const ClockIcon = () => <svg {...svgProps}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+const TrashIcon = () => <svg {...svgProps}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>;
+
+export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[]; loadFailed?: boolean }) {
   const router = useRouter();
   const { push } = useToast();
   const [q, setQ] = useState("");
@@ -69,15 +75,15 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
     setEditingCode(null);
     const t = codeDraft.trim().toUpperCase();
     const m = t.match(/^P?\s*0*(\d{1,6})$/);
-    if (t && !m) { push("Product code: a number, e.g. 58"); return; }
+    if (t && !m) { push("Product code must be a number"); return; }
     const next = m ? `P${m[1]}` : null;
     if (next === (r.product_code ?? null)) return;
     setCodeShown((c) => ({ ...c, [r.id]: next }));
     try {
       const res = await fetch(`/api/runs/${r.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_code: next }) });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); push(`Product code not saved: ${(d as { error?: string }).error ?? res.status}`); setCodeShown((c) => { const n = { ...c }; delete n[r.id]; return n; }); return; }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); const msg = (d as { error?: string }).error; push(msg ? `Product code not saved: ${msg}` : "Product code not saved"); setCodeShown((c) => { const n = { ...c }; delete n[r.id]; return n; }); return; }
       router.refresh();
-    } catch { push("Product code not saved: network error"); setCodeShown((c) => { const n = { ...c }; delete n[r.id]; return n; }); }
+    } catch { push("Product code not saved: no connection"); setCodeShown((c) => { const n = { ...c }; delete n[r.id]; return n; }); }
   }
   const codeOf = (r: RunSummary) => (r.id in codeShown ? codeShown[r.id] : r.product_code);
   const query = q.trim().toLowerCase();
@@ -102,6 +108,8 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
     { label: "For later", rows: [...later].sort(by) },
     { label: "Recent", rows: [...recent].sort(by) },
   ].filter((g) => g.rows.length);
+  // Fast polling while anything is working, including Stage 5 ads.
+  const hasActiveRuns = runs.some((r) => ACTIVE_STATUSES.has(r.status ?? "") || adsRunning(r));
 
   const [snoozing, setSnoozing] = useState<number | null>(null);
   async function snooze(e: React.MouseEvent, r: RunSummary) {
@@ -121,11 +129,11 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
   async function del(e: React.MouseEvent, r: RunSummary) {
     e.stopPropagation();
     const name = r.brand_name || r.product_name || `#${r.id}`;
-    if (!window.confirm(`Delete run "${name}"? This can't be undone.`)) return;
+    if (!window.confirm(`Delete "${name}" and all its outputs?`)) return;
     setDeleting(r.id);
     try {
       const res = await fetch(`/api/runs/${r.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error("delete failed");
       router.refresh();
       push("Run deleted", "success");
     } catch { push("Couldn't delete that run"); }
@@ -134,6 +142,7 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "30px 22px 80px" }} data-screen-label="Home">
+      <HistoryRefresher hasActiveRuns={hasActiveRuns} />
       <div className="flex items-center gap-3.5 mb-[22px]">
         <h1 className="text-[19px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Runs</h1>
         <div className="flex-1" />
@@ -158,13 +167,13 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
               <div key={r.id} onClick={() => router.push(`/runs/${r.id}`)}
                 className={cx("group w-full grid items-center gap-3.5 px-[13px] py-[11px] text-left cursor-pointer hover:bg-[var(--color-surface-2)] tr",
                   i > 0 && "border-t border-[var(--color-border)]")}
-                style={{ gridTemplateColumns: "34px 44px minmax(0,1fr) 210px 74px 18px 18px" }}>
+                style={{ gridTemplateColumns: "34px 44px minmax(0,1fr) 180px 64px 32px 32px" }}>
                 <div className="w-[34px] h-[34px] rounded-[5px] border border-[var(--color-border)] grid place-items-center ff-mono text-[9px] text-[var(--color-text-3)] overflow-hidden"
                   style={{ background: "repeating-linear-gradient(135deg,var(--color-surface-2) 0 4px,var(--color-bg) 4px 8px)" }}>
                   {r.stage3_hero_image_url
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={r.stage3_hero_image_url} alt="" className="w-full h-full object-cover" />
-                    : (codeOf(r) || "—")}
+                    : null}
                 </div>
                 {editingCode === r.id ? (
                   <input autoFocus value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} onBlur={() => saveCode(r)}
@@ -178,11 +187,8 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                     className="cursor-pointer ff-mono text-[11.5px] text-left text-[var(--color-text-2)] rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)]">{codeOf(r) || "—"}</button>
                 )}
                 <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-[13.5px] font-[500] truncate text-[var(--color-text)]">{r.brand_name || r.product_name || `Run ${r.id}`}</span>
-                    <span className="ff-mono text-[10.5px] text-[var(--color-text-3)]">run {r.id}</span>
-                  </div>
-                  <div className="text-[12px] text-[var(--color-text-2)] truncate">{r.product_url ? truncateUrl(r.product_url, 64) : "—"}</div>
+                  <div className="text-[13.5px] font-[500] truncate text-[var(--color-text)]" title={`Run ${r.id}`}>{r.brand_name || r.product_name || `Run ${r.id}`}</div>
+                  <div className="text-[12px] text-[var(--color-text-2)] truncate" title={r.product_url ?? undefined}>{r.product_url ? truncateUrl(r.product_url, 140) : "—"}</div>
                 </div>
                 <div className="flex items-center gap-[7px] min-w-0">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: toneOf(r.status) }} />
@@ -198,12 +204,12 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
                 <button onClick={(e) => snooze(e, r)} disabled={snoozing === r.id}
                   aria-label={r.snoozed_at ? "Bring back" : "Set aside for later"}
                   title={r.snoozed_at ? "Bring back" : "Set aside for later"}
-                  className={cx("cursor-pointer text-[13px] tr hover:text-[var(--color-amber)]",
-                    r.snoozed_at ? "text-[var(--color-amber)]" : "text-[var(--color-text-4)] opacity-0 group-hover:opacity-100")}>
-                  {r.snoozed_at ? "☾" : "☾"}
+                  className={cx("cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] tr hover:bg-[var(--color-surface-3)] hover:text-[var(--color-amber)] hover:opacity-100",
+                    r.snoozed_at ? "text-[var(--color-amber)]" : "text-[var(--color-text-3)] opacity-40 group-hover:opacity-100")}>
+                  <ClockIcon />
                 </button>
-                <button onClick={(e) => del(e, r)} disabled={deleting === r.id} aria-label="Delete run"
-                  className="cursor-pointer text-[13px] text-[var(--color-text-4)] opacity-0 group-hover:opacity-100 hover:text-[var(--color-red)] tr">×</button>
+                <button onClick={(e) => del(e, r)} disabled={deleting === r.id} aria-label="Delete run" title="Delete run"
+                  className="cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] text-[var(--color-text-3)] opacity-40 group-hover:opacity-100 hover:opacity-100 hover:bg-[var(--color-surface-3)] hover:text-[var(--color-red)] tr"><TrashIcon /></button>
               </div>
             ))}
           </div>
@@ -212,7 +218,9 @@ export default function HomeV2({ runs }: { runs: RunSummary[] }) {
 
       {groups.length === 0 && (
         <div className="py-[60px] text-center text-[13px] text-[var(--color-text-2)]">
-          {query ? <>Nothing matches “{q}”.</> : <>No runs yet. <button onClick={() => router.push("/new")} className="cursor-pointer underline">Start one</button>.</>}
+          {loadFailed
+            ? <span className="inline-flex items-center gap-3"><span className="text-[var(--color-red)]">Couldn&apos;t load runs.</span><button onClick={() => router.refresh()} className="btn btn-sm">Retry</button></span>
+            : query ? <>Nothing matches “{q}”.</> : <>No runs yet.</>}
         </div>
       )}
     </div>

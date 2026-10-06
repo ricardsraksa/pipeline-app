@@ -1,0 +1,1379 @@
+[
+ {
+  "version": "2.104.0",
+  "date": "2026-10-06",
+  "title": "simpler screens, one place to deliver, a Changes page",
+  "items": [
+   "Changes page: every version and what it changed",
+   "Deliver only from Done; the rail's Doc / Shopify / Drive rows show status and open Done",
+   "Rarely used actions (prompt used, feedback, restart, cost) moved into ⋯ menus",
+   "No duplicate Continue when the page already shows the same button",
+   "Research: Write copy button under the angles",
+   "Restart confirms list exactly what gets deleted",
+   "Edit with AI asks before replacing your edits; pricing resets ask first",
+   "Spinner and timer on every running step; Stage 4 shows Retry / Stop after 15 min stalled",
+   "Hero: Regenerate as is, and an editable hero prompt",
+   "Images first on the finished Stage 4 screen; delivery blocks removed from Stages 4 and 5",
+   "Image tiles: visible Regenerate, a ⋯ menu, labels Failed / Flagged / OK / Not checked",
+   "Regenerate dialog: one main button, versions folded away",
+   "Re-placing asks before replacing your Section 2 / 3 picks",
+   "Recover images only shows when something failed",
+   "Settings: Prompts / Models / Pricing tabs, collapsed prompts, unsaved bar, Discard vs Reset to default",
+   "Home: load errors say so, icons for snooze and delete, run number on hover",
+   "Error toasts stay until closed and sit top-right",
+   "Plain file names (P87_Copy.md), plain status labels, mono labels render mono",
+   "Helper and instruction text removed across the app"
+  ]
+ },
+ {
+  "version": "2.103.0",
+  "date": "2026-10-06",
+  "title": "five ways to silently lose work, closed",
+  "items": [
+   "Regenerating the hero asks first when 8 prompts/images exist (it deletes them)",
+   "Stage 4 prompt edits and AI rewrites are saved to the run, not just the tab",
+   "Stage 1 photo ticks survive Regenerate / Edit with AI (which reload the page)",
+   "New angles keep your pick and your own angles",
+   "Settings: restoring one prompt keeps unsaved edits in the others"
+  ]
+ },
+ {
+  "version": "2.102.1",
+  "date": "2026-09-26",
+  "title": "a rename also swaps the brand word the copy uses on its own",
+  "items": []
+ },
+ {
+  "version": "2.102.0",
+  "date": "2026-09-26",
+  "title": "one product name per run, and renames reach every stage",
+  "items": []
+ },
+ {
+  "version": "2.101.2",
+  "date": "2026-09-26",
+  "title": "no false 'the angle changed' after the hero",
+  "items": []
+ },
+ {
+  "version": "2.101.1",
+  "date": "2026-09-26",
+  "title": "picked angles are stored whole, never cut to 8,000 characters",
+  "items": []
+ },
+ {
+  "version": "2.101.0",
+  "date": "2026-09-24",
+  "title": "Mac worker keeps scraper state off iCloud and reports real failures",
+  "items": []
+ },
+ {
+  "version": "2.100.1",
+  "date": "2026-09-23",
+  "title": "ad briefs get room for Opus 5.5's thinking (12k → 24k)",
+  "items": []
+ },
+ {
+  "version": "2.100.0",
+  "date": "2026-09-23",
+  "title": "Opus 5.5 in the model list and on the Opus roles",
+  "items": []
+ },
+ {
+  "version": "2.99.0",
+  "date": "2026-09-18",
+  "title": "angles about shopping are banned, and caught when they slip through",
+  "items": [
+   "angles prompt: the problem happens while she lives with it, never while she shops (listings, photos, being burned, sizing before delivery, proof, returns); test — would someone who already owns a good one still have it at home? And: the market position decides how an angle is said, never what",
+   "angles tool: a required self-check, problem_happens = \"at home, using it\" | \"while shopping\"; the ones filed under shopping are dropped",
+   "copy (code and live Settings) and ads: never open on doubt; answer it with specifics, the size chart and the guarantee where it comes up"
+  ]
+ },
+ {
+  "version": "2.98.0",
+  "date": "2026-09-18",
+  "title": "decide who a product is for, once, and make every stage follow it",
+  "items": [
+   "lib/audience.ts: buyer (who every word is written to), whether she uses it herself or buys it for someone else, and then the user (who the images show) and what the copy calls them — gender-neutral (\"your parent\")",
+   "research (product analysis 8B) decides it and writes BUYER / USER / CALL THE USER lines; the runner stores them. Older runs are worked out once from the one-pager and avatar (mechanical model) and stored as \"derived\". Default is \"herself\", including things she might also give as a gift",
+   "audienceBlock goes to the angles, copy, copy rewrites, hero and 8-prompt writers, the ad writer and the Ask assistant",
+   "voice rule in the copy, ads and image-overlay prompts: write to \"you\", never \"she/her/he/him\" about the customer (live Settings copy prompt updated to match; previous version kept in its history)",
+   "\"Who it's for\" card on the Research stage, editable; \"audience\" is part of the shared context, so changing it flags everything built before",
+   "research restarts clear it (research decides it again)"
+  ]
+ },
+ {
+  "version": "2.97.0",
+  "date": "2026-09-18",
+  "title": "Ask — a question assistant for each product",
+  "items": [
+   "/api/runs/[id]/ask: POST streams the answer as plain text and saves it on the run when it finishes (a closed panel loses nothing); GET the thread; DELETE clears it. The product context is a cached system block (1h), so follow-ups pay for the question, not the whole run again",
+   "web search available (max 3) for facts outside the run",
+   "new model role \"assistant\" (Sonnet 5 default, Settings → Models)",
+   "read-only: it answers and changes nothing"
+  ]
+ },
+ {
+  "version": "2.96.0",
+  "date": "2026-09-18",
+  "title": "the rail's Next button is a Continue that does the next step",
+  "items": []
+ },
+ {
+  "version": "2.95.1",
+  "date": "2026-09-18",
+  "title": "product codes follow the runs only",
+  "items": []
+ },
+ {
+  "version": "2.95.0",
+  "date": "2026-09-18",
+  "title": "Restart run, and a next-code endpoint that says where the number comes from",
+  "items": []
+ },
+ {
+  "version": "2.94.0",
+  "date": "2026-09-18",
+  "title": "Edit with AI on the product description",
+  "items": []
+ },
+ {
+  "version": "2.93.0",
+  "date": "2026-09-18",
+  "title": "one shared context — every edit reaches the stages built after it",
+  "items": [
+   "the five parts anything can depend on (product description, research, angle, copy, images) and what each stage is built from (DEPENDS)",
+   "run_edits: every operator edit in order, hand or AI, with the instruction. Recorded centrally in the PATCH route, the regenerate route and the prompt-rewrite route",
+   "contextBlock(): what the operator changed, filtered to the parts that stage depends on, handed to the angles, copy, hero, 8-prompt and ad writers so a correction arrives with its reason",
+   "effectiveDescription/effectiveCopy: one precedence, used everywhere",
+   "changedSince(): what has changed since a stage was built, from the fingerprints it stored (<stage>_built_on). Runs without them fall back to the old keys, then to the edit log (the log starts here, so anything in it postdates an unfingerprinted stage)"
+  ]
+ },
+ {
+  "version": "2.92.0",
+  "date": "2026-09-17",
+  "title": "research revisions reach images and ads; superseded jobs cannot write",
+  "items": [
+   "images and ads remember the research they were built on (stage3_research_key, ads_research_key); a revised one-pager flags them with \"Redo images on the revised research\" / \"Rewrite the ads…\", held until the copy has been rebuilt since both derive from it",
+   "pre-2.91 images/ads on a run with an edited one-pager count as stale",
+   "every research flag has \"Keep as is\" (PATCH research_ack) so an old run the operator is happy with stops showing amber"
+  ]
+ },
+ {
+  "version": "2.91.0",
+  "date": "2026-09-17",
+  "title": "a revised research one-pager now reaches the rest of the run",
+  "items": [
+   "lib/research-edits.ts: onePagerForDownstream (the operator's text, marked as overriding the research/avatar/offer brief/beliefs, plus the revision instructions in their own words), researchKey fingerprint",
+   "copy, copy rewrites, angles, hero + 8-prompt writers and ads all receive that block; the copy stage gets the one-pager for the first time",
+   "regenerate stage1 stores the instruction in research_edit_notes",
+   "staleness: angles and copy remember the research they were built on; an amber line offers \"New angles from the revised research\" / \"Rebuild copy on the revised research\" (regenerate mode \"research\"), rail word \"research changed\". Copy with no fingerprint (pre-2.91) counts as stale whenever the one-pager was edited, since it never saw it."
+  ]
+ },
+ {
+  "version": "2.90.1",
+  "date": "2026-09-17",
+  "title": "Mac worker runs from outside the iCloud-synced Desktop",
+  "items": [
+   "launchd now runs ~/.pipeline-worker/run-worker.sh, which execs the copies kept in that folder (never the repo copies)",
+   "the worker watches the repo originals and pulls an update in itself, only when the copy reads back non-empty and compiles; otherwise it stays on what it has and says so once",
+   "worker state moved from ~/Desktop/scraped to ~/.pipeline-worker (one-time copy of the old file); \"worker starting\" is logged first thing so a silent death is visible next time"
+  ]
+ },
+ {
+  "version": "2.90.0",
+  "date": "2026-09-15",
+  "title": "every stage keeps going when the page is closed",
+  "items": [
+   "lib/jobs.ts: in-process job registry (one job per key, stop requests)",
+   "lib/stage3/jobs.ts: heroJob, heroRegenJob, remainingPromptsJob, remainingBatchJob (3 at a time, per-image upsert, completion → placement → ad briefs), regenerateOneImage",
+   "lib/ads/jobs.ts: adsBatchJob, regenerateOneAd",
+   "lib/stage3/audit.ts, placement.ts, upsert.ts: pulled out of their routes so jobs and routes share one implementation; lib/ads/write.ts gets maybeStartAds (the claim the PATCH route used inline)",
+   "routes: hero-prompt / hero-regenerate / hero-approve / skip-hero start a job and return; new generate-batch, stop-batch, regenerate-one for stage3 and ads",
+   "watchdog: resumes generating_hero / generating_remaining / ads writing or generating after 4 min of silence from what the row holds; started at boot by instrumentation.ts so a deploy needs no page visit",
+   "Stage3HeroFlow / AdsFlow: hand batches to the server and follow progress by polling; single regenerations are one server call",
+   "Done screen: \"Push to all\" (Shopify, Google Doc, Drive, reported per line)"
+  ]
+ },
+ {
+  "version": "2.89.1",
+  "date": "2026-09-15",
+  "title": "product codes follow the runs; Home sorts and edits codes",
+  "items": []
+ },
+ {
+  "version": "2.89.0",
+  "date": "2026-09-10",
+  "title": "version bump and Done screen docs (missed in 8a18959)",
+  "items": []
+ },
+ {
+  "version": "2.88.1",
+  "date": "2026-09-10",
+  "title": "Stage 5 gets \"Relink from Higgsfield\"",
+  "items": []
+ },
+ {
+  "version": "2.88.0",
+  "date": "2026-09-10",
+  "title": "compare against the baseline alternative, not competitors",
+  "items": [
+   "research product analysis: new section 6B THE BASELINE ALTERNATIVE, a plain phrase plus 3-5 ranked criteria (baseline does X / this does Y, VERIFIED only, her words)",
+   "one-pager: \"Compared to\" replaces \"Key Competitor Gap\" and restates 6B; USPs are what the product has that the baseline lacks",
+   "angles, copy, Stage 4 templates 6 and 7, ads concepts 1/2/5, offer brief: all point their contrast at the baseline and its criteria, never a competitor brand. Live Settings copy prompt updated to match (it was identical to code; previous version kept in its history)."
+  ]
+ },
+ {
+  "version": "2.87.3",
+  "date": "2026-09-10",
+  "title": "chief review starts at a 32k budget",
+  "items": []
+ },
+ {
+  "version": "2.87.2",
+  "date": "2026-09-10",
+  "title": "stream every model call so long replies are not cancelled",
+  "items": []
+ },
+ {
+  "version": "2.87.1",
+  "date": "2026-09-09",
+  "title": "Market card settable on runs with no diagnosis",
+  "items": []
+ },
+ {
+  "version": "2.87.0",
+  "date": "2026-09-09",
+  "title": "Breakthrough Advertising principles wired through the pipeline",
+  "items": [
+   "lib/market.ts: awareness (5 states) + sophistication (5 stages), the per-stage opening rules, parse/validate, and marketBlock() — which injects ONLY the diagnosed pair's rules, not the whole theory",
+   "research/product_analysis: diagnoses sophistication properly against the five stages (it previously asked only for \"ad exposure light/moderate/ heavy\") and ends with two machine-readable lines the pipeline parses",
+   "runs.market_position stores the diagnosis; an operator edit is never overwritten by a re-run",
+   "angles: ranked by the three dimensions of mass desire (how badly it is felt, whether it recurs, how many share it) instead of by sharpness",
+   "copy: the MARKET POSITION block decides where the copy opens and whether it leads with claim or mechanism; the awareness-blind headline formula list is replaced by shapes tied to each opening",
+   "ads: the same block sits above the angle, so hooks open in the right place",
+   "Market card on Stage 2 above the angles, editable"
+  ]
+ },
+ {
+  "version": "2.86.0",
+  "date": "2026-09-09",
+  "title": "bundle pricing on the Pricing card",
+  "items": [
+   "lib/pricing.ts: BundleTier/Bundles types, tierPrice/tierCompareAt/ buildBundles/rebuildBundles/validateBundles/bundleWarnings, parseBundleDiscounts; buildPricing fills the ladder",
+   "app/api/pricing/bundles: the quantity suggestion (forced tool use)",
+   "PATCH validates product_pricing.bundles",
+   "PricingCard: Bundles block; PricingSettings: discounts field; rail Price row shows the tiers"
+  ]
+ },
+ {
+  "version": "2.85.0",
+  "date": "2026-09-09",
+  "title": "cut the explanatory text the app no longer needs",
+  "items": [
+   "Dead from that pass: the STAGE_DEFS subtitle strings nothing reads, an unused StageActions component and an unused summary() helper.",
+   "Ten of the Next line's explanatory sentences, each restating its own title or the button beside it. The four that carry real information stay: a failure's reason, a stopped stage, the ads progress count, the current step.",
+   "Tooltips that repeated the button they sat on, including six \"Click to view fullscreen\" variants on elements that already show a zoom cursor.",
+   "Captions repeating the heading above them, notices trimmed to their first clause, three spinner sentences, and three different wordings of the same \"5+ characters\" validation reduced to one.",
+   "Shorter empty states and hints across Settings, the new-run form, the variants card, the feedback controls and both delivery rows."
+  ]
+ },
+ {
+  "version": "2.84.0",
+  "date": "2026-09-09",
+  "title": "delete the retired image page; its two dead controls now drive the live pipeline",
+  "items": [
+   "Settings \"Stage 4 — Images\" now drives the live 8-image writer. Its default was the retired page's 9-prompt system; it is now the writer's own prompt. A saved override is only used when it states the same 8-prompt contract, so an old saved value cannot break generation.",
+   "Thumbs on images now reach the hero and 8-prompt writers as soft hints, the way Research and Copy already work, and Stage 4 gets the thumbs control and the applied-feedback chip it never had.",
+   "Deleted with the page: its two API routes, the file-backed learning store (empty, and wiped on every deploy anyway), /preview (unlinked and blocked by the app's own security headers), the /history/[id] stub, the pre-scrapling scraper and its route, /api/shopify/resolve and /fields (no callers), RunProductCode, three unused prompt files, a test file with no runner, the Dockerfile and Replit leftovers, and committed python bytecode.",
+   "The docs zip no longer offers CHIEF_MID (always missing since that pass was removed) or RESEARCH_REVISED (a byte-for-byte copy of RESEARCH)."
+  ]
+ },
+ {
+  "version": "2.83.0",
+  "date": "2026-09-09",
+  "title": "every AI edit now works from the rules it is editing against",
+  "items": [
+   "It now prepends the right rules per caller: the hero prompt, the 8-prompt writer, or the ads prompt for ad_* — plus the product description.",
+   "Three callers sent no reference images at all, including the regenerate modal that already had them. All five now pass them.",
+   "The auditor failed ads for doing what they were told: heavy on-image text, a split screen showing the product twice, the product name as a wordmark. It now knows what an ad legitimately contains, and ads send only real product photos as fidelity references instead of Stage 4 scenes.",
+   "Both rewrites lost the past-feedback block the generators use, and recorded no prompt; both restored.",
+   "A plain copy edit cleared the angle-changed flag; only a rebuild does now.",
+   "The strategist never saw the angles it previously proposed.",
+   "The ad writer gets the full research its own rules cite for statistics."
+  ]
+ },
+ {
+  "version": "2.82.1",
+  "date": "2026-09-09",
+  "title": "Stage 5 can no longer strand itself; status is validated; hidden failures surface",
+  "items": [
+   "Stage 5 marked itself 'done' after a Stop and after a batch where everything failed, and a closed tab left it on 'writing' or 'generating' for good. The terminal state now follows the results, the whole array is written at the end (repairing any lost per-image save), and a step that has not moved in 15 minutes is reported as stalled with a retry instead of a spinner.",
+   "The ads image upsert now retries on a busy database, like its Stage 4 twin.",
+   "status is checked against the known set; an unknown value used to strand a run in a state nothing renders.",
+   "Reference-image overrides are URL-checked like every sibling column, a malformed body is a 400 rather than a 500, and approved_urls is validated.",
+   "error_message written next to a non-failed status was never shown; Stage 4 stops now surface in the Next line.",
+   "The Shopify push accepted images with no status, so it could push a picture placement refuses to place. Same 'done' bar everywhere.",
+   "The Shopify 'not configured' message named a variable the app is not provisioned with."
+  ]
+ },
+ {
+  "version": "2.82.0",
+  "date": "2026-09-09",
+  "title": "stop losing work silently: Resume no longer rewinds a finished run, truncated documents are rejected, a failed audit no longer reads as a pass",
+  "items": [
+   "Resume: getLastCompletedStage read two columns only the retired page writes, so every finished run looked like it stopped after Copy and Resume reset it to the Stage 4 entry gate. It now reads the hero-first columns and has a hero-review branch. This was the cause of the run 128 incident.",
+   "Truncation: a reply that hit the token ceiling was stored as a finished document. It is now retried on a doubled budget and, failing that, refused with a named reason — nothing half-written is saved.",
+   "Budgets raised where truncation was likely: the copy kit (8k, the largest output in the app, on a thinking model), one-pager synthesis, chief review, reviseDoc, the JSON structuring pass, placement, variants and both AI edits.",
+   "A failing auditor stamped every image 'pass'. The verdict is now left unset so the existing 'not audited' badge shows and it is excluded from the counts.",
+   "Three of the five research modules read only the first text block with no empty check; a run could finish missing research. All now go through one checked helper that fails loudly."
+  ]
+ },
+ {
+  "version": "2.81.3",
+  "date": "2026-09-08",
+  "title": "a failed ad can save its failure, and Higgsfield says why it refused",
+  "items": []
+ },
+ {
+  "version": "2.81.2",
+  "date": "2026-09-08",
+  "title": "the build now fails on illegal React hooks",
+  "items": []
+ },
+ {
+  "version": "2.81.1",
+  "date": "2026-09-08",
+  "title": "fix the run page crash: hooks after an early return in AdsFlow",
+  "items": []
+ },
+ {
+  "version": "2.81.0",
+  "date": "2026-09-08",
+  "title": "Stage 5 starts itself when the images finish, and asks for attention on Home",
+  "items": []
+ },
+ {
+  "version": "2.80.1",
+  "date": "2026-09-08",
+  "title": "angles start from the customer's day, not the competition",
+  "items": []
+ },
+ {
+  "version": "2.80.0",
+  "date": "2026-09-08",
+  "title": "angles get their own model role (Opus 5) and room to finish: 8k to 24k tokens",
+  "items": []
+ },
+ {
+  "version": "2.79.1",
+  "date": "2026-09-08",
+  "title": "AI edits keep the stage's own rules: the Copy and Research revision passes now carry the full stage prompt (live override included)",
+  "items": []
+ },
+ {
+  "version": "2.79.0",
+  "date": "2026-09-08",
+  "title": "one Drive button sends images and ads together; the rail shows the run's source and competitor links",
+  "items": []
+ },
+ {
+  "version": "2.78.0",
+  "date": "2026-09-08",
+  "title": "fix empty-document failures (thinking was eating the whole token budget) and add 'set aside for later'",
+  "items": []
+ },
+ {
+  "version": "2.77.0",
+  "date": "2026-09-07",
+  "title": "product codes assign themselves: next in sequence from the last product (runs and master-doc tabs), shown in its own Home column",
+  "items": []
+ },
+ {
+  "version": "2.76.1",
+  "date": "2026-09-07",
+  "title": "the visible-browser fallback waits for the real product markup, not any h1, so the window stays open long enough to solve a challenge",
+  "items": []
+ },
+ {
+  "version": "2.76.0",
+  "date": "2026-09-07",
+  "title": "AliExpress throttling: headed-browser fallback on the Mac, hours-long back-off instead of 3 tries in 3 minutes, and a 'Try again' on the gate",
+  "items": []
+ },
+ {
+  "version": "2.75.1",
+  "date": "2026-09-07",
+  "title": "empty model replies are retried (3 attempts, nudge) instead of failing the stage as 'returned empty'; final error names the stop reason",
+  "items": []
+ },
+ {
+  "version": "2.75.0",
+  "date": "2026-09-07",
+  "title": "re-sending ads replaces a regenerated one: the old file goes to Drive's bin, the new one takes its name",
+  "items": []
+ },
+ {
+  "version": "2.74.0",
+  "date": "2026-09-07",
+  "title": "separate 'Drive · ads' row in the rail; one sender for both kinds; Stage 5 uses it too",
+  "items": []
+ },
+ {
+  "version": "2.73.4",
+  "date": "2026-09-07",
+  "title": "Drive send reports the week folder it used",
+  "items": []
+ },
+ {
+  "version": "2.73.3",
+  "date": "2026-09-07",
+  "title": "Drive ads folder is named for the ISO week (Image Ads W37), one per week",
+  "items": []
+ },
+ {
+  "version": "2.73.2",
+  "date": "2026-09-07",
+  "title": "Shopify re-push adds images again when they were removed from the product; skip only when pushed before AND still on the product",
+  "items": []
+ },
+ {
+  "version": "2.73.1",
+  "date": "2026-09-07",
+  "title": "Shopify push always reflects the current copy: re-derives the fields when the text is newer than the structure; stamps stage2_json_at everywhere it is written",
+  "items": []
+ },
+ {
+  "version": "2.73.0",
+  "date": "2026-09-07",
+  "title": "angle staleness: each stage stamps the angle it was built on; changed angle flags Copy/Images/Ads ('angle changed' in the rail); Copy gets a one-call 'Rebuild copy on this angle'",
+  "items": []
+ },
+ {
+  "version": "2.72.0",
+  "date": "2026-09-07",
+  "title": "angles stay editable for the whole run; drop the open/partly-claimed/crowded classification",
+  "items": []
+ },
+ {
+  "version": "2.71.2",
+  "date": "2026-09-07",
+  "title": "every stage uses the full window; prose keeps a reading measure, image grids widen",
+  "items": []
+ },
+ {
+  "version": "2.71.1",
+  "date": "2026-09-07",
+  "title": "Stage 5: full-width layout, references are the hero + Stage 4 images only, quieter thumbnails",
+  "items": []
+ },
+ {
+  "version": "2.71.0",
+  "date": "2026-09-07",
+  "title": "Stage 5 builds on the Stage 4 images: writer sees them, picks one per ad, and they are reference candidates in the UI",
+  "items": []
+ },
+ {
+  "version": "2.70.0",
+  "date": "2026-09-07",
+  "title": "Set in Shopify: create the product's options and variants from the Variants card",
+  "items": [
+   "preview shows the options, every combination and the one price before writing",
+   "add-only: refuses unless the product still has the single default variant",
+   "one price + compare-at for every variant, from the Pricing card, written once",
+   "never updates or deletes an existing variant, never touches inventory"
+  ]
+ },
+ {
+  "version": "2.69.0",
+  "date": "2026-09-07",
+  "title": "cut the explanatory copy from every stage; Variants shows options only, no SKU table",
+  "items": []
+ },
+ {
+  "version": "2.68.0",
+  "date": "2026-09-07",
+  "title": "Variants card: restructure options with AI ('split into Color and Size') or by hand, with revert",
+  "items": [
+   "new route /api/variants/edit (mechanical model, forced tool call) returns the new option groups plus a SKU title mapping; supplier prices and stock kept",
+   "override stored in runs.product_variants_edited, validated in PATCH; the card shows an 'edited' badge and a Revert to the listing",
+   "Edit by hand: rename groups, edit values, add/remove groups"
+  ]
+ },
+ {
+  "version": "2.67.3",
+  "date": "2026-09-07",
+  "title": "Stage 4: an existing hero is reviewable at awaiting_user; the unknown-state fallback offers a restart",
+  "items": []
+ },
+ {
+  "version": "2.67.2",
+  "date": "2026-09-07",
+  "title": "cut polling cost: slim status payload, cache settings reads, no polling in hidden tabs, slower gate cadence",
+  "items": []
+ },
+ {
+  "version": "2.67.1",
+  "date": "2026-09-07",
+  "title": "Stage 5 gets its own model role (Ad briefs, default Opus 5)",
+  "items": []
+ },
+ {
+  "version": "2.67.0",
+  "date": "2026-09-07",
+  "title": "Stage 5 · Image ads: five concept briefs (premise/headline/prompt) reviewed before generation, 1:1 via the Stage 4 generator + auditor, per-ad regenerate, Drive 'Image Ads' folder",
+  "items": [
+   "prompt key 'ads' (operator's five templates, Settings → Stage 5), writer lib/ads/write.ts",
+   "columns ads_prompts/_edited/_images/_step/_error/_ref_overrides; run.status stays completed",
+   "PATCH: ads fields + ads_image_upsert; restart-stage 'ads'; status meta.ads; rail stage 5 + Next line",
+   "rules: 1:1, quotes/stats only from real sources, product name as text wordmark, no logos"
+  ]
+ },
+ {
+  "version": "2.66.1",
+  "date": "2026-09-03",
+  "title": "product code editable in the rail (names the Doc tab and Drive folder)",
+  "items": []
+ },
+ {
+  "version": "2.66.0",
+  "date": "2026-09-03",
+  "title": "Variants card always visible with 'Re-read listing': the Mac worker re-scrapes options + per-SKU prices into the run at any stage",
+  "items": []
+ },
+ {
+  "version": "2.65.7",
+  "date": "2026-09-03",
+  "title": "rail keeps polling at gates (slow) and refreshes on focus / Stage 4 writes; Google Doc row shows its error; Shopify labels say set",
+  "items": []
+ },
+ {
+  "version": "2.65.6",
+  "date": "2026-09-03",
+  "title": "hero review shows the source photos beside the hero; fullscreen flips between them",
+  "items": []
+ },
+ {
+  "version": "2.65.5",
+  "date": "2026-09-03",
+  "title": "the stage on screen stays put when it finishes; only a click changes it",
+  "items": []
+ },
+ {
+  "version": "2.65.4",
+  "date": "2026-09-03",
+  "title": "Propose angles is available on a failed run; success parks it at the research gate",
+  "items": []
+ },
+ {
+  "version": "2.65.3",
+  "date": "2026-09-03",
+  "title": "angles: accept any tool-input shape, plain-JSON fallback, error carries the raw shape",
+  "items": []
+ },
+ {
+  "version": "2.65.2",
+  "date": "2026-09-03",
+  "title": "angles: 8k output budget, repair stringified tool input, one corrective retry, error says why",
+  "items": []
+ },
+ {
+  "version": "2.65.1",
+  "date": "2026-09-03",
+  "title": "Next line reflects generated images and the push step; Stage 1 ignores seller-side listing noise",
+  "items": []
+ },
+ {
+  "version": "2.65.0",
+  "date": "2026-09-03",
+  "title": "Variants card: option groups + per-SKU AliExpress prices with rule prices, on Stage 3 and above the Shopify push",
+  "items": []
+ },
+ {
+  "version": "2.64.2",
+  "date": "2026-09-03",
+  "title": "Deliver rows unlock on finished images, not the status word; Stage 4 self-heals a lost 'completed' write",
+  "items": []
+ },
+ {
+  "version": "2.64.1",
+  "date": "2026-09-03",
+  "title": "Drive: show the failure reason in the rail + toast; scraper reads AliExpress per-SKU prices",
+  "items": []
+ },
+ {
+  "version": "2.64.0",
+  "date": "2026-09-03",
+  "title": "Shopify: one Push button, title set on every push, no preview step",
+  "items": []
+ },
+ {
+  "version": "2.63.1",
+  "date": "2026-09-03",
+  "title": "drop the fit badge; rail shows the multiple",
+  "items": []
+ },
+ {
+  "version": "2.63.0",
+  "date": "2026-09-03",
+  "title": "Pricing card: rules × COGS, .95 ending, compare-at, judged against competitors",
+  "items": [
+   "lib/pricing.ts: parseMoney, toEnding, marketBand, suggestPrice (floor = min_multiple × COGS, target = just under the competitor median), compareAtFor (+$5–10, whole dollars), fitFor, pricingWarnings",
+   "Stage 3 (Copy): PricingCard above the copy kit — COGS/Price/Compare-at editable, multiple + margin line, competitor range + chips, red flags, Reset to rules; auto-saved once, edits persist (runs.product_pricing)",
+   "Rail: Price row on every stage (opens Stage 3)",
+   "Settings: Pricing rules block (app_kv pricing_rules) + /api/settings/pricing",
+   "status route exposes meta.pricing + meta.pricingRules; PATCH validates product_pricing; Restart Stage 1 clears it",
+   "public /api/version for deploy checks (allow-listed in proxy.ts)",
+   "No prompt, doc export or Shopify write reads any of this"
+  ]
+ },
+ {
+  "version": "2.62.0",
+  "date": "2026-09-03",
+  "title": "image placement judged against the copy; manual override, staleness, honest Shopify fill",
+  "items": [
+   "placement route: sends Section 2/3 headline+paragraph, angle, product name and per-image overlay/objective; label before each image; one corrective retry, then an explicit fallback (reasons say so); stores placed_urls/at/source; only status=done images",
+   "prompt writer: told about the two page sections, authors one image each and marks intended_section (default pick for placement)",
+   "Stage 4 UI: section tiles show the headline they sit beside; → S2/→ S3 on any image, Swap 2 ↔ 3, Keep/Re-place notice when a placed image was regenerated; PATCH accepts stage3_placement (validated)",
+   "Shopify fill: 409 when a placed image is failed/missing/changed; section files keyed by URL; alt-dedupe only without push state",
+   "Drive: section-2-*/section-3-* file names"
+  ]
+ },
+ {
+  "version": "2.61.2",
+  "date": "2026-09-03",
+  "title": "Deliver block in the rail matches the stage list",
+  "items": []
+ },
+ {
+  "version": "2.61.1",
+  "date": "2026-09-03",
+  "title": "the reference picker never hides photos",
+  "items": []
+ },
+ {
+  "version": "2.61.0",
+  "date": "2026-09-03",
+  "title": "the Shopify product link can be set at any point in the run",
+  "items": []
+ },
+ {
+  "version": "2.60.0",
+  "date": "2026-09-03",
+  "title": "every run action is a visible button; reference tiles uncropped",
+  "items": []
+ },
+ {
+  "version": "2.59.0",
+  "date": "2026-09-03",
+  "title": "the auditor checks fidelity and generation defects, against the references",
+  "items": []
+ },
+ {
+  "version": "2.58.0",
+  "date": "2026-09-02",
+  "title": "the image auditor judges the right things, and re-runs when the image changes",
+  "items": []
+ },
+ {
+  "version": "2.57.1",
+  "date": "2026-09-02",
+  "title": "opening the prompt editor snapshots the current text too",
+  "items": []
+ },
+ {
+  "version": "2.57.0",
+  "date": "2026-09-02",
+  "title": "restart on every stage, and prompt history on the 8 image prompts",
+  "items": []
+ },
+ {
+  "version": "2.56.0",
+  "date": "2026-09-02",
+  "title": "every photo on the run can be referenced by any of the 8 images",
+  "items": []
+ },
+ {
+  "version": "2.55.0",
+  "date": "2026-09-02",
+  "title": "the Claude Design direction, and the newest models by default",
+  "items": [
+   "Libre Franklin + Space Mono; dark is the default theme, light via the toggle and remembered; warm near-monochrome palette, 6-9px radii, no shadows. Values live in the existing --color-* names, so every component follows.",
+   "Top bar: 50px, blurred, underline on the active destination, needs-count, theme toggle, sign out.",
+   "Home: \"Runs\" with search, bordered groups of rows (thumb, name, run number, URL, state dot + reason, relative time).",
+   "New run: one 620px column, label + hint per field, dashed drop area.",
+   "Run workspace: 268px sticky rail (run, four-stage list with mono state, a Next block holding the single action, cost rows, text actions) beside a 1000px content column with uppercase section labels.",
+   "Product gate: description, photo grid with ticks and group captions, a \"what was read\" table.",
+   "Angles: bordered rows, tick to select, primary/supporting tags, ground colour, expandable label/value detail.",
+   "Login rebuilt to match."
+  ]
+ },
+ {
+  "version": "2.54.1",
+  "date": "2026-09-02",
+  "title": "copy prompt default backported from the live Settings version",
+  "items": []
+ },
+ {
+  "version": "2.54.0",
+  "date": "2026-09-02",
+  "title": "workspace layout: one stage per screen, 16:9",
+  "items": []
+ },
+ {
+  "version": "2.53.0",
+  "date": "2026-09-02",
+  "title": "one vocabulary across the four stages; copy trimmed; FAQ = one question",
+  "items": []
+ },
+ {
+  "version": "2.52.0",
+  "date": "2026-09-02",
+  "title": "angles map competitor positioning and name the gap",
+  "items": []
+ },
+ {
+  "version": "2.51.0",
+  "date": "2026-09-02",
+  "title": "the worker gives up after ~3 minutes, not hours",
+  "items": []
+ },
+ {
+  "version": "2.50.1",
+  "date": "2026-09-02",
+  "title": "cap the product description at 200 words",
+  "items": []
+ },
+ {
+  "version": "2.50.0",
+  "date": "2026-09-02",
+  "title": "no length cap on the product description",
+  "items": []
+ },
+ {
+  "version": "2.49.1",
+  "date": "2026-09-02",
+  "title": "pick several angles (first = primary) or write your own",
+  "items": []
+ },
+ {
+  "version": "2.49.0",
+  "date": "2026-09-02",
+  "title": "positioning angles gate between Research and Copy",
+  "items": []
+ },
+ {
+  "version": "2.48.0",
+  "date": "2026-09-02",
+  "title": "add your own photos at the Stage 1 gate",
+  "items": []
+ },
+ {
+  "version": "2.47.0",
+  "date": "2026-09-02",
+  "title": "Mac worker makes Stage 1 scraping automatic (no paid server)",
+  "items": []
+ },
+ {
+  "version": "2.46.0",
+  "date": "2026-09-02",
+  "title": "scrapling becomes Stage 1; research/copy/images shift to 2/3/4",
+  "items": [
+   "New Run is link-first: paste the product URL (+ optional competitor links, optional own photos). Stage 1 runs scripts/supplier-scrape.py for every link, re-hosts the photos on R2, then the analyst model writes the 120-word description from the page text and photos (product analyst prompt, editable in Settings as \"Stage 1 — Product Description\", model role \"product\").",
+   "Review gate (awaiting_product_approval): edit the description in place, regenerate it, tick which photos the run may use (scraped gallery, seller description images, competitor photos, own uploads). Approve → research. The approved text is the research input; the ticked photos are the run's source images for research vision and the Stage 4 references.",
+   "Local fallback when the supplier rate-limits the server: the run page shows `supplier-scrape.py --push <app> --run <id> <url>`; the Mac scrape posts to /api/runs/[id]/scrape-push and the description is written from it.",
+   "Restart Stage 1 re-scrapes and clears research.",
+   "Server mode: --json (structured stdout), --out, --state, --refresh; the same file the Mac runs, so there is one scraper.",
+   "--push/--run mode logs in with the app password (asked interactively or PIPELINE_APP_PASSWORD) and uploads data.json + photos.",
+   "Dockerfile on the Playwright Python image (Chromium included) + Node 22; render.yaml → runtime docker, plan standard (browser path needs ~1GB).",
+   "Display numbering shifted: Research = 2, Copy = 3, Images = 4 (status labels, run page, settings, model roles, home, step lines). Internal identifiers, DB columns and prompt text are unchanged."
+  ]
+ },
+ {
+  "version": "2.45.1",
+  "date": "2026-09-02",
+  "title": "cache results and space out browser fetches",
+  "items": []
+ },
+ {
+  "version": "2.45.0",
+  "date": "2026-09-02",
+  "title": "read copy out of images, extract competitor positioning",
+  "items": []
+ },
+ {
+  "version": "2.44.0",
+  "date": "2026-09-02",
+  "title": "scraper pulls every variant and the full seller description",
+  "items": []
+ },
+ {
+  "version": "2.43.1",
+  "date": "2026-09-02",
+  "title": "supplier scraper captures sales signals, not just price",
+  "items": []
+ },
+ {
+  "version": "2.43.0",
+  "date": "2026-09-02",
+  "title": "drop Firecrawl, scrape JS-only supplier pages locally",
+  "items": []
+ },
+ {
+  "version": "2.41.1",
+  "date": "2026-09-01",
+  "title": "foundational-docs download is ad source material only",
+  "items": []
+ },
+ {
+  "version": "2.41.0",
+  "date": "2026-09-01",
+  "title": "download the Stage 1 foundational documents",
+  "items": []
+ },
+ {
+  "version": "2.40.1",
+  "date": "2026-08-31",
+  "title": "Drive folders created with the doc tab's exact name",
+  "items": []
+ },
+ {
+  "version": "2.40.0",
+  "date": "2026-08-31",
+  "title": "send run images to the product's Google Drive folder",
+  "items": []
+ },
+ {
+  "version": "2.39.0",
+  "date": "2026-08-31",
+  "title": "auto-placement picks sections 2 and 3 only",
+  "items": []
+ },
+ {
+  "version": "2.38.2",
+  "date": "2026-08-31",
+  "title": "Shopify fill requires auto-placement to have run",
+  "items": []
+ },
+ {
+  "version": "2.38.1",
+  "date": "2026-08-31",
+  "title": "never name the product after a supplier or competitor brand",
+  "items": [
+   "IDENTIFY: brand text visible in supplier photos identifies the manufacturer/a competitor — note it as supplier branding, never adopt it as the product's name.",
+   "ONE_PAGER: never carry over supplier/competitor brand names; use a plain descriptive category name and leave branding to Stage 2.",
+   "STAGE2 (code default + live override): the keep-that-name clause is replaced — the brand word must be freshly invented, never any brand appearing in the research, supplier listing/photos, or competitor links; matching suggestions are discarded."
+  ]
+ },
+ {
+  "version": "2.38.0",
+  "date": "2026-08-31",
+  "title": "brand safety: no logos in images, no competitor names in copy",
+  "items": [
+   "PRODUCT_FIDELITY_GUARDRAIL (rides on every Higgsfield call): no brand logos/names/trademarks or recognizable branded products anywhere in the scene — props, clothing, packaging, screens, backgrounds. Only exception: branding physically on the product itself.",
+   "HERO_SYSTEM + REMAINING_SYSTEM: same rule up front, and every prompt's NEGATIVE RULES must forbid logos and branded props.",
+   "IMAGE_AUDIT_SYSTEM: new BRAND SAFETY criterion — any legible third-party brand mark is an automatic FAIL.",
+   "STAGE2_PROMPT (code default + live Settings override): competitor brands/products/stores may never be named in customer-facing copy; alternatives are referred to generically, with a pre-output scan."
+  ]
+ },
+ {
+  "version": "2.37.1",
+  "date": "2026-08-31",
+  "title": "allow saintport.com storefront links in the product-URL field",
+  "items": []
+ },
+ {
+  "version": "2.37.0",
+  "date": "2026-08-31",
+  "title": "section photos live only in their sections, never twice",
+  "items": []
+ },
+ {
+  "version": "2.36.0",
+  "date": "2026-08-31",
+  "title": "fill Section 2/3 Photo metafields from the placement",
+  "items": []
+ },
+ {
+  "version": "2.35.0",
+  "date": "2026-08-31",
+  "title": "Shopify auth via Dev Dashboard client-credentials grant",
+  "items": []
+ },
+ {
+  "version": "2.34.2",
+  "date": "2026-08-31",
+  "title": "blank line between parts inside doc cells",
+  "items": []
+ },
+ {
+  "version": "2.34.1",
+  "date": "2026-08-31",
+  "title": "doc fill writes into the right column of the value row",
+  "items": []
+ },
+ {
+  "version": "2.34.0",
+  "date": "2026-08-31",
+  "title": "fill the doc tab's Overview block too",
+  "items": []
+ },
+ {
+  "version": "2.33.3",
+  "date": "2026-08-31",
+  "title": "unit-test the Google Doc fill planner against a template replica",
+  "items": []
+ },
+ {
+  "version": "2.33.2",
+  "date": "2026-08-31",
+  "title": "Stage 2 FAQs target the two most common objections",
+  "items": []
+ },
+ {
+  "version": "2.33.1",
+  "date": "2026-08-29",
+  "title": "probe hero importability at the approve gate",
+  "items": []
+ },
+ {
+  "version": "2.33.0",
+  "date": "2026-08-29",
+  "title": "Edit with AI on the 8-prompt review cards",
+  "items": []
+ },
+ {
+  "version": "2.32.1",
+  "date": "2026-08-28",
+  "title": "fix infinite reload loop on the login page",
+  "items": []
+ },
+ {
+  "version": "2.32.0",
+  "date": "2026-08-27",
+  "title": "Google Doc export fills the product's tab template",
+  "items": [
+   "fillProductTab: reads the doc with includeTabsContent, finds the tab whose title starts with the run's product code (recursing into child tabs — the doc groups tabs under READY FOR LAUNCH / TO TEST), locates each template label row (BADGE TEXT, SUPPORTING SENTENCE, BENEFIT SECTION, FAQ cells, SECTION 1-3, Headline/Primary Text/Description, ONE LINERS) and inserts the copy into the empty cell of the row below.",
+   "Inserts sorted descending by index so earlier writes can't shift later targets; every request carries the explicit tabId (tabless requests would silently hit the doc's first tab).",
+   "Never overwrites: non-empty cells are skipped and reported (already-filled), so re-sends fill gaps only. insertText remains the only request type that can pass the non-destructive assertion.",
+   "No matching tab -> actionable error naming the exact tab title to create, plus the list of existing tabs. No product code -> tells the operator to set one on the run.",
+   "Route gains dryRun (full fill report, zero writes) for the first live test; auto-hook refetches the run so a code set after start still works.",
+   "Tabs cannot be created via the Docs API (verified) — duplicating the template tab stays the operator's one manual step, as today."
+  ]
+ },
+ {
+  "version": "2.31.0",
+  "date": "2026-08-27",
+  "title": "password gate, SSRF hardening, Google Doc export, Shopify fill v2",
+  "items": [
+   "proxy.ts + lib/auth.ts: every page and API route now requires a session. Stateless HMAC cookie keyed off PIPELINE_PASSWORD (rotating the password is global logout), httpOnly/lax/30d with sliding renewal, timing-safe comparisons, per-IP + global login rate limits, Sec-Fetch-Site check on mutations, X-Robots-Tag on everything. FAIL CLOSED: unset password = 503 naming the fix (never a redirect loop). Pages redirect to /login; /api/* gets JSON 401; AuthWatch sends any 401'd fetch to the login page.",
+   "requireSession() defense-in-depth on the money/config routes.",
+   "proxyClientMaxBodySize 100mb (the proxy would otherwise silently truncate the 10x8MB source-image upload at 10MB).",
+   "Scrape extracted to lib/scrape.ts; the pipeline runner calls it directly instead of fetching its own (now-gated) HTTP API.",
+   "SSRF: ssrfAgentOptions exported from lib/ssrf.ts; hf-png's bare fetch of caller-influenced URLs now guarded by assertPublicUrl + safe agent; stage3 generate/edit-prompt/audit validate bodies and reference URLs; stage3_reference_images validated on write.",
+   "Hand-rolled service-account JWT (Docs scope ONLY — cannot create/list files), lazy key parsing, escaped-newline PEM fix, actionable error mapping (403 prints the SA email to share the doc with).",
+   "Appends via endOfSegmentLocation (no index math) and an allowlist assertion that refuses any destructive Docs request type.",
+   "Auto-append after Stage 2 (fire-and-forget, never fails a run) + \"Send to Google Doc\" button on the Copy tab; gdoc_appended_at gates re-sends behind a 409/confirm; Stage 2 regeneration clears the flag.",
+   "lib/shopify/fields.ts: single source of truth for the store's metafield labels, shared by the Copy tab and the pusher.",
+   "Metafield-definition discovery matched by normalized visible name (exact only), cached 24h keyed by store domain.",
+   "lib/shopify/push.ts: strict/reversible fill — metafieldsSet upserts (chunked 25), opt-in title update, APPEND-only media with dedupe via shopify_push_state + existing alts; a token assertion refuses any mutation containing delete/publish/price operations.",
+   "URL parsing with an exact-match domain allowlist; writes always target SHOPIFY_STORE_DOMAIN regardless of the pasted host.",
+   "Routes: /api/shopify/resolve (read-only confirm), /fields (match report), /fill (dryRun DEFAULT — preview computes the full report with zero writes). ShopifyFill panel with per-field report; old create-draft flow demoted behind a details toggle. API version env-overridable, default 2026-01 (was unsupported 2024-10)."
+  ]
+ },
+ {
+  "version": "2.30.0",
+  "date": "2026-08-27",
+  "title": "product states: images can show the closed/folded product",
+  "items": [
+   "REMAINING_SYSTEM: new PRODUCT STATES rule — when a scene genuinely needs a state the hero doesn't show (e.g. the organizer closed inside a handbag), the prompt must say the state explicitly and set that image's source_image_references to the source photo(s) showing it, instead of (or alongside) the hero. Default stays the hero.",
+   "generateRemainingPrompts: hero path now also receives the active source photos (blacklist respected) as attached state references, with their URLs listed for per-image selection. Skip-hero path is unchanged — sources are already its main references.",
+   "hero-approve passes stage3ActiveSourceImages(run) through."
+  ]
+ },
+ {
+  "version": "2.29.0",
+  "date": "2026-08-27",
+  "title": "storyboard preview frames on the 8-prompt review",
+  "items": []
+ },
+ {
+  "version": "2.28.1",
+  "date": "2026-08-27",
+  "title": "comparison image is now a problem-vs-fix split",
+  "items": []
+ },
+ {
+  "version": "2.28.0",
+  "date": "2026-08-27",
+  "title": "Stage 3 prompt review is now a picture review",
+  "items": []
+ },
+ {
+  "version": "2.27.0",
+  "date": "2026-08-27",
+  "title": "prompt caching where the tracker showed it pays",
+  "items": []
+ },
+ {
+  "version": "2.26.0",
+  "date": "2026-08-26",
+  "title": "reference picker in the bulk \"fix all failed\" modal",
+  "items": []
+ },
+ {
+  "version": "2.25.0",
+  "date": "2026-08-26",
+  "title": "per-image reference picker for the 8 derivative images",
+  "items": [
+   "runs.stage3_ref_overrides: JSON { \"<prompt index>\": [urls] }, PATCHable with the same convention as the other stage3 columns. Cleared on Stage 3 restart and on hero regeneration (a new hero invalidates overrides that point at the old one).",
+   "RefPicker (compact multi-select thumbnails with HERO/SOURCE/REF badges) rendered under every prompt at the 8-prompt review gate and in the per-image regenerate modal.",
+   "refsFor() resolves override → curated refs → hero; used by generateAll, single-image regenerate, and bulk fix (which inherits stored overrides).",
+   "Regenerating from the modal with a changed selection persists it as that image's override, so later passes reuse it.",
+   "Min-1 guard: an image can never end up with zero references."
+  ]
+ },
+ {
+  "version": "2.24.0",
+  "date": "2026-08-26",
+  "title": "Stage 3 source-image picker (use / exclude per photo)",
+  "items": [
+   "lib/stage3/sources.ts: stage3SourceCandidates / stage3ActiveSourceImages (uploaded + scraped, deduped, minus blacklist) — replaces the identical inline resolution in stage3-hero-prompt, skip-hero, and hero-regenerate, so all three respect the exclusions.",
+   "PATCH /api/runs/[id] accepts stage3_source_blacklist (same convention as stage3_reference_images).",
+   "Stage3SourcePicker: thumbnail grid, click to toggle, excluded photos dimmed with a badge, guard against excluding the last active photo. Mounted on the Stage 3 entry screen and inside the hero QC gate's regenerate panel."
+  ]
+ },
+ {
+  "version": "2.23.0",
+  "date": "2026-08-26",
+  "title": "add Sonnet 5 to the model catalog",
+  "items": []
+ },
+ {
+  "version": "2.22.1",
+  "date": "2026-08-24",
+  "title": "fix empty response from Edit-with-AI on Opus 5",
+  "items": []
+ },
+ {
+  "version": "2.22.0",
+  "date": "2026-08-24",
+  "title": "cut API costs + per-run cost tracker",
+  "items": [
+   "Add claude-opus-5 to the catalog (same $5/$25 as 4.8); stage2 default → Opus 5",
+   "New stage3Edit role (default Sonnet 4.6) for prompt rewrites/edits — the edit-prompt route (single rewrite, bulk fix, hero edit-with-AI) now bills Sonnet instead of the Opus-tier stage3Prompt role",
+   "withRetry (pipeline-runner) + audit route now retry only transient errors (429/5xx/timeout/overload) — a deterministic 400 was being billed 3×",
+   "hero-approve/skip-hero pass only the visual-strategy section of the research doc to the remaining-8 writer instead of the entire concatenated doc",
+   "Remove dead call surfaces: /api/stage1-one-pager, /api/stage3-prompts, /api/stage3-images (sole importer of the former), unreachable regenerateStage3Prompts branch, legacy /stage3 page link",
+   "Skip the Stage 2 re-structuring call when a Save didn't change the text",
+   "Drop no-op cache_control markers (audit 587 tok, structuring 289 tok — both below their models' minimum cacheable prefix; the audit comment claiming 7/8 cache hits was wrong)",
+   "api_usage table + recordUsage() best-effort insert; captured in every Anthropic call site (research ×5, avatar/offer/beliefs/chief/one-pager, stage2 copy, structuring, hero, remaining-8, audit, rewrite, placement, edit-with-AI)",
+   "GET /api/runs/[id]/usage → per-label rollup + total $",
+   "RunCost component on the run page: total $, calls, breakdown table"
+  ]
+ },
+ {
+  "version": "2.21.0",
+  "date": "2026-08-19",
+  "title": "Stage 3: work around Higgsfield's PNG-only media import",
+  "items": [
+   "lib/hf-png.ts: transcode non-PNG references to PNG, park them in R2 keyed by a hash of the source URL, hand Higgsfield the PNG. Best-effort throughout — falls back to the original URL if R2 is unconfigured or the image cannot be decoded.",
+   "importMediaId: normalize first, and retry once with a forced conversion if a .png-named URL still trips their signing bug.",
+   "generateImageViaMcp: tolerate per-reference import failures. Their moderation rejects some product photos outright (\"Something went wrong\"); dropping one of several references beats failing the whole generation. Only throws when no reference survives."
+  ]
+ },
+ {
+  "version": "2.20.0",
+  "date": "2026-08-03",
+  "title": "Stage 2: Facebook ad headline hard-capped at 25 characters",
+  "items": []
+ },
+ {
+  "version": "2.19.1",
+  "date": "2026-07-29",
+  "title": "Copy tab: copy each FAQ with its answer",
+  "items": []
+ },
+ {
+  "version": "2.19.0",
+  "date": "2026-07-29",
+  "title": "adopt the Stage 2 product name as the run name",
+  "items": []
+ },
+ {
+  "version": "2.18.2",
+  "date": "2026-07-28",
+  "title": "AI-edited Stage 2 copy now reaches the Copy tab",
+  "items": []
+ },
+ {
+  "version": "2.18.1",
+  "date": "2026-07-28",
+  "title": "remove the manual hero-prompt editor from the hero gate",
+  "items": []
+ },
+ {
+  "version": "2.18.0",
+  "date": "2026-07-28",
+  "title": "rewrite auto-regenerates everywhere, image version history, full restart",
+  "items": []
+ },
+ {
+  "version": "2.17.0",
+  "date": "2026-07-27",
+  "title": "Copy tab reflects edits, adds section/group copy and Facebook",
+  "items": []
+ },
+ {
+  "version": "2.16.0",
+  "date": "2026-07-27",
+  "title": "Stage 3 rewrites compound, and rewriting regenerates",
+  "items": []
+ },
+ {
+  "version": "2.15.0",
+  "date": "2026-07-24",
+  "title": "full rewrite of every Stage 1 prompt for English-speaking markets",
+  "items": [
+   "Market: USA first, then Canada/UK/Australia and other affluent English-speaking countries; core buyer is a middle-aged mother",
+   "Platforms: Amazon.com (then .co.uk/.ca/.com.au), US/UK/AU parenting subreddits (with per-category subreddit guidance), Mumsnet, Quora, Trustpilot.com, Influenster",
+   "Trust signals: Trustpilot, BBB, verified-purchase Amazon reviews, third-party lab testing, money-back guarantees",
+   "Pricing stays out of scope throughout; positioning maps use messaging angles, never price tiers"
+  ]
+ },
+ {
+  "version": "2.14.1",
+  "date": "2026-07-23",
+  "title": "Stage 2 tabs: keep only Full text + Copy",
+  "items": []
+ },
+ {
+  "version": "2.14.0",
+  "date": "2026-07-23",
+  "title": "Shopify tab: one copy button per metafield",
+  "items": []
+ },
+ {
+  "version": "2.13.0",
+  "date": "2026-07-23",
+  "title": "fullscreen lightbox for Stage 3 images",
+  "items": []
+ },
+ {
+  "version": "2.12.1",
+  "date": "2026-07-23",
+  "title": "'Relink from Higgsfield' on the completed Stage 3 view",
+  "items": []
+ },
+ {
+  "version": "2.12.0",
+  "date": "2026-07-23",
+  "title": "'← Back to hero' from the 8-prompt review gate",
+  "items": [
+   "app/api/stage3/back-to-hero: reverts status to awaiting_hero_qc and resets stage3_hero_approved. Non-destructive — prompts and any generated images are kept, so re-approving the same hero loses nothing (approval rewrites the prompts; the resume logic keeps finished images).",
+   "hero-regenerate now clears stage3_remaining_prompts/_edited/_images when a NEW hero is generated. Required for the back loop to be safe: without it the generation resume would skip already-'done' indices and silently mix old-hero images with new-hero prompts.",
+   "Stage3HeroFlow: '← Back to hero' button on the prompt-review gate (only when a hero exists — skip-hero runs came straight from source photos), with hint copy explaining what is kept vs cleared."
+  ]
+ },
+ {
+  "version": "2.11.2",
+  "date": "2026-07-22",
+  "title": "show the real app version in the TopBar",
+  "items": []
+ },
+ {
+  "version": "2.11.1",
+  "date": "2026-07-22",
+  "title": "show the start prompt (the input that created the run)",
+  "items": []
+ },
+ {
+  "version": "2.11.0",
+  "date": "2026-07-22",
+  "title": "record and show the exact prompt each run executed with",
+  "items": [
+   "runs.prompts_used (new column): JSON { stage1, stage2, stage3_hero, stage3_remaining } written via recordPromptUsed() — best-effort, never fails a run",
+   "Recorded at: Stage 1 one-pager synthesis and Stage 2 copy (pipeline-runner, including feedback suffixes), hero prompt-writer and 8-prompts writer (stage3-hero-prompt, hero-approve, skip-hero routes)",
+   "Surfaced through /api/runs/[id]/status as promptsUsed",
+   "New PromptUsed component: a 'View prompt used' toggle on the Stage 1, 2 and 3 sections of the run page — labeled, copyable, scrollable prompt blocks; runs from before this version show an honest 'not recorded' note instead of a guess"
+  ]
+ },
+ {
+  "version": "2.10.0",
+  "date": "2026-07-22",
+  "title": "Stage 2 default prompt: enforce template character limits",
+  "items": [
+   "New CHARACTER LIMITS block in OUTPUT STRUCTURE: supporting sentence max 56 chars; every other text field (paragraphs, What's Included, FAQ answers, Facebook primary text and description) max 397 chars, counted before output.",
+   "Supporting sentence: the old 'Maximum 12 words' guidance is replaced by the 56-character hard limit (the Key Benefits 12-word rule is unchanged).",
+   "Per-section slop check now scans for character-limit breaches first."
+  ]
+ },
+ {
+  "version": "2.9.0",
+  "date": "2026-07-22",
+  "title": "push a finished run to Shopify as a draft product",
+  "items": [
+   "lib/shopify: Admin GraphQL client (SHOPIFY_STORE_DOMAIN + SHOPIFY_ADMIN_TOKEN), productCreate with status DRAFT. Images are passed as originalSource URLs, so Shopify fetches the existing Higgsfield CDN links directly — no re-upload.",
+   "app/api/shopify/push: assembles the product from the run — Stage 2 copy (supporting sentence, benefits, the 3 headline/paragraph sections, what's included, FAQs) into descriptionHtml with HTML escaping, falling back to the canonical text when structured copy is absent; hero first then the 8 images in prompt order (Shopify uses the first as the thumbnail); tagged pipeline/run-N.",
+   "Stage3HeroFlow: 'Push to Shopify (draft)' on a completed run, linking to the created product in the Shopify admin."
+  ]
+ },
+ {
+  "version": "2.8.1",
+  "date": "2026-07-22",
+  "title": "remove the German leftovers the v2.6.0 migration missed",
+  "items": []
+ },
+ {
+  "version": "2.8.0",
+  "date": "2026-07-15",
+  "title": "recover Stage 3 images from Higgsfield history (no re-generation)",
+  "items": [
+   "lib/higgsfield-mcp: listImageGenerations() (paginated show_generations)",
+   "app/api/stage3/recover-from-higgsfield: matching + persist endpoint",
+   "Stage3HeroFlow: 'Recover from Higgsfield' button on the prompt-review gate"
+  ]
+ },
+ {
+  "version": "2.7.4",
+  "date": "2026-07-15",
+  "title": "persist Stage 3 images reliably (fixes images lost on navigation)",
+  "items": []
+ },
+ {
+  "version": "2.7.3",
+  "date": "2026-07-15",
+  "title": "stop the always-failing validation retry that doubled Stage 3 prompt time",
+  "items": []
+ },
+ {
+  "version": "2.7.2",
+  "date": "2026-07-15",
+  "title": "generate Stage 3 prompts via forced tool call (fixes the 8 not generating)",
+  "items": []
+ },
+ {
+  "version": "2.7.1",
+  "date": "2026-07-15",
+  "title": "omit temperature on models that reject sampling params",
+  "items": []
+ },
+ {
+  "version": "2.7.0",
+  "date": "2026-07-15",
+  "title": "tested Stage 3 prompts + format validation + temperature 0",
+  "items": []
+ },
+ {
+  "version": "2.6.1",
+  "date": "2026-07-13",
+  "title": "new section-structured hero prompt template",
+  "items": []
+ },
+ {
+  "version": "2.6.0",
+  "date": "2026-07-13",
+  "title": "finish English migration: remove all remaining German",
+  "items": []
+ },
+ {
+  "version": "2.5.0",
+  "date": "2026-06-17",
+  "title": "Stage 2 rewritten for English-speaking markets (US-led)",
+  "items": []
+ },
+ {
+  "version": "2.4.0",
+  "date": "2026-06-17",
+  "title": "Stage 1 rewritten for English-speaking markets (US-led)",
+  "items": [
+   "research: identify, market, competitive, product_analysis, visual",
+   "synthesis: avatar, offer_brief, necessary_beliefs",
+   "chief_final, revise_doc",
+   "one_pager (adds Positioning Angle + Key Competitor Gap sections)"
+  ]
+ },
+ {
+  "version": "2.3.5",
+  "date": "2026-06-12",
+  "title": "FIX Stage 3 completed-view crash (\"This page couldn't load\")",
+  "items": []
+ },
+ {
+  "version": "2.3.4",
+  "date": "2026-06-12",
+  "title": "lazy-load Stage 3 images (reduce memory / Safari OOM on the grid)",
+  "items": []
+ },
+ {
+  "version": "2.3.3",
+  "date": "2026-06-12",
+  "title": "hero \"Rewrite prompt\" AI now sees the reference images",
+  "items": []
+ },
+ {
+  "version": "2.3.2",
+  "date": "2026-06-12",
+  "title": "hero regen: add reference images in the Edit-with-AI panel",
+  "items": []
+ },
+ {
+  "version": "2.3.1",
+  "date": "2026-06-12",
+  "title": "delete runs from the \"Needs you\" pile too",
+  "items": []
+ },
+ {
+  "version": "2.3.0",
+  "date": "2026-06-12",
+  "title": "Stage 3: operator-added reference images (prompt-writer curated)",
+  "items": [
+   "DB: stage3_reference_images column (+ Run field, + PATCH whitelist). Prod ALTERed.",
+   "hero.ts: generateHeroPrompt / generateRemainingPrompts take extraReferenceUrls, show them in the vision context, and the system prompts instruct Claude to put only the fitting ones into each prompt's source_image_references (alongside the hero/product). curateRefs() keeps base refs always + validates chosen extras against the known pool so nothing hallucinated reaches Higgsfield.",
+   "Routes hero-prompt / hero-approve / skip-hero load the pool and pass it; hero gen now sends the curated source_image_references.",
+   "UI: Stage3ReferenceImages (dropzone upload + thumbnails) on the hero-approval and completed screens. Applies when prompts are (re)generated."
+  ]
+ },
+ {
+  "version": "2.2.3",
+  "date": "2026-06-11",
+  "title": "Stage 2 per-line copy + images download individually (no zip)",
+  "items": [
+   "Stage 2: new \"Lines\" view (components/Stage2Lines.tsx) — every content line gets its own Copy button, for pasting straight into page-builder fields. Added to the Full text / Lines / Fields toggle (Lines always available; Fields when structured JSON exists).",
+   "Images: \"Download all\" and the BottomBar \"Images\" button now save each image as its own file instead of a .zip (sequential, small gap so the browser keeps all of them). Dropped JSZip from Stage3HeroFlow. Docs export still zips (unchanged — only images were requested)."
+  ]
+ },
+ {
+  "version": "2.2.1",
+  "date": "2026-06-11",
+  "title": "fix run page crash: stop client pulling DB via Stage 2 format",
+  "items": []
+ },
+ {
+  "version": "2.2.0",
+  "date": "2026-06-11",
+  "title": "per-role model selection + Sonnet 4.5→4.6",
+  "items": [
+   "Central model config (lib/models.ts): 5 logical roles (Stage 1, Stage 2, Stage 3 prompts, Stage 3 audit, mechanical) each resolved DB selection → env override → default. Defaults move Sonnet 4.5 → 4.6 (same price, newer); Stage 2 stays Opus 4.8, mechanical stays Haiku 4.5. Fable 5 selectable.",
+   "In-app picker: Settings → Models (components/ModelSettings.tsx + /api/settings/models) — dropdown per role, saved to app_kv, effective next run, no redeploy.",
+   "Rewired ~13 call sites (research runner, pipeline-runner, hero, stage2 format, audit/placement/edit-prompt/prompts routes, one-pager, regenerate) to getModel(role). anthropicMessage resolves the model before the (non-async) retry thunk. Stage 2 progress text no longer hardcodes \"Opus\"."
+  ]
+ },
+ {
+  "version": "2.1.0",
+  "date": "2026-06-11",
+  "title": "workflow efficiency + reliability (plan phases A–D)",
+  "items": [
+   "cache_control on the repeated big system prompts (audit ~8x/run, Stage 2 static prefix, hero/remaining prompt generation)",
+   "feedback recall dedupes by brand|product and caps note length",
+   "STAGE3_PROMPT_MODEL env to optionally run Opus for Stage-3 prompt writing",
+   "cheap Haiku structuring pass (lib/stage2/format.ts) derives JSON from the canonical free text verbatim — zero risk to the tuned copy quality",
+   "stage2_json column + status/polling plumbing + Stage2Structured per-field copy UI behind a Text/Fields toggle",
+   "C1 token-refresh single-flight mutex (verified in place)",
+   "C2 generate 8 images 3-wide via a worker pool (main loop AND bulk-fix- failed); per-tile busy state via a Set; stop-after-batch + resume preserved",
+   "atomic server-side image upsert (write-locked txn + busy retry) so the now- concurrent persists can't lost-update each other",
+   "C4 bulk-fix modal surfaces each image's audit reasons and folds them into the one-click rewrite",
+   "C3 (batch audits) deliberately skipped — would regress the per-tile incremental verdicts C2 enables; rationale in IMPLEMENTATION_PLAN.md parse + connect time (covers redirects/rebinding); input length caps on the start + PATCH routes"
+  ]
+ }
+]
