@@ -999,9 +999,9 @@ export default function RunPage() {
         {/* Stage 6 · Done — everything in one place */}
         {activeKey === "done" && runId !== null && (
           <>
-            <div className="flex items-baseline gap-2.5 mb-5">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-2 mb-5">
               <h1 className="text-[17px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Done</h1>
-              <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{run.meta.productCode ? `${run.meta.productCode} · ` : ""}{displayName}</span>
+              <span className="ff-mono text-[11px] text-[var(--color-text-3)] min-w-0 truncate">{run.meta.productCode ? `${run.meta.productCode} · ` : ""}{displayName}</span>
               <div className="flex-1" />
               <div className="flex items-start gap-2">
                 {hasDocs && <button onClick={handleDownloadDocs} className="btn btn-sm">Download docs</button>}

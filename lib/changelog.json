@@ -1,5 +1,14 @@
 [
  {
+  "version": "2.104.1",
+  "date": "2026-10-06",
+  "title": "dates match between server and browser",
+  "items": [
+   "Older run dates on Home no longer trigger a page error",
+   "The Done header wraps on narrow windows"
+  ]
+ },
+ {
   "version": "2.104.0",
   "date": "2026-10-06",
   "title": "simpler screens, one place to deliver, a Changes page",

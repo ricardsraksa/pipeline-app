@@ -7,6 +7,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { RunSummary } from "@/lib/db";
 
+// Dates are formatted by hand: the server's Node has no en-GB locale data, so
+// toLocaleDateString renders differently there and breaks hydration.
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export const ACTIVE_STATUSES = new Set(["pending", "product", "scraping", "stage1", "stage2", "generating_hero", "generating_remaining"]);
 export const WAITING_STATUSES = new Set(["awaiting_product_approval", "awaiting_stage2_approval", "awaiting_user", "awaiting_qc", "awaiting_hero_qc"]);
 
@@ -26,7 +30,7 @@ export const statusLabel = (s: string | null | undefined) => (s ? STATUS_LABEL[s
 export function shortDate(iso?: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return Number.isNaN(d.getTime()) ? "" : `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
 /** Live "1m 5s" since an ISO time, ticking every second. */
@@ -89,7 +93,8 @@ export function relativeTime(iso?: string | null): string {
   const min = Math.floor(sec / 60); if (min < 60) return `${min}m ago`;
   const hr = Math.floor(min / 60); if (hr < 24) return `${hr}h ago`;
   const day = Math.floor(hr / 24); if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  const d = new Date(iso);
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${MONTHS[d.getUTCMonth()]}`;
 }
 
 export function elapsedTime(startedAt?: string | null, finishedAt?: string | null): string | null {

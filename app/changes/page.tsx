@@ -5,7 +5,8 @@ import changelog from "@/lib/changelog.json";
 
 type Entry = { version: string; date: string; title: string; items: string[] };
 
-const fmt = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmt = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function ChangesPage() {
