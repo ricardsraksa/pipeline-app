@@ -242,10 +242,14 @@ export default function ProductGate({
   // What the worker actually hit on the product page (it reports each failure),
   // so the banner can name it instead of assuming AliExpress throttling.
   const failure = (product?.workerFailures ?? []).find((f) => f.url === productPage?.url) ?? product?.workerFailures?.[0] ?? null;
-  const throttled = !!failure && /rate-limit|throttl|anti-bot|captcha/i.test(failure.error);
+  // A check is open in a window on the Mac right now, waiting for the operator.
+  const checkOpen = !!failure?.challenge && !!failure.retryAt && new Date(failure.retryAt).getTime() > Date.now();
+  const throttled = !!failure && !checkOpen && /rate-limit|throttl|anti-bot|captcha/i.test(failure.error);
   const retryMin = failure?.retryAt ? Math.max(1, Math.round((new Date(failure.retryAt).getTime() - Date.now()) / 60_000)) : null;
   const failureLine = failure
-    ? `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "stopped retrying."}`
+    ? checkOpen
+      ? `Complete the slider in the browser window that opened on your Mac. It waits ${retryMin} more min.`
+      : `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "stopped retrying."}`
     : null;
   const [retrying, setRetrying] = useState<string | null>(null);
   const tryAgain = async () => {
@@ -274,6 +278,7 @@ export default function ProductGate({
           <p className="text-[12.5px] font-[600] text-[var(--color-text)]">
             {productPage.deferred
               ? (!workerOnline ? "Mac worker offline."
+                : checkOpen ? "AliExpress wants a check on your Mac."
                 : failure ? (throttled ? "AliExpress is throttling your Mac's IP." : "Your Mac couldn't read this page.")
                 : gaveUp ? "Not read yet."
                 : "Your Mac is scraping this page.")
@@ -285,7 +290,7 @@ export default function ProductGate({
                 {failureLine ?? `Checked in ${workerAgo}.`}
               </p>
             )}
-            {productPage.deferred && workerOnline && (
+            {productPage.deferred && workerOnline && !checkOpen && (
               <button onClick={tryAgain} disabled={retrying === "…"} className="btn btn-sm">{retrying === "…" ? "Requesting…" : "Try again"}</button>
             )}
             {retrying && retrying !== "…" && <span className="text-[11.5px] text-[var(--color-text-3)]">{retrying}</span>}

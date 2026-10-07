@@ -45,7 +45,7 @@ export interface RunStatus {
     approvedAt: string | null;
     workerLastSeen: string | null;
     /** The worker's last failure per page (app/api/worker/queue POST). */
-    workerFailures?: Array<{ url: string; error: string; attempts: number; retryAt: string | null; at: string }>;
+    workerFailures?: Array<{ url: string; error: string; attempts: number; retryAt: string | null; at: string; challenge?: boolean }>;
   };
   /** Angles gate — JSON strings (Angle[] / Angle), see lib/angles.ts. */
   angles: {

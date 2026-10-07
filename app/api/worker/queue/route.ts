@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   return Response.json({ jobs, now: new Date().toISOString() });
 }
 
-export interface WorkerFailure { url: string; error: string; attempts: number; retryAt: string | null; at: string }
+export interface WorkerFailure { url: string; error: string; attempts: number; retryAt: string | null; at: string; challenge?: boolean }
 
 // The worker reports each failed page (and clears it once the page lands), so
 // the Stage 1 banner can say what actually went wrong. Stored per run in
@@ -51,7 +51,7 @@ export interface WorkerFailure { url: string; error: string; attempts: number; r
 export async function POST(req: NextRequest) {
   const denied = requireSession(req);
   if (denied) return denied;
-  const b = (await req.json().catch(() => ({}))) as { runId?: unknown; url?: unknown; error?: unknown; attempts?: unknown; retryInSec?: unknown };
+  const b = (await req.json().catch(() => ({}))) as { runId?: unknown; url?: unknown; error?: unknown; attempts?: unknown; retryInSec?: unknown; challenge?: unknown };
   const runId = Number(b.runId);
   const url = typeof b.url === "string" ? b.url.slice(0, 2000) : "";
   if (!Number.isInteger(runId) || runId <= 0 || !url) return Response.json({ success: false, error: "runId and url are required" }, { status: 400 });
@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
       attempts: Number.isInteger(Number(b.attempts)) ? Number(b.attempts) : 1,
       retryAt: Number.isFinite(retry) && retry > 0 ? new Date(now + retry * 1000).toISOString() : null,
       at: new Date(now).toISOString(),
+      // AliExpress is showing a check in a window on the Mac: the operator
+      // has until retryAt to complete it.
+      ...(b.challenge === true ? { challenge: true } : {}),
     };
   } else {
     delete map[url];

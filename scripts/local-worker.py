@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import subprocess
+import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -153,17 +154,57 @@ def note_failure(state: dict, key: str, run_id: int, msg: str, app: "App | None"
         report(app, run_id, url, msg, attempts, wait if left > 0 else None)
 
 
-def report(app: "App", run_id: int, url: str, error: str | None, attempts: int = 0, retry_in: int | None = None) -> None:
+def report(app: "App", run_id: int, url: str, error: str | None, attempts: int = 0, retry_in: int | None = None, challenge: bool = False) -> None:
     """Tell the run page why a page failed (or that it no longer does), so its
     banner shows the real reason instead of guessing. Best-effort."""
     try:
         app.post("/api/worker/queue", {"runId": run_id, "url": url, "error": error[:300] if error else None,
-                                       "attempts": attempts, "retryInSec": retry_in})
+                                       "attempts": attempts, "retryInSec": retry_in, "challenge": challenge})
     except Exception as e:
         log(f"run #{run_id}: could not report to the app — {type(e).__name__}: {e}")
 
 
-def run_once(app: App, scraper) -> int:
+class Busy:
+    """While a page is being scraped the poll loop is blocked — an AliExpress
+    check can hold it for 3 minutes — so the app saw no heartbeat and said
+    "Mac worker offline". Keep checking in from a side thread, and tell the run
+    page when AliExpress is waiting for the operator to complete a check."""
+
+    def __init__(self, app: "App", scraper) -> None:
+        self.app, self.job = app, None
+        self.challenged = False
+        original = scraper.say
+
+        def say(*a, **k):
+            original(*a, **k)
+            text = " ".join(str(x) for x in a)
+            if self.job and "challenging this IP" in text:
+                self.challenged = True
+                run_id, url = self.job
+                wait = scraper.HEADED_TIMEOUT_MS // 1000
+                report(app, run_id, url, "AliExpress wants a check: complete the slider in the browser window that just opened on your Mac.",
+                       0, wait, challenge=True)
+                # A Mac notification with a sound, so the window isn't missed
+                # while the operator is in another app.
+                try:
+                    subprocess.run(["osascript", "-e",
+                                    f'display notification "Complete the slider in the browser window — it waits {wait // 60} min." '
+                                    f'with title "Pipeline · run #{run_id}" subtitle "AliExpress wants a check" sound name "Glass"'],
+                                   timeout=10, capture_output=True)
+                except Exception:
+                    pass
+        scraper.say = say
+        threading.Thread(target=self._beat, daemon=True).start()
+
+    def _beat(self) -> None:
+        while True:
+            time.sleep(30)
+            if self.job:
+                try: self.app.get("/api/worker/queue")
+                except Exception: pass
+
+
+def run_once(app: App, scraper, busy: "Busy | None" = None) -> int:
     data = app.get("/api/worker/queue")
     jobs = data.get("jobs", [])
     state = load_state()
@@ -212,10 +253,14 @@ def run_once(app: App, scraper) -> int:
                 # scraper should apply immediately); keep the 7-day cache for
                 # AliExpress, where every fetch counts against the rate limit.
                 fresh = "aliexpress." not in u["url"].lower()
-                folder = scraper.scrape(u["url"], refresh=fresh)
+                if busy: busy.job, busy.challenged = (run_id, u["url"]), False
+                try:
+                    folder = scraper.scrape(u["url"], refresh=fresh)
+                finally:
+                    if busy: busy.job = None
                 # describe=0 on every push; one analyst call per run comes after the loop
                 scraper.push_to_app(APP_URL, str(run_id), folder, describe=False, password=app.password)
-                if key in state:
+                if key in state or (busy and busy.challenged):
                     report(app, run_id, u["url"], None)
                 state.pop(key, None)
                 done += 1
@@ -297,9 +342,10 @@ def main() -> None:
             sys.exit(1)
         time.sleep(60)
     log(f"worker up — polling {APP_URL} every {POLL_SECONDS}s")
+    busy = Busy(app, scraper)
     while True:
         try:
-            n = run_once(app, scraper)
+            n = run_once(app, scraper, busy)
             if n:
                 log(f"{n} page(s) pushed")
         except Exception as e:
