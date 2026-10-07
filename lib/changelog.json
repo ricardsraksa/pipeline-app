@@ -1,5 +1,13 @@
 [
  {
+  "version": "2.104.2",
+  "date": "2026-10-07",
+  "title": "Continue goes to the next stage, not back to Stage 1",
+  "items": [
+   "After an action, the run page follows the run to the stage that needs you"
+  ]
+ },
+ {
   "version": "2.104.1",
   "date": "2026-10-06",
   "title": "dates match between server and browser",

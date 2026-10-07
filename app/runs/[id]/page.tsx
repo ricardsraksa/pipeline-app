@@ -249,6 +249,9 @@ export default function RunPage() {
   // The stage first shown on this page load stays on screen until the
   // operator clicks another one — a stage finishing must not yank the view.
   const lockedStage = useRef<StageKey | null>(null);
+  // The run status the lock was taken at: a new status re-locks to the stage
+  // that now needs the operator (actions refetch instead of reloading).
+  const lockedAt = useRef<string | null>(null);
   const [stage2View, setStage2View] = useState<"text" | "copy">("text");
   const [zippingImages, setZippingImages] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -555,7 +558,11 @@ export default function RunPage() {
   const presentKeys = STAGE_DEFS.map((d) => d.key).filter((k) => present[k]);
   const autoKey: StageKey =
     (presentKeys.find((k) => stageActionable(states[k])) ?? (run.status === "completed" ? "done" : presentKeys[presentKeys.length - 1])) ?? "product";
-  if (lockedStage.current === null) lockedStage.current = autoKey;
+  const lockKey = `${run.status}|${run.meta.ads?.step ?? ""}`;
+  if (lockedStage.current === null || lockedAt.current !== lockKey) {
+    lockedStage.current = autoKey;
+    lockedAt.current = lockKey;
+  }
   const activeKey: StageKey = activeOverride && present[activeOverride]
     ? activeOverride
     : (lockedStage.current && present[lockedStage.current] ? lockedStage.current : autoKey);
