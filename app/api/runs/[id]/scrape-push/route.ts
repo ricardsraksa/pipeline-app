@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, context: { params: Promise<unknown>
     return NextResponse.json({ success: true, mode: "variants", options: Object.keys(options).length, variants: variants.length, hasEdit: Boolean(run.product_variants_edited) });
   }
 
-  if (!["awaiting_product_approval", "product", "pending", "failed", "cancelled"].includes(run.status ?? "")) {
+  if (run.product_approved_at || !["awaiting_product_approval", "product", "pending", "failed", "cancelled"].includes(run.status ?? "")) {
     return NextResponse.json({ success: false, error: `Run is past Stage 1 (status ${run.status}) — restart Stage 1 first` }, { status: 400 });
   }
 

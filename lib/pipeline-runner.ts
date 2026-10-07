@@ -396,6 +396,10 @@ export async function runProductStage(runId: number): Promise<void> {
 /** Park the run at the Stage 1 gate with a step line that says what's needed. */
 export async function parkAtProductGate(runId: number): Promise<void> {
   const run = await getRun(runId);
+  // Already approved: research owns the run now. A description rewrite that
+  // started before the approval and finished after it used to land here and
+  // put the run back at the gate while its research kept going (run 180).
+  if (run?.product_approved_at) return;
   const scrape = parseProductScrape(run?.product_scrape);
   const productPage = scrape?.pages.find((p) => p.role === "product");
   const productOk = Boolean(productPage?.ok);
