@@ -22,7 +22,7 @@ export default function PushAll({ runId, productUrl, hasDocs, hasImages, hasAds,
 
   async function run() {
     const plan = [
-      hasImages ? (productUrl ? "Shopify: title, copy fields and images on the saved product" : "Shopify: skipped, no product link saved") : "Shopify: skipped, no images yet",
+      hasImages ? (productUrl ? "Shopify: title, copy fields and images on the saved product" : "Shopify: a new draft from your template, then filled (skipped if no template is set)") : "Shopify: skipped, no images yet",
       hasDocs ? "Google Doc: the copy into the product's tab" : "Google Doc: skipped, no copy yet",
       hasImages || hasAds ? `Drive: ${[hasImages ? "images" : null, hasAds ? "ads" : null].filter(Boolean).join(" and ")}` : "Drive: skipped, nothing finished",
     ];
@@ -32,20 +32,19 @@ export default function PushAll({ runId, productUrl, hasDocs, hasImages, hasAds,
 
     // Shopify
     if (!hasImages) set("Shopify", { state: "skipped", note: "no images yet" });
-    else if (!productUrl) set("Shopify", { state: "skipped", note: "no product link saved" });
     else {
       set("Shopify", { state: "running" });
       try {
         const res = await fetch("/api/shopify/fill", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ runId, productUrl, includeTitle: true, dryRun: false }),
+          body: JSON.stringify({ runId, productUrl: productUrl || undefined, includeTitle: true, dryRun: false }),
         });
-        const d = await res.json().catch(() => ({})) as { success?: boolean; error?: string; warning?: string; report?: { fields?: Array<{ status?: string }>; images?: { toAdd?: unknown[] } } };
-        if (!d.success) set("Shopify", { state: "failed", note: d.error ?? `failed (${res.status})` });
+        const d = await res.json().catch(() => ({})) as { success?: boolean; error?: string; warning?: string; created?: { handle?: string } | null; setup?: { problem?: string }; report?: { fields?: Array<{ status?: string }>; images?: { toAdd?: unknown[] } } };
+        if (!d.success) set("Shopify", res.status === 400 && !productUrl ? { state: "skipped", note: d.error } : { state: "failed", note: d.error ?? `failed (${res.status})` });
         else {
           const setCount = d.report?.fields?.filter((f) => f.status === "set").length;
           const imgs = d.report?.images?.toAdd?.length;
-          set("Shopify", { state: "done", note: [setCount != null ? `${setCount} fields` : null, imgs ? `${imgs} images` : null, d.warning ?? null].filter(Boolean).join(" · ") || undefined });
+          set("Shopify", { state: "done", note: [d.created ? "new draft from template" : null, setCount != null ? `${setCount} fields` : null, imgs ? `${imgs} images` : null, d.setup?.problem ?? null, d.warning ?? null].filter(Boolean).join(" · ") || undefined });
         }
       } catch (e) { set("Shopify", { state: "failed", note: e instanceof Error ? e.message : "network error" }); }
     }

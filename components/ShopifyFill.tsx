@@ -4,7 +4,7 @@
 // sets the title, fills the metafields and appends the images. Strict/reversible
 // on the server: never publishes, never deletes, never touches price.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface FieldRow {
   label: string;
@@ -59,6 +59,14 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
   const [err, setErr] = useState<string | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // A template product is set: an empty link means "create it for me".
+  const [template, setTemplate] = useState(false);
+  useEffect(() => {
+    fetch("/api/settings/shopify?lite=1").then((r) => r.json()).then((d) => setTemplate(Boolean(d.url))).catch(() => {});
+  }, []);
+  const willCreate = template && !url.trim() && !initialAdminUrl;
+  const [created, setCreated] = useState<{ adminUrl: string; handle: string } | null>(null);
+  const [setup, setSetup] = useState<{ variants?: string; price?: string; problem?: string } | null>(null);
 
   async function push() {
     setBusy(true);
@@ -72,6 +80,8 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       const data = await res.json();
       if (!data.success) { setErr(data.error ?? `Failed (${res.status})`); return; }
       setReport(data.report as Report);
+      if (data.created) { setCreated(data.created); setUrl(data.created.adminUrl); }
+      setSetup(data.setup && Object.keys(data.setup).length ? data.setup : null);
       if (data.warning) setErr(String(data.warning));
       setNote(data.restructured ? "Re-derived from your edits." : null);
       window.dispatchEvent(new Event("run:changed"));
@@ -94,18 +104,30 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
           spellCheck={false}
           aria-label="Shopify product link"
           aria-invalid={urlErr}
-          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Shopify product link"}
+          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : template ? "Leave empty to create it from your template" : "Shopify product link"}
           className={`flex-1 min-w-[260px] border ${urlErr ? "border-[var(--color-red)]" : "border-[var(--color-border-strong)]"} bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--color-accent)]`}
         />
         <button
           onClick={push}
-          disabled={busy || !(url.trim() || initialAdminUrl)}
+          disabled={busy || !(url.trim() || initialAdminUrl || template)}
           className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-[620] bg-[var(--color-primary)] text-[var(--color-on-primary)] disabled:opacity-40"
         >
-          {busy ? "Pushing…" : "Push to Shopify"}
+          {busy ? (willCreate ? "Creating…" : "Pushing…") : willCreate ? "Create & push to Shopify" : "Push to Shopify"}
         </button>
       </div>
       {note && <p className="text-[11.5px] text-[var(--color-text-3)]">{note}</p>}
+      {created && (
+        <p className="text-[11.5px] text-[var(--color-text-2)]">
+          Created a draft from your template at /products/{created.handle} ·{" "}
+          <a href={created.adminUrl} target="_blank" rel="noopener noreferrer" className="underline">open in Shopify</a> to publish it.
+        </p>
+      )}
+      {setup && (
+        <p className={`text-[11.5px] ${setup.problem ? "text-[var(--color-amber)]" : "text-[var(--color-text-2)]"}`}>
+          {[setup.variants, setup.price ? `price ${setup.price}` : null].filter(Boolean).join(" · ")}
+          {setup.problem ? `${setup.variants || setup.price ? " · " : ""}${setup.problem}` : ""}
+        </p>
+      )}
       {err && <p className="text-[11.5px] text-[var(--color-red)]">{err}</p>}
       {report && (
         <div className="space-y-2">
