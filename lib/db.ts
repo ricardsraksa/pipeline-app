@@ -1,9 +1,12 @@
 import { createClient } from "@libsql/client";
+import { createImportStore } from "@/lib/import/store";
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!url || !authToken) {
+// A local file DB (TURSO_DATABASE_URL=file:data/dev.db) needs no token —
+// used for development so tests never touch the production database.
+if (!url || (!authToken && !url.startsWith("file:"))) {
   throw new Error("Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN env vars");
 }
 
@@ -243,6 +246,10 @@ async function migrateDB() {
     // Set aside for later: keeps the run out of "Needs you" and the header
     // count without changing its status or its work.
     "snoozed_at TEXT",
+    // Started from the Import list: the 💦 priority flag, and the Instagram
+    // links kept as references (JSON array, never scraped).
+    "priority INTEGER",
+    "reference_urls TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -268,6 +275,9 @@ async function migrateDB() {
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_api_usage_run ON api_usage(run_id)`,
   );
+
+  // Import list (products waiting to be started).
+  await createImportStore(db).init();
 }
 
 // ── DB helper functions ───────────────────────────────────────────────────────
@@ -292,6 +302,8 @@ export interface RunSummary {
   product_code: string | null;
   /** Set when the operator put this run aside for later. */
   snoozed_at: string | null;
+  /** 1 when started from a 💦 priority Import item. */
+  priority: number | null;
   /** Stage 5: writing | review | generating | done. */
   ads_step: string | null;
   ads_error: string | null;
@@ -304,7 +316,7 @@ export async function listRuns(): Promise<RunSummary[]> {
     SELECT
       id, created_at, product_url, product_name, brand_name, status,
       current_step, last_updated_at, stage3_hero_image_url, uploaded_source_images,
-      product_code, snoozed_at, ads_step, ads_error,
+      product_code, snoozed_at, priority, ads_step, ads_error,
       (
         (CASE WHEN step_research              IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN step_chief_mid             IS NOT NULL THEN 1 ELSE 0 END) +
@@ -341,6 +353,8 @@ export async function createRun(data: {
   uploaded_source_images?: string[] | null;
   product_code?: string | null;
   status?: string;
+  priority?: boolean;
+  reference_urls?: string[] | null;
 }): Promise<number> {
   const url = data.product_url ?? "";
   // Compute a sensible display name: description excerpt → URL → fallback.
@@ -352,8 +366,8 @@ export async function createRun(data: {
     sql: `INSERT INTO runs (
             created_at, product_url, product_name, product_description,
             competitor_urls, uploaded_source_images, product_code, status,
-            started_at, last_updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            started_at, last_updated_at, priority, reference_urls
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       new Date().toISOString(),
       url,
@@ -365,6 +379,8 @@ export async function createRun(data: {
       data.status ?? "pending",
       new Date().toISOString(),
       new Date().toISOString(),
+      data.priority ? 1 : null,
+      data.reference_urls && data.reference_urls.length ? JSON.stringify(data.reference_urls) : null,
     ],
   });
   return Number(result.lastInsertRowid);
@@ -690,4 +706,7 @@ export interface Run {
   ads_drive_state: string | null;
   scrape_retry_requested: string | null;
   snoozed_at: string | null;
+  priority: number | null;
+  /** JSON array of Instagram links (references, never scraped). */
+  reference_urls: string | null;
 }
