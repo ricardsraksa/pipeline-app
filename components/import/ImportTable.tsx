@@ -84,14 +84,14 @@ export default function ImportTable({ onImported }: { onImported: () => void }) 
                 ref={(el) => { if (el) refs.current.set(`${r.key}:name`, el); else refs.current.delete(`${r.key}:name`); }}
                 value={r.name} onChange={(e) => set(r.key, { name: e.target.value })}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); focusLinks(r.key); } }}
-                placeholder={i === 0 ? "e.g. Wall Lamp" : ""} aria-label={`Product name, row ${i + 1}`} disabled={busy}
+                aria-label={`Product name, row ${i + 1}`} disabled={busy}
                 className={cx(inputCls, "h-[36px]", err && /name/i.test(err) && "border-[var(--color-red)]")} />
               <textarea
                 ref={(el) => { if (el) refs.current.set(`${r.key}:links`, el); else refs.current.delete(`${r.key}:links`); }}
                 value={r.links} onChange={(e) => set(r.key, { links: e.target.value })}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); focusNextName(r.key); } }}
                 rows={Math.min(4, Math.max(1, r.links.split("\n").length))} spellCheck={false} disabled={busy}
-                placeholder={i === 0 ? "Reel, brand site or Amazon — any of them" : ""} aria-label={`Links, row ${i + 1}`}
+                aria-label={`Links, row ${i + 1}`}
                 className={cx(inputCls, "py-[8px] min-h-[36px] ff-mono text-[12px] resize-none", err && !/name/i.test(err) && "border-[var(--color-red)]")} />
               <label className="h-[36px] grid place-items-center cursor-pointer rounded-[6px] hover:bg-[var(--color-surface-2)] tr" title="Priority">
                 <input type="checkbox" checked={r.priority} onChange={(e) => set(r.key, { priority: e.target.checked })} disabled={busy}
@@ -106,8 +106,7 @@ export default function ImportTable({ onImported }: { onImported: () => void }) 
           </div>
         );
       })}
-      <div className="flex items-center justify-between gap-3 px-[13px] py-[10px] border-t border-[var(--color-border)] bg-[var(--color-surface-2)]">
-        <span className="text-[12px] text-[var(--color-text-3)]">Enter moves to the next box · Shift+Enter for another link</span>
+      <div className="flex items-center justify-end gap-3 px-[13px] py-[10px] border-t border-[var(--color-border)] bg-[var(--color-surface-2)]">
         <button onClick={importAll} disabled={!canImport}
           className="cursor-pointer h-9 px-[14px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed tr">
           {busy ? "Importing…" : filled > 1 ? `Import all (${filled})` : "Import"}

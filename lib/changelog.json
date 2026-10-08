@@ -1,5 +1,16 @@
 [
  {
+  "version": "2.107.0",
+  "date": "2026-10-08",
+  "title": "Import is the home page, runs live under Runs, no instructions anywhere",
+  "items": [
+   "Import is the home page: just the product table and Bring in from the doc",
+   "Runs tab: New run (products waiting to start) at the top, the run inbox below",
+   "/import, /new and /history forward to the new pages",
+   "Hint lines, explainer paragraphs, panel intros and example placeholders removed across the app"
+  ]
+ },
+ {
   "version": "2.106.0",
   "date": "2026-10-08",
   "title": "products are imported in the pipeline, numbered and mirrored to the doc",

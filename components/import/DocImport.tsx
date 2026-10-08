@@ -68,7 +68,7 @@ export default function DocImport({ onImported }: { onImported: () => void }) {
         <span className="text-[13px] font-[500] text-[var(--color-text)]">Doc tabs with no run yet · {tabs.length}</span>
         <button onClick={() => setTabs(null)} className="cursor-pointer text-[12.5px] text-[var(--color-text-2)] hover:text-[var(--color-text)] px-2 h-8 rounded-[6px] tr">Cancel</button>
       </div>
-      {tabs.length === 0 && <div className="px-[13px] py-[14px] text-[13px] text-[var(--color-text-2)]">Every product tab already has a run or is in the list.</div>}
+      {tabs.length === 0 && <div className="px-[13px] py-[14px] text-[13px] text-[var(--color-text-2)]">Nothing to bring in.</div>}
       {tabs.map((t, i) => (
         <label key={t.tabId} className={cx("flex items-start gap-3 px-[13px] py-[9px] cursor-pointer hover:bg-[var(--color-surface-2)] tr", i > 0 && "border-t border-[var(--color-border)]")}>
           <input type="checkbox" checked={picked.has(t.tabId)} onChange={() => toggle(t.tabId)} className="mt-[3px] w-4 h-4 cursor-pointer accent-[var(--color-accent)]" />

@@ -57,7 +57,7 @@ const svgProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", s
 const ClockIcon = () => <svg {...svgProps}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
 const TrashIcon = () => <svg {...svgProps}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /></svg>;
 
-export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[]; loadFailed?: boolean }) {
+export default function HomeV2({ runs, loadFailed = false, top }: { runs: RunSummary[]; loadFailed?: boolean; top?: React.ReactNode }) {
   const router = useRouter();
   const { push } = useToast();
   const [q, setQ] = useState("");
@@ -142,7 +142,7 @@ export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "30px 22px 80px" }} data-screen-label="Home">
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "30px 22px 80px" }} data-screen-label="Runs">
       <HistoryRefresher hasActiveRuns={hasActiveRuns} />
       <div className="flex items-center gap-3.5 mb-[22px]">
         <h1 className="text-[19px] font-[600] tracking-[-0.02em] text-[var(--color-text)]">Runs</h1>
@@ -151,11 +151,11 @@ export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[
           className="cursor-pointer h-8 px-2.5 text-[12.5px] rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-2)] outline-none focus:border-[var(--color-border-strong)]">
           {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, code or run number"
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search runs"
           className="w-[250px] h-8 px-[11px] text-[13px] rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-3)]" />
-        <button onClick={() => router.push("/new")}
-          className="cursor-pointer h-8 px-[13px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 tr">Start runs</button>
       </div>
+
+      {top}
 
       {groups.map((g) => (
         <div key={g.label} className="mb-[26px]">
@@ -180,7 +180,7 @@ export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[
                   <input autoFocus value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} onBlur={() => saveCode(r)}
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCode(r); } else if (e.key === "Escape") { e.preventDefault(); setEditingCode(null); } }}
-                    placeholder="58" inputMode="numeric" aria-label="Product code"
+                    inputMode="numeric" aria-label="Product code"
                     className="ff-mono w-[44px] text-[11.5px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[4px] px-1 py-px outline-none focus:border-[var(--color-accent)]" />
                 ) : (
                   <button onClick={(e) => { e.stopPropagation(); setCodeDraft((codeOf(r) ?? "").replace(/^P/i, "")); setEditingCode(r.id); }}

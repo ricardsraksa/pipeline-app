@@ -72,8 +72,7 @@ export default function AudienceCard({ runId, audience }: { runId: number; audie
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] px-[13px] py-3 space-y-3">
         <label className="flex flex-col gap-1">
           <span className="eyebrow">Buyer</span>
-          <input value={draft.buyer} onChange={(e) => setDraft({ ...draft, buyer: e.target.value })} onBlur={() => save(draft)}
-            placeholder="Adult buying for an ageing parent" className={inputCls} />
+          <input value={draft.buyer} onChange={(e) => setDraft({ ...draft, buyer: e.target.value })} onBlur={() => save(draft)} className={inputCls} />
         </label>
         <div className="flex items-center gap-2" role="radiogroup" aria-label="Who uses it">
           {[{ v: true, l: "Uses it themselves" }, { v: false, l: "Buys it for someone else" }].map((o) => (
@@ -87,13 +86,11 @@ export default function AudienceCard({ runId, audience }: { runId: number; audie
           <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)" }}>
             <label className="flex flex-col gap-1 min-w-0">
               <span className="eyebrow">User</span>
-              <input value={draft.user} onChange={(e) => setDraft({ ...draft, user: e.target.value })} onBlur={() => save(draft)}
-                placeholder="Parent in their 70s, unsteady getting up" className={inputCls} />
+              <input value={draft.user} onChange={(e) => setDraft({ ...draft, user: e.target.value })} onBlur={() => save(draft)} className={inputCls} />
             </label>
             <label className="flex flex-col gap-1 min-w-0">
               <span className="eyebrow">The copy calls them</span>
-              <input value={draft.relation} onChange={(e) => setDraft({ ...draft, relation: e.target.value })} onBlur={() => save(draft)}
-                placeholder="your mom or dad" className={inputCls} />
+              <input value={draft.relation} onChange={(e) => setDraft({ ...draft, relation: e.target.value })} onBlur={() => save(draft)} className={inputCls} />
             </label>
           </div>
         )}

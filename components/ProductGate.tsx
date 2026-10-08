@@ -248,7 +248,7 @@ export default function ProductGate({
   const retryMin = failure?.retryAt ? Math.max(1, Math.round((new Date(failure.retryAt).getTime() - Date.now()) / 60_000)) : null;
   const failureLine = failure
     ? checkOpen
-      ? `Complete the slider in the browser window that opened on your Mac. It waits ${retryMin} more min.`
+      ? `Check open on your Mac · ${retryMin} min left.`
       : `${throttled ? "" : `${failure.error.length > 160 ? `${failure.error.slice(0, 160)}…` : failure.error} — `}${retryMin ? `retrying in ${retryMin} min.` : "stopped retrying."}`
     : null;
   const [retrying, setRetrying] = useState<string | null>(null);
@@ -315,7 +315,6 @@ export default function ProductGate({
           )}
         </div>
         <textarea value={text} onChange={(e) => setText(e.target.value)} disabled={!waiting || regenerating || approving} rows={7}
-          placeholder={waiting ? "What the product is and does…" : ""}
           className="w-full px-[13px] py-3 rounded-[8px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[13.5px] leading-[1.6] text-[var(--color-text)] outline-none resize-y focus:border-[var(--color-border-strong)] disabled:opacity-70 placeholder:text-[var(--color-text-3)]" />
       </div>
 

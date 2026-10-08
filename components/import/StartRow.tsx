@@ -70,7 +70,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
         <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1.6fr) auto" }}>
           <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Product name" className={cx(inputCls, "h-[36px]")} />
           <textarea value={draft.links} onChange={(e) => setDraft({ ...draft, links: e.target.value })} rows={Math.min(5, Math.max(2, draft.links.split("\n").length + 1))}
-            spellCheck={false} aria-label="Links" placeholder="Add the brand link you found here" className={cx(inputCls, "py-[8px] ff-mono text-[12px] resize-y")} />
+            spellCheck={false} aria-label="Links" className={cx(inputCls, "py-[8px] ff-mono text-[12px] resize-y")} />
           <label className="h-[36px] flex items-center gap-1.5 cursor-pointer text-[12.5px] text-[var(--color-text-2)]">
             <input type="checkbox" checked={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.checked })} className="w-4 h-4 cursor-pointer accent-[var(--color-water)]" />
             Priority

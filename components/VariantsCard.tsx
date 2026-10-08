@@ -166,7 +166,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
           <input
             value={aiText} onChange={(e) => setAiText(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") void runAi(); if (e.key === "Escape") setAiOpen(false); }}
-            placeholder="e.g. split into Color and Size"
+            placeholder="What to change"
             className="flex-1 min-w-[280px] px-[11px] py-2 rounded-[8px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[12.5px] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]"
           />
           <button onClick={runAi} disabled={aiBusy || aiText.trim().length < 3} className="btn btn-sm btn-primary">{aiBusy ? "Working…" : "Apply"}</button>
@@ -209,7 +209,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
                 <input value={row.name} onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                   placeholder="Option name" className="w-[130px] shrink-0 px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[12.5px] font-[600] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)]" />
                 <textarea value={row.values} onChange={(e) => setDraft((d) => d.map((x, j) => (j === i ? { ...x, values: e.target.value } : x)))} rows={2}
-                  placeholder="Values, comma separated" className="flex-1 px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] ff-mono text-[11.5px] text-[var(--color-text)] outline-none resize-y focus:border-[var(--color-border-strong)]" />
+                  placeholder="Values" className="flex-1 px-2 py-1.5 rounded-[7px] bg-[var(--color-surface)] border border-[var(--color-border)] ff-mono text-[11.5px] text-[var(--color-text)] outline-none resize-y focus:border-[var(--color-border-strong)]" />
                 <button onClick={() => setDraft((d) => d.filter((_, j) => j !== i))} className="btn btn-sm btn-danger">×</button>
               </div>
             ))}

@@ -99,7 +99,7 @@ export default function Stage3ReferenceImages({ runId, initial }: { runId: numbe
         >
           <input {...getInputProps()} />
           <p className="text-[12px] text-[var(--color-text-3)]">
-            {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : "Drop images or click to upload"}
+            {uploading ? "Uploading…" : isDragActive ? "Drop to upload" : "Add images"}
           </p>
         </div>
       )}

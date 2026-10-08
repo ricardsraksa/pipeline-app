@@ -714,7 +714,7 @@ export default function RunPage() {
               {editingCode ? (
                 <input autoFocus value={codeDraft} onChange={(e) => setCodeDraft(e.target.value)} onBlur={saveCode}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCode(); } else if (e.key === "Escape") { e.preventDefault(); setEditingCode(false); } }}
-                  placeholder="58" aria-label="Product code" inputMode="numeric"
+                  aria-label="Product code" inputMode="numeric"
                   className="ff-mono w-[58px] text-[10.5px] text-[var(--color-text)] bg-[var(--color-surface)] border border-[var(--color-border-strong)] rounded-[4px] px-1.5 py-px outline-none focus:border-[var(--color-accent)]" />
               ) : (
                 <button onClick={() => { setCodeDraft((codeOverride ?? run.meta.productCode ?? "").replace(/^P/i, "")); setEditingCode(true); }} title="Product code"

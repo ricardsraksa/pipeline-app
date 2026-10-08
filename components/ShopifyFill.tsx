@@ -104,7 +104,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
           spellCheck={false}
           aria-label="Shopify product link"
           aria-invalid={urlErr}
-          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : template ? "Leave empty to create it from your template" : "Shopify product link"}
+          placeholder={initialAdminUrl ? `Last: ${initialAdminUrl}` : "Shopify product link"}
           className={`flex-1 min-w-[260px] border ${urlErr ? "border-[var(--color-red)]" : "border-[var(--color-border-strong)]"} bg-[var(--color-surface)] text-[var(--color-text)] rounded-md px-3 py-1.5 text-[12px] focus:outline-none focus:border-[var(--color-accent)]`}
         />
         <button
@@ -118,8 +118,8 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       {note && <p className="text-[11.5px] text-[var(--color-text-3)]">{note}</p>}
       {created && (
         <p className="text-[11.5px] text-[var(--color-text-2)]">
-          Created a draft from your template at /products/{created.handle} ·{" "}
-          <a href={created.adminUrl} target="_blank" rel="noopener noreferrer" className="underline">open in Shopify</a> to publish it.
+          Draft created: /products/{created.handle} ·{" "}
+          <a href={created.adminUrl} target="_blank" rel="noopener noreferrer" className="underline">open in Shopify</a>
         </p>
       )}
       {setup && (

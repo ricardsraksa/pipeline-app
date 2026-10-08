@@ -32,7 +32,7 @@ The only screen visible when logged out. Everything else redirects here.
 ## 2. Global chrome (on every signed-in screen)
 
 - App name and version of the deployed build.
-- Four destinations: Home, Import, Start runs, Settings (plus Changes).
+- Destinations: Import (the home page), Runs, Settings, Changes.
 - An amber badge showing how many runs currently need the operator.
 - Light/dark toggle (sun/moon icon); the saved theme is applied before first
   paint.
@@ -40,9 +40,12 @@ The only screen visible when logged out. Everything else redirects here.
 
 ---
 
-## 3. Home
+## 3. Runs
 
-Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box, Start runs. The product code on each row is editable in place: type the number, the P is added.
+Top: **New run** — the imported products waiting to start (see 4b), shown only when there are any. Below it, the run inbox.
+
+
+Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box. The product code on each row is editable in place: type the number, the P is added.
 
 The run inbox. Four groups, each with a count:
 
@@ -72,9 +75,7 @@ database read fails.
 
 ---
 
-## 4a. Import
-
-Where new products go in — usually by the person who finds them on Instagram.
+## 4a. Import (home)
 
 - A table, one product per row: **Product name**, **Links** (reel, brand site,
   Amazon — any mix, Shift+Enter for another link) and a **Priority** drop.
@@ -85,9 +86,6 @@ Where new products go in — usually by the person who finds them on Instagram.
 - **Bring in from the doc** (one-off): lists master-doc tabs with no run yet
   ("already sourced" ones start unticked) and brings the ticked ones in,
   keeping their tabs.
-- **Waiting to start**: every imported product with its provisional P number,
-  the drop when it's a priority, and where its doc tab stands ("tab pending",
-  "in doc", the error, or "doc not connected").
 
 Numbering: priority products first, then oldest first; numbers follow on
 from the highest P in the runs and the doc. Adding a priority product moves
@@ -95,7 +93,7 @@ the others down one, and their doc tabs are renamed to match. Each product
 gets a tab in the master doc (`💦 P92 - Name` for a priority) as soon as it's
 imported.
 
-## 4b. Start runs (replaces New run)
+## 4b. New run (top of Runs)
 
 The imported products waiting to start, in work order. Each row: P number,
 the priority drop (click to toggle), name and links ("reel" for Instagram),
@@ -424,3 +422,8 @@ leaving the page asks first.
   state. All four matter.
 - Text on screen is short by design: labels and one-line explanations, no
   paragraphs of instructions.
+
+
+## Copy rule
+
+No instruction or explanation text anywhere: no hint lines, explainer paragraphs, panel intros, example placeholders or how-to empty states. Labels, statuses, errors, confirm dialogs and action buttons only.

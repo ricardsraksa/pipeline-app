@@ -50,7 +50,7 @@ export async function POST(req: Request, context: { params: Promise<unknown> }) 
     return Response.json({ success: false, error: status === 503 ? `Not started: ${msg}` : msg }, { status });
   }
 
-  revalidatePath("/");
+  revalidatePath("/runs");
   runPipeline(started.runId).catch((err) => console.error(`Pipeline ${started.runId} failed:`, err));
   void docSync.requestSync();
   return Response.json({ success: true, runId: started.runId, code: started.code });

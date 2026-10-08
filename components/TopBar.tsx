@@ -61,7 +61,7 @@ export default function TopBar() {
     router.push("/login");
   }
 
-  const isRun = path.startsWith("/runs") || path === "/";
+  const isRun = path.startsWith("/runs");
   return (
     <header className="sticky top-0 z-30 h-[50px] flex items-center gap-6 px-[22px] border-b border-[var(--color-border)]"
       style={{ background: "color-mix(in srgb, var(--color-bg) 78%, transparent)", backdropFilter: "blur(14px) saturate(160%)" }}>
@@ -70,9 +70,8 @@ export default function TopBar() {
         <span className="ff-mono text-[10px] text-[var(--color-text-3)]">v{process.env.NEXT_PUBLIC_APP_VERSION ?? ""}</span>
       </Link>
       <nav className="flex items-center gap-[2px]">
-        <Tab href="/" label="Home" active={isRun} badge={needs} />
-        <Tab href="/import" label="Import" active={path === "/import"} />
-        <Tab href="/new" label="Start runs" active={path === "/new"} />
+        <Tab href="/" label="Import" active={path === "/"} />
+        <Tab href="/runs" label="Runs" active={isRun} badge={needs} />
         <Tab href="/settings" label="Settings" active={path === "/settings"} />
         <Tab href="/changes" label="Changes" active={path === "/changes"} />
       </nav>

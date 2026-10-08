@@ -97,9 +97,6 @@ export default function AskAssistant({ runId, code }: { runId: number; code: str
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-            {loaded && thread.length === 0 && (
-              <p className="text-[12.5px] text-[var(--color-text-3)] pt-2">Questions about this product — sizing, variants, setup, positioning.</p>
-            )}
             {thread.map((t, i) => (
               <div key={i} className="space-y-2">
                 <div className="ml-8 rounded-[9px] bg-[var(--color-surface-2)] px-3 py-2 text-[13px] leading-[1.5] text-[var(--color-text)] whitespace-pre-wrap">{t.q}</div>
