@@ -16,7 +16,13 @@ Everything from "Start run" onward is unchanged.
 
 ## What the operator sees
 
-### Import (new group at the top of Home)
+### Pages
+
+Top bar: **Home · Import · Start runs · Settings**. Home is unchanged (the
+run inbox). The old New run page is removed — every product comes through
+Import.
+
+### Import page (`/import`)
 
 - **Add product** form has three fields: **Product name** (for reference,
   like in the doc), **Product link** (the original listing) and a
@@ -32,8 +38,27 @@ Everything from "Start run" onward is unchanged.
   rows keep their table order (priority rows still go first).
 - Order: priority items first, then the rest, each by date added (oldest
   first). Priority items carry a water-drop badge (SVG icon, not emoji).
-- Row actions: edit, toggle priority, **Start run**. No delete — products
-  added to Import are not removed.
+- No delete — imported products are not removed.
+
+### Start runs page (`/new`, replaces New run)
+
+- The list of imported, not-yet-started products with their provisional
+  numbers, priority first.
+- Each row: edit (name, link, priority) and an **AliExpress link** box with
+  a **Start** button inline. Start creates the run exactly as the old New
+  run form did; no separate form.
+
+### Bring in from the doc (one-off, on the Import page)
+
+- Reads every tab in the master doc and lists those whose P code has no
+  run. For each: name (from "Product name:" or the tab title), link (from
+  "Competitor/example link:"), priority (💧 in the title).
+- Tabs whose "Alibaba link:" line is filled start **unticked** (older
+  products done by hand); the rest start ticked. Operator confirms.
+- Ticked tabs become Import items that **reuse their existing tab**
+  (`doc_tab_id` set, no new tab). They follow the normal numbering rules,
+  so their tab may be renamed if their list position gives a different
+  number.
 
 ### Numbering
 
@@ -60,11 +85,11 @@ Everything from "Start run" onward is unchanged.
 
 ### Start run
 
-- Opens today's New run form pre-filled: product code locked to the item's
-  number, run name = the product name. A listing link goes in the
+- Pressed on the Start runs page after pasting the AliExpress link. Product
+  code = the item's number, run name = the product name. A listing link goes in the
   competitor field (scraped as today); a reel link (instagram.com,
   including /reel/ and /p/) is kept as a reference only, never scraped. The
-  operator pastes the AliExpress link and submits; the run starts as today.
+  run then starts as today.
 - The run stores `priority` (badge on Home) and, for a reel, `reference_url`
   (clickable in the rail's Links section).
 - The Import item is marked started (`run_id` set) and leaves the list.
@@ -108,7 +133,6 @@ after the spike.
 - Any change to Stages 1–5, Shopify, Drive.
 - Trello. (Trello cards group launched P numbers; this design keeps P
   numbers in work order so that keeps working.)
-- Importing the doc's existing tabs. (Optional one-off later.)
 
 ## Testing
 
