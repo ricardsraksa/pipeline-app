@@ -21,13 +21,16 @@ export interface ModelOption {
 // Models offered in the dropdowns. `id` is the exact string the API expects —
 // keep in sync with the Claude model catalog.
 export const MODEL_CATALOG: ModelOption[] = [
-  { id: "claude-fable-5", label: "Fable 5", hint: "Most powerful · $10 / $50 per 1M" },
+  { id: "claude-fable-5-1", label: "Fable 5.1", hint: "Most powerful · $10 / $50 per 1M" },
+  { id: "claude-fable-5", label: "Fable 5", hint: "Prior Fable · $10 / $50 per 1M" },
   { id: "claude-opus-5-5", label: "Opus 5.5", hint: "Newest Opus · $4 / $20 per 1M" },
   { id: "claude-opus-5", label: "Opus 5", hint: "Prior Opus · $5 / $25 per 1M" },
   { id: "claude-opus-4-8", label: "Opus 4.8", hint: "Older Opus · $5 / $25 per 1M" },
-  { id: "claude-sonnet-5", label: "Sonnet 5", hint: "Newest Sonnet · $2 / $10 per 1M" },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", hint: "Newest Sonnet · $2 / $10 per 1M" },
+  { id: "claude-sonnet-5", label: "Sonnet 5", hint: "Prior Sonnet · $2 / $10 per 1M" },
   { id: "claude-sonnet-4-6", label: "Sonnet 4.6", hint: "Balanced · $3 / $15 per 1M" },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hint: "Fast & cheap · $1 / $5 per 1M" },
+  { id: "claude-haiku-5-5", label: "Haiku 5.5", hint: "Newest Haiku · $0.10 / $0.50 per 1M" },
+  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5", hint: "Prior Haiku · $1 / $5 per 1M" },
 ];
 
 export interface RoleMeta {
@@ -123,13 +126,19 @@ const SAMPLING_PARAM_MODELS = new Set<string>([
 // input rate unless `cacheRead` says otherwise (Opus 5.5 reads at $0.20);
 // writes bill 1.25× (5m TTL) or 2× (1h TTL) — the tracker prices all writes at
 // 2× so it never understates (the big static prefixes use 1h).
-const MODEL_PRICING: Record<string, { input: number; output: number; cacheRead?: number }> = {
+// `long` is the price above a prompt-length threshold (Haiku 5.5 charges more
+// for prompts over 100,000 tokens).
+type Price = { input: number; output: number; cacheRead?: number };
+const MODEL_PRICING: Record<string, Price & { long?: Price & { over: number } }> = {
+  "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25 },
   "claude-fable-5": { input: 10, output: 50 },
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
   "claude-opus-5": { input: 5, output: 25 },
   "claude-opus-4-8": { input: 5, output: 25 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1 },
   "claude-sonnet-5": { input: 2, output: 10 },
   "claude-sonnet-4-6": { input: 3, output: 15 },
+  "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01, long: { over: 100_000, input: 0.5, output: 2.5, cacheRead: 0.05 } },
   "claude-haiku-4-5": { input: 1, output: 5 },
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
 };
@@ -143,8 +152,10 @@ export interface UsageTokens {
 
 /** Dollar cost of one call's token usage on a model. 0 for unknown models. */
 export function costOfUsage(modelId: string, u: UsageTokens): number {
-  const p = MODEL_PRICING[modelId];
-  if (!p) return 0;
+  const base = MODEL_PRICING[modelId];
+  if (!base) return 0;
+  const prompt = u.input_tokens + u.cache_read_tokens + u.cache_write_tokens;
+  const p: Price = base.long && prompt > base.long.over ? base.long : base;
   return (
     (u.input_tokens * p.input +
       u.output_tokens * p.output +
@@ -160,8 +171,9 @@ export function modelSupportsSamplingParams(modelId: string): boolean {
 }
 
 // Models that reject a forced tool call (`tool_choice` "tool" / "any" is a 400):
-// Opus 5.5 thinks on every turn and only takes "auto".
-const NO_FORCED_TOOL_MODELS = new Set<string>(["claude-opus-5-5"]);
+// Opus 5.5, Fable 5.1 and Sonnet 5.5 only take "auto" (checked Oct 8 2026;
+// Haiku 5.5 still accepts a forced call).
+const NO_FORCED_TOOL_MODELS = new Set<string>(["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5"]);
 
 /**
  * Stream a call whose answer must come back through one tool, on any model.

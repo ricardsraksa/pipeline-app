@@ -66,7 +66,7 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
   }, []);
   const willCreate = template && !url.trim() && !initialAdminUrl;
   const [created, setCreated] = useState<{ adminUrl: string; handle: string } | null>(null);
-  const [setup, setSetup] = useState<{ variants?: string; price?: string; problem?: string } | null>(null);
+  const [setup, setSetup] = useState<{ variants?: string; price?: string; category?: string; problem?: string } | null>(null);
 
   async function push() {
     setBusy(true);
@@ -124,8 +124,8 @@ export default function ShopifyFill({ runId, initialAdminUrl, initialUrl }: { ru
       )}
       {setup && (
         <p className={`text-[11.5px] ${setup.problem ? "text-[var(--color-amber)]" : "text-[var(--color-text-2)]"}`}>
-          {[setup.variants, setup.price ? `price ${setup.price}` : null].filter(Boolean).join(" · ")}
-          {setup.problem ? `${setup.variants || setup.price ? " · " : ""}${setup.problem}` : ""}
+          {[setup.category, setup.variants, setup.price ? `price ${setup.price}` : null].filter(Boolean).join(" · ")}
+          {setup.problem ? `${setup.category || setup.variants || setup.price ? " · " : ""}${setup.problem}` : ""}
         </p>
       )}
       {err && <p className="text-[11.5px] text-[var(--color-red)]">{err}</p>}

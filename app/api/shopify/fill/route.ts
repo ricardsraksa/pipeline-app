@@ -7,6 +7,7 @@ import { resolveProduct, applyToProduct } from "@/lib/shopify/push";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import { structureStage2Copy } from "@/lib/stage2/format";
 import { createFromTemplate, getTemplateUrl, priceNewProduct } from "@/lib/shopify/template";
+import { pickCategory, applyCategory } from "@/lib/shopify/category";
 import { planVariants, applyVariants } from "@/lib/shopify/variants";
 import { parseProductScrape } from "@/lib/product";
 import type { ProductPricing } from "@/lib/pricing";
@@ -213,7 +214,21 @@ export async function POST(req: Request) {
     // A product this push created gets its variants and price too: the
     // template has a single default variant, so options can be added and the
     // price set without touching anything that existed before this push.
-    const setup: { variants?: string; price?: string; problem?: string } = {};
+    const setup: { variants?: string; price?: string; category?: string; problem?: string } = {};
+    const problems: string[] = [];
+    // Category and product type: set on a product this push created (a copy
+    // of the template would keep the template's); a dry run shows the pick.
+    if (created || report.dryRun) {
+      try {
+        const pick = await pickCategory(run);
+        if (pick) {
+          if (created) await applyCategory(product.id, pick);
+          setup.category = `${pick.fullName}${pick.productType ? ` · ${pick.productType}` : ""}`;
+        } else problems.push("No matching Shopify category");
+      } catch (e) {
+        problems.push(`Category: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
     if (created && !report.dryRun) {
       let pricing: ProductPricing | null = null;
       try { pricing = run.product_pricing ? JSON.parse(run.product_pricing) as ProductPricing : null; } catch { pricing = null; }
@@ -226,23 +241,24 @@ export async function POST(req: Request) {
       try {
         if (Object.keys(options).length) {
           const plan = await planVariants({ productId: product.id, productTitle: product.title, adminUrl: product.adminUrl, options, price: pricing?.price ?? null, compareAt: pricing?.compare_at ?? null, currency: pricing?.cogs_currency ?? "USD" });
-          if (plan.blocked) setup.problem = plan.blocked;
+          if (plan.blocked) problems.push(plan.blocked);
           else {
             const r = await applyVariants(plan);
             setup.variants = `${r.created} variants (${r.optionsCreated.join(", ")})`;
-            if (r.errors.length) setup.problem = r.errors.join("; ");
+            if (r.errors.length) problems.push(r.errors.join("; "));
             if (pricing?.price) setup.price = pricing.price.toFixed(2);
           }
         } else if (pricing?.price) {
           await priceNewProduct(product.id, pricing.price, pricing.compare_at ?? null);
           setup.price = pricing.price.toFixed(2);
         } else {
-          setup.problem = "No price on this run yet — set one in the Pricing card, then set it in Shopify.";
+          problems.push("No price on this run yet");
         }
       } catch (e) {
-        setup.problem = e instanceof Error ? e.message : String(e);
+        problems.push(e instanceof Error ? e.message : String(e));
       }
     }
+    if (problems.length) setup.problem = problems.join(" · ");
 
     return Response.json({ success: true, report, restructured, warning: restructureWarning, created: created ? { adminUrl: product.adminUrl, handle: product.handle } : null, setup });
   } catch (err) {
