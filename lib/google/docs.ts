@@ -9,8 +9,9 @@
 // copy into the empty cell of the row below it.
 //
 // Safety model:
-//   - insertText is the ONLY request type that can leave this module —
-//     asserted immediately before batchUpdate. Nothing can delete content.
+//   - Only insertText, addDocumentTab and updateDocumentTabProperties can
+//     leave this module (lib/google/guard.ts) — asserted immediately before
+//     every batchUpdate. Nothing can delete or overwrite content.
 //   - Cells that already have content are SKIPPED and reported, never
 //     overwritten — re-running fills gaps only.
 //   - The write targets one explicit tabId; without a matched tab, nothing
@@ -19,19 +20,11 @@
 import { googleAccessToken, masterDocId, googleDocConfigured } from "./auth";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import { whatsIncluded } from "@/lib/stage2/shape";
-import { sameCode } from "@/lib/import/codes";
+import { codeNumber, sameCode } from "@/lib/import/codes";
+import { assertNonDestructive } from "./guard";
 
 export { googleDocConfigured };
 
-const ALLOWED_REQUESTS = new Set(["insertText"]);
-
-function assertNonDestructive(requests: Array<Record<string, unknown>>): void {
-  for (const r of requests) {
-    for (const k of Object.keys(r)) {
-      if (!ALLOWED_REQUESTS.has(k)) throw new Error(`Refusing potentially destructive Docs request: ${k}`);
-    }
-  }
-}
 
 // ── Docs document JSON (minimal shapes we read) ─────────────────────────────
 
@@ -308,4 +301,51 @@ export async function fillProductTab(params: {
     console.error("[google-doc]", message);
     return { ok: false, error: message };
   }
+}
+
+// ── Import list: create / rename / list product tabs ────────────────────────
+
+async function batchUpdate(requests: Array<Record<string, unknown>>): Promise<{ replies?: Array<Record<string, unknown>> }> {
+  assertNonDestructive(requests);
+  const token = await googleAccessToken();
+  const res = await fetch(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}:batchUpdate`,
+    { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ requests }) },
+  );
+  if (!res.ok) throw new Error(`Docs API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()) as { replies?: Array<Record<string, unknown>> };
+}
+
+/** Rename one tab (the 💦 mark and the P number live in the title). */
+export async function renameTab(tabId: string, title: string): Promise<void> {
+  await batchUpdate([{ updateDocumentTabProperties: { tabProperties: { tabId, title }, fields: "title" } }]);
+}
+
+/** Add a product tab with its overview lines. See the spike note
+ *  (docs/superpowers/plans/2026-10-08-import-list-spike.md) for how the
+ *  template tables are handled. */
+export async function createProductTab(title: string, overview: { productName: string; links: string[] }): Promise<{ tabId: string }> {
+  const out = await batchUpdate([{ addDocumentTab: { tabProperties: { title } } }]);
+  const reply = out.replies?.[0] as { addDocumentTab?: { tabProperties?: { tabId?: string } } } | undefined;
+  const tabId = reply?.addDocumentTab?.tabProperties?.tabId;
+  if (!tabId) throw new Error("Docs API did not return the new tab's id.");
+  const text = [
+    `Product name: ${overview.productName}`,
+    `Competitor/example link: ${overview.links.join(" ")}`,
+    "Alibaba link:",
+  ].join("\n") + "\n";
+  await batchUpdate([{ insertText: { location: { index: 1, tabId }, text } }]);
+  return { tabId };
+}
+
+/** Every tab with its code and overview lines (for "Bring in from the doc"). */
+export async function listTabsWithOverview(): Promise<Array<{ tabId: string; title: string; code: number | null; paragraphs: string[] }>> {
+  return (await fetchDocTabs())
+    .filter((t) => t.tabProperties?.tabId)
+    .map((t) => ({
+      tabId: t.tabProperties!.tabId!,
+      title: t.tabProperties?.title ?? "",
+      code: codeNumber(t.tabProperties?.title),
+      paragraphs: (t.documentTab?.body?.content ?? []).filter((el) => el.paragraph).map((el) => paragraphText(el.paragraph)),
+    }));
 }
