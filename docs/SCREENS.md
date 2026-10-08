@@ -32,7 +32,7 @@ The only screen visible when logged out. Everything else redirects here.
 ## 2. Global chrome (on every signed-in screen)
 
 - App name and version of the deployed build.
-- Three destinations: Home, New run, Settings.
+- Four destinations: Home, Import, Start runs, Settings (plus Changes).
 - An amber badge showing how many runs currently need the operator.
 - Light/dark toggle (sun/moon icon); the saved theme is applied before first
   paint.
@@ -42,7 +42,7 @@ The only screen visible when logged out. Everything else redirects here.
 
 ## 3. Home
 
-Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box, New run. The product code on each row is editable in place: type the number, the P is added.
+Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box, Start runs. The product code on each row is editable in place: type the number, the P is added.
 
 The run inbox. Four groups, each with a count:
 
@@ -61,10 +61,10 @@ a trash button to delete it; both are always faintly visible.
 
 Each row: thumbnail (generated hero if there is one, else a source photo, else a
 generated pattern), product code in its own column (e.g. "P58"), product/brand
-name (run number on hover), status, relative time, product URL, snooze, delete. The code is
-assigned when the run is created, continuing the sequence from the highest
-number already used by a run or by a tab in the master doc; it stays editable
-in the run's rail.
+name (run number on hover, a water drop when the product was a priority),
+status, relative time, product URL, snooze, delete. The code is assigned when
+the run is started from Start runs (see 4b); it stays editable in the run's
+rail.
 
 Also: a search field filtering by name, code or run number; an empty state
 ("No runs yet" / "Nothing matches …"); "Couldn't load runs." + Retry when the
@@ -72,19 +72,40 @@ database read fails.
 
 ---
 
-## 4. New run
+## 4a. Import
 
-Three inputs and one button. Nothing is generated here — submitting creates the
-run and the work starts in the background.
+Where new products go in — usually by the person who finds them on Instagram.
 
-1. **Product link** (required, https). Error when it isn't a full link.
-2. **Competitor links** (optional, up to 5, one per line; read for positioning
-   only). Inline errors: "Line N isn't a full https:// link", "Max 5".
-3. **Your own photos** (optional, up to 10, drag or click; each has an
-   always-visible remove button; the scraped listing photos are added
-   automatically).
+- A table, one product per row: **Product name**, **Links** (reel, brand site,
+  Amazon — any mix, Shift+Enter for another link) and a **Priority** drop.
+  A new empty row appears as soon as the last one has text; Enter moves
+  name → links → next row. Empty rows are ignored. **Import all (N)** adds
+  them; rows missing a name or a link, or with text that isn't a link, are
+  marked in red once Import is pressed.
+- **Bring in from the doc** (one-off): lists master-doc tabs with no run yet
+  ("already sourced" ones start unticked) and brings the ticked ones in,
+  keeping their tabs.
+- **Waiting to start**: every imported product with its provisional P number,
+  the drop when it's a priority, and where its doc tab stands ("tab pending",
+  "in doc", the error, or "doc not connected").
 
-Submit is "Run pipeline" (also ⌘↵). It can show "Starting…" and an error box.
+Numbering: priority products first, then oldest first; numbers follow on
+from the highest P in the runs and the doc. Adding a priority product moves
+the others down one, and their doc tabs are renamed to match. Each product
+gets a tab in the master doc (`💦 P92 - Name` for a priority) as soon as it's
+imported.
+
+## 4b. Start runs (replaces New run)
+
+The imported products waiting to start, in work order. Each row: P number,
+the priority drop (click to toggle), name and links ("reel" for Instagram),
+doc status, an **AliExpress link** box and **Start**, and an edit button
+(name, links, priority — e.g. to add the brand found from a reel).
+
+Start takes the next P number, whichever row it was (the rows above move down
+one), and the run begins as before: Instagram links are kept as references
+(shown as "Reel" in the run's Links), every other link is read as a
+competitor page. No photo upload here; the listing's photos are used.
 
 ---
 
