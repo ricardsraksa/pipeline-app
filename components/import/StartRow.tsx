@@ -72,7 +72,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
           <textarea value={draft.links} onChange={(e) => setDraft({ ...draft, links: e.target.value })} rows={Math.min(5, Math.max(2, draft.links.split("\n").length + 1))}
             spellCheck={false} aria-label="Links" placeholder="Add the brand link you found here" className={cx(inputCls, "py-[8px] ff-mono text-[12px] resize-y")} />
           <label className="h-[36px] flex items-center gap-1.5 cursor-pointer text-[12.5px] text-[var(--color-text-2)]">
-            <input type="checkbox" checked={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.checked })} className="w-4 h-4 cursor-pointer accent-[var(--color-accent)]" />
+            <input type="checkbox" checked={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.checked })} className="w-4 h-4 cursor-pointer accent-[var(--color-water)]" />
             Priority
           </label>
         </div>
@@ -93,7 +93,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
       <span className="ff-mono text-[12.5px] text-[var(--color-text)]">{item.productCode}</span>
       <button onClick={togglePriority} disabled={busy} title={item.priority ? "Remove priority" : "Make priority"} aria-label={item.priority ? "Remove priority" : "Make priority"}
         className={cx("cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] hover:bg-[var(--color-surface-2)] tr",
-          item.priority ? "text-[var(--color-accent)]" : "text-[var(--color-text-3)] opacity-40 hover:opacity-100")}>
+          item.priority ? "text-[var(--color-water)] bg-[var(--color-water-bg)]" : "text-[var(--color-text-3)] opacity-50 hover:opacity-100")}>
         <SplashIcon />
       </button>
       <div className="min-w-0">

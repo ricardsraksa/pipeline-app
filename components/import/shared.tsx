@@ -22,7 +22,7 @@ export function SplashIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 export function PriorityBadge() {
   return (
-    <span title="Priority" className="inline-flex items-center text-[var(--color-accent)]">
+    <span title="Priority" className="inline-flex items-center text-[var(--color-water)]">
       <SplashIcon className="w-[15px] h-[15px]" />
       <span className="sr-only">Priority</span>
     </span>
