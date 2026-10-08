@@ -108,11 +108,13 @@ export async function fetchDocTabs(): Promise<Tab[]> {
   return flattenTabs(doc.tabs ?? []);
 }
 
-/** The doc tab title for a product code ("P55 - Wall Lamp"), or null. Never throws. */
-export async function docTabTitleForCode(code: string): Promise<string | null> {
-  if (!googleDocConfigured() || !code.trim()) return null;
+/** The doc tab title for a product code ("P55 - Wall Lamp"), or null. Never throws.
+ *  A run started from Import knows its exact tab (`tabId`), which wins. */
+export async function docTabTitleForCode(code: string, tabId?: string | null): Promise<string | null> {
+  if (!googleDocConfigured() || (!code.trim() && !tabId)) return null;
   try {
-    const tab = findProductTab(await fetchDocTabs(), code);
+    const tabs = await fetchDocTabs();
+    const tab = (tabId && tabs.find((t) => t.tabProperties?.tabId === tabId)) || findProductTab(tabs, code);
     return tab?.tabProperties?.title ?? null;
   } catch {
     return null;
@@ -223,6 +225,8 @@ export interface FillResult {
 
 export async function fillProductTab(params: {
   productCode: string;
+  /** The run's own tab (runs started from Import) — used before the code. */
+  tabId?: string | null;
   json: Stage2Json;
   /** Overview block values (bare "Label:" lines above the tables). */
   overview?: { productName?: string; productUrl?: string; competitorUrl?: string };
@@ -258,8 +262,8 @@ export async function fillProductTab(params: {
     const doc = (await docRes.json()) as { tabs?: Tab[] };
     const tabs = flattenTabs(doc.tabs ?? []);
 
-    // Tab titled "P58 - ..." (case-insensitive, code at the start).
-    const tab = findProductTab(tabs, code);
+    // The run's own tab when it has one, else the tab titled "P58 - ...".
+    const tab = (params.tabId && tabs.find((t) => t.tabProperties?.tabId === params.tabId)) || findProductTab(tabs, code);
     if (!tab || !tab.tabProperties?.tabId) {
       return {
         ok: false,
@@ -321,21 +325,42 @@ export async function renameTab(tabId: string, title: string): Promise<void> {
   await batchUpdate([{ updateDocumentTabProperties: { tabProperties: { tabId, title }, fields: "title" } }]);
 }
 
-/** Add a product tab with its overview lines. See the spike note
- *  (docs/superpowers/plans/2026-10-08-import-list-spike.md) for how the
- *  template tables are handled. */
-export async function createProductTab(title: string, overview: { productName: string; links: string[] }): Promise<{ tabId: string }> {
+/** Add an empty product tab; returns its id. Saved by the caller before
+ *  anything else is written, so a later failure never orphans the tab. */
+export async function addTab(title: string): Promise<string> {
   const out = await batchUpdate([{ addDocumentTab: { tabProperties: { title } } }]);
   const reply = out.replies?.[0] as { addDocumentTab?: { tabProperties?: { tabId?: string } } } | undefined;
   const tabId = reply?.addDocumentTab?.tabProperties?.tabId;
   if (!tabId) throw new Error("Docs API did not return the new tab's id.");
+  return tabId;
+}
+
+/** The overview lines at the top of a new product tab. See the spike note
+ *  (docs/superpowers/plans/2026-10-08-import-list-spike.md) for the
+ *  template tables. */
+export async function writeOverview(tabId: string, overview: { productName: string; links: string[] }): Promise<void> {
   const text = [
     `Product name: ${overview.productName}`,
     `Competitor/example link: ${overview.links.join(" ")}`,
     "Alibaba link:",
   ].join("\n") + "\n";
   await batchUpdate([{ insertText: { location: { index: 1, tabId }, text } }]);
-  return { tabId };
+}
+
+/** Tab ids, titles and codes only — no tab contents (much smaller than
+ *  fetchDocTabs; read on every Import write). */
+export async function listTabTitles(): Promise<Array<{ tabId: string; title: string; code: number | null }>> {
+  const token = await googleAccessToken();
+  const fields = "tabs(tabProperties(tabId,title),childTabs(tabProperties(tabId,title),childTabs(tabProperties(tabId,title))))";
+  const res = await fetch(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}?includeTabsContent=true&fields=${encodeURIComponent(fields)}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Docs API ${res.status} while reading tab titles.`);
+  const doc = (await res.json()) as { tabs?: Tab[] };
+  return flattenTabs(doc.tabs ?? [])
+    .filter((t) => t.tabProperties?.tabId)
+    .map((t) => ({ tabId: t.tabProperties!.tabId!, title: t.tabProperties?.title ?? "", code: codeNumber(t.tabProperties?.title) }));
 }
 
 /** Every tab with its code and overview lines (for "Bring in from the doc"). */

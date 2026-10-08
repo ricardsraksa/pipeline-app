@@ -116,7 +116,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
         className="cursor-pointer h-9 rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-35 disabled:cursor-not-allowed tr">
         {busy ? "…" : "Start"}
       </button>
-      <button onClick={() => setEditing(true)} title="Edit" aria-label={`Edit ${item.name}`}
+      <button onClick={() => { setDraft({ name: item.name, links: item.urls.join("\n"), priority: item.priority }); setEditing(true); }} title="Edit" aria-label={`Edit ${item.name}`}
         className="cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] text-[var(--color-text-3)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] tr">
         <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
       </button>

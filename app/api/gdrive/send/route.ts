@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     // Folder name mirrors the master doc's tab name ("P55 - Wall Lamp");
     // falls back to "<code> - <product name>" when the doc has no tab yet.
     const code = run.product_code ?? "";
-    const tabTitle = await docTabTitleForCode(code);
+    const tabTitle = await docTabTitleForCode(code, run.doc_tab_id);
     const folderName = tabTitle ?? `${code} - ${(run.brand_name ?? run.product_name ?? "product").trim()}`;
     const folders = await ensureProductFolders(code, folderName);
     const targetFolderId = wantAds ? folders.adsFolderId : folders.imagesFolderId;

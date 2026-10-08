@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   try { competitorUrl = (JSON.parse(run.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
   const result = await fillProductTab({
     productCode: run.product_code ?? "",
+    tabId: run.doc_tab_id,
     json,
     overview: {
       productName: run.brand_name ?? json.product_name ?? undefined,

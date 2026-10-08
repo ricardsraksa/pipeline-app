@@ -250,6 +250,8 @@ async function migrateDB() {
     // links kept as references (JSON array, never scraped).
     "priority INTEGER",
     "reference_urls TEXT",
+    // The run's own tab in the master doc (set for runs started from Import).
+    "doc_tab_id TEXT",
   ];
   for (const col of newColumns) {
     try {
@@ -709,4 +711,5 @@ export interface Run {
   priority: number | null;
   /** JSON array of Instagram links (references, never scraped). */
   reference_urls: string | null;
+  doc_tab_id: string | null;
 }

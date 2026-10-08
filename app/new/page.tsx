@@ -26,7 +26,7 @@ export default function StartRunsPage() {
       {items && items.length > 0 && (
         <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] overflow-hidden">
           {items.map((it, i) => (
-            <div key={`${it.id}:${it.productCode}:${it.priority}:${it.name}:${it.urls.join(" ")}`} className={cx(i > 0 && "border-t border-[var(--color-border)]")}>
+            <div key={it.id} className={cx(i > 0 && "border-t border-[var(--color-border)]")}>
               <StartRow item={it} first={i === 0} docConfigured={docConfigured} onChanged={reload} />
             </div>
           ))}

@@ -2,8 +2,7 @@ import { requireSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { googleDocConfigured, listTabsWithOverview } from "@/lib/google/docs";
 import { importStore } from "@/lib/import/db-store";
-import { currentBase, docSync } from "@/lib/import/doc-ops";
-import { orderItems } from "@/lib/import/numbering";
+import { docNumbers, docSync } from "@/lib/import/doc-ops";
 import { codeNumber, isPriorityTitle } from "@/lib/import/codes";
 import { readTabOverview } from "@/lib/import/tab-overview";
 
@@ -47,10 +46,14 @@ export async function POST(req: Request) {
   const wanted = new Set(Array.isArray(tabIds) ? tabIds.filter((x): x is string => typeof x === "string") : []);
   if (!wanted.size) return Response.json({ success: false, error: "Tick at least one tab" }, { status: 400 });
   const chosen = (await candidates()).filter((c) => wanted.has(c.tabId));
-  const added = await importStore.adopt(
-    chosen.map((c) => ({ name: c.name, urls: c.links, priority: c.priority, docTabId: c.tabId, docTitle: c.title })),
-    await currentBase(),
-  );
-  void importStore.listOpen().then((open) => docSync.syncItems(orderItems(open)));
-  return Response.json({ success: true, added: added.length });
+  try {
+    const added = await importStore.adopt(
+      chosen.map((c) => ({ name: c.name, urls: c.links, priority: c.priority, docTabId: c.tabId, docTitle: c.title })),
+      docNumbers,
+    );
+    void docSync.requestSync();
+    return Response.json({ success: true, added: added.length });
+  } catch (err) {
+    return Response.json({ success: false, error: `Couldn't read the master doc: ${err instanceof Error ? err.message : err}` }, { status: 503 });
+  }
 }

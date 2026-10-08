@@ -862,6 +862,7 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
           try { competitorUrl = (JSON.parse(fresh?.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
           const r = await fillProductTab({
             productCode: fresh?.product_code ?? "",
+            tabId: fresh?.doc_tab_id,
             json: structured,
             overview: {
               productName: stage2Name ?? structured.product_name ?? undefined,
