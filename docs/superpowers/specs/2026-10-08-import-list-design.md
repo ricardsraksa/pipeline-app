@@ -7,7 +7,7 @@ Date: 2026-10-08 · Status: agreed in chat, awaiting spec review
 New products are found by a second person (from Instagram reels → the
 original listing, usually a brand site or Amazon) and added as tabs in the
 master Google Doc. The operator then re-types each one into the pipeline's
-New run form. Priority products are marked with a 💧 in the tab title, which
+New run form. Priority products are marked with a 💦 in the tab title, which
 the pipeline's code parser does not understand, so P numbers drift.
 
 Goal: products are entered **in the pipeline**, the doc stays the record
@@ -52,7 +52,7 @@ Import.
 
 - Reads every tab in the master doc and lists those whose P code has no
   run. For each: name (from "Product name:" or the tab title), link (from
-  "Competitor/example link:"), priority (💧 in the title).
+  "Competitor/example link:"), priority (💦 in the title).
 - Tabs whose "Alibaba link:" line is filled start **unticked** (older
   products done by hand); the rest start ticked. Operator confirms.
 - Ticked tabs become Import items that **reuse their existing tab**
@@ -70,13 +70,15 @@ Import.
   bowl; a priority mug is added → P92 mug, P93 lamp, P94 bowl.
 - A number is **locked for good** when Start run is pressed. Started runs
   are never renumbered.
-- Code parsing ignores any leading emoji / symbols: `💧 P90 - Lamp` → 90.
-  The same parser is used by the Docs export, so sending copy finds 💧 tabs.
+- The priority mark is 💦 (U+1F4A6, "splashing" droplets). Only 💦 in a
+  title means priority when reading the doc.
+- Code parsing ignores any leading emoji / symbols: `💦 P90 - Lamp` → 90.
+  The same parser is used by the Docs export, so sending copy finds 💦 tabs.
 
 ### The Google Doc
 
 - Adding an item creates its tab immediately, titled
-  `[💧 ]P<n> - <product name>`, from the template, with the overview lines
+  `[💦 ]P<n> - <product name>`, from the template, with the overview lines
   filled: "Product name:" and "Competitor/example link:" (the product link).
 - A batch import creates its tabs one after another (Docs API write limits);
   the list shows each row's tab as pending until it exists.
