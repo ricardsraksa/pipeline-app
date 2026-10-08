@@ -48,3 +48,4 @@ next-env.d.ts
 # python bytecode from the Mac scraper/worker
 __pycache__/
 *.pyc
+.superpowers/
