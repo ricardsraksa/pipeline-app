@@ -1,15 +1,15 @@
 // Product codes (P58, P59, …) name the Google Doc tab and the Drive folder.
-// The sequence is the app's runs and nothing else: the next code is the
-// highest run code plus one. The master doc is NOT consulted — it carries tabs
-// for products that never went through the app (Sep 18 2026: tabs up to P91
-// against runs up to P77, which pushed every new run to P92). A number the doc
-// already uses is therefore possible; /api/runs/next-code reports it, and the
-// code stays editable on Home and in the rail.
+// Since the Import list (v2.106) the doc is the record again: the next code
+// follows the highest number in the runs AND in doc tabs that no open Import
+// item owns (those carry provisional numbers). Tab titles are read with any
+// leading emoji ignored ("💦 P90 - Lamp" → 90). The code stays editable on
+// Home and in the rail.
 
 import { db } from "@/lib/db";
 import { fetchDocTabs, googleDocConfigured } from "@/lib/google/docs";
-
 import { codeNumber } from "@/lib/import/codes";
+import { codeForStart } from "@/lib/import/numbering";
+import { currentBase } from "@/lib/import/doc-ops";
 
 // Emoji-tolerant ("💦 P90 - Lamp" → 90); lives in lib/import/codes.
 export { codeNumber };
@@ -57,7 +57,12 @@ export async function productCodeDiagnostics(): Promise<{ highestInRuns: number;
   };
 }
 
-/** The next code in the sequence, e.g. "P78". Never throws. */
+/** The next code in the sequence, e.g. "P92": after the highest number in
+ *  the runs and in doc tabs no Import item owns. Never throws. */
 export async function nextProductCode(): Promise<string> {
-  return `P${(await highestInRuns()) + 1}`;
+  try {
+    return codeForStart(await currentBase());
+  } catch {
+    return codeForStart(await highestInRuns());
+  }
 }
