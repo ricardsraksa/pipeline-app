@@ -52,6 +52,14 @@ mutation OptionsCreate($productId: ID!, $options: [OptionCreateInput!]!) {
   }
 }`;
 
+// The product's existing (default) variant: new variants copy its settings.
+const DEFAULT_VARIANT_SETTINGS = `
+query D($id: ID!) {
+  product(id: $id) {
+    variants(first: 1) { nodes { taxable inventoryPolicy inventoryItem { requiresShipping measurement { weight { value unit } } } } }
+  }
+}`;
+
 const VARIANTS_CREATE = `
 mutation VariantsCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
   productVariantsBulkCreate(productId: $productId, variants: $variants, strategy: REMOVE_STANDALONE_VARIANT) {
@@ -141,10 +149,26 @@ export async function applyVariants(plan: VariantPlan): Promise<VariantResult> {
   // One price for the whole product, written once at creation.
   const price = plan.price != null ? plan.price.toFixed(2) : undefined;
   const compareAtPrice = plan.compareAt != null ? plan.compareAt.toFixed(2) : undefined;
+  // New variants otherwise get Shopify's defaults — inventory tracked, tax on —
+  // whatever the product had (inventory was switched on this way). They copy
+  // the existing variant's settings instead, and inventory is never tracked.
+  type Settings = { taxable: boolean; inventoryPolicy: string; inventoryItem: { requiresShipping: boolean; measurement: { weight: { value: number; unit: string } | null } | null } | null };
+  const d = await shopifyGraphQL<{ product: { variants: { nodes: Settings[] } } | null }>(DEFAULT_VARIANT_SETTINGS, { id: plan.productId });
+  const base = d.product?.variants.nodes[0];
+  const weight = base?.inventoryItem?.measurement?.weight;
+  const inherited = {
+    ...(base ? { taxable: base.taxable, inventoryPolicy: base.inventoryPolicy } : {}),
+    inventoryItem: {
+      tracked: false,
+      ...(base?.inventoryItem ? { requiresShipping: base.inventoryItem.requiresShipping } : {}),
+      ...(weight ? { measurement: { weight: { value: weight.value, unit: weight.unit } } } : {}),
+    },
+  };
   const variants = plan.combinations.map((combo) => ({
     optionValues: combo.map((value, i) => ({ optionName: plan.options[i].name, name: value })),
     ...(price ? { price } : {}),
     ...(compareAtPrice ? { compareAtPrice } : {}),
+    ...inherited,
   }));
 
   const res = await shopifyGraphQL<{ productVariantsBulkCreate: { productVariants: Array<{ id: string }> | null; userErrors: Array<{ message: string }> } }>(

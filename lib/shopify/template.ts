@@ -98,7 +98,9 @@ export async function priceNewProduct(productGid: string, price: number, compare
   if (nodes.length !== 1) throw new Error(`expected one variant, found ${nodes.length}`);
   const r = await shopifyGraphQL<{ productVariantsBulkUpdate: { userErrors: Array<{ message: string }> } }>(UPDATE_PRICE, {
     productId: productGid,
-    variants: [{ id: nodes[0].id, price: price.toFixed(2), ...(compareAt && compareAt > price ? { compareAtPrice: compareAt.toFixed(2) } : {}) }],
+    // Inventory is never tracked on a product the app made, whatever the
+    // template says.
+    variants: [{ id: nodes[0].id, price: price.toFixed(2), ...(compareAt && compareAt > price ? { compareAtPrice: compareAt.toFixed(2) } : {}), inventoryItem: { tracked: false } }],
   });
   const errs = r.productVariantsBulkUpdate.userErrors ?? [];
   if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
