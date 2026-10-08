@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { RunSummary } from "@/lib/db";
 import { useToast } from "@/components/Toasts";
 import { PriorityBadge } from "@/components/import/shared";
+import NewRunForm from "@/components/import/NewRunForm";
 import { HistoryRefresher } from "./history/HistoryRefresher";
 import { ACTIVE_STATUSES, WAITING_STATUSES, relativeTime, statusLabel, truncateUrl } from "@/components/ui/run-ui";
 
@@ -60,6 +61,7 @@ const TrashIcon = () => <svg {...svgProps}><path d="M3 6h18" /><path d="M8 6V4h8
 export default function HomeV2({ runs, loadFailed = false, top }: { runs: RunSummary[]; loadFailed?: boolean; top?: React.ReactNode }) {
   const router = useRouter();
   const { push } = useToast();
+  const [newRunOpen, setNewRunOpen] = useState(false);
   const [q, setQ] = useState("");
   const [deleting, setDeleting] = useState<number | null>(null);
   // Sort order, remembered per browser.
@@ -153,8 +155,13 @@ export default function HomeV2({ runs, loadFailed = false, top }: { runs: RunSum
         </select>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search runs"
           className="w-[250px] h-8 px-[11px] text-[13px] rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-3)]" />
+        {!newRunOpen && (
+          <button onClick={() => setNewRunOpen(true)}
+            className="cursor-pointer h-8 px-[13px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 tr">New run</button>
+        )}
       </div>
 
+      {newRunOpen && <NewRunForm onClose={() => setNewRunOpen(false)} />}
       {top}
 
       {groups.map((g) => (

@@ -30,3 +30,13 @@ test("garbage input shape is rejected per row", () => {
   const r = validateRows([null, { name: 5 }]);
   assert.equal(r.items.length, 0);
 });
+
+test("links can be optional (New run on Runs)", () => {
+  const r = validateRows([{ name: "Mug", links: "", priority: true }], { linksOptional: true });
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.items, [{ name: "Mug", urls: [], priority: true }]);
+});
+test("optional links still reject non-links", () => {
+  const r = validateRows([{ name: "Mug", links: "hello", priority: false }], { linksOptional: true });
+  assert.equal(r.errors.length, 1);
+});

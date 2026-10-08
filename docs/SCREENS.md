@@ -42,7 +42,7 @@ The only screen visible when logged out. Everything else redirects here.
 
 ## 3. Runs
 
-Top: **New run** — the imported products waiting to start (see 4b), shown only when there are any. Below it, the run inbox.
+Header: sort, search, **New run** — opens a one-row form (product name, links, priority, AliExpress link, Start) that starts a run at once with the next P number and its doc tab. Below: **To start** — the imported products waiting to start (see 4b), shown only when there are any. Then the run inbox.
 
 
 Header: a sort picker (newest, oldest, last updated, P number high to low or low to high, name) remembered per browser, the search box. The product code on each row is editable in place: type the number, the P is added.
@@ -78,7 +78,7 @@ database read fails.
 ## 4a. Import (home)
 
 - A table, one product per row: **Product name**, **Links** (reel, brand site,
-  Amazon — any mix, Shift+Enter for another link) and a **Priority** drop.
+  Amazon — any mix, Shift+Enter for another link) and a **Priority** tick (a green check in the app; 💦 in doc tab titles).
   A new empty row appears as soon as the last one has text; Enter moves
   name → links → next row. Empty rows are ignored. **Import all (N)** adds
   them; rows missing a name or a link, or with text that isn't a link, are
@@ -93,7 +93,7 @@ the others down one, and their doc tabs are renamed to match. Each product
 gets a tab in the master doc (`💦 P92 - Name` for a priority) as soon as it's
 imported.
 
-## 4b. New run (top of Runs)
+## 4b. To start (top of Runs)
 
 The imported products waiting to start, in work order. Each row: P number,
 the priority drop (click to toggle), name and links ("reel" for Instagram),

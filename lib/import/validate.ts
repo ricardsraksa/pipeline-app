@@ -4,7 +4,7 @@ import type { NewItem } from "./store.ts";
 
 export type RowInput = { name?: unknown; links?: unknown; priority?: unknown };
 
-export function validateRows(rows: unknown[]): { items: NewItem[]; errors: Array<{ index: number; message: string }> } {
+export function validateRows(rows: unknown[], opts: { linksOptional?: boolean } = {}): { items: NewItem[]; errors: Array<{ index: number; message: string }> } {
   const items: NewItem[] = [];
   const errors: Array<{ index: number; message: string }> = [];
   rows.forEach((raw, index) => {
@@ -16,7 +16,7 @@ export function validateRows(rows: unknown[]): { items: NewItem[]; errors: Array
     const urls = [...references, ...competitors];
     if (!name) errors.push({ index, message: "Add a product name" });
     else if (invalid.length) errors.push({ index, message: `Not a link: ${invalid.slice(0, 2).join(", ")}` });
-    else if (!urls.length) errors.push({ index, message: "Add at least one link" });
+    else if (!urls.length && !opts.linksOptional) errors.push({ index, message: "Add at least one link" });
     else items.push({ name, urls, priority: r.priority === true });
   });
   return { items, errors };

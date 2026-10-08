@@ -8,7 +8,7 @@ import { useRef, useState } from "react";
 import { useToast } from "@/components/Toasts";
 import { emptyRow, withTrailingEmpty, type DraftRow } from "@/lib/import/rows";
 import { validateRows } from "@/lib/import/validate";
-import { cx, inputCls, SplashIcon } from "./shared";
+import { cx, inputCls, CheckIcon } from "./shared";
 
 export default function ImportTable({ onImported }: { onImported: () => void }) {
   const { push } = useToast();
@@ -97,8 +97,8 @@ export default function ImportTable({ onImported }: { onImported: () => void }) 
                 <input type="checkbox" checked={r.priority} onChange={(e) => set(r.key, { priority: e.target.checked })} disabled={busy}
                   className="sr-only peer" aria-label={`Priority, row ${i + 1}`} />
                 <span className={cx("w-[30px] h-[30px] grid place-items-center rounded-[6px] border tr peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--color-accent)]",
-                  r.priority ? "border-[var(--color-water)] text-[var(--color-water)] bg-[var(--color-water-bg)]" : "border-[var(--color-border-strong)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]")}>
-                  <SplashIcon />
+                  r.priority ? "border-[var(--color-priority)] text-[var(--color-priority)] bg-[var(--color-priority-bg)]" : "border-[var(--color-border-strong)] text-[var(--color-text-3)] hover:text-[var(--color-text-2)]")}>
+                  <CheckIcon />
                 </span>
               </label>
             </div>

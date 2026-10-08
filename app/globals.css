@@ -67,10 +67,10 @@
 }
 
 :root {
-  /* Priority (💦): a muted water blue. Plain variables, not @theme —
+  /* Priority: a clear green. Plain variables, not @theme —
      only var() uses them, so Tailwind would drop them. */
-  --color-water:        oklch(0.76 0.09 235);
-  --color-water-bg:     oklch(0.30 0.04 235);
+  --color-priority:     oklch(0.78 0.16 150);
+  --color-priority-bg:  oklch(0.30 0.06 150);
 }
 
 /* Light */
@@ -99,8 +99,8 @@
   --color-green-bg:     oklch(0.93 0.02 150);
   --color-amber:        oklch(0.55 0.09 75);
   --color-amber-bg:     oklch(0.94 0.04 75);
-  --color-water:        oklch(0.52 0.11 240);
-  --color-water-bg:     oklch(0.94 0.03 235);
+  --color-priority:     oklch(0.55 0.15 150);
+  --color-priority-bg:  oklch(0.94 0.05 150);
   --color-red:          oklch(0.50 0.12 25);
   --color-red-bg:       oklch(0.94 0.02 25);
   --color-gray:         #6d6e6c;

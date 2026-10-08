@@ -1,5 +1,15 @@
 [
  {
+  "version": "2.108.0",
+  "date": "2026-10-08",
+  "title": "priority is a green check, New run button on Runs",
+  "items": [
+   "Priority shows as a green checkmark everywhere in the app (doc tab titles keep 💦)",
+   "Runs has a New run button: name, links, priority and AliExpress link in one row, Start",
+   "The waiting list on Runs is now called To start"
+  ]
+ },
+ {
   "version": "2.107.0",
   "date": "2026-10-08",
   "title": "Import is the home page, runs live under Runs, no instructions anywhere",

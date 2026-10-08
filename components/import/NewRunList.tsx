@@ -12,7 +12,7 @@ export default function NewRunList() {
   return (
     <div className="mb-[26px]">
       <div className="flex items-center gap-2 px-0.5 pb-[7px]">
-        <span className="eyebrow">New run</span>
+        <span className="eyebrow">To start</span>
         <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{items.length}</span>
       </div>
       <div className="border border-[var(--color-border)] rounded-[9px] bg-[var(--color-surface)] overflow-hidden">

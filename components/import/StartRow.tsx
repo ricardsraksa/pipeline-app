@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toasts";
-import { cx, docStatus, inputCls, isInstagram, SplashIcon, type ImportItem } from "./shared";
+import { cx, docStatus, inputCls, isInstagram, CheckIcon, type ImportItem } from "./shared";
 
 const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 const looksLikeUrl = (s: string) => { try { const u = new URL(s); return u.protocol === "https:" || u.protocol === "http:"; } catch { return false; } };
@@ -72,7 +72,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
           <textarea value={draft.links} onChange={(e) => setDraft({ ...draft, links: e.target.value })} rows={Math.min(5, Math.max(2, draft.links.split("\n").length + 1))}
             spellCheck={false} aria-label="Links" className={cx(inputCls, "py-[8px] ff-mono text-[12px] resize-y")} />
           <label className="h-[36px] flex items-center gap-1.5 cursor-pointer text-[12.5px] text-[var(--color-text-2)]">
-            <input type="checkbox" checked={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.checked })} className="w-4 h-4 cursor-pointer accent-[var(--color-water)]" />
+            <input type="checkbox" checked={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.checked })} className="w-4 h-4 cursor-pointer accent-[var(--color-priority)]" />
             Priority
           </label>
         </div>
@@ -93,8 +93,8 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
       <span className="ff-mono text-[12.5px] text-[var(--color-text)]">{item.productCode}</span>
       <button onClick={togglePriority} disabled={busy} title={item.priority ? "Remove priority" : "Make priority"} aria-label={item.priority ? "Remove priority" : "Make priority"}
         className={cx("cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] hover:bg-[var(--color-surface-2)] tr",
-          item.priority ? "text-[var(--color-water)] bg-[var(--color-water-bg)]" : "text-[var(--color-text-3)] opacity-50 hover:opacity-100")}>
-        <SplashIcon />
+          item.priority ? "text-[var(--color-priority)] bg-[var(--color-priority-bg)]" : "text-[var(--color-text-3)] opacity-50 hover:opacity-100")}>
+        <CheckIcon />
       </button>
       <div className="min-w-0">
         <div className="text-[13.5px] font-[500] text-[var(--color-text)] truncate flex items-center gap-1.5">
