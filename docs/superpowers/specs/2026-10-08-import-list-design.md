@@ -47,6 +47,12 @@ Import.
 - Each row: edit (name, link, priority) and an **AliExpress link** box with
   a **Start** button inline. Start creates the run exactly as the old New
   run form did; no separate form.
+- When the item's link is a reel, the row also shows a **Competitor links**
+  box (optional, up to 5, one per line, same checks as the old form) where
+  the operator adds the brand listing(s) found from the reel. For a
+  listing link the item's link is the competitor and no box is shown.
+- No photo upload on Start runs (the scraped listing photos are used).
+  *Can be added back later if needed.*
 
 ### Bring in from the doc (one-off, on the Import page)
 
