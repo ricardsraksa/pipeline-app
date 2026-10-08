@@ -9,15 +9,10 @@
 import { db } from "@/lib/db";
 import { fetchDocTabs, googleDocConfigured } from "@/lib/google/docs";
 
-const CODE_RE = /^\s*P\s*0*(\d{1,6})\b/i;
+import { codeNumber } from "@/lib/import/codes";
 
-/** The number in a code or tab title ("P58 - Wall Lamp" → 58), else null. */
-export function codeNumber(text: string | null | undefined): number | null {
-  const m = typeof text === "string" ? text.match(CODE_RE) : null;
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : null;
-}
+// Emoji-tolerant ("💦 P90 - Lamp" → 90); lives in lib/import/codes.
+export { codeNumber };
 
 /** Highest product number the app knows about (0 when there is none). */
 async function highestInRuns(): Promise<number> {

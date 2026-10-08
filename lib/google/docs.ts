@@ -19,6 +19,7 @@
 import { googleAccessToken, masterDocId, googleDocConfigured } from "./auth";
 import type { Stage2Json } from "@/lib/stage2/shape";
 import { whatsIncluded } from "@/lib/stage2/shape";
+import { sameCode } from "@/lib/import/codes";
 
 export { googleDocConfigured };
 
@@ -125,13 +126,10 @@ export async function docTabTitleForCode(code: string): Promise<string | null> {
   }
 }
 
-/** The tab whose title starts with the product code (case-insensitive). */
+/** The tab whose title carries the product code, ignoring a leading 💦 or
+ *  other emoji ("💦 P93 - Mug" matches "P93"). */
 export function findProductTab(tabs: Tab[], code: string): Tab | undefined {
-  const codeNorm = code.trim().toLowerCase();
-  return tabs.find((t) => {
-    const title = (t.tabProperties?.title ?? "").trim().toLowerCase();
-    return title === codeNorm || title.startsWith(codeNorm + " ") || title.startsWith(codeNorm + "-") || title.startsWith(codeNorm + "_");
-  });
+  return tabs.find((t) => sameCode(t.tabProperties?.title ?? "", code));
 }
 
 /** Pure fill planner: walk the tab's tables, match label rows, target the

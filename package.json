@@ -7,7 +7,8 @@
     "build": "eslint . --max-warnings 0 && tsc --noEmit && next build",
     "start": "node server.mjs",
     "lint": "eslint . --max-warnings 0",
-    "changelog": "node scripts/changelog.mjs"
+    "changelog": "node scripts/changelog.mjs",
+    "test": "node --test 'tests/**/*.test.mjs'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
