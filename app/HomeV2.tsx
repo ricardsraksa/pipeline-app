@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RunSummary } from "@/lib/db";
 import { useToast } from "@/components/Toasts";
+import { PriorityBadge } from "@/components/import/shared";
 import { HistoryRefresher } from "./history/HistoryRefresher";
 import { ACTIVE_STATUSES, WAITING_STATUSES, relativeTime, statusLabel, truncateUrl } from "@/components/ui/run-ui";
 
@@ -153,7 +154,7 @@ export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, code or run number"
           className="w-[250px] h-8 px-[11px] text-[13px] rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] placeholder:text-[var(--color-text-3)]" />
         <button onClick={() => router.push("/new")}
-          className="cursor-pointer h-8 px-[13px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 tr">New run</button>
+          className="cursor-pointer h-8 px-[13px] rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 tr">Start runs</button>
       </div>
 
       {groups.map((g) => (
@@ -187,7 +188,9 @@ export default function HomeV2({ runs, loadFailed = false }: { runs: RunSummary[
                     className="cursor-pointer ff-mono text-[11.5px] text-left text-[var(--color-text-2)] rounded-[4px] px-1 -mx-1 hover:bg-[var(--color-surface-2)]">{codeOf(r) || "—"}</button>
                 )}
                 <div className="min-w-0">
-                  <div className="text-[13.5px] font-[500] truncate text-[var(--color-text)]" title={`Run ${r.id}`}>{r.brand_name || r.product_name || `Run ${r.id}`}</div>
+                  <div className="text-[13.5px] font-[500] truncate text-[var(--color-text)] flex items-center gap-1.5" title={`Run ${r.id}`}>
+                    {r.priority ? <PriorityBadge /> : null}<span className="truncate">{r.brand_name || r.product_name || `Run ${r.id}`}</span>
+                  </div>
                   <div className="text-[12px] text-[var(--color-text-2)] truncate" title={r.product_url ?? undefined}>{r.product_url ? truncateUrl(r.product_url, 140) : "—"}</div>
                 </div>
                 <div className="flex items-center gap-[7px] min-w-0">

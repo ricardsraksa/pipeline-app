@@ -778,7 +778,7 @@ export default function RunPage() {
         )}
 
         {/* the links this run was built from */}
-        {(run.meta.productUrl || run.meta.competitorUrls.length > 0) && (
+        {(run.meta.productUrl || run.meta.competitorUrls.length > 0 || (run.meta.referenceUrls ?? []).length > 0) && (
           <div className="border-t border-[var(--color-border)] pt-3.5 flex flex-col gap-2">
             <span className={label}>Links</span>
             <div className="flex flex-col gap-px">
@@ -792,6 +792,12 @@ export default function RunPage() {
               {run.meta.competitorUrls.map((u, i) => (
                 <a key={u} href={u} target="_blank" rel="noreferrer" className={deliverRow} style={deliverCols} title={u}>
                   <span className="text-[13px] font-[500] text-[var(--color-text)] truncate">Competitor {i + 1}</span>
+                  <span className="ff-mono text-[11px] text-[var(--color-text-3)] truncate max-w-[110px]">{hostOf(u)}</span>
+                </a>
+              ))}
+              {(run.meta.referenceUrls ?? []).map((u, i, all) => (
+                <a key={u} href={u} target="_blank" rel="noreferrer" className={deliverRow} style={deliverCols} title={u}>
+                  <span className="text-[13px] font-[500] text-[var(--color-text)] truncate">Reel{all.length > 1 ? ` ${i + 1}` : ""}</span>
                   <span className="ff-mono text-[11px] text-[var(--color-text-3)] truncate max-w-[110px]">{hostOf(u)}</span>
                 </a>
               ))}

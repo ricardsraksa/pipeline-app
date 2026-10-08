@@ -156,6 +156,7 @@ export async function GET(
       productDescription: run.product_description,
       uploadedSourceImages: safeJson(run.uploaded_source_images) ?? [],
       competitorUrls: safeJson(run.competitor_urls) ?? [],
+      referenceUrls: safeJson(run.reference_urls) ?? [],
       // Stage 3 Pricing card: the stored suggestion and the current rules.
       pricing: safeJson(run.product_pricing) ?? null,
       pricingRules,

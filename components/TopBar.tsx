@@ -71,7 +71,8 @@ export default function TopBar() {
       </Link>
       <nav className="flex items-center gap-[2px]">
         <Tab href="/" label="Home" active={isRun} badge={needs} />
-        <Tab href="/new" label="New run" active={path === "/new"} />
+        <Tab href="/import" label="Import" active={path === "/import"} />
+        <Tab href="/new" label="Start runs" active={path === "/new"} />
         <Tab href="/settings" label="Settings" active={path === "/settings"} />
         <Tab href="/changes" label="Changes" active={path === "/changes"} />
       </nav>

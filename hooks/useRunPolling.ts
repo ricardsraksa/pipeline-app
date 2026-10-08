@@ -70,6 +70,8 @@ export interface RunStatus {
     productDescription: string | null;
     uploadedSourceImages: string[];
     competitorUrls: string[];
+    /** Instagram links from the Import item — references, never scraped. */
+    referenceUrls: string[];
     pricing: ProductPricing | null;
     pricingRules: PricingRules;
     marketPosition: MarketPosition | null;
