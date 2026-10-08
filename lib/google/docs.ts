@@ -335,9 +335,8 @@ export async function addTab(title: string): Promise<string> {
   return tabId;
 }
 
-/** The overview lines at the top of a new product tab. See the spike note
- *  (docs/superpowers/plans/2026-10-08-import-list-spike.md) for the
- *  template tables. */
+/** The overview lines at the top of a new product tab. The template
+ *  tables are not copied in (yet) — the operator pastes them. */
 export async function writeOverview(tabId: string, overview: { productName: string; links: string[] }): Promise<void> {
   const text = [
     `Product name: ${overview.productName}`,

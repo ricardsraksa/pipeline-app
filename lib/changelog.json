@@ -1,11 +1,48 @@
 [
  {
+  "version": "2.106.0",
+  "date": "2026-10-08",
+  "title": "products are imported in the pipeline, numbered and mirrored to the doc",
+  "items": [
+   "Import page: name, links (reel, brand or Amazon) and a 💦 priority tick, many rows at once",
+   "Start runs replaces New run: paste the AliExpress link on a row and press Start",
+   "P numbers follow the doc and the runs; priority first, numbers shift until a run starts",
+   "Each imported product gets its tab in the master doc (💦 P92 - Name), renamed when its number moves",
+   "Bring in from the doc: tabs with no run yet become Import items",
+   "💦 tab titles are read correctly everywhere (numbering, Send to Google Doc, Drive)"
+  ]
+ },
+ {
+  "version": "2.105.0",
+  "date": "2026-10-07",
+  "title": "Shopify products come from a template, not a hand-made duplicate",
+  "items": []
+ },
+ {
+  "version": "2.104.4",
+  "date": "2026-10-07",
+  "title": "an approved product stays approved",
+  "items": []
+ },
+ {
+  "version": "2.104.3",
+  "date": "2026-10-07",
+  "title": "an AliExpress check on the Mac says so, instead of 'Mac worker offline'",
+  "items": []
+ },
+ {
   "version": "2.104.2",
   "date": "2026-10-07",
   "title": "Continue goes to the next stage, not back to Stage 1",
   "items": [
    "After an action, the run page follows the run to the stage that needs you"
   ]
+ },
+ {
+  "version": "2.102.2",
+  "date": "2026-10-06",
+  "title": "photos go to the model inline, never as links it must download",
+  "items": []
  },
  {
   "version": "2.104.1",
