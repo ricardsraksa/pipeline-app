@@ -25,9 +25,10 @@ Import.
 ### Import page (`/import`)
 
 - **Add product** form has three fields: **Product name** (for reference,
-  like in the doc), **Product link** (the original listing) and a
-  **Priority** tick. Name and link are both required. The link can be the
-  original listing (brand site, Amazon) or an Instagram reel. Anyone signed in can
+  like in the doc), **Links** (one box for every link — reel, brand site,
+  Amazon, any mix, one or more) and a **Priority** tick. Name and at least
+  one link are required. Links can be added to the same box later by
+  editing (e.g. the brand found from a reel). Anyone signed in can
   add (same password as today).
 - **Many at once:** the form is a table of rows (name · link · priority)
   with **+ Add row**, and **Import all** adds every row in one go. Built for
@@ -47,10 +48,6 @@ Import.
 - Each row: edit (name, link, priority) and an **AliExpress link** box with
   a **Start** button inline. Start creates the run exactly as the old New
   run form did; no separate form.
-- When the item's link is a reel, the row also shows a **Competitor links**
-  box (optional, up to 5, one per line, same checks as the old form) where
-  the operator adds the brand listing(s) found from the reel. For a
-  listing link the item's link is the competitor and no box is shown.
 - No photo upload on Start runs (the scraped listing photos are used).
   *Can be added back later if needed.*
 
@@ -85,7 +82,8 @@ Import.
 
 - Adding an item creates its tab immediately, titled
   `[💦 ]P<n> - <product name>`, from the template, with the overview lines
-  filled: "Product name:" and "Competitor/example link:" (the product link).
+  filled: "Product name:" and "Competitor/example link:" (all of the
+  item's links, space-separated).
 - A batch import creates its tabs one after another (Docs API write limits);
   the list shows each row's tab as pending until it exists.
 - When an item's number or priority changes, the pipeline renames its tab.
@@ -94,20 +92,21 @@ Import.
 ### Start run
 
 - Pressed on the Start runs page after pasting the AliExpress link. Product
-  code = the item's number, run name = the product name. A listing link goes in the
-  competitor field (scraped as today); a reel link (instagram.com,
-  including /reel/ and /p/) is kept as a reference only, never scraped. The
+  code = the item's number, run name = the product name. The item's links are sorted
+  automatically: Instagram links (instagram.com, /reel/ and /p/) are kept
+  as references only, never scraped; every other link becomes a competitor
+  link (scraped as today, max 5). The
   run then starts as today.
-- The run stores `priority` (badge on Home) and, for a reel, `reference_url`
-  (clickable in the rail's Links section).
+- The run stores `priority` (badge on Home) and `reference_urls` (JSON
+  array of the Instagram links, clickable in the rail's Links section).
 - The Import item is marked started (`run_id` set) and leaves the list.
 
 ## Data
 
-- New table `import_items`: `id, name, url, priority (0/1), product_code,
+- New table `import_items`: `id, name, urls (JSON array), priority (0/1), product_code,
   doc_tab_id, created_at, updated_at, run_id NULL`.
 - New `runs` columns (same `ALTER TABLE … ADD COLUMN` loop as today):
-  `priority INTEGER`, `reference_url TEXT`.
+  `priority INTEGER`, `reference_urls TEXT`.
 - Renumbering runs in one function (`renumberImports()`) that computes the
   target code for every open item, updates rows, then renames changed tabs.
   Tab renames happen after the DB write; a failed rename is recorded on the
