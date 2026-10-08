@@ -1,6 +1,6 @@
 # Import list — design
 
-Date: 2026-10-08 · Status: agreed in chat, awaiting spec review
+Date: 2026-10-08 · Status: approved 2026-10-08
 
 ## Why
 
@@ -73,6 +73,10 @@ Import.
   bowl; a priority mug is added → P92 mug, P93 lamp, P94 bowl.
 - A number is **locked for good** when Start run is pressed. Started runs
   are never renumbered.
+- Starting takes the **next number** (base + 1), whichever row is started.
+  Starting the top row keeps its shown number. Starting a lower row gives
+  it base + 1 and the rows above it move down by one — so P numbers always
+  follow the order runs are started in.
 - The priority mark is 💦 (U+1F4A6, "splashing" droplets). Only 💦 in a
   title means priority when reading the doc.
 - Code parsing ignores any leading emoji / symbols: `💦 P90 - Lamp` → 90.
@@ -104,7 +108,8 @@ Import.
 ## Data
 
 - New table `import_items`: `id, name, urls (JSON array), priority (0/1), product_code,
-  doc_tab_id, created_at, updated_at, run_id NULL`.
+  doc_tab_id, doc_title (last title written), doc_error, created_at,
+  updated_at, run_id NULL`.
 - New `runs` columns (same `ALTER TABLE … ADD COLUMN` loop as today):
   `priority INTEGER`, `reference_urls TEXT`.
 - Renumbering runs in one function (`renumberImports()`) that computes the
