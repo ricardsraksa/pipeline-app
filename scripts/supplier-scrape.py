@@ -199,6 +199,21 @@ def fullsize(u: str) -> str:
     return u
 
 
+def aliexpress_gallery(html: str) -> list[str]:
+    """The listing's own photo gallery from AliExpress's page data. Its image
+    addresses changed to …aliexpress-media.com/kf/S<hash>.jpg, which
+    GALLERY_RE doesn't match, so only og:image was found — one photo per run
+    (runs 162 and 190). imagePathList is the gallery itself, in order."""
+    out: list[str] = []
+    for key in ("imagePathList", "summImagePathList"):
+        m = re.search(r'"%s"\s*:\s*\[(.*?)\]' % key, html, re.S)
+        if m:
+            out += [u.replace("\\/", "/") for u in re.findall(r'"(https?:[^"]+?\.(?:jpe?g|png|webp)[^"]*)"', m.group(1), re.I)]
+        if out:
+            break
+    return out
+
+
 def candidates(page, url: str = "") -> list[str]:
     """Product images, best first: the store's own gallery (Shopify JSON), then
     og:image, then the AliExpress gallery blob, then <img> tags as a last resort."""
@@ -217,6 +232,8 @@ def candidates(page, url: str = "") -> list[str]:
     og = page.css("meta[property='og:image']::attr(content)").get()
     if og:
         found.append(og)
+
+    found += aliexpress_gallery(page.html_content)
 
     found += GALLERY_RE.findall(page.html_content)
 
