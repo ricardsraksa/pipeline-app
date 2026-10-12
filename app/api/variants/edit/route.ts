@@ -23,7 +23,8 @@ Rules:
 - Values keep the supplier's own wording (do not translate "Silvery" to "Silver" unless asked), but drop duplicated words that now live in another group's name.
 - Never invent values a SKU does not support, and never drop a value that exists.
 - For every SKU title you are given, return its new title with the values joined by " / " in the same order as the option groups. Map every SKU; do not add or remove any.
-- If the instruction cannot be applied (for example splitting a group whose values have only one dimension), return the groups unchanged and say why in "note".`;
+- If the instruction cannot be applied (for example splitting a group whose values have only one dimension), return the groups unchanged and say why in "note".
+- If the operator asks to remove the options or variants altogether (the product is sold as one item), return an empty options list and no SKU mapping.`;
 
 const TOOL: Anthropic.Tool = {
   name: "submit_options",
@@ -119,7 +120,8 @@ export async function POST(req: NextRequest) {
       const vals = Array.isArray(g?.values) ? g.values.filter((v): v is string => typeof v === "string").map((v) => v.trim()).filter(Boolean) : [];
       if (name && vals.length) nextOptions[name] = [...new Set(vals)].slice(0, 100);
     }
-    if (!Object.keys(nextOptions).length) {
+    const removeAll = !Object.keys(nextOptions).length && /\b(remove|delete|drop|no|none|without|clear)\b/i.test(instruction);
+    if (!Object.keys(nextOptions).length && !removeAll) {
       return Response.json({ success: false, error: "The model returned no usable option groups" }, { status: 502 });
     }
     // Rename SKUs by the mapping, keeping the supplier's prices and stock.
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
     for (const m of input.variants ?? []) {
       if (typeof m?.from === "string" && typeof m?.to === "string" && m.to.trim()) map.set(m.from.trim(), m.to.trim().slice(0, 200));
     }
-    const nextVariants: Variant[] = variants.map((v) => ({ ...v, title: map.get((v.title ?? "").trim()) ?? v.title }));
+    const nextVariants: Variant[] = removeAll ? [] : variants.map((v) => ({ ...v, title: map.get((v.title ?? "").trim()) ?? v.title }));
 
     const payload = { options: nextOptions, variants: nextVariants, at: new Date().toISOString(), source: "ai" as const, instruction };
     await updateRun(runId, { product_variants_edited: JSON.stringify(payload), last_updated_at: payload.at });

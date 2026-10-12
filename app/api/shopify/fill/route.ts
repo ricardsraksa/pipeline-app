@@ -232,12 +232,11 @@ export async function POST(req: Request) {
     if (created && !report.dryRun) {
       let pricing: ProductPricing | null = null;
       try { pricing = run.product_pricing ? JSON.parse(run.product_pricing) as ProductPricing : null; } catch { pricing = null; }
-      let options: Record<string, string[]> = {};
-      try {
-        const edited = run.product_variants_edited ? JSON.parse(run.product_variants_edited) as { options?: Record<string, string[]> } : null;
-        if (edited?.options) options = edited.options;
-      } catch { /* fall through */ }
-      if (!Object.keys(options).length) options = productPageOptions(run.product_scrape);
+      // The operator's edit wins over the listing — an edit with no options
+      // means "no variants", not "use the listing".
+      let edited: { options?: Record<string, string[]> } | null = null;
+      try { edited = run.product_variants_edited ? JSON.parse(run.product_variants_edited) as { options?: Record<string, string[]> } : null; } catch { edited = null; }
+      const options: Record<string, string[]> = edited?.options ?? productPageOptions(run.product_scrape);
       try {
         if (Object.keys(options).length) {
           const plan = await planVariants({ productId: product.id, productTitle: product.title, adminUrl: product.adminUrl, options, price: pricing?.price ?? null, compareAt: pricing?.compare_at ?? null, currency: pricing?.cogs_currency ?? "USD" });

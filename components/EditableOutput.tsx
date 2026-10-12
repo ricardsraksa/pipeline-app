@@ -49,6 +49,15 @@ export default function EditableOutput({
   const [editing, setEditing] = useState(false);
   const [editedValue, setEditedValue] = useState<string | null>(initialEditedValue);
   const [editedAt, setEditedAt] = useState<string | null>(initialEditedAt);
+  // A newer text from the server (an AI edit, another tab) replaces the one on
+  // screen unless the operator is typing. It was copied in once, so an AI edit
+  // saved fine but the old text stayed until a reload.
+  const [seenValue, setSeenValue] = useState<string | null>(initialEditedValue);
+  if (initialEditedValue !== seenValue && !editing) {
+    setSeenValue(initialEditedValue);
+    setEditedValue(initialEditedValue);
+    setEditedAt(initialEditedAt);
+  }
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");

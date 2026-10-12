@@ -131,8 +131,8 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
       if (name && vals.length) next[name] = [...new Set(vals)];
     }
     setEditing(false);
-    if (!Object.keys(next).length) return;
-    void saveOverride({ options: next, variants, source: "manual" });
+    // Every group removed: the product has no variants.
+    void saveOverride(Object.keys(next).length ? { options: next, variants, source: "manual" } : { options: {}, variants: [], source: "manual" });
   };
 
   if (!parsed) return null;
@@ -146,7 +146,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
       <div className="flex items-center gap-3.5 mb-2.5 flex-wrap">
         <span className="eyebrow">Variants</span>
         <span className="ff-mono text-[10.5px] text-[var(--color-text-3)]">
-          {empty ? "none read from the listing" : `${groups.length} option${groups.length === 1 ? "" : "s"}`}
+          {empty ? (override ? "none" : "none read from the listing") : `${groups.length} option${groups.length === 1 ? "" : "s"}`}
         </span>
         {override && <span className="ff-mono text-[10px] uppercase tracking-wide text-[var(--color-amber)] bg-[var(--color-amber-bg)] rounded px-1.5 py-0.5">edited</span>}
         <div className="flex-1" />

@@ -28,14 +28,11 @@ export async function POST(req: NextRequest) {
   if (!run) return Response.json({ success: false, error: "Run not found" }, { status: 404 });
 
   // Options: the operator's restructure wins over what the listing said.
-  let options: Record<string, string[]> = {};
-  try {
-    const edited = run.product_variants_edited ? JSON.parse(run.product_variants_edited) as { options?: Record<string, string[]> } : null;
-    if (edited?.options) options = edited.options;
-  } catch { /* fall through */ }
-  if (!Object.keys(options).length) {
-    options = parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product")?.options ?? {};
-  }
+  // An edit with no options means "no variants", not "use the listing".
+  let edited: { options?: Record<string, string[]> } | null = null;
+  try { edited = run.product_variants_edited ? JSON.parse(run.product_variants_edited) as { options?: Record<string, string[]> } : null; } catch { edited = null; }
+  const options: Record<string, string[]> = edited?.options
+    ?? parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product")?.options ?? {};
 
   let pricing: ProductPricing | null = null;
   try { pricing = run.product_pricing ? JSON.parse(run.product_pricing) as ProductPricing : null; } catch { pricing = null; }
