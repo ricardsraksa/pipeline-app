@@ -128,6 +128,17 @@ export default function Stage3HeroFlow({
   // the run when the box loses focus and sent with every write of the 8.
   const [direction, setDirection] = useState<string | null>(null);
   const directionText = direction ?? run?.stage3_prompt_direction ?? "";
+  // One plain line per prompt card — what the picture shows. Fetched whenever
+  // the prompts under review change; the server only redoes changed ones.
+  const [lines, setLines] = useState<Record<number, string>>({});
+  const promptsSig = run?.status === "awaiting_qc" ? (run.stage3_remaining_prompts_edited ?? run.stage3_remaining_prompts ?? "") : "";
+  useEffect(() => {
+    if (!promptsSig) return;
+    let live = true;
+    fetch("/api/stage3/lines", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) })
+      .then((r) => r.json()).then((d) => { if (live && d.success) setLines(d.lines ?? {}); }).catch(() => {});
+    return () => { live = false; };
+  }, [promptsSig, runId]);
   const saveDirection = async () => {
     if (direction === null || direction.trim() === (run?.stage3_prompt_direction ?? "")) return;
     try {
@@ -706,10 +717,7 @@ export default function Stage3HeroFlow({
         {err && <ErrBox msg={err} />}
         <div className="space-y-3">
           {saved.map((p, i) => {
-            const objective = promptSection(p.prompt, "OBJECTIVE");
-            const scene = promptSection(p.prompt, "SCENE INSTRUCTIONS");
-            const benefit = promptSection(p.prompt, "BENEFIT TO COMMUNICATE");
-            const summary = objective || p.prompt.replace(/\s+/g, " ").slice(0, 220);
+            const line = lines[p.index];
             const editing = editingPromptIdxs.has(i);
             return (
               <div key={i} className="border border-[var(--color-border)] rounded-[11px] bg-[var(--color-surface)] p-3 space-y-2">
@@ -755,9 +763,7 @@ export default function Stage3HeroFlow({
                     <PromptPreview p={p} heroUrl={heroUrl} />
                   </div>
                   <div className="flex-1 min-w-[220px] space-y-1.5">
-                    <p className="text-[12.5px] leading-relaxed text-[var(--color-text)]">{summary}</p>
-                    {scene && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Scene:</span> {scene}</p>}
-                    {benefit && <p className="text-[11.5px] leading-snug text-[var(--color-text-3)]"><span className="font-[620] text-[var(--color-text-2)]">Communicates:</span> {benefit}</p>}
+                    <p className={`text-[14px] leading-snug ${line ? "text-[var(--color-text)]" : "text-[var(--color-text-4)]"}`}>{line ?? "…"}</p>
                     {p.overlay_text && (
                       <p className="text-[11.5px] text-[var(--color-text-2)]">
                         <span className="font-[620]">Text on image:</span>{" "}
@@ -954,23 +960,6 @@ export default function Stage3HeroFlow({
 }
 
 /* ── Prompt summaries for the picture-first review ─────────────────────── */
-
-// The gold-standard prompts are structured with ALL-CAPS section headers.
-// Pull one section's text so the review can show WHAT the image will be
-// without dumping the whole prompt.
-function promptSection(prompt: string, header: string): string {
-  const lines = prompt.split("\n");
-  const isHeader = (l: string) => /^[A-Z][A-Z /&_-]{2,}:\s*$/.test(l.trim()) || /^[A-Z][A-Z /&_-]{2,}:\s+\S/.test(l.trim());
-  const start = lines.findIndex((l) => l.trim().toUpperCase().startsWith(header.toUpperCase() + ":"));
-  if (start === -1) return "";
-  const first = lines[start].slice(lines[start].indexOf(":") + 1).trim();
-  const out: string[] = first ? [first] : [];
-  for (let i = start + 1; i < lines.length; i++) {
-    if (isHeader(lines[i])) break;
-    out.push(lines[i]);
-  }
-  return out.join(" ").replace(/\s+/g, " ").trim();
-}
 
 // Storyboard mock of what the image will look like. Not a render — a frame in
 // the image's real aspect ratio: split shots (comparison / before-after /

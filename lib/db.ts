@@ -228,6 +228,8 @@ async function migrateDB() {
     "stage3_built_on TEXT",
     // The operator's direction for the 8 image prompts ("3 with dogs, 3 with cats").
     "stage3_prompt_direction TEXT",
+    // One plain line per image prompt, keyed by the prompt it came from (lib/stage3/lines.ts).
+    "stage3_prompt_lines TEXT",
     "ads_built_on TEXT",
     // The run's question assistant: [{ q, a, at }] (lib/assistant).
     "assistant_thread TEXT",
@@ -702,6 +704,7 @@ export interface Run {
   stage2_built_on: string | null;
   stage3_built_on: string | null;
   stage3_prompt_direction: string | null;
+  stage3_prompt_lines: string | null;
   ads_built_on: string | null;
   assistant_thread: string | null;
   audience: string | null;

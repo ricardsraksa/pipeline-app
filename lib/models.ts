@@ -10,7 +10,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getKV, setKV } from "./db";
 
-export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "pricing" | "stage3Prompt" | "stage3Edit" | "stage3Audit" | "ads" | "assistant" | "mechanical";
+export type ModelRole = "product" | "stage1" | "angles" | "stage2" | "pricing" | "stage3Prompt" | "stage3Lines" | "stage3Edit" | "stage3Audit" | "ads" | "assistant" | "mechanical";
 
 export interface ModelOption {
   id: string;
@@ -77,6 +77,12 @@ export const ROLES: Record<ModelRole, RoleMeta> = {
     description: "Hero and image prompts, placement.",
     env: "STAGE3_PROMPT_MODEL",
     default: "claude-opus-5-5",
+  },
+  stage3Lines: {
+    label: "Stage 4 · Image lines",
+    description: "The one line on each prompt card saying what the picture shows.",
+    env: "STAGE3_LINES_MODEL",
+    default: "claude-haiku-5-5",
   },
   stage3Edit: {
     label: "Stage 4 · Rewrites",
