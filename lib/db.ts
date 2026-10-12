@@ -226,6 +226,8 @@ async function migrateDB() {
     "angles_built_on TEXT",
     "stage2_built_on TEXT",
     "stage3_built_on TEXT",
+    // The operator's direction for the 8 image prompts ("3 with dogs, 3 with cats").
+    "stage3_prompt_direction TEXT",
     "ads_built_on TEXT",
     // The run's question assistant: [{ q, a, at }] (lib/assistant).
     "assistant_thread TEXT",
@@ -699,6 +701,7 @@ export interface Run {
   angles_built_on: string | null;
   stage2_built_on: string | null;
   stage3_built_on: string | null;
+  stage3_prompt_direction: string | null;
   ads_built_on: string | null;
   assistant_thread: string | null;
   audience: string | null;

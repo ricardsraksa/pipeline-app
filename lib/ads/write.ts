@@ -107,8 +107,10 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   const listingText = [listing?.scraped_text ?? "", listing?.image_text ? `\nCOPY FROM LISTING IMAGES\n${listing.image_text}` : ""].join("").slice(0, 8000);
 
   const who = audienceBlock(await ensureAudience(run));
+  const direction = run.stage3_prompt_direction?.trim();
   const user = [
     `PRODUCT NAME: ${productName}`,
+    ...(direction ? ["", "OPERATOR DIRECTION FOR THIS RUN'S IMAGES (the 8 product images follow it too) — the five ads follow it as well; where it conflicts with a concept's defaults (who or what appears, settings), the direction wins:", direction, ""] : []),
     who,
     contextBlock(run, "ads"),
     "",

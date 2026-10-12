@@ -10,8 +10,13 @@ import { startJob } from "@/lib/jobs";
 export async function POST(req: NextRequest) {
   const denied = requireSession(req);
   if (denied) return denied;
-  const { runId } = (await req.json()) as { runId?: number };
+  const { runId, direction } = (await req.json()) as { runId?: number; direction?: unknown };
   if (!runId) return Response.json({ success: false, error: "runId required" }, { status: 400 });
+  if (direction !== undefined && direction !== null && (typeof direction !== "string" || direction.length > 2000)) {
+    return Response.json({ success: false, error: "direction must be text under 2,000 characters" }, { status: 400 });
+  }
+  // Saved before the job starts: the writer reads it from the run (and so does a resume).
+  if (direction !== undefined) await updateRun(runId, { stage3_prompt_direction: typeof direction === "string" && direction.trim() ? direction.trim() : null });
   const run = await getRun(runId);
   if (!run) return Response.json({ success: false, error: "Run not found" }, { status: 404 });
   const heroUrl = run.stage3_hero_image_url;

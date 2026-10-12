@@ -183,6 +183,7 @@ export async function remainingPromptsJob(runId: number, fromSource: boolean, al
       fromSource,
       runId,
       sections: pageSectionsFromStage2Json(run.stage2_json),
+      direction: run.stage3_prompt_direction,
     });
     if (!prompts.length) throw new Error("Prompt generation produced no prompts");
     if (!alive()) return;

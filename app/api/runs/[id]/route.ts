@@ -143,6 +143,7 @@ export async function PATCH(
     stage3_remaining_prompts_edited?: string | null;
     stage3_remaining_images?: string | null;
     stage3_reference_images?: string | null;
+    stage3_prompt_direction?: string | null;
     stage3_source_blacklist?: string | null;
     stage3_ref_overrides?: string | null;
     stage3_prompt_history?: string | null;
@@ -380,6 +381,7 @@ export async function PATCH(
   if ("stage3_hero_prompt_edited" in body || "stage3_remaining_prompts_edited" in body) edited.push("image_prompts");
   if ("stage3_remaining_prompts_edited" in body)  { fields.push("stage3_remaining_prompts_edited = ?");  values.push(body.stage3_remaining_prompts_edited ?? null); }
   if ("stage3_remaining_images" in body)          { fields.push("stage3_remaining_images = ?");          values.push(body.stage3_remaining_images ?? null); }
+  if ("stage3_prompt_direction" in body)          { fields.push("stage3_prompt_direction = ?");          values.push(typeof body.stage3_prompt_direction === "string" && body.stage3_prompt_direction.trim() ? body.stage3_prompt_direction.trim().slice(0, 2000) : null); }
   if ("stage3_reference_images" in body) {
     // Validate on write: these URLs later feed server-side generation fetches.
     const raw = body.stage3_reference_images;

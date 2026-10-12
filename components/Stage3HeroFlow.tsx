@@ -124,6 +124,31 @@ export default function Stage3HeroFlow({
   const [run, setRun] = useState<Run | null>(null);
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Direction for the 8 image prompts ("3 with dogs, 3 with cats"), saved on
+  // the run when the box loses focus and sent with every write of the 8.
+  const [direction, setDirection] = useState<string | null>(null);
+  const directionText = direction ?? run?.stage3_prompt_direction ?? "";
+  const saveDirection = async () => {
+    if (direction === null || direction.trim() === (run?.stage3_prompt_direction ?? "")) return;
+    try {
+      await fetch(`/api/runs/${runId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stage3_prompt_direction: direction.trim() || null }) });
+    } catch { /* sent again with the next write of the 8 */ }
+  };
+  const directionBox = (
+    <div className="space-y-1.5 max-w-2xl">
+      <label htmlFor="stage3-direction" className="font-[var(--font-ibm-plex-mono)] text-[10px] uppercase tracking-widest text-[var(--color-text-3)]">Direction for the 8 images</label>
+      <textarea
+        id="stage3-direction"
+        value={directionText}
+        onChange={(e) => setDirection(e.target.value)}
+        onBlur={() => void saveDirection()}
+        rows={2}
+        maxLength={2000}
+        disabled={busy !== null}
+        className="w-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text)] rounded-lg px-3 py-2 text-[12.5px] resize-y focus:outline-none focus:border-[var(--color-accent)] focus:shadow-[0_0_0_3px_var(--color-ring)]"
+      />
+    </div>
+  );
   const [err, setErr] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Bumped after a server-side change to the finished images (relink), so the
@@ -365,6 +390,7 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-3">
         <Stage3SourcePicker runId={runId} candidates={sourceCandidates} blacklist={sourceBlacklist} onChanged={fetchRun} />
+        {directionBox}
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap items-center">
           <button
@@ -376,7 +402,7 @@ export default function Stage3HeroFlow({
           </button>
           <button
             disabled={!stage2Ready || busy !== null}
-            onClick={() => trigger("/api/stage3/skip-hero", { runId }, "skip")}
+            onClick={() => trigger("/api/stage3/skip-hero", { runId, direction: directionText }, "skip")}
             className={btnSecondary}
           >
             {busy === "skip" ? "Writing prompts…" : "Skip hero — use source images"}
@@ -461,9 +487,10 @@ export default function Stage3HeroFlow({
         </div>
         {heroZoom !== null && <Lightbox items={compareItems} index={heroZoom} onClose={() => setHeroZoom(null)} onIndex={setHeroZoom} />}
         <ValidationBadge raw={run.stage3_hero_validation} />
+        {directionBox}
         {err && <ErrBox msg={err} />}
         <div className="flex gap-3 flex-wrap">
-          <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId }, "approve")} className={btnPrimary}>
+          <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId, direction: directionText }, "approve")} className={btnPrimary}>
             {busy === "approve" ? "Starting…" : "Approve Hero — Generate Rest →"}
           </button>
           <button
@@ -663,6 +690,18 @@ export default function Stage3HeroFlow({
     return (
       <div className="space-y-4">
         <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the {saved.length} prompts</h3>
+        {doneByIndex.size === 0 && (
+          <div className="space-y-2">
+            {directionBox}
+            <button
+              disabled={busy !== null}
+              onClick={() => trigger(heroUrl ? "/api/stage3/hero-approve" : "/api/stage3/skip-hero", { runId, direction: directionText }, "rewrite-8")}
+              className={btnSecondary}
+            >
+              {busy === "rewrite-8" ? "Writing…" : `Write the ${saved.length} again`}
+            </button>
+          </div>
+        )}
         <ValidationBadge raw={run.stage3_remaining_validation} />
         {err && <ErrBox msg={err} />}
         <div className="space-y-3">
