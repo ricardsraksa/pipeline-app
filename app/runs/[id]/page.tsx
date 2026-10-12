@@ -10,7 +10,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRunPolling, type RunStatus } from "@/hooks/useRunPolling";
 import { Icon } from "@/components/ui/Icon";
-import { Elapsed, OverflowMenu, elapsedTime, shortDate, statusLabel } from "@/components/ui/run-ui";
+import { ActionBar, Elapsed, OverflowMenu, elapsedTime, shortDate, statusLabel } from "@/components/ui/run-ui";
 import { useToast } from "@/components/Toasts";
 import AIRegenerate from "@/components/AIRegenerate";
 import FeedbackButtons from "@/components/FeedbackButtons";
@@ -863,20 +863,20 @@ export default function RunPage() {
               <>
                 {runId !== null && (
                   <div className="mb-[30px]">
+                    {run.status === "awaiting_stage2_approval" && (
+                      <ActionBar>
+                        <button onClick={writeCopy} disabled={!run.angles?.selected || startingStage2}
+                          className="cursor-pointer h-[34px] px-4 rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed tr">
+                          {startingStage2 ? "Starting…" : "Write copy"}
+                        </button>
+                      </ActionBar>
+                    )}
                     <AudienceCard runId={runId} audience={run.meta.audience ?? null} />
                     <MarketPositionCard runId={runId} position={run.meta.marketPosition ?? null} />
                     <ResearchStaleFlag which="angles" show={anglesResearchStale} text={`${partsSentence(changedFor("angles"))} changed since these angles were proposed.`} action={
                       <button onClick={newAnglesFromResearch} disabled={reAngling} className="btn btn-sm btn-primary">{reAngling ? "Proposing…" : "Propose new angles"}</button>
                     } />
                     <AnglePicker runId={runId} run={run} editable />
-                    {run.status === "awaiting_stage2_approval" && (
-                      <div className="mt-3">
-                        <button onClick={writeCopy} disabled={!run.angles?.selected || startingStage2}
-                          className="cursor-pointer h-[34px] px-4 rounded-[6px] bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[13px] font-[500] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed tr">
-                          {startingStage2 ? "Starting…" : "Write copy"}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
                 <div>

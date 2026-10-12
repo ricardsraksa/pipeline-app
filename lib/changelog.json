@@ -1,5 +1,43 @@
 [
  {
+  "version": "2.111.2",
+  "date": "2026-10-12",
+  "title": "gate buttons sit at the top and stay in view",
+  "items": [
+   "Hero review, prompt review, ads, product and research: the actions are pinned at the top while you scroll"
+  ]
+ },
+ {
+  "version": "2.111.1",
+  "date": "2026-10-12",
+  "title": "a loose direction ('a mix of cats and dogs') is worked out by the writer",
+  "items": []
+ },
+ {
+  "version": "2.111.0",
+  "date": "2026-10-12",
+  "title": "prompt cards say what the picture shows, in one line",
+  "items": []
+ },
+ {
+  "version": "2.110.0",
+  "date": "2026-10-12",
+  "title": "a direction for the 8 images (and the ads)",
+  "items": []
+ },
+ {
+  "version": "2.109.1",
+  "date": "2026-10-08",
+  "title": "a push never switches on inventory tracking",
+  "items": []
+ },
+ {
+  "version": "2.109.0",
+  "date": "2026-10-08",
+  "title": "Sonnet 5.5, Haiku 5.5 and Fable 5.1; created Shopify products get a category",
+  "items": []
+ },
+ {
   "version": "2.108.0",
   "date": "2026-10-08",
   "title": "priority is a green check, New run button on Runs",

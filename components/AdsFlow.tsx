@@ -5,6 +5,7 @@
 // Higgsfield + auditor path as Stage 4 → review, regenerate per ad, send to
 // the Done page (delivery lives there).
 
+import { ActionBar } from "@/components/ui/run-ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { Run } from "@/lib/db";
@@ -311,9 +312,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / {total} generated{flaggedCount ? ` · ${flaggedCount} flagged` : ""}</span>
-        <div className="flex-1" />
+      <ActionBar title={<span className="ff-mono text-[11px] text-[var(--color-text-3)]">{doneCount} / {total} generated{flaggedCount ? ` · ${flaggedCount} flagged` : ""}</span>}>
         {doneCount > 0 && <button onClick={downloadAll} disabled={zipping} className="btn btn-sm">{zipping ? "Zipping…" : "↓ Download all"}</button>}
         {anyMissing && !anyBusy && (
           <button onClick={relink} disabled={relinking} className="btn btn-sm">
@@ -327,7 +326,7 @@ export default function AdsFlow({ runId }: { runId: number }) {
             : doneCount < total
               ? <button onClick={() => generateAll(true)} className="btn btn-primary">Generate the missing {total - doneCount}</button>
               : <button onClick={() => { if (window.confirm(`Replaces all ${total} ads. Regenerate?`)) void generateAll(false); }} className="btn btn-sm">Regenerate all {total}</button>}
-      </div>
+      </ActionBar>
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(520px, 1fr))" }}>

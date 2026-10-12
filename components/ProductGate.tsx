@@ -9,6 +9,7 @@
 // starts research. When the product page couldn't be read, the card shows the
 // scraper's status and still lets the operator describe the product by hand.
 
+import { ActionBar } from "@/components/ui/run-ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/Toasts";
@@ -271,6 +272,15 @@ export default function ProductGate({
 
   return (
     <div className="flex flex-col gap-[26px]">
+      {waiting && (
+        <ActionBar>
+          <button onClick={approve} disabled={!canApprove}
+            className={cx("cursor-pointer h-[34px] px-4 rounded-[6px] text-[13px] font-[500] tr",
+              canApprove ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-90" : "bg-[var(--color-surface-2)] text-[var(--color-text-3)] cursor-not-allowed")}>
+            {approving ? "Starting research…" : "Approve & start research"}
+          </button>
+        </ActionBar>
+      )}
       {/* worker / manual fallback */}
       {waiting && productPage && !productPage.ok && (
         <div className="rounded-[9px] border px-4 py-3.5 flex flex-col gap-2"
@@ -372,15 +382,6 @@ export default function ProductGate({
 
       {err && <p className="text-[12px] text-[var(--color-red)]">{err}</p>}
 
-      {waiting && (
-        <div className="flex items-center gap-3">
-          <button onClick={approve} disabled={!canApprove}
-            className={cx("cursor-pointer h-[34px] px-4 rounded-[6px] text-[13px] font-[500] tr",
-              canApprove ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-90" : "bg-[var(--color-surface-2)] text-[var(--color-text-3)] cursor-not-allowed")}>
-            {approving ? "Starting research…" : "Approve & start research"}
-          </button>
-        </div>
-      )}
       {approved && !waiting && <p className="text-[11.5px] text-[var(--color-text-3)]">Approved {new Date(product!.approvedAt!).toLocaleString()}.</p>}
     </div>
   );

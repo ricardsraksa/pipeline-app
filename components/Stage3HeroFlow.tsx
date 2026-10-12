@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionBar } from "@/components/ui/run-ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Run } from "@/lib/db";
 import Stage3ReferenceImages from "@/components/Stage3ReferenceImages";
@@ -475,32 +476,7 @@ export default function Stage3HeroFlow({
     const compareItems = [{ url: heroUrl, label: "Hero" }, ...activeSources.map((u, i) => ({ url: u, label: `Source ${i + 1}` }))];
     return (
       <div className="space-y-4">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the hero shot</h3>
-        <div className="flex gap-4 items-start flex-wrap">
-          <div className="space-y-1.5">
-            <p className="eyebrow">Hero</p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(0)} className="rounded-lg w-[420px] max-w-full border border-[var(--color-border)] cursor-zoom-in" />
-          </div>
-          {activeSources.length > 0 && (
-            <div className="space-y-1.5 min-w-0 flex-1">
-              <p className="eyebrow">Source photos <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {activeSources.length}</span></p>
-              <div className="grid grid-cols-3 gap-2 max-w-[420px]">
-                {activeSources.map((u, i) => (
-                  <button key={u} onClick={() => setHeroZoom(i + 1)} className="aspect-square rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-hidden cursor-zoom-in">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={u} alt={`Source ${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        {heroZoom !== null && <Lightbox items={compareItems} index={heroZoom} onClose={() => setHeroZoom(null)} onIndex={setHeroZoom} />}
-        <ValidationBadge raw={run.stage3_hero_validation} />
-        {directionBox}
-        {err && <ErrBox msg={err} />}
-        <div className="flex gap-3 flex-wrap">
+        <ActionBar title="Review the hero shot">
           <button disabled={busy !== null} onClick={() => trigger("/api/stage3/hero-approve", { runId, direction: directionText }, "approve")} className={btnPrimary}>
             {busy === "approve" ? "Starting…" : "Approve Hero — Generate Rest →"}
           </button>
@@ -511,8 +487,8 @@ export default function Stage3HeroFlow({
           >
             {heroEditing ? "Cancel" : "Regenerate Hero"}
           </button>
-        </div>
-
+        </ActionBar>
+        {err && <ErrBox msg={err} />}
         {heroEditing && (
           <div className="space-y-3 max-w-2xl">
             <div className="space-y-1.5">
@@ -554,6 +530,29 @@ export default function Stage3HeroFlow({
             <Stage3ReferenceImages runId={Number(runId)} initial={safeParse<string[]>(run.stage3_reference_images, [])} />
           </div>
         )}
+        <div className="flex gap-4 items-start flex-wrap">
+          <div className="space-y-1.5">
+            <p className="eyebrow">Hero</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={heroUrl} alt="Hero" onClick={() => setHeroZoom(0)} className="rounded-lg w-[420px] max-w-full border border-[var(--color-border)] cursor-zoom-in" />
+          </div>
+          {activeSources.length > 0 && (
+            <div className="space-y-1.5 min-w-0 flex-1">
+              <p className="eyebrow">Source photos <span className="text-[var(--color-text-4)] font-[500] normal-case tracking-normal">— {activeSources.length}</span></p>
+              <div className="grid grid-cols-3 gap-2 max-w-[420px]">
+                {activeSources.map((u, i) => (
+                  <button key={u} onClick={() => setHeroZoom(i + 1)} className="aspect-square rounded-[9px] border border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-hidden cursor-zoom-in">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt={`Source ${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        {heroZoom !== null && <Lightbox items={compareItems} index={heroZoom} onClose={() => setHeroZoom(null)} onIndex={setHeroZoom} />}
+        <ValidationBadge raw={run.stage3_hero_validation} />
+        {directionBox}
       </div>
     );
   }
@@ -700,7 +699,25 @@ export default function Stage3HeroFlow({
 
     return (
       <div className="space-y-4">
-        <h3 className="text-[15px] font-[600] text-[var(--color-text)]">Review the {saved.length} prompts</h3>
+        <ActionBar title={`Review the ${saved.length} prompts`}>
+          <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
+            {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : `Generate ${saved.length} Images →`}
+          </button>
+          {/* Step back to the hero QC gate (only meaningful when a hero exists —
+              skip-hero runs generated straight from source photos). */}
+          {heroUrl && (
+            <button disabled={busy !== null} onClick={() => trigger("/api/stage3/back-to-hero", { runId }, "back-hero")} className={btnSecondary}>
+              {busy === "back-hero" ? "Going back…" : "← Back to hero"}
+            </button>
+          )}
+          {/* Pull images that finished on Higgsfield but never persisted —
+              only offered once a pass has run and left gaps. */}
+          {existing.length > 0 && doneByIndex.size < saved.length && (
+            <button disabled={busy !== null} onClick={() => trigger("/api/stage3/recover-from-higgsfield", { runId }, "recover-hf")} className={btnSecondary}>
+              {busy === "recover-hf" ? "Recovering…" : "Recover images"}
+            </button>
+          )}
+        </ActionBar>
         {doneByIndex.size === 0 && (
           <div className="space-y-2">
             {directionBox}
@@ -821,25 +838,6 @@ export default function Stage3HeroFlow({
               </div>
             );
           })}
-        </div>
-        <div className="flex gap-3 flex-wrap items-center">
-          <button disabled={busy !== null} onClick={generateAll} className={btnPrimary}>
-            {doneByIndex.size > 0 ? `Resume generation (${doneByIndex.size}/${saved.length} done) →` : `Generate ${saved.length} Images →`}
-          </button>
-          {/* Step back to the hero QC gate (only meaningful when a hero exists —
-              skip-hero runs generated straight from source photos). */}
-          {heroUrl && (
-            <button disabled={busy !== null} onClick={() => trigger("/api/stage3/back-to-hero", { runId }, "back-hero")} className={btnSecondary}>
-              {busy === "back-hero" ? "Going back…" : "← Back to hero"}
-            </button>
-          )}
-          {/* Pull images that finished on Higgsfield but never persisted —
-              only offered once a pass has run and left gaps. */}
-          {existing.length > 0 && doneByIndex.size < saved.length && (
-            <button disabled={busy !== null} onClick={() => trigger("/api/stage3/recover-from-higgsfield", { runId }, "recover-hf")} className={btnSecondary}>
-              {busy === "recover-hf" ? "Recovering…" : "Recover images"}
-            </button>
-          )}
         </div>
       </div>
     );

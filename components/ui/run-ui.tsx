@@ -168,3 +168,16 @@ export function StatusBadge({ status, stuck }: { status: string | null; stuck?: 
     </span>
   );
 }
+
+/** A gate's actions, pinned under the top bar so they stay in reach while the
+ *  operator scrolls the content they are deciding on. */
+export function ActionBar({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="sticky top-[50px] z-20 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--color-border)]"
+      style={{ background: "color-mix(in srgb, var(--color-bg) 88%, transparent)", backdropFilter: "blur(14px) saturate(160%)" }}>
+      {typeof title === "string" ? <h3 className="text-[15px] font-[600] text-[var(--color-text)]">{title}</h3> : title}
+      <div className="flex-1" />
+      <div className="flex flex-wrap items-center gap-2">{children}</div>
+    </div>
+  );
+}
