@@ -53,6 +53,11 @@ export default function AdsFlow({ runId }: { runId: number }) {
   // rather than the snapshot this closure captured when it started.
   const imagesRef = useRef<AdImage[]>([]);
   const chain = useRef<Promise<unknown>>(Promise.resolve());
+  // The briefs the drafts were taken from. When the server's change — new
+  // briefs written, or cleared by a restart — the drafts follow; otherwise a
+  // panel left open kept the old briefs and "Generate" sent them back
+  // (run 190: a restarted Stage 5 produced the same ads, on the old images).
+  const serverBriefs = useRef<string | null | undefined>(undefined);
 
   const fetchRun = useCallback(async () => {
     try {
@@ -62,13 +67,24 @@ export default function AdsFlow({ runId }: { runId: number }) {
         setRun(rr);
         setImages(parseAdImages(rr.ads_images));
         setRefOverrides(safeParse<Record<string, string[]>>(rr.ads_ref_overrides, {}));
-        setDrafts((prev) => prev ?? (parseAdPrompts(rr.ads_prompts_edited ?? rr.ads_prompts).length ? parseAdPrompts(rr.ads_prompts_edited ?? rr.ads_prompts) : null));
+        const briefs = rr.ads_prompts_edited ?? rr.ads_prompts ?? null;
+        if (briefs !== serverBriefs.current) {
+          serverBriefs.current = briefs;
+          const parsed = parseAdPrompts(briefs);
+          setDrafts(parsed.length ? parsed : null);
+        }
         window.dispatchEvent(new Event("run:changed"));
       }
     } catch { /* keep the last copy */ }
   }, [runId]);
   useEffect(() => { imagesRef.current = images; }, [images]);
   useEffect(() => { void fetchRun(); }, [fetchRun]);
+  // A restart from the run page clears Stage 5 on the server; reload at once.
+  useEffect(() => {
+    const reload = () => { void fetchRun(); };
+    window.addEventListener("ads:reload", reload);
+    return () => window.removeEventListener("ads:reload", reload);
+  }, [fetchRun]);
   // Poll while the server is writing the briefs or generating the ads.
   useEffect(() => {
     if (run?.ads_step !== "writing" && run?.ads_step !== "generating") return;

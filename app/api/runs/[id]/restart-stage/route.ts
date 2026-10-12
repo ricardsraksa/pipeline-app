@@ -175,6 +175,12 @@ export async function POST(
   // A whole-run restart goes back to the very beginning, exactly like "product".
   if (stage === "ads") {
     await updateRun(runId, { ...fieldsToClear(stage), last_updated_at: new Date().toISOString() });
+    // A restart redoes the stage: write fresh briefs now, from the current
+    // Stage 4 images, research, angle and copy (they then wait for review).
+    void (async () => {
+      const { maybeStartAds } = await import("@/lib/ads/write");
+      await maybeStartAds(runId);
+    })();
     return NextResponse.json({ success: true });
   }
 

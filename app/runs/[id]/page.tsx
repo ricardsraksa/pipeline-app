@@ -350,6 +350,7 @@ export default function RunPage() {
       const data = await res.json();
       if (!data.success) { push(`Restart failed: ${data.error ?? "unknown error"}`); setRestarting(false); return; }
       if (stage === "run") { lockedStage.current = "product"; setActiveOverride("product"); }
+      if (stage === "ads") window.dispatchEvent(new Event("ads:reload"));
       window.dispatchEvent(new Event("run:changed"));
       setTimeout(() => setRestarting(false), 1200);
     } catch (err) {
