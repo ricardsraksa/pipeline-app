@@ -110,7 +110,7 @@ export async function generateAdPrompts(runId: number): Promise<AdPrompt[]> {
   const direction = run.stage3_prompt_direction?.trim();
   const user = [
     `PRODUCT NAME: ${productName}`,
-    ...(direction ? ["", "OPERATOR DIRECTION FOR THIS RUN'S IMAGES (the 8 product images follow it too) — the five ads follow it as well; where it conflicts with a concept's defaults (who or what appears, settings), the direction wins:", direction, ""] : []),
+    ...(direction ? ["", "OPERATOR DIRECTION FOR THIS RUN'S IMAGES (the 8 product images follow it too) — the five ads follow it as well, and it wins over a concept's defaults (who or what appears, settings). Where it is specific, follow it exactly; where it leaves choices open, decide which ad gets what so each concept works best:", direction, ""] : []),
     who,
     contextBlock(run, "ads"),
     "",

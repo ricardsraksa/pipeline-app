@@ -395,7 +395,7 @@ export async function generateRemainingPrompts(params: {
     ? 'Generate the 8 prompts JSON array now. The source product photos are attached below — every prompt references them so the real product stays consistent (there is no separate hero shot).'
     : 'Generate the 8 prompts JSON array now. The approved hero image is attached below — every prompt references it.'
   const userText = [
-    ...(params.direction?.trim() ? ["OPERATOR DIRECTION FOR THESE 8 IMAGES — follow it exactly. Where it conflicts with anything below (the image mix, who or what appears, settings), the direction wins:", params.direction.trim(), ''] : []),
+    ...(params.direction?.trim() ? ["OPERATOR DIRECTION FOR THESE 8 IMAGES — it wins over anything below (the image mix, who or what appears, settings). Where it is specific, follow it exactly. Where it leaves choices open (\"a mix of cats and dogs\"), make them yourself: decide how many images get what and which image suits which, so each image does its own job best:", params.direction.trim(), ''] : []),
     ...(params.angle ? ['POSITIONING ANGLE (chosen by the operator — the set of images tells THIS problem → consequence → mechanism story; the problem/comparison/lifestyle images show this specific problem, not a generic one):', params.angle, ''] : []),
     'STAGE 1 ONE-PAGER:',
     params.onePager || '(none)',
