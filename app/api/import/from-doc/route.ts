@@ -17,12 +17,14 @@ async function candidates(): Promise<Candidate[]> {
     db.execute("SELECT product_code FROM runs WHERE product_code IS NOT NULL"),
   ]);
   const used = new Set((runCodes.rows as unknown as { product_code: string }[]).map((r) => codeNumber(r.product_code)).filter((n): n is number => n !== null));
+  // Only the products filed under the doc's "To test" section are brought in.
   return tabs
+    .filter((t) => t.parents.some((p) => /\bto[\s-]*test\b/i.test(p)))
     .filter((t) => t.code !== null && !used.has(t.code) && !owned.has(t.tabId))
     .map((t) => {
       const o = readTabOverview(t.paragraphs);
       const name = o.productName ?? t.title.replace(/^[^\p{L}\p{N}]*P\s*\d+\s*[-–—_:]?\s*/iu, "").trim();
-      return { tabId: t.tabId, title: t.title, name: name || t.title, links: o.links, priority: isPriorityTitle(t.title), suggested: !o.alibabaLink };
+      return { tabId: t.tabId, title: t.title, name: name || t.title, links: o.links, priority: isPriorityTitle(t.title), suggested: true };
     });
 }
 

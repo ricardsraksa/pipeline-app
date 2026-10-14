@@ -363,13 +363,32 @@ export async function listTabTitles(): Promise<Array<{ tabId: string; title: str
 }
 
 /** Every tab with its code and overview lines (for "Bring in from the doc"). */
-export async function listTabsWithOverview(): Promise<Array<{ tabId: string; title: string; code: number | null; paragraphs: string[] }>> {
-  return (await fetchDocTabs())
-    .filter((t) => t.tabProperties?.tabId)
-    .map((t) => ({
-      tabId: t.tabProperties!.tabId!,
-      title: t.tabProperties?.title ?? "",
-      code: codeNumber(t.tabProperties?.title),
-      paragraphs: (t.documentTab?.body?.content ?? []).filter((el) => el.paragraph).map((el) => paragraphText(el.paragraph)),
-    }));
+export async function listTabsWithOverview(): Promise<Array<{ tabId: string; title: string; code: number | null; paragraphs: string[]; parents: string[] }>> {
+  // Walk the tab tree keeping each tab's section ("To test" > "P97 - …"):
+  // flattenTabs loses it, and Import only takes the tabs under "To test".
+  const token = await googleAccessToken();
+  const res = await fetch(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}?includeTabsContent=true`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Docs API ${res.status} while reading tabs.`);
+  const doc = (await res.json()) as { tabs?: Tab[] };
+  const out: Array<{ tabId: string; title: string; code: number | null; paragraphs: string[]; parents: string[] }> = [];
+  const walk = (tabs: Tab[], parents: string[]) => {
+    for (const t of tabs) {
+      const title = t.tabProperties?.title ?? "";
+      if (t.tabProperties?.tabId) {
+        out.push({
+          tabId: t.tabProperties.tabId,
+          title,
+          code: codeNumber(title),
+          paragraphs: (t.documentTab?.body?.content ?? []).filter((el) => el.paragraph).map((el) => paragraphText(el.paragraph)),
+          parents,
+        });
+      }
+      if (t.childTabs?.length) walk(t.childTabs, [...parents, title]);
+    }
+  };
+  walk(doc.tabs ?? [], []);
+  return out;
 }
