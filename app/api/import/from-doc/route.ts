@@ -20,7 +20,8 @@ async function candidates(): Promise<Candidate[]> {
   // Only the products filed under the doc's "To test" section are brought in.
   return tabs
     .filter((t) => t.parents.some((p) => /\bto[\s-]*test\b/i.test(p)))
-    .filter((t) => t.code !== null && !used.has(t.code) && !owned.has(t.tabId))
+    // P0 is the doc's template tab, never a product.
+    .filter((t) => t.code !== null && t.code !== 0 && !used.has(t.code) && !owned.has(t.tabId))
     .map((t) => {
       const o = readTabOverview(t.paragraphs);
       const name = o.productName ?? t.title.replace(/^[^\p{L}\p{N}]*P\s*\d+\s*[-–—_:]?\s*/iu, "").trim();
