@@ -25,11 +25,12 @@ export async function PATCH(req: Request, context: { params: Promise<unknown> })
     void docSync.requestSync();
     return Response.json({ success: true });
   }
+  // A product brought in from a doc tab may have no competitor link yet.
   const { items, errors } = validateRows([{
     name: typeof b.name === "string" ? b.name : item.name,
     links: typeof b.links === "string" ? b.links : item.urls.join("\n"),
     priority,
-  }]);
+  }], { linksOptional: Boolean(item.docTabId) });
   if (errors.length || !items.length) return Response.json({ success: false, error: errors[0]?.message ?? "Invalid" }, { status: 400 });
 
   try {

@@ -15,6 +15,13 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
   const router = useRouter();
   const { push } = useToast();
   const [ali, setAli] = useState("");
+  // Competitor links, editable in the row: saved when the box loses focus.
+  const [comp, setComp] = useState(item.urls.join(" "));
+  const [compSaving, setCompSaving] = useState(false);
+  // Links changed elsewhere (the edit mode, another tab): show them.
+  const urlsKey = item.urls.join(" ");
+  const [seenUrls, setSeenUrls] = useState(urlsKey);
+  if (urlsKey !== seenUrls) { setSeenUrls(urlsKey); setComp(urlsKey); }
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: item.name, links: item.urls.join("\n"), priority: item.priority });
@@ -48,6 +55,23 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
       push("Not saved: no connection");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveComp() {
+    const links = comp.trim().split(/\s+/).filter(Boolean).join("\n");
+    if (links === item.urls.join("\n") || compSaving) return;
+    setCompSaving(true);
+    try {
+      const res = await fetch(`/api/import/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ links }) });
+      const d = (await res.json().catch(() => ({}))) as { success?: boolean; error?: string };
+      if (!res.ok || !d.success) { push(d.error ?? "Link not saved"); setComp(item.urls.join(" ")); return; }
+      onChanged();
+    } catch {
+      push("Link not saved: no connection");
+      setComp(item.urls.join(" "));
+    } finally {
+      setCompSaving(false);
     }
   }
 
@@ -89,7 +113,7 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
   const aliBad = ali.trim() !== "" && !looksLikeUrl(ali.trim());
   return (
     <div className={cx("px-[13px] py-[10px] grid items-center gap-3", first && "bg-[color-mix(in_srgb,var(--color-accent)_5%,transparent)]")}
-      style={{ gridTemplateColumns: "52px 32px minmax(0,1fr) minmax(220px,300px) 76px 32px" }}>
+      style={{ gridTemplateColumns: "52px 32px minmax(0,1fr) minmax(180px,260px) minmax(180px,260px) 76px 32px" }}>
       <span className="ff-mono text-[12.5px] text-[var(--color-text)]">{item.productCode}</span>
       <button onClick={togglePriority} disabled={busy} title={item.priority ? "Remove priority" : "Make priority"} aria-label={item.priority ? "Remove priority" : "Make priority"}
         className={cx("cursor-pointer w-8 h-8 grid place-items-center rounded-[6px] hover:bg-[var(--color-surface-2)] tr",
@@ -109,6 +133,10 @@ export default function StartRow({ item, first, docConfigured, onChanged }: { it
           <span className={cx(st.tone === "bad" ? "text-[var(--color-red)]" : "text-[var(--color-text-3)]", "truncate max-w-[220px]")} title={st.text}>· {st.text}</span>
         </div>
       </div>
+      <input value={comp} onChange={(e) => setComp(e.target.value)} onBlur={() => void saveComp()}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        placeholder="Competitor link" spellCheck={false} aria-label={`Competitor link for ${item.name}`} disabled={busy || compSaving}
+        className={cx(inputCls, "h-[36px] ff-mono text-[12px]")} />
       <input value={ali} onChange={(e) => setAli(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void start(); }}
         placeholder="AliExpress link" spellCheck={false} aria-label={`AliExpress link for ${item.name}`} disabled={busy}
         className={cx(inputCls, "h-[36px] ff-mono text-[12px]", aliBad && "border-[var(--color-red)]")} />
