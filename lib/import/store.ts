@@ -25,13 +25,15 @@ export interface ImportItem {
   docError: string | null;
   /** The overview lines were written into the tab. */
   docOverview: boolean;
+  /** Brought in from a doc tab: keeps the tab's own P number, never renumbered. */
+  fixedCode: boolean;
   createdAt: string;
   updatedAt: string;
   runId: number | null;
 }
 
 export type NewItem = { name: string; urls: string[]; priority: boolean };
-export type AdoptedItem = NewItem & { docTabId: string; docTitle: string };
+export type AdoptedItem = NewItem & { docTabId: string; docTitle: string; /** The tab's own number ("P84"); kept for good. */ code?: string };
 /** Product numbers used by doc tabs that are not in `ownedTabIds`. May throw. */
 export type DocNumbers = (ownedTabIds: Set<string>) => Promise<number[]>;
 
@@ -70,6 +72,7 @@ function toItem(r: Row): ImportItem {
     docTitle: (r.doc_title as string | null) ?? null,
     docError: (r.doc_error as string | null) ?? null,
     docOverview: Number(r.doc_overview) === 1,
+    fixedCode: Number(r.fixed_code) === 1,
     createdAt: String(r.created_at),
     updatedAt: String(r.updated_at),
     runId: r.run_id == null ? null : Number(r.run_id),
@@ -122,8 +125,19 @@ export function createImportStore(client: Client) {
     return Math.max(0, ...(await docNumbers(owned)));
   }
 
+  /** Highest number an open item keeps for good (a doc tab's own number). */
+  async function fixedMax(ex: Exec): Promise<number> {
+    let max = 0;
+    for (const it of await openRows(ex)) {
+      const n = it.fixedCode ? codeNumber(it.productCode) : null;
+      if (n && n > max) max = n;
+    }
+    return max;
+  }
+
   async function renumber(ex: Exec, b: number): Promise<void> {
-    const items = await openRows(ex);
+    // Items brought in from a doc tab keep the tab's number.
+    const items = (await openRows(ex)).filter((it) => !it.fixedCode);
     const target = assignCodes(b, items);
     for (const it of items) {
       const code = target.get(it.id)!;
@@ -141,7 +155,7 @@ export function createImportStore(client: Client) {
       const tx = await client.transaction("write");
       try {
         const out = await fn(tx);
-        await renumber(tx, Math.max(await runBase(tx), doc));
+        await renumber(tx, Math.max(await runBase(tx), doc, await fixedMax(tx)));
         await tx.commit();
         return out;
       } catch (err) {
@@ -162,15 +176,15 @@ export function createImportStore(client: Client) {
     return (r.rows as unknown as Row[]).map(toItem);
   }
 
-  async function insert(tx: Transaction, rows: Array<NewItem & { docTabId?: string; docTitle?: string }>): Promise<number[]> {
+  async function insert(tx: Transaction, rows: Array<NewItem & { docTabId?: string; docTitle?: string; code?: string }>): Promise<number[]> {
     const ids: number[] = [];
     for (const row of rows) {
       const at = stamp();
       const r = await tx.execute({
-        sql: `INSERT INTO import_items (name, urls, priority, doc_tab_id, doc_title, doc_overview, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        // An adopted tab already has its overview lines.
-        args: [row.name.trim(), JSON.stringify(row.urls), row.priority ? 1 : 0, row.docTabId ?? null, row.docTitle ?? null, row.docTabId ? 1 : 0, at, at],
+        sql: `INSERT INTO import_items (name, urls, priority, doc_tab_id, doc_title, doc_overview, product_code, fixed_code, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        // An adopted tab already has its overview lines, and keeps its number.
+        args: [row.name.trim(), JSON.stringify(row.urls), row.priority ? 1 : 0, row.docTabId ?? null, row.docTitle ?? null, row.docTabId ? 1 : 0, row.code ?? null, row.code ? 1 : 0, at, at],
       });
       ids.push(Number(r.lastInsertRowid));
     }
@@ -182,6 +196,7 @@ export function createImportStore(client: Client) {
       await client.execute(SCHEMA);
       // Added after the first version of the table.
       try { await client.execute("ALTER TABLE import_items ADD COLUMN doc_overview INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+      try { await client.execute("ALTER TABLE import_items ADD COLUMN fixed_code INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
     },
 
     /** Highest product number used by a run (0 when none). */
@@ -249,15 +264,16 @@ export function createImportStore(client: Client) {
         }
         let runId: number | null = null;
         try {
-          const b = Math.max(await runBase(client), await docMax(docNumbers));
-          const code = codeForStart(b);
           const item = (await byIds([id]))[0];
+          const b = Math.max(await runBase(client), await docMax(docNumbers), await fixedMax(client));
+          // A doc tab brought in keeps its own number; others take the next one.
+          const code = item.fixedCode && item.productCode ? item.productCode : codeForStart(b);
           runId = await createRun(code, item);
           // From here the run exists: the item is never released again.
           await client.execute({ sql: "UPDATE import_items SET run_id = ?, product_code = ?, updated_at = ? WHERE id = ?", args: [runId, code, stamp(), id] });
           const tx = await client.transaction("write");
           try {
-            await renumber(tx, b + 1);
+            await renumber(tx, item.fixedCode && item.productCode ? b : b + 1);
             await tx.commit();
           } finally {
             tx.close();

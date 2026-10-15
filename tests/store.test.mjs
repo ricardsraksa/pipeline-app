@@ -100,6 +100,30 @@ test("adopting doc tabs does not count their own numbers", async () => {
   assert.deepEqual(await open(), ["P92 p92", "P93 p93"]);
 });
 
+test("doc tabs brought in keep their own numbers", async () => {
+  const docNumbers = async () => [];
+  await store.adopt([{ ...row("spice"), docTabId: "t.84", docTitle: "P84 - spice", code: "P84" }, { ...row("knob"), docTabId: "t.95", docTitle: "P95 - knob", code: "P95" }], docNumbers);
+  assert.deepEqual(await open(), ["P84 spice", "P95 knob"]);
+  // A new item numbers above every kept number and run.
+  await store.add([row("lamp")], docNumbers);
+  assert.deepEqual(await open(), ["P84 spice", "P95 knob", "P96 lamp"]);
+  // Renumbering (a priority toggle) never moves a kept number.
+  const lamp = (await store.listOpen()).find((i) => i.name === "lamp");
+  await store.update(lamp.id, { priority: true }, docNumbers);
+  assert.deepEqual(await open(), ["P84 spice", "P95 knob", "P96 lamp"]);
+});
+
+test("starting a doc tab item uses its own number", async () => {
+  const [spice] = await store.adopt([{ ...row("spice"), docTabId: "t.84", docTitle: "P84 - spice", code: "P84" }], noDoc);
+  const [lamp] = await store.add([row("lamp")], noDoc);
+  const out = await store.start(spice.id, noDoc, createRun());
+  assert.equal(out.code, "P84");
+  assert.deepEqual(await open(), ["P92 lamp"]);
+  const next = await store.start(lamp.id, noDoc, createRun());
+  assert.equal(next.code, "P92");
+  assert.deepEqual(await runCodes(), ["P90", "P91", "P84", "P92"]);
+});
+
 test("doc number failure fails the write", async () => {
   await assert.rejects(store.add([row("a")], async () => { throw new Error("Docs API 500"); }), /500/);
   assert.deepEqual(await open(), []);

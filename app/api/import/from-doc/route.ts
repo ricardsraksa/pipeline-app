@@ -8,7 +8,7 @@ import { readTabOverview } from "@/lib/import/tab-overview";
 
 export const maxDuration = 120;
 
-type Candidate = { tabId: string; title: string; name: string; links: string[]; priority: boolean; suggested: boolean };
+type Candidate = { tabId: string; title: string; name: string; links: string[]; priority: boolean; suggested: boolean; code: string };
 
 async function candidates(): Promise<Candidate[]> {
   const [tabs, owned, runCodes] = await Promise.all([
@@ -25,7 +25,7 @@ async function candidates(): Promise<Candidate[]> {
     .map((t) => {
       const o = readTabOverview(t.paragraphs);
       const name = o.productName ?? t.title.replace(/^[^\p{L}\p{N}]*P\s*\d+\s*[-–—_:]?\s*/iu, "").trim();
-      return { tabId: t.tabId, title: t.title, name: name || t.title, links: o.links, priority: isPriorityTitle(t.title), suggested: true };
+      return { tabId: t.tabId, title: t.title, name: name || t.title, links: o.links, priority: isPriorityTitle(t.title), suggested: true, code: `P${t.code}` };
     });
 }
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   const chosen = (await candidates()).filter((c) => wanted.has(c.tabId));
   try {
     const added = await importStore.adopt(
-      chosen.map((c) => ({ name: c.name, urls: c.links, priority: c.priority, docTabId: c.tabId, docTitle: c.title })),
+      chosen.map((c) => ({ name: c.name, urls: c.links, priority: c.priority, docTabId: c.tabId, docTitle: c.title, code: c.code })),
       docNumbers,
     );
     void docSync.requestSync();
