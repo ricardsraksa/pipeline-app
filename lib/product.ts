@@ -128,3 +128,48 @@ export function buildAnalystContent(scrape: ProductScrape): Array<
   if (photos.length) blocks.push({ type: "text", text: "The images above are the product listing's photos and the seller's description images (read any specs printed in them). Write the description now." });
   return blocks;
 }
+
+// ── Pack counts are the bundle, not variants ────────────────────────────────
+// Suppliers list quantities as an option ("Color: 1pcs, 2pcs, 3pcs, 5pcs").
+// That is how many units the buyer takes — the Kaching bundle — not a choice
+// of colour or size, so a group whose values are all counts is left out of
+// the variants. A group mixing a real choice with a count ("c-1pcs",
+// "ab-2pcs") stays: it is a choice.
+
+const PACK_UNIT_RE = /^(?:(?:pack|set|box|bundle|lot)\s*(?:of)?\s*)?(\d{1,3})\s*(?:x\s*)?(pcs?|psc|pieces?|packs?|pk|sets?|units?|count|ct|pairs?)\.?$/i;
+const PACK_PREFIX_RE = /^(?:pack|set|box|bundle|lot)\s*(?:of)?\s*(\d{1,3})$/i;
+const QTY_GROUP_RE = /\b(qty|quantity|pack|package|pcs|number|amount|count|sets?)\b/i;
+
+/** The count in a pack value ("3pcs", "Set of 2", "2 Pieces"), or null. */
+export function packCount(value: string, groupName = ""): number | null {
+  const v = value.trim();
+  const m = v.match(PACK_UNIT_RE) ?? v.match(PACK_PREFIX_RE);
+  if (m) return Number(m[1]);
+  // A bare number only counts when the group itself says it is a quantity.
+  if (/^\d{1,3}$/.test(v) && QTY_GROUP_RE.test(groupName)) return Number(v);
+  return null;
+}
+
+// "Black-2pcs", "Grey 4 pcs", "c-1pcs": a real choice with a count attached.
+const NAMED_COUNT_RE = /^(.*?)[\s\-_/,+(]*(\d{1,3})\s*(pcs?|psc|pieces?|packs?|pk|sets?|units?|pairs?)\.?\)?$/i;
+
+/** Listing options without pack counts, plus the counts found. A group of
+ *  counts goes entirely; a group whose values carry a count ("Black-2pcs")
+ *  keeps only the choice (Black); a group left with one value is no choice. */
+export function splitPackOptions(options: Record<string, string[]> | null | undefined): { options: Record<string, string[]>; packCounts: number[] } {
+  const out: Record<string, string[]> = {};
+  const counts = new Set<number>();
+  for (const [name, values] of Object.entries(options ?? {})) {
+    const nums = values.map((v) => packCount(v, name));
+    if (values.length && nums.every((n) => n !== null)) { nums.forEach((n) => counts.add(n!)); continue; }
+    const parts = values.map((v) => v.trim().match(NAMED_COUNT_RE));
+    if (values.length && parts.every((m) => m && m[1].trim())) {
+      parts.forEach((m) => counts.add(Number(m![2])));
+      const choices = [...new Set(parts.map((m) => m![1].trim()))];
+      if (choices.length > 1) out[name] = choices;
+      continue;
+    }
+    if (values.length > 1) out[name] = values;
+  }
+  return { options: out, packCounts: [...counts].sort((a, b) => a - b) };
+}

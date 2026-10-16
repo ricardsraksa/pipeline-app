@@ -4,7 +4,7 @@ import { anthropicClient } from "@/lib/anthropic-client";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel, streamToolCall } from "@/lib/models";
-import { parseProductScrape } from "@/lib/product";
+import { parseProductScrape, splitPackOptions } from "@/lib/product";
 import { buildBundles, defaultQtys, type Bundles, type ProductPricing } from "@/lib/pricing";
 import { getPricingRules } from "@/lib/pricing-store";
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const tiersWanted = rules.bundle_discounts.length;
   const page = parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product");
   const description = run.product_description_edited || run.product_description_ai || run.product_description || "";
-  const options = page?.options ?? {};
+  const { options, packCounts } = splitPackOptions(page?.options);
   const variantTitles = (page?.variants ?? []).map((v) => (v.title ?? "").trim()).filter(Boolean).slice(0, 60);
 
   const user = [
@@ -94,6 +94,16 @@ export async function POST(req: NextRequest) {
     await updateRun(runId, { product_pricing: JSON.stringify(next), last_updated_at: next.at });
     return next;
   };
+
+  // The listing sells in pack counts (1pcs / 2pcs / 3pcs …): the bundle is
+  // the standard ladder in single units, no model needed. A note from
+  // "Suggest again" still asks the model.
+  if (packCounts.length && !note) {
+    const fresh = buildBundles(pricing, defaultQtys(rules), rules, { source: "rules", ai_at: new Date().toISOString() });
+    const keepManual = body.note === undefined && pricing.bundles?.tiers.some((t) => t.manual);
+    const next = await persist(keepManual ? { ...fresh, tiers: pricing.bundles!.tiers } : fresh);
+    return Response.json({ success: true, pricing: next });
+  }
 
   try {
     const model = await getModel("pricing");

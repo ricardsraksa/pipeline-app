@@ -3,7 +3,7 @@
 // reads (lib/run-context.ts), so an answer is about the product as it now
 // stands, edits included.
 import type { Run } from "@/lib/db";
-import { parseProductScrape, productPageOf } from "@/lib/product";
+import { parseProductScrape, productPageOf, splitPackOptions } from "@/lib/product";
 import { parseSelectedAngles } from "@/lib/angles";
 import { parseStoredMarketPosition, marketBlock } from "@/lib/market";
 import { effectiveCopy, effectiveDescription, editsBlock } from "@/lib/run-context";
@@ -27,7 +27,7 @@ export function buildProductContext(run: Run): string {
   const name = run.brand_name ?? run.product_name ?? "(unnamed)";
 
   // The listing as the supplier sells it: options, SKUs, specs.
-  const options = Object.entries(page?.options ?? {}).map(([k, v]) => `- ${k}: ${v.join(", ")}`).join("\n");
+  const options = Object.entries(splitPackOptions(page?.options).options).map(([k, v]) => `- ${k}: ${v.join(", ")}`).join("\n");
   const skus = (page?.variants ?? []).slice(0, 60).map((v) => `- ${v.title ?? "?"}${v.price ? ` — ${v.price}` : ""}${v.available === false ? " (sold out)" : ""}`).join("\n");
   const edited = json<{ options?: Record<string, string[]> } | null>(run.product_variants_edited, null);
   const editedOptions = edited?.options ? Object.entries(edited.options).map(([k, v]) => `- ${k}: ${v.join(", ")}`).join("\n") : "";

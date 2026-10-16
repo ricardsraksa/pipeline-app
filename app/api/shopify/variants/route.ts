@@ -5,7 +5,7 @@ import { shopifyConfigured } from "@/lib/shopify";
 import { parseProductRef } from "@/lib/shopify/resolve";
 import { resolveProduct } from "@/lib/shopify/push";
 import { applyVariants, planVariants } from "@/lib/shopify/variants";
-import { parseProductScrape } from "@/lib/product";
+import { parseProductScrape, splitPackOptions } from "@/lib/product";
 import type { ProductPricing } from "@/lib/pricing";
 
 export const maxDuration = 120;
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   let edited: { options?: Record<string, string[]> } | null = null;
   try { edited = run.product_variants_edited ? JSON.parse(run.product_variants_edited) as { options?: Record<string, string[]> } : null; } catch { edited = null; }
   const options: Record<string, string[]> = edited?.options
-    ?? parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product")?.options ?? {};
+    ?? splitPackOptions(parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product")?.options).options;
 
   let pricing: ProductPricing | null = null;
   try { pricing = run.product_pricing ? JSON.parse(run.product_pricing) as ProductPricing : null; } catch { pricing = null; }

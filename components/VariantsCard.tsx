@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parseProductScrape } from "@/lib/product";
+import { parseProductScrape, splitPackOptions } from "@/lib/product";
 import type { VariantPlan } from "@/lib/shopify/variants";
 
 
@@ -51,7 +51,7 @@ export default function VariantsCard({ runId, scrape, requestedAt = null, edited
   useEffect(() => { setOverride(parseEdited(edited)); }, [edited]);
 
   const page = parsed?.pages.find((p) => p.role === "product");
-  const listingOptions = page?.options ?? {};
+  const listingOptions = splitPackOptions(page?.options).options;
   const listingVariants = page?.variants ?? [];
   const options = override?.options ?? listingOptions;
   const variants = override?.variants ?? listingVariants;

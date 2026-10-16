@@ -4,7 +4,7 @@ import { anthropicClient } from "@/lib/anthropic-client";
 import { requireSession } from "@/lib/auth";
 import { getRun, updateRun, recordUsage } from "@/lib/db";
 import { getModel, streamToolCall } from "@/lib/models";
-import { parseProductScrape } from "@/lib/product";
+import { parseProductScrape, splitPackOptions } from "@/lib/product";
 
 export const maxDuration = 120;
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   } catch { /* fall through to the scrape */ }
   if (!Object.keys(options).length) {
     const page = parseProductScrape(run.product_scrape)?.pages.find((p) => p.role === "product");
-    options = page?.options ?? {};
+    options = splitPackOptions(page?.options).options;
     variants = page?.variants ?? [];
   }
   if (!Object.keys(options).length && !variants.length) {

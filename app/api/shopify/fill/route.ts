@@ -9,7 +9,7 @@ import { structureStage2Copy } from "@/lib/stage2/format";
 import { createFromTemplate, getTemplateUrl, priceNewProduct } from "@/lib/shopify/template";
 import { pickCategory, applyCategory } from "@/lib/shopify/category";
 import { planVariants, applyVariants } from "@/lib/shopify/variants";
-import { parseProductScrape } from "@/lib/product";
+import { parseProductScrape, splitPackOptions } from "@/lib/product";
 import type { ProductPricing } from "@/lib/pricing";
 
 // One product per run: a second press while the first is still creating must
@@ -266,5 +266,5 @@ export async function POST(req: Request) {
 }
 
 function productPageOptions(raw: string | null): Record<string, string[]> {
-  return parseProductScrape(raw)?.pages.find((p) => p.role === "product")?.options ?? {};
+  return splitPackOptions(parseProductScrape(raw)?.pages.find((p) => p.role === "product")?.options).options;
 }
