@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
-import { addTab, appAccountEmail, docIdFromLink, docSummary, extraDocIds, googleDocConfigured, readTab, setExtraDocIds, templateTab, writeOverview } from "@/lib/google/docs";
+import { appAccountEmail, docIdFromLink, docSummary, extraDocIds, googleDocConfigured, setExtraDocIds, templateTab } from "@/lib/google/docs";
 import { masterDocId } from "@/lib/google/auth";
 
 // The product docs: the master (from Render) plus extra docs new product
@@ -45,21 +45,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, docs: await summaries(), account: appAccountEmail() });
 }
 
-// Temporary check: build the template into a new throwaway tab and read it back.
-export async function PUT(req: Request) {
-  const denied = requireSession(req); if (denied) return denied;
-  if (!googleDocConfigured()) return NextResponse.json({ error: "not configured" }, { status: 503 });
-  let id: string | null = null;
-  try {
-    id = await addTab("Template test - delete me");
-    await writeOverview(id, { productName: "Test product", links: ["https://example.com/a"] });
-    const tab = await readTab(id);
-    type E = { paragraph?: { elements?: Array<{ textRun?: { content?: string } }> }; table?: { tableRows?: Array<{ tableCells?: Array<{ content?: E[] }> }> } };
-    const text = (e: E): string => (e.paragraph?.elements ?? []).map((r) => r.textRun?.content ?? "").join("");
-    const body = ((tab?.documentTab?.body?.content ?? []) as E[]).map((e) =>
-      e.table ? { table: (e.table.tableRows ?? []).map((r) => (r.tableCells ?? []).map((c) => (c.content ?? []).map(text).join(""))) } : text(e));
-    return NextResponse.json({ id, body });
-  } catch (e) {
-    return NextResponse.json({ id, error: e instanceof Error ? e.message : String(e) }, { status: 502 });
-  }
-}

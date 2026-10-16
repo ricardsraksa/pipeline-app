@@ -422,7 +422,7 @@ export async function templateTab(): Promise<{ id: string; title: string; conten
 }
 
 /** One tab, read fresh (stored-form id), or null. */
-export async function readTab(id: string): Promise<Tab | null> {
+async function readTab(id: string): Promise<Tab | null> {
   const { docId } = splitTab(id);
   const tabs = flattenTabs(withDocIds(docId, (await readDoc(docId)).tabs ?? []));
   return tabs.find((t) => t.tabProperties?.tabId === id) ?? null;
