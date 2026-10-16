@@ -12,6 +12,15 @@ export const docSync = createDocSync({
   // Copy for this run is written to this exact tab, whatever its title says.
   linkRun: async (runId, tabId) => {
     await db.execute({ sql: "UPDATE runs SET doc_tab_id = ? WHERE id = ? AND (doc_tab_id IS NULL OR doc_tab_id <> ?)", args: [tabId, runId, tabId] });
+    // The copy was written before the run had a tab (the doc was full, or the
+    // tab came later): send it now that there is one. Only ever once — a run
+    // already sent is left alone.
+    const r = await db.execute({ sql: "SELECT 1 FROM runs WHERE id = ? AND stage2_json IS NOT NULL AND gdoc_appended_at IS NULL", args: [runId] });
+    if (r.rows.length) {
+      const { sendRunToDoc } = await import("@/lib/google/send-run");
+      const out = await sendRunToDoc(runId);
+      if (!out.ok) console.error(`[google-doc] run ${runId} copy after linking its tab:`, out.error);
+    }
   },
 });
 
