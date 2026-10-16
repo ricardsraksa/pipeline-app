@@ -96,6 +96,24 @@ test("a started item's stale title is fixed and its run is linked", async () => 
   assert.equal((await store.listAll()).find((i) => i.id === a.id).docTitle, "P93 - a");
 });
 
+test("a started product with no tab links to its existing tab instead of adding one", async () => {
+  const sync = make();
+  const [a] = await store.add([row("lamp")], noDoc);
+  const out = await store.start(a.id, noDoc, async (code) => Number((await client.execute({ sql: "INSERT INTO runs (product_code) VALUES (?)", args: [code] })).lastInsertRowid));
+  // Its tab could not be added at the time; the run was then renumbered to an existing tab's number.
+  await client.execute({ sql: "UPDATE runs SET product_code = 'P91' WHERE id = ?", args: [out.runId] });
+  await client.execute({ sql: "UPDATE runs SET product_code = 'P80' WHERE id = 1" });
+  await store.setDocState(a.id, { docError: "Docs API 400: limited to 100 tabs" });
+  calls = [];
+  await sync.requestSync();
+  assert.deepEqual(calls.filter((c) => c[0] === "add"), []);
+  const it = await store.get(a.id);
+  assert.equal(it.docTabId, "t.old");
+  assert.equal(it.docError, null);
+  assert.deepEqual(linked, [[out.runId, "t.old"]]);
+  assert.deepEqual(calls.filter((c) => c[0] === "rename"), []);
+});
+
 test("not configured: no calls, no error", async () => {
   const sync = make(fakeOps(), false);
   await store.add([row("a")], noDoc);

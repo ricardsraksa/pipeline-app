@@ -15,7 +15,7 @@
 // this runs under node --test with fakes. Never throws from a pass.
 
 import type { ImportStore, ImportItem } from "./store.ts";
-import { tabTitle } from "./codes.ts";
+import { codeNumber, tabTitle } from "./codes.ts";
 
 export interface DocOps {
   addTab(title: string): Promise<string>;
@@ -45,6 +45,20 @@ export function createDocSync(deps: {
     const title = expectedTitle(it);
     try {
       let tabId = it.docTabId;
+      // A started product may already have its tab — in either doc, made by
+      // hand or before its tab could be added (the 100-tab limit): link that
+      // one instead of adding a duplicate, and leave its title and content.
+      if (!tabId && it.runId && it.runId > 0) {
+        const code = codeNumber(it.productCode);
+        const owned = await store.ownedTabIds();
+        const hit = code ? (await ops.listTabTitles()).find((t) => t.code === code && !owned.has(t.tabId)) : undefined;
+        if (hit) {
+          tabId = hit.tabId;
+          await store.setDocState(it.id, { docTabId: tabId, docTitle: title, docError: null, docOverview: true });
+          if (linkRun) await linkRun(it.runId, tabId);
+          return;
+        }
+      }
       if (!tabId) {
         tabId = await ops.addTab(title);
         await store.setDocState(it.id, { docTabId: tabId, docTitle: title, docError: null, docOverview: false });
