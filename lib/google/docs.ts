@@ -292,6 +292,8 @@ export interface FillResult {
   ok: boolean;
   /** No tab carries this run's number in any product doc. */
   noTab?: boolean;
+  /** The tab exists but has none of the template's tables. */
+  noTemplate?: boolean;
   error?: string;
   tabTitle?: string;
   dryRun?: boolean;
@@ -339,25 +341,10 @@ export async function fillProductTab(params: {
     const tablePlan = planFills(tab, params.json);
 
     // A tab without the template tables (one the app created — the Docs API
-    // can't copy the template tab): the copy goes in as labelled text after
-    // what is there, once.
+    // can't duplicate the template tab): nothing to fill. Reported, not
+    // marked sent, so the copy goes in once the tab has the template.
     if (!tablePlan.rows.some((r) => r.status !== "label-not-found")) {
-      const body = tab.documentTab?.body?.content ?? [];
-      const existing = body.map((el) => paragraphText(el.paragraph)).join("");
-      if (existing.includes(COPY_MARK)) {
-        return { ok: true, dryRun: params.dryRun, tabTitle, rows: [{ label: "copy", status: "already-filled" }] };
-      }
-      const end = Math.max(1, (body[body.length - 1]?.endIndex ?? 2) - 1);
-      const text = (existing.trim() ? "\n" : "") + copyAsText(params.json, existing.includes("Product name:") ? null : params.overview ?? null);
-      if (params.dryRun) return { ok: true, dryRun: true, tabTitle, rows: [{ label: "copy", status: "filled" }] };
-      const requests = [{ insertText: { location: { index: end, tabId }, text } }];
-      assertNonDestructive(requests as unknown as Array<Record<string, unknown>>);
-      const upRes = await fetch(
-        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
-        { method: "POST", headers: auth, body: JSON.stringify({ requests }) },
-      );
-      if (!upRes.ok) return { ok: false, tabTitle, error: `Docs API ${upRes.status}: ${(await upRes.text()).slice(0, 200)}` };
-      return { ok: true, tabTitle, rows: [{ label: "copy", status: "filled" }] };
+      return { ok: false, noTemplate: true, tabTitle, error: `“${tabTitle}” has no template tables to fill.` };
     }
 
     const overviewPlan = planOverviewFills(tab, params.overview ?? {});
@@ -389,6 +376,18 @@ export async function fillProductTab(params: {
     console.error("[google-doc]", message);
     return { ok: false, error: message };
   }
+}
+
+// ── The template tab ────────────────────────────────────────────────────────
+
+/** The template tab ("P0 - TEMPLATE"), full content, or null. */
+export async function templateTab(): Promise<{ id: string; title: string; content: unknown[] } | null> {
+  for (const docId of await docIds()) {
+    const tabs = flattenTabs(withDocIds(docId, (await readDoc(docId)).tabs ?? []));
+    const t = tabs.find((x) => /^\W*P0\b/i.test(x.tabProperties?.title ?? "") || /\btemplate\b/i.test(x.tabProperties?.title ?? ""));
+    if (t?.tabProperties?.tabId) return { id: t.tabProperties.tabId, title: t.tabProperties.title ?? "", content: t.documentTab?.body?.content ?? [] };
+  }
+  return null;
 }
 
 // ── Copy as text, for a tab without the template tables ─────────────────────

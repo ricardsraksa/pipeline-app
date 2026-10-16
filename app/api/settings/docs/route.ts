@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
-import { appAccountEmail, docIdFromLink, docSummary, extraDocIds, googleDocConfigured, setExtraDocIds } from "@/lib/google/docs";
+import { appAccountEmail, docIdFromLink, docSummary, extraDocIds, googleDocConfigured, setExtraDocIds, templateTab } from "@/lib/google/docs";
 import { masterDocId } from "@/lib/google/auth";
 
 // The product docs: the master (from Render) plus extra docs new product
@@ -15,6 +15,11 @@ async function summaries() {
 
 export async function GET(req: Request) {
   const denied = requireSession(req); if (denied) return denied;
+  // ?template=1: the template tab's structure (read-only), for rebuilding it in new tabs.
+  if (new URL(req.url).searchParams.get("template")) {
+    try { return NextResponse.json({ template: await templateTab() }); }
+    catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 }); }
+  }
   if (!googleDocConfigured()) return NextResponse.json({ configured: false, docs: [], account: null });
   return NextResponse.json({ configured: true, docs: await summaries(), account: appAccountEmail() });
 }
