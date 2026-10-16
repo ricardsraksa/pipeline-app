@@ -7,8 +7,16 @@ test("allows insert, tab create and tab rename", () => {
     { insertText: {} }, { addDocumentTab: {} }, { updateDocumentTabProperties: {} },
   ]));
 });
+test("allows the template rebuild: tables and styles", () => {
+  assert.doesNotThrow(() => assertNonDestructive([
+    { insertTable: {} }, { updateTextStyle: {} }, { updateParagraphStyle: {} },
+    { updateTableCellStyle: {} }, { updateTableColumnProperties: {} },
+  ]));
+});
 test("assertNonDestructiveRejectsDelete", () => {
   assert.throws(() => assertNonDestructive([{ deleteTab: {} }]), /deleteTab/);
   assert.throws(() => assertNonDestructive([{ deleteContentRange: {} }]), /deleteContentRange/);
   assert.throws(() => assertNonDestructive([{ replaceAllText: {} }]), /replaceAllText/);
+  assert.throws(() => assertNonDestructive([{ deleteTableRow: {} }]), /deleteTableRow/);
+  assert.throws(() => assertNonDestructive([{ mergeTableCells: {} }]), /mergeTableCells/);
 });

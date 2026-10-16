@@ -14,3 +14,9 @@ test("filled alibaba link and spaced label", () => {
 test("non-url text in link line is ignored", () => {
   assert.deepEqual(readTabOverview(["Competitor/example link: see reel"]).links, []);
 });
+test("template overview: labels split by line breaks in one paragraph", () => {
+  const o = readTabOverview(["Product Name: Mug\n", "Alibaba link: https://ali.com/1\u000b\u000bCompetitor / Example Link: https://a.com\n"]);
+  assert.equal(o.alibabaLink, "https://ali.com/1");
+  assert.deepEqual(o.links, ["https://a.com"]);
+  assert.equal(o.productName, "Mug");
+});

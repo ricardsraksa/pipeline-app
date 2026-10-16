@@ -9,9 +9,10 @@
 // copy into the empty cell of the row below it.
 //
 // Safety model:
-//   - Only insertText, addDocumentTab and updateDocumentTabProperties can
+//   - Only inserts (text, tables, tabs), tab renames and style updates can
 //     leave this module (lib/google/guard.ts) — asserted immediately before
-//     every batchUpdate. Nothing can delete or overwrite content.
+//     every batchUpdate. Nothing can delete or overwrite content. Styles are
+//     only set on text the app just inserted (the rebuilt template).
 //   - Cells that already have content are SKIPPED and reported, never
 //     overwritten — re-running fills gaps only.
 //   - The write targets one explicit tabId; without a matched tab, nothing
@@ -22,6 +23,7 @@ import type { Stage2Json } from "@/lib/stage2/shape";
 import { whatsIncluded } from "@/lib/stage2/shape";
 import { codeNumber, sameCode } from "@/lib/import/codes";
 import { assertNonDestructive } from "./guard";
+import { canBuildInto, isEmptyParagraph, paragraphRequests, tableFillRequests, tableInsertRequest, templateBlocks, type El } from "./template-plan";
 import { getKV, setKV } from "@/lib/db";
 
 export { googleDocConfigured };
@@ -29,7 +31,7 @@ export { googleDocConfigured };
 
 // ── Docs document JSON (minimal shapes we read) ─────────────────────────────
 
-interface TextRun { textRun?: { content?: string } }
+interface TextRun { startIndex?: number; textRun?: { content?: string } }
 interface Paragraph { elements?: TextRun[] }
 interface StructuralElement {
   startIndex?: number;
@@ -238,6 +240,26 @@ export function planFills(tab: Tab, json: Stage2Json): { rows: FillRow[]; insert
   return { rows, inserts };
 }
 
+/** Each line of the tab's paragraphs with the index of its line end. The template keeps "Alibaba link:" and "Competitor / Example
+ *  Link:" in one paragraph split by line breaks, so lines, not paragraphs. */
+function overviewLines(tab: Tab): Array<{ text: string; end: number }> {
+  const out: Array<{ text: string; end: number }> = [];
+  for (const el of tab.documentTab?.body?.content ?? []) {
+    const runs = el.paragraph?.elements ?? [];
+    if (!runs.length || runs.some((r) => typeof r.startIndex !== "number")) continue;
+    let text = "";
+    for (const r of runs) {
+      const content = r.textRun?.content ?? "";
+      for (let k = 0; k < content.length; k++) {
+        // A line ends at its newline or line break; the value goes just before it.
+        if (content[k] === "\n" || content[k] === "\v") { out.push({ text, end: r.startIndex! + k }); text = ""; }
+        else text += content[k];
+      }
+    }
+  }
+  return out;
+}
+
 /** Overview lines the pipeline can fill: bare "Label:" paragraphs above the
  *  tables. Only writes when nothing follows the colon — a typed value is
  *  never touched. Exported for unit tests. */
@@ -254,9 +276,8 @@ export function planOverviewFills(
   const inserts: Array<{ index: number; text: string }> = [];
   const seen = new Set<string>();
 
-  for (const el of tab.documentTab?.body?.content ?? []) {
-    if (!el.paragraph || typeof el.endIndex !== "number") continue;
-    const text = paragraphText(el.paragraph).replace(/\n/g, "").trim();
+  for (const line of overviewLines(tab)) {
+    const text = line.text.trim();
     for (const t of targets) {
       if (seen.has(t.label)) continue;
       // Bare label line → fill. A line with content after the colon doesn't
@@ -264,8 +285,7 @@ export function planOverviewFills(
       if (t.re.test(text)) {
         seen.add(t.label);
         if (!t.value?.trim()) { rows.push({ label: t.label, status: "empty-value" }); break; }
-        // endIndex is past the trailing newline — insert just before it.
-        inserts.push({ index: el.endIndex - 1, text: " " + t.value.trim() });
+        inserts.push({ index: line.end, text: (/\s$/.test(line.text) ? "" : " ") + t.value.trim() });
         rows.push({ label: t.label, status: "filled" });
         break;
       }
@@ -294,6 +314,8 @@ export interface FillResult {
   noTab?: boolean;
   /** The tab exists but has none of the template's tables. */
   noTemplate?: boolean;
+  /** Dry run: the template would be built into the tab before filling. */
+  buildsTemplate?: boolean;
   error?: string;
   tabTitle?: string;
   dryRun?: boolean;
@@ -325,7 +347,7 @@ export async function fillProductTab(params: {
     const tabs = await fetchDocTabs();
 
     // The run's own tab when it has one, else the tab titled "P58 - ...".
-    const tab = (params.tabId && tabs.find((t) => t.tabProperties?.tabId === params.tabId)) || findProductTab(tabs, code);
+    let tab = (params.tabId && tabs.find((t) => t.tabProperties?.tabId === params.tabId)) || findProductTab(tabs, code);
     if (!tab || !tab.tabProperties?.tabId) {
       return {
         ok: false,
@@ -338,13 +360,22 @@ export async function fillProductTab(params: {
     const tabTitle = tab.tabProperties.title ?? code;
 
     // Pure planning step (unit-tested against a replica of the template).
-    const tablePlan = planFills(tab, params.json);
+    let tablePlan = planFills(tab, params.json);
 
-    // A tab without the template tables (one the app created — the Docs API
-    // can't duplicate the template tab): nothing to fill. Reported, not
-    // marked sent, so the copy goes in once the tab has the template.
+    // A tab without the template tables. One the app made (empty, or only
+    // the old overview lines) gets the template built in first; any other
+    // tab is reported and not marked sent.
     if (!tablePlan.rows.some((r) => r.status !== "label-not-found")) {
-      return { ok: false, noTemplate: true, tabTitle, error: `“${tabTitle}” has no template tables to fill.` };
+      const content = (tab.documentTab?.body?.content ?? []) as El[];
+      if (!canBuildInto(content)) {
+        return { ok: false, noTemplate: true, tabTitle, error: `“${tabTitle}” has no template tables to fill.` };
+      }
+      if (params.dryRun) return { ok: true, dryRun: true, tabTitle, buildsTemplate: true, rows: [] };
+      await buildTemplateInto(tab.tabProperties.tabId);
+      const rebuilt = await readTab(tab.tabProperties.tabId);
+      if (!rebuilt) return { ok: false, tabTitle, error: `“${tabTitle}” disappeared while the template was added.` };
+      tab = rebuilt;
+      tablePlan = planFills(tab, params.json);
     }
 
     const overviewPlan = planOverviewFills(tab, params.overview ?? {});
@@ -390,40 +421,41 @@ export async function templateTab(): Promise<{ id: string; title: string; conten
   return null;
 }
 
-// ── Copy as text, for a tab without the template tables ─────────────────────
+/** One tab, read fresh (stored-form id), or null. */
+export async function readTab(id: string): Promise<Tab | null> {
+  const { docId } = splitTab(id);
+  const tabs = flattenTabs(withDocIds(docId, (await readDoc(docId)).tabs ?? []));
+  return tabs.find((t) => t.tabProperties?.tabId === id) ?? null;
+}
 
-const COPY_MARK = "SHOPIFY COPYWRITING";
-
-export function copyAsText(j: Stage2Json, overview: { productName?: string; productUrl?: string; competitorUrl?: string } | null): string {
-  const join = (parts: Array<string | undefined>) => parts.filter((x) => x?.trim()).join("\n\n");
-  const sec = (i: number) => j.sections[i] ?? { headline: "", paragraph: "" };
-  const faq = (i: number) => join([j.faqs[i]?.q, j.faqs[i]?.a]);
-  const block = (label: string, value: string) => (value.trim() ? `${label}\n${value.trim()}\n\n` : "");
-  return [
-    overview ? [
-      `Product name: ${overview.productName ?? ""}`,
-      `Competitor/example link: ${overview.competitorUrl ?? ""}`,
-      `Alibaba link: ${overview.productUrl ?? ""}`,
-      "",
-      "",
-    ].join("\n") : "",
-    `${COPY_MARK}\n\n`,
-    block("BADGE TEXT", j.badge ?? ""),
-    block("SUPPORTING SENTENCE", j.supporting_sentence ?? ""),
-    block("BENEFIT SECTION", join(j.benefits ?? [])),
-    block("FAQ: WHAT'S INCLUDED", whatsIncluded(j)),
-    block("FAQ: CUSTOM QUESTION 1", faq(0)),
-    block("FAQ: CUSTOM QUESTION 2", faq(1)),
-    block("SECTION 1", join([sec(0).headline, sec(0).paragraph])),
-    block("SECTION 2", join([sec(1).headline, sec(1).paragraph])),
-    block("SECTION 3", join([sec(2).headline, sec(2).paragraph])),
-    "FACEBOOK COPYWRITING\n\n",
-    block("HEADLINE", j.facebook?.headline ?? ""),
-    block("PRIMARY TEXT", j.facebook?.primary ?? ""),
-    block("DESCRIPTION", j.facebook?.description ?? ""),
-    "AD COPYWRITING\n\n",
-    block("ONE LINERS", (j.one_liners ?? []).filter((o) => o?.trim()).join("\n\n")),
-  ].join("");
+/** Rebuild the template tab at the top of a tab the app made (see
+ *  lib/google/template-plan.ts). Insert-only, like every other write. */
+export async function buildTemplateInto(id: string, template?: Awaited<ReturnType<typeof templateTab>>): Promise<void> {
+  const tpl = template ?? (await templateTab());
+  if (!tpl) throw new Error("No “P0 - TEMPLATE” tab in the product docs to copy.");
+  const { docId, tabId } = splitTab(id);
+  const blocks = templateBlocks(tpl.content as El[]);
+  let pending: Array<Record<string, unknown>> = [];
+  // A table insert leaves an empty line above the table; the template's own
+  // empty line there reuses it instead of adding a second.
+  let blankAbove = false;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const el = blocks[i];
+    if (el.table) {
+      pending.push(tableInsertRequest(el, tabId, 1));
+      await batchUpdate(docId, pending);
+      pending = [];
+      const content = ((await readTab(id))?.documentTab?.body?.content ?? []) as El[];
+      const made = content.find((e) => e.table);
+      if (!made) throw new Error("The template table wasn't added.");
+      await batchUpdate(docId, tableFillRequests(el, made, tabId));
+      blankAbove = made.startIndex === 2 && content.some((e) => e.startIndex === 1 && isEmptyParagraph(e));
+      continue;
+    }
+    pending.push(...paragraphRequests(el, tabId, 1, blankAbove && isEmptyParagraph(el)));
+    blankAbove = false;
+  }
+  if (pending.length) await batchUpdate(docId, pending);
 }
 
 // ── Import list: create / rename / list product tabs ────────────────────────
@@ -458,10 +490,25 @@ export async function addTab(title: string): Promise<string> {
   return joinTab(docId, tabId);
 }
 
-/** The overview lines at the top of a new product tab. The template
- *  tables are not copied in (yet) — the operator pastes them. */
+/** A new product tab's content: the template, with the product name and
+ *  competitor links filled into its overview lines. Without a template tab
+ *  in the docs, plain overview lines as before. */
 export async function writeOverview(id: string, overview: { productName: string; links: string[] }): Promise<void> {
   const { docId, tabId } = splitTab(id);
+  let tab = await readTab(id);
+  if (tab && canBuildInto((tab.documentTab?.body?.content ?? []) as El[])) {
+    const tpl = await templateTab();
+    if (tpl) {
+      await buildTemplateInto(id, tpl);
+      tab = await readTab(id);
+    }
+  }
+  if (tab && planOverviewFills(tab, {}).rows.length) {
+    const plan = planOverviewFills(tab, { productName: overview.productName, competitorUrl: overview.links.join(" ") || undefined });
+    const requests = plan.inserts.sort((a, b) => b.index - a.index).map((i) => ({ insertText: { location: { index: i.index, tabId }, text: i.text } }));
+    if (requests.length) await batchUpdate(docId, requests);
+    return;
+  }
   const text = [
     `Product name: ${overview.productName}`,
     `Competitor/example link: ${overview.links.join(" ")}`,

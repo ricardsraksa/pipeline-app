@@ -1,6 +1,6 @@
 {
   "name": "pipeline-app",
-  "version": "2.112.4",
+  "version": "2.112.5",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -10,8 +10,8 @@ const ALI_RE = /^alibaba link\s*:\s*(.*)$/i;
 
 export function readTabOverview(paragraphs: string[]): TabOverview {
   const out: TabOverview = { productName: null, links: [], alibabaLink: null };
-  for (const raw of paragraphs) {
-    const line = raw.replace(/\n/g, "").trim();
+  // The template keeps several labels in one paragraph, split by line breaks.
+  for (const line of paragraphs.flatMap((p) => p.split(/[\n\v]/)).map((l) => l.trim())) {
     let m: RegExpMatchArray | null;
     if ((m = line.match(NAME_RE))) out.productName = m[1].trim() || null;
     else if ((m = line.match(COMP_RE))) out.links = m[1].split(/\s+/).filter((s) => /^https?:\/\//i.test(s));
