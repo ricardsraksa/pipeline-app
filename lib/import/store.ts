@@ -67,7 +67,8 @@ function toItem(r: Row): ImportItem {
     name: String(r.name ?? ""),
     urls,
     priority: Number(r.priority) === 1,
-    productCode: String(r.product_code ?? ""),
+    // Started: the run's number, which the operator may have changed since.
+    productCode: String(r.run_code ?? r.product_code ?? ""),
     docTabId: (r.doc_tab_id as string | null) ?? null,
     docTitle: (r.doc_title as string | null) ?? null,
     docError: (r.doc_error as string | null) ?? null,
@@ -170,7 +171,7 @@ export function createImportStore(client: Client) {
   async function byIds(ids: number[]): Promise<ImportItem[]> {
     if (!ids.length) return [];
     const r = await client.execute({
-      sql: `SELECT * FROM import_items WHERE id IN (${ids.map(() => "?").join(",")})`,
+      sql: `SELECT i.*, r.product_code AS run_code FROM import_items i LEFT JOIN runs r ON r.id = i.run_id AND i.run_id > 0 WHERE i.id IN (${ids.map(() => "?").join(",")})`,
       args: ids,
     });
     return (r.rows as unknown as Row[]).map(toItem);
@@ -220,7 +221,7 @@ export function createImportStore(client: Client) {
 
     /** Every item, open and started (the doc sync checks them all). */
     async listAll(): Promise<ImportItem[]> {
-      const r = await client.execute("SELECT * FROM import_items WHERE run_id IS NULL OR run_id <> -1");
+      const r = await client.execute("SELECT i.*, r.product_code AS run_code FROM import_items i LEFT JOIN runs r ON r.id = i.run_id AND i.run_id > 0 WHERE i.run_id IS NULL OR i.run_id <> -1");
       return (r.rows as unknown as Row[]).map(toItem);
     },
 

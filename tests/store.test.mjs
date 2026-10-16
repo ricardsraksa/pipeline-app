@@ -124,6 +124,14 @@ test("starting a doc tab item uses its own number", async () => {
   assert.deepEqual(await runCodes(), ["P90", "P91", "P84", "P92"]);
 });
 
+test("a started item takes its run's current number", async () => {
+  const [a] = await store.add([row("a")], noDoc);
+  const out = await store.start(a.id, noDoc, createRun());
+  await client.execute({ sql: "UPDATE runs SET product_code = 'P50' WHERE id = ?", args: [out.runId] });
+  assert.equal((await store.get(a.id)).productCode, "P50");
+  assert.equal((await store.listAll()).find((i) => i.id === a.id).productCode, "P50");
+});
+
 test("doc number failure fails the write", async () => {
   await assert.rejects(store.add([row("a")], async () => { throw new Error("Docs API 500"); }), /500/);
   assert.deepEqual(await open(), []);

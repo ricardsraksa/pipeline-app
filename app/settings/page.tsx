@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import ModelSettings, { type SettingsHandle } from "@/components/ModelSettings";
 import PricingSettings from "@/components/PricingSettings";
 import ShopifySettings from "@/components/ShopifySettings";
+import DocsSettings from "@/components/DocsSettings";
 
 // Internal keys are one behind the displayed numbers (the product stage was
 // added in front): product = Stage 1, stage1 = Stage 2, and so on.
@@ -22,12 +23,13 @@ const STAGE_LABELS: Record<Stage, string> = {
   ads: "Stage 5 · Image ads",
 };
 
-type Tab = "prompts" | "models" | "pricing" | "shopify";
+type Tab = "prompts" | "models" | "pricing" | "shopify" | "docs";
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: "prompts", label: "Prompts" },
   { key: "models", label: "Models" },
   { key: "pricing", label: "Pricing" },
   { key: "shopify", label: "Shopify" },
+  { key: "docs", label: "Google Doc" },
 ];
 const TAB_KEY = "settings.tab";
 
@@ -185,7 +187,7 @@ export default function SettingsPage() {
 
   const dirtyStages = prompts ? STAGE_ORDER.filter((s) => prompts[s].editing !== prompts[s].current) : [];
   const unsaved = dirtyStages.length + modelDirty + pricingDirty;
-  const tabDirty: Record<Tab, boolean> = { prompts: dirtyStages.length > 0, models: modelDirty > 0, pricing: pricingDirty > 0, shopify: false };
+  const tabDirty: Record<Tab, boolean> = { prompts: dirtyStages.length > 0, models: modelDirty > 0, pricing: pricingDirty > 0, shopify: false, docs: false };
 
   useEffect(() => {
     if (!unsaved) return;
@@ -244,6 +246,9 @@ export default function SettingsPage() {
       </div>
       <div hidden={tab !== "shopify"}>
         <ShopifySettings />
+      </div>
+      <div hidden={tab !== "docs"}>
+        <DocsSettings />
       </div>
 
       <div hidden={tab !== "prompts"}>

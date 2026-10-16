@@ -22,6 +22,7 @@ import type { Stage2Json } from "@/lib/stage2/shape";
 import { whatsIncluded } from "@/lib/stage2/shape";
 import { codeNumber, sameCode } from "@/lib/import/codes";
 import { assertNonDestructive } from "./guard";
+import { getKV, setKV } from "@/lib/db";
 
 export { googleDocConfigured };
 
@@ -94,18 +95,91 @@ function valuesForLabels(j: Stage2Json): Array<{ match: string; value: string }>
   ];
 }
 
-/** Fetch the master doc's tabs (flattened). Throws with operator-readable
- *  messages on auth/id problems; returns [] when the doc has no tabs. */
-export async function fetchDocTabs(): Promise<Tab[]> {
+// ── More than one product doc ───────────────────────────────────────────────
+// Google caps a doc at 100 tabs and the master doc is full, so new products
+// get their tab in an extra doc (Settings). Everything reads every doc; new
+// tabs go into the last doc. A tab in an extra doc is identified as
+// "<docId>::<tabId>"; master-doc tabs keep their plain id, so every id saved
+// before this still works.
+
+const EXTRA_DOCS_KEY = "gdoc_extra_docs";
+const SEP = "::";
+
+/** The extra docs' ids, oldest first. */
+export async function extraDocIds(): Promise<string[]> {
+  try {
+    const v = JSON.parse((await getKV(EXTRA_DOCS_KEY)) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 10) : [];
+  } catch { return []; }
+}
+export async function setExtraDocIds(ids: string[]): Promise<void> {
+  await setKV(EXTRA_DOCS_KEY, JSON.stringify(ids));
+}
+/** Every product doc: the master first, then the extras. */
+export async function docIds(): Promise<string[]> {
+  return [masterDocId(), ...(await extraDocIds()).filter((id) => id !== masterDocId())];
+}
+function joinTab(docId: string, tabId: string): string {
+  return docId === masterDocId() ? tabId : `${docId}${SEP}${tabId}`;
+}
+/** Which doc a stored tab id lives in, and its id inside that doc. */
+export function splitTab(id: string): { docId: string; tabId: string } {
+  const i = id.indexOf(SEP);
+  return i > 0 ? { docId: id.slice(0, i), tabId: id.slice(i + SEP.length) } : { docId: masterDocId(), tabId: id };
+}
+
+async function readDoc(docId: string, fields?: string): Promise<{ tabs?: Tab[]; title?: string }> {
   const token = await googleAccessToken();
-  const docId = masterDocId();
   const res = await fetch(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}?includeTabsContent=true`,
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}?includeTabsContent=true${fields ? `&fields=${encodeURIComponent(fields)}` : ""}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
+  if (res.status === 403) {
+    let saEmail = "(unknown)";
+    try { saEmail = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "{}").client_email ?? saEmail; } catch { /* keep */ }
+    throw new Error(`No permission on doc ${docId}. Share it with ${saEmail} as Editor.`);
+  }
+  if (res.status === 404) throw new Error(`Doc ${docId} not found.`);
   if (!res.ok) throw new Error(`Docs API ${res.status} while reading tabs.`);
-  const doc = (await res.json()) as { tabs?: Tab[] };
-  return flattenTabs(doc.tabs ?? []);
+  return (await res.json()) as { tabs?: Tab[]; title?: string };
+}
+
+/** Rewrite a doc's tab ids to the stored form ("<docId>::<tabId>" outside the master). */
+function withDocIds(docId: string, tabs: Tab[]): Tab[] {
+  const walk = (list: Tab[]): Tab[] => list.map((t) => ({
+    ...t,
+    tabProperties: t.tabProperties?.tabId ? { ...t.tabProperties, tabId: joinTab(docId, t.tabProperties.tabId) } : t.tabProperties,
+    childTabs: t.childTabs ? walk(t.childTabs) : t.childTabs,
+  }));
+  return walk(tabs);
+}
+
+/** Every product doc's tabs, flattened, with stored-form ids. Throws with
+ *  operator-readable messages on auth/id problems. */
+export async function fetchDocTabs(): Promise<Tab[]> {
+  const out: Tab[] = [];
+  for (const id of await docIds()) out.push(...flattenTabs(withDocIds(id, (await readDoc(id)).tabs ?? [])));
+  return out;
+}
+
+/** A doc's title and tab count; throws when the app can't open it. */
+export async function docSummary(docId: string): Promise<{ id: string; title: string; tabs: number }> {
+  const fields = "title,tabs(tabProperties(tabId),childTabs(tabProperties(tabId),childTabs(tabProperties(tabId),childTabs(tabProperties(tabId)))))";
+  const doc = await readDoc(docId, fields);
+  return { id: docId, title: doc.title ?? "(untitled)", tabs: flattenTabs(doc.tabs ?? []).length };
+}
+
+/** "https://docs.google.com/document/d/<id>/edit…" or a bare id → the id. */
+export function docIdFromLink(raw: string): string | null {
+  const s = raw.trim();
+  const m = s.match(/\/document\/d\/([A-Za-z0-9_-]{20,})/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : null;
+}
+
+/** The account the docs must be shared with (as Editor). */
+export function appAccountEmail(): string | null {
+  try { return JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "{}").client_email ?? null; } catch { return null; }
 }
 
 /** The doc tab title for a product code ("P55 - Wall Lamp"), or null. Never throws.
@@ -242,25 +316,9 @@ export async function fillProductTab(params: {
 
   try {
     const token = await googleAccessToken();
-    const docId = masterDocId();
     const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-
-    const docRes = await fetch(
-      `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}?includeTabsContent=true`,
-      { headers: auth },
-    );
-    if (!docRes.ok) {
-      const body = await docRes.text();
-      if (docRes.status === 403) {
-        let saEmail = "(unknown)";
-        try { saEmail = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON ?? "{}").client_email ?? saEmail; } catch { /* keep */ }
-        return { ok: false, error: `No permission on the master doc. Share it with ${saEmail} as Editor.` };
-      }
-      if (docRes.status === 404) return { ok: false, error: "Master doc not found — check GOOGLE_MASTER_DOC_ID." };
-      return { ok: false, error: `Docs API ${docRes.status}: ${body.slice(0, 200)}` };
-    }
-    const doc = (await docRes.json()) as { tabs?: Tab[] };
-    const tabs = flattenTabs(doc.tabs ?? []);
+    // Every product doc: the product's tab may be in the master or an extra doc.
+    const tabs = await fetchDocTabs();
 
     // The run's own tab when it has one, else the tab titled "P58 - ...".
     const tab = (params.tabId && tabs.find((t) => t.tabProperties?.tabId === params.tabId)) || findProductTab(tabs, code);
@@ -271,7 +329,7 @@ export async function fillProductTab(params: {
         availableTabs: tabs.map((t) => t.tabProperties?.title ?? "?").slice(0, 60),
       };
     }
-    const tabId = tab.tabProperties.tabId;
+    const { docId, tabId } = splitTab(tab.tabProperties.tabId);
     const tabTitle = tab.tabProperties.title ?? code;
 
     // Pure planning step (unit-tested against a replica of the template).
@@ -309,11 +367,11 @@ export async function fillProductTab(params: {
 
 // ── Import list: create / rename / list product tabs ────────────────────────
 
-async function batchUpdate(requests: Array<Record<string, unknown>>): Promise<{ replies?: Array<Record<string, unknown>> }> {
+async function batchUpdate(docId: string, requests: Array<Record<string, unknown>>): Promise<{ replies?: Array<Record<string, unknown>> }> {
   assertNonDestructive(requests);
   const token = await googleAccessToken();
   const res = await fetch(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}:batchUpdate`,
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
     { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ requests }) },
   );
   if (!res.ok) throw new Error(`Docs API ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -321,43 +379,43 @@ async function batchUpdate(requests: Array<Record<string, unknown>>): Promise<{ 
 }
 
 /** Rename one tab (the 💦 mark and the P number live in the title). */
-export async function renameTab(tabId: string, title: string): Promise<void> {
-  await batchUpdate([{ updateDocumentTabProperties: { tabProperties: { tabId, title }, fields: "title" } }]);
+export async function renameTab(id: string, title: string): Promise<void> {
+  const { docId, tabId } = splitTab(id);
+  await batchUpdate(docId, [{ updateDocumentTabProperties: { tabProperties: { tabId, title }, fields: "title" } }]);
 }
 
 /** Add an empty product tab; returns its id. Saved by the caller before
  *  anything else is written, so a later failure never orphans the tab. */
 export async function addTab(title: string): Promise<string> {
-  const out = await batchUpdate([{ addDocumentTab: { tabProperties: { title } } }]);
+  // New tabs go into the newest doc (the master until an extra one is added).
+  const ids = await docIds();
+  const docId = ids[ids.length - 1];
+  const out = await batchUpdate(docId, [{ addDocumentTab: { tabProperties: { title } } }]);
   const reply = out.replies?.[0] as { addDocumentTab?: { tabProperties?: { tabId?: string } } } | undefined;
   const tabId = reply?.addDocumentTab?.tabProperties?.tabId;
   if (!tabId) throw new Error("Docs API did not return the new tab's id.");
-  return tabId;
+  return joinTab(docId, tabId);
 }
 
 /** The overview lines at the top of a new product tab. The template
  *  tables are not copied in (yet) — the operator pastes them. */
-export async function writeOverview(tabId: string, overview: { productName: string; links: string[] }): Promise<void> {
+export async function writeOverview(id: string, overview: { productName: string; links: string[] }): Promise<void> {
+  const { docId, tabId } = splitTab(id);
   const text = [
     `Product name: ${overview.productName}`,
     `Competitor/example link: ${overview.links.join(" ")}`,
     "Alibaba link:",
   ].join("\n") + "\n";
-  await batchUpdate([{ insertText: { location: { index: 1, tabId }, text } }]);
+  await batchUpdate(docId, [{ insertText: { location: { index: 1, tabId }, text } }]);
 }
 
 /** Tab ids, titles and codes only — no tab contents (much smaller than
  *  fetchDocTabs; read on every Import write). */
 export async function listTabTitles(): Promise<Array<{ tabId: string; title: string; code: number | null }>> {
-  const token = await googleAccessToken();
   const fields = "tabs(tabProperties(tabId,title),childTabs(tabProperties(tabId,title),childTabs(tabProperties(tabId,title))))";
-  const res = await fetch(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}?includeTabsContent=true&fields=${encodeURIComponent(fields)}`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!res.ok) throw new Error(`Docs API ${res.status} while reading tab titles.`);
-  const doc = (await res.json()) as { tabs?: Tab[] };
-  return flattenTabs(doc.tabs ?? [])
+  const all: Tab[] = [];
+  for (const id of await docIds()) all.push(...flattenTabs(withDocIds(id, (await readDoc(id, fields)).tabs ?? [])));
+  return all
     .filter((t) => t.tabProperties?.tabId)
     .map((t) => ({ tabId: t.tabProperties!.tabId!, title: t.tabProperties?.title ?? "", code: codeNumber(t.tabProperties?.title) }));
 }
@@ -366,13 +424,6 @@ export async function listTabTitles(): Promise<Array<{ tabId: string; title: str
 export async function listTabsWithOverview(): Promise<Array<{ tabId: string; title: string; code: number | null; paragraphs: string[]; parents: string[] }>> {
   // Walk the tab tree keeping each tab's section ("To test" > "P97 - …"):
   // flattenTabs loses it, and Import only takes the tabs under "To test".
-  const token = await googleAccessToken();
-  const res = await fetch(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(masterDocId())}?includeTabsContent=true`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!res.ok) throw new Error(`Docs API ${res.status} while reading tabs.`);
-  const doc = (await res.json()) as { tabs?: Tab[] };
   const out: Array<{ tabId: string; title: string; code: number | null; paragraphs: string[]; parents: string[] }> = [];
   const walk = (tabs: Tab[], parents: string[]) => {
     for (const t of tabs) {
@@ -389,6 +440,6 @@ export async function listTabsWithOverview(): Promise<Array<{ tabId: string; tit
       if (t.childTabs?.length) walk(t.childTabs, [...parents, title]);
     }
   };
-  walk(doc.tabs ?? [], []);
+  for (const id of await docIds()) walk(withDocIds(id, (await readDoc(id)).tabs ?? []), []);
   return out;
 }
