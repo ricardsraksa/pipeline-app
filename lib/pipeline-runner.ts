@@ -5,7 +5,7 @@ import { scraplingScrape } from "./scrapling";
 import { buildAnalystContent, parseProductScrape, type ProductScrape, type ProductScrapePage } from "./product";
 import { generateAngles } from "./angles-generate";
 import { anglesBlock, parseSelectedAngles, angleKey } from "./angles";
-import { fillProductTab, googleDocConfigured } from "./google/docs";
+import { googleDocConfigured } from "./google/docs";
 import type { Run } from "./db";
 import { getModel } from "./models";
 import { marketBlock, parseMarketPosition, parseStoredMarketPosition } from "./market";
@@ -857,22 +857,11 @@ export async function runStage2(runId: number, run: Run): Promise<void> {
       // operator set it after starting the run.
       if (googleDocConfigured()) {
         void (async () => {
-          const fresh = await getRun(runId);
-          let competitorUrl: string | undefined;
-          try { competitorUrl = (JSON.parse(fresh?.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
-          const r = await fillProductTab({
-            productCode: fresh?.product_code ?? "",
-            tabId: fresh?.doc_tab_id,
-            json: structured,
-            overview: {
-              productName: stage2Name ?? structured.product_name ?? undefined,
-              productUrl: fresh?.product_url ?? undefined,
-              competitorUrl,
-            },
-          });
-          const ts = now();
-          if (r.ok) await updateRun(runId, { gdoc_appended_at: ts, gdoc_append_error: null, last_updated_at: ts });
-          else await updateRun(runId, { gdoc_append_error: r.error ?? "unknown", last_updated_at: ts });
+          // Same path as "Send to Google Doc": fills the template, or writes
+          // the copy as text into a tab without it, or adds the tab.
+          const { sendRunToDoc } = await import("./google/send-run");
+          const r = await sendRunToDoc(runId);
+          if (!r.ok && r.status !== 409) console.error(`[google-doc] run ${runId}:`, r.error);
         })().catch((e) => console.error(`[google-doc] run ${runId}:`, e));
       }
     }

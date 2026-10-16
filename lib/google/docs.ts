@@ -290,6 +290,8 @@ export interface FillRow {
 
 export interface FillResult {
   ok: boolean;
+  /** No tab carries this run's number in any product doc. */
+  noTab?: boolean;
   error?: string;
   tabTitle?: string;
   dryRun?: boolean;
@@ -325,7 +327,8 @@ export async function fillProductTab(params: {
     if (!tab || !tab.tabProperties?.tabId) {
       return {
         ok: false,
-        error: `No tab starting with “${code}” in the master doc. Duplicate the template tab and name it “${code} - <product>”, then send again.`,
+        noTab: true,
+        error: `No tab starting with “${code}” in the product docs.`,
         availableTabs: tabs.map((t) => t.tabProperties?.title ?? "?").slice(0, 60),
       };
     }
@@ -334,6 +337,29 @@ export async function fillProductTab(params: {
 
     // Pure planning step (unit-tested against a replica of the template).
     const tablePlan = planFills(tab, params.json);
+
+    // A tab without the template tables (one the app created — the Docs API
+    // can't copy the template tab): the copy goes in as labelled text after
+    // what is there, once.
+    if (!tablePlan.rows.some((r) => r.status !== "label-not-found")) {
+      const body = tab.documentTab?.body?.content ?? [];
+      const existing = body.map((el) => paragraphText(el.paragraph)).join("");
+      if (existing.includes(COPY_MARK)) {
+        return { ok: true, dryRun: params.dryRun, tabTitle, rows: [{ label: "copy", status: "already-filled" }] };
+      }
+      const end = Math.max(1, (body[body.length - 1]?.endIndex ?? 2) - 1);
+      const text = (existing.trim() ? "\n" : "") + copyAsText(params.json, existing.includes("Product name:") ? null : params.overview ?? null);
+      if (params.dryRun) return { ok: true, dryRun: true, tabTitle, rows: [{ label: "copy", status: "filled" }] };
+      const requests = [{ insertText: { location: { index: end, tabId }, text } }];
+      assertNonDestructive(requests as unknown as Array<Record<string, unknown>>);
+      const upRes = await fetch(
+        `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
+        { method: "POST", headers: auth, body: JSON.stringify({ requests }) },
+      );
+      if (!upRes.ok) return { ok: false, tabTitle, error: `Docs API ${upRes.status}: ${(await upRes.text()).slice(0, 200)}` };
+      return { ok: true, tabTitle, rows: [{ label: "copy", status: "filled" }] };
+    }
+
     const overviewPlan = planOverviewFills(tab, params.overview ?? {});
     const rows = [...overviewPlan.rows, ...tablePlan.rows];
     const inserts = [...tablePlan.inserts, ...overviewPlan.inserts];
@@ -363,6 +389,42 @@ export async function fillProductTab(params: {
     console.error("[google-doc]", message);
     return { ok: false, error: message };
   }
+}
+
+// ── Copy as text, for a tab without the template tables ─────────────────────
+
+const COPY_MARK = "SHOPIFY COPYWRITING";
+
+export function copyAsText(j: Stage2Json, overview: { productName?: string; productUrl?: string; competitorUrl?: string } | null): string {
+  const join = (parts: Array<string | undefined>) => parts.filter((x) => x?.trim()).join("\n\n");
+  const sec = (i: number) => j.sections[i] ?? { headline: "", paragraph: "" };
+  const faq = (i: number) => join([j.faqs[i]?.q, j.faqs[i]?.a]);
+  const block = (label: string, value: string) => (value.trim() ? `${label}\n${value.trim()}\n\n` : "");
+  return [
+    overview ? [
+      `Product name: ${overview.productName ?? ""}`,
+      `Competitor/example link: ${overview.competitorUrl ?? ""}`,
+      `Alibaba link: ${overview.productUrl ?? ""}`,
+      "",
+      "",
+    ].join("\n") : "",
+    `${COPY_MARK}\n\n`,
+    block("BADGE TEXT", j.badge ?? ""),
+    block("SUPPORTING SENTENCE", j.supporting_sentence ?? ""),
+    block("BENEFIT SECTION", join(j.benefits ?? [])),
+    block("FAQ: WHAT'S INCLUDED", whatsIncluded(j)),
+    block("FAQ: CUSTOM QUESTION 1", faq(0)),
+    block("FAQ: CUSTOM QUESTION 2", faq(1)),
+    block("SECTION 1", join([sec(0).headline, sec(0).paragraph])),
+    block("SECTION 2", join([sec(1).headline, sec(1).paragraph])),
+    block("SECTION 3", join([sec(2).headline, sec(2).paragraph])),
+    "FACEBOOK COPYWRITING\n\n",
+    block("HEADLINE", j.facebook?.headline ?? ""),
+    block("PRIMARY TEXT", j.facebook?.primary ?? ""),
+    block("DESCRIPTION", j.facebook?.description ?? ""),
+    "AD COPYWRITING\n\n",
+    block("ONE LINERS", (j.one_liners ?? []).filter((o) => o?.trim()).join("\n\n")),
+  ].join("");
 }
 
 // ── Import list: create / rename / list product tabs ────────────────────────

@@ -2,7 +2,7 @@
 // filled, filled cells are left alone). Used by "Send to Google Doc", Push to
 // all, and the Import sync when a run gets its tab after its copy was written.
 import { getRun, updateRun } from "@/lib/db";
-import { fillProductTab } from "@/lib/google/docs";
+import { addTab, fillProductTab } from "@/lib/google/docs";
 import type { Stage2Json } from "@/lib/stage2/shape";
 
 export type SendResult =
@@ -21,17 +21,25 @@ export async function sendRunToDoc(runId: number, opts: { force?: boolean; dryRu
 
   let competitorUrl: string | undefined;
   try { competitorUrl = (JSON.parse(run.competitor_urls ?? "[]") as string[])[0]; } catch { /* none */ }
-  const result = await fillProductTab({
-    productCode: run.product_code ?? "",
-    tabId: run.doc_tab_id,
-    json,
-    overview: {
-      productName: run.brand_name ?? json.product_name ?? undefined,
-      productUrl: run.product_url ?? undefined,
-      competitorUrl,
-    },
-    dryRun: opts.dryRun === true,
-  });
+  const overview = {
+    productName: run.brand_name ?? json.product_name ?? undefined,
+    productUrl: run.product_url ?? undefined,
+    competitorUrl,
+  };
+  let tabId = run.doc_tab_id;
+  let result = await fillProductTab({ productCode: run.product_code ?? "", tabId, json, overview, dryRun: opts.dryRun === true });
+  // No tab carries this run's number in any doc: make one (in the newest
+  // doc), keep it on the run, and write the copy into it.
+  if (!result.ok && result.noTab && !opts.dryRun && run.product_code?.trim()) {
+    try {
+      const name = (run.brand_name ?? json.product_name ?? run.product_name ?? "").trim();
+      tabId = await addTab(`${run.product_code.trim()} - ${name}`.slice(0, 120));
+      await updateRun(runId, { doc_tab_id: tabId });
+      result = await fillProductTab({ productCode: run.product_code ?? "", tabId, json, overview });
+    } catch (e) {
+      result = { ok: false, error: `Couldn't add a tab: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
   const ts = new Date().toISOString();
   if (!result.ok) {
     await updateRun(runId, { gdoc_append_error: result.error ?? "unknown", last_updated_at: ts }).catch(() => {});
